@@ -345,7 +345,7 @@ function Ring({score,color,size=96,label}){
 // PROMPTS
 // ─────────────────────────────────────────────────────────────────────────────
 function buildAnalysisPrompt(f){
-  return `You are Destiniq's core engine — a world-class advisor. Analyse this person and return a detailed JSON life report. Every word must be specific to their inputs. Never use generic template language.
+  return `You are /api/analyze's core engine — a world-class advisor. Analyse this person and return a detailed JSON life report. Every word must be specific to their inputs. Never use generic template language.
 
 PROFILE: Name=${f.name}, Age=${f.age}, Gender=${f.gender||"N/A"}, Country=${f.country}, Relationship=${f.relationship||"N/A"}, Income=${f.income||"N/A"}, Education=${f.education||"N/A"}, Career/Situation=${f.career}, Skills=${f.skills||"N/A"}, Habits=${f.habits||"N/A"}, Goals=${f.goals}, Challenge=${f.challenge}
 
@@ -386,7 +386,7 @@ Return ONLY valid JSON:
 }
 
 function buildCheckinPrompt(profile, entry, reportData){
-  return `You are Destiniq's daily advisor for ${profile.name}. They checked in today. Give a short, direct, personal response — like a coach who knows them deeply. 2-3 paragraphs max. Never generic. Reference their specific challenge: "${profile.challenge}" and goal: "${profile.goals}". Their score today: ${entry.score}/10. Feeling: ${entry.feeling}. What they did: "${entry.did}". What they avoided: "${entry.avoided}". Their life score: ${reportData?.overall||70}. Start directly with insight — no pleasantries. Do not mention being an advisor or system.`;
+  return `You are /api/analyze's daily advisor for ${profile.name}. They checked in today. Give a short, direct, personal response — like a coach who knows them deeply. 2-3 paragraphs max. Never generic. Reference their specific challenge: "${profile.challenge}" and goal: "${profile.goals}". Their score today: ${entry.score}/10. Feeling: ${entry.feeling}. What they did: "${entry.did}". What they avoided: "${entry.avoided}". Their life score: ${reportData?.overall||70}. Start directly with insight — no pleasantries. Do not mention being an advisor or system.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -518,7 +518,7 @@ function CheckIn({profile, reportData, onComplete, streak}){
     try{
       const reply=await callAPI(
         [{role:"user",content:buildCheckinPrompt(profile,entry,reportData)}],
-        "You are Destiniq's personal advisor. Be direct, warm, and specific. Never generic. Never mention being an AI or system."
+        "You are /api/analyze's personal advisor. Be direct, warm, and specific. Never generic. Never mention being an AI or system."
       );
       setResult(reply);
     }catch{
@@ -600,7 +600,7 @@ function AdvisorChat({profile, reportData}){
 
   useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight;},[msgs,loading]);
 
-  const system=`You are Destiniq's personal advisor for ${profile.name}. You have their full life report. Be specific, direct, and human. Reference their exact situation: country=${profile.country}, age=${profile.age}, goals="${profile.goals}", challenge="${profile.challenge}". Their scores: life=${reportData?.scores?.life}, wealth=${reportData?.scores?.wealth}, mindset=${reportData?.scores?.mindset}. Never say "AI". You are their advisor. Keep responses concise — 2-3 paragraphs max. Always end with one sharp question or prompt that moves them forward.`;
+  const system=`You are /api/analyze's personal advisor for ${profile.name}. You have their full life report. Be specific, direct, and human. Reference their exact situation: country=${profile.country}, age=${profile.age}, goals="${profile.goals}", challenge="${profile.challenge}". Their scores: life=${reportData?.scores?.life}, wealth=${reportData?.scores?.wealth}, mindset=${reportData?.scores?.mindset}. Never say "AI". You are their advisor. Keep responses concise — 2-3 paragraphs max. Always end with one sharp question or prompt that moves them forward.`;
 
   const send=/api/analyzec()=>{
     if(!input.trim()||loading) return;
@@ -665,7 +665,7 @@ function Landing({onStart}){
               The system<br/>that knows<br/><span className="em">your next move</span>
             </h1>
             <p className="body-lg fu2" style={{marginBottom:36,maxWidth:420}}>
-              Destiniq analyses your complete life profile and delivers a daily intelligence layer — covering direction, finances, mindset, career, and your global options.
+              /api/analyze analyses your complete life profile and delivers a daily intelligence layer — covering direction, finances, mindset, career, and your global options.
             </p>
             <div className="fu3" style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
               <button className="btn btn-gold btn-lg" onClick={onStart}>Begin Your Analysis</button>
@@ -710,7 +710,7 @@ function Landing({onStart}){
       {/* CURIOSITY SECTION — what they won't see until they pay */}
       <section style={{padding:"80px 0",borderBottom:"1px solid var(--line)",background:"rgba(210,175,90,0.02)"}}>
         <div className="cx-md" style={{textAlign:"center"}}>
-          <div className="mono fu" style={{marginBottom:16}}>What Destiniq Reveals</div>
+          <div className="mono fu" style={{marginBottom:16}}>What /api/analyze Reveals</div>
           <h2 className="d2 fu1" style={{marginBottom:16}}>
             Most people are solving<br/><span className="em">the wrong problem</span>
           </h2>
@@ -741,7 +741,7 @@ function Landing({onStart}){
         <div className="cx">
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16}}>
             {[
-              {quote:"I've tried journaling apps, coaching apps, everything. Destiniq is the first thing that felt like it actually understood my specific situation.",name:"Amara, 27 · Ghana"},
+              {quote:"I've tried journaling apps, coaching apps, everything. /api/analyze is the first thing that felt like it actually understood my specific situation.",name:"Amara, 27 · Ghana"},
               {quote:"The career section alone was worth it. Found a remote role paying 4× what I earned locally within 3 months of following the roadmap.",name:"Rafael, 31 · Brazil"},
               {quote:"I was sceptical. But the daily check-in has genuinely changed how I think about progress. I haven't missed a day in 6 weeks.",name:"Priya, 24 · India"},
             ].map((t,i)=>(
@@ -764,7 +764,7 @@ function Landing({onStart}){
         </div>
       </section>
 
-      <div className="disc">Destiniq is a personal development intelligence platform. All insights are frameworks for reflection — not medical, financial, or legal advice.</div>
+      <div className="disc">/api/analyze is a personal development intelligence platform. All insights are frameworks for reflection — not medical, financial, or legal advice.</div>
     </div>
   );
 }
@@ -870,7 +870,7 @@ function Loading(){
   useEffect(()=>{const t=setInterval(()=>setS(p=>Math.min(p+1,LOADING_PHRASES.length-1)),950);return()=>clearInterval(t);},[]);
   return(
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"40px 24px"}}>
-      <div className="mono fu" style={{marginBottom:24}}>Destiniq Analysis Engine</div>
+      <div className="mono fu" style={{marginBottom:24}}>/api/analyze Analysis Engine</div>
       <div className="d3 fu1" style={{marginBottom:12,fontWeight:300}}>Building your report</div>
       <p className="small fu2" style={{marginBottom:48}}>We reason carefully. This takes a few moments.</p>
       <div className="sweep-line" style={{width:260,height:1,background:"var(--line)",marginBottom:28}}/>
@@ -915,7 +915,7 @@ function Dashboard({data, formData, isPaid, onUnlock, streak, onCheckin, showChe
         <div className="cx-md">
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:16,marginBottom:28}}>
             <div>
-              <div className="mono fu" style={{marginBottom:8}}>Your Destiniq Report</div>
+              <div className="mono fu" style={{marginBottom:8}}>Your /api/analyze Report</div>
               <h1 className="d2 fu1" style={{marginBottom:8}}>{formData.name}</h1>
               <p className="body fu2" style={{fontStyle:"italic",maxWidth:500}}>&ldquo;{data.greeting}&rdquo;</p>
             </div>
@@ -1129,7 +1129,7 @@ function Dashboard({data, formData, isPaid, onUnlock, streak, onCheckin, showChe
         </div>
       </div>
 
-      <div className="disc">Destiniq is a personal intelligence platform. All insights are frameworks for reflection, not professional advice.</div>
+      <div className="disc">/api/analyze is a personal intelligence platform. All insights are frameworks for reflection, not professional advice.</div>
     </div>
   );
 }
@@ -1137,7 +1137,7 @@ function Dashboard({data, formData, isPaid, onUnlock, streak, onCheckin, showChe
 // ─────────────────────────────────────────────────────────────────────────────
 // ROOT
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DestiniqApp(){
+export default function /api/analyzeApp(){
   const [screen,  setScreen  ]=useState("landing");
   const [formData,setFormData]=useState(null);
   const [report,  setReport  ]=useState(null);
@@ -1150,7 +1150,7 @@ export default function DestiniqApp(){
     try{
       const raw=/api/analyzek(
         [{role:"user",content:buildAnalysisPrompt(f)}],
-        "You are Destiniq's analytical engine. Return ONLY valid JSON, no markdown, no code fences, no explanation."
+        "You are /api/analyze's analytical engine. Return ONLY valid JSON, no markdown, no code fences, no explanation."
       );
       const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
       setReport(parsed);
@@ -1171,7 +1171,7 @@ export default function DestiniqApp(){
       <div className="root">
         {/* NAV */}
         <nav className="nav">
-          <div className="logo" onClick={restart}>Destin<b>iq</b></div>
+          <div className="logo" onClick={restart}>Destin<b>IQ</b></div>
           <div className="nav-r">
             {screen==="results"&&!isPaid&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={handleUnlock}>Upgrade</button>}
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
