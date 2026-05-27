@@ -331,7 +331,7 @@ function Ring({score,color,size=96,label}){
 // ─────────────────────────────────────────────────────────────────────────────
 // API
 // ─────────────────────────────────────────────────────────────────────────────
-async function ask(messages, system){
+/api/analyzec function callAPI(messages, system){
   const res = await fetch("/api/analyze", {
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system,messages}),
@@ -511,12 +511,12 @@ function CheckIn({profile, reportData, onComplete, streak}){
   const [loading, setLoading]=useState(false);
   const [result, setResult]=useState(null);
 
-  const submit=async()=>{
+  const submit=/api/analyzec()=>{
     if(!feeling||!did.trim()) return;
     setLoading(true);
     const entry={feeling,score,did,avoided};
     try{
-      const reply=await ask(
+      const reply=await callAPI(
         [{role:"user",content:buildCheckinPrompt(profile,entry,reportData)}],
         "You are Destiniq's personal advisor. Be direct, warm, and specific. Never generic. Never mention being an AI or system."
       );
@@ -602,13 +602,13 @@ function AdvisorChat({profile, reportData}){
 
   const system=`You are Destiniq's personal advisor for ${profile.name}. You have their full life report. Be specific, direct, and human. Reference their exact situation: country=${profile.country}, age=${profile.age}, goals="${profile.goals}", challenge="${profile.challenge}". Their scores: life=${reportData?.scores?.life}, wealth=${reportData?.scores?.wealth}, mindset=${reportData?.scores?.mindset}. Never say "AI". You are their advisor. Keep responses concise — 2-3 paragraphs max. Always end with one sharp question or prompt that moves them forward.`;
 
-  const send=async()=>{
+  const send=/api/analyzec()=>{
     if(!input.trim()||loading) return;
     const msg=input.trim(); setInput("");
     const updated=[...msgs,{role:"user",content:msg}];
     setMsgs(updated); setLoading(true);
     try{
-      const reply=await ask(updated.map(m=>({role:m.role,content:m.content})),system);
+      const reply=/api/analyzek(updated.map(m=>({role:m.role,content:m.content})),system);
       setMsgs(p=>[...p,{role:"assistant",content:reply}]);
     }catch{
       setMsgs(p=>[...p,{role:"assistant",content:"I lost the connection for a moment. Try again — I'm still here."}]);
@@ -1145,10 +1145,10 @@ export default function DestiniqApp(){
   const [streak,  setStreak  ]=useState(1);
   const [showCI,  setShowCI  ]=useState(false);
 
-  const handleSubmit=useCallback(async(f)=>{
+  const handleSubmit=useCallback(/api/analyzec(f)=>{
     setFormData(f);setScreen("loading");
     try{
-      const raw=await ask(
+      const raw=/api/analyzek(
         [{role:"user",content:buildAnalysisPrompt(f)}],
         "You are Destiniq's analytical engine. Return ONLY valid JSON, no markdown, no code fences, no explanation."
       );
