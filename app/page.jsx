@@ -331,7 +331,7 @@ function Ring({score,color,size=96,label}){
 // ─────────────────────────────────────────────────────────────────────────────
 // API
 // ─────────────────────────────────────────────────────────────────────────────
-async function ask(messages, system){
+async function callAPI(messages, system){
   const res = await fetch("/api/analyze", {
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system,messages}),
