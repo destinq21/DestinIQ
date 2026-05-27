@@ -1,32 +1,26 @@
-import { NextResponse } from "next/server";
-
-export async function POST(req: Request) {
+export async function POST(request) {
   try {
-    const body = await req.json();
-    const input = body.input;
+    const body = await request.json();
+    
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: body.system || "",
+        messages: body.messages,
+      }),
+    });
 
-    if (!input) {
-      return NextResponse.json(
-        { error: "Input is required" },
-        { status: 400 }
-      );
-    }
+    const data = await response.json();
+    return Response.json(data);
 
-    const result = `DestiniQ analysis for: "${input}"
-
-Here’s what I see:
-- You are exploring your future path
-- You are trying to make better decisions
-- You need clarity and direction
-
-Advice:
-Focus on one skill and build consistency.`;
-
-    return NextResponse.json({ result });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: error.message }, { status: 500 });
   }
-} 
+}
