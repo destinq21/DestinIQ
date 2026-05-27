@@ -1,5 +1,3 @@
-export const runtime = 'edge';
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -20,12 +18,17 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json();
-    return Response.json(data);
+    
+    // Return exactly what Anthropic returns
+    return new Response(JSON.stringify(data), {
+      status: response.status,
+      headers: { "Content-Type": "application/json" },
+    });
 
   } catch (error) {
-    return Response.json(
-      { error: String(error) },
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
