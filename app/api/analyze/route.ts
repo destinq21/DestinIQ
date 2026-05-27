@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server';
+export const runtime = 'edge';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
 
@@ -8,13 +8,13 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
-        system: body.system || "",
+        system: body.system ?? "",
         messages: body.messages,
       }),
     });
@@ -22,8 +22,10 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     return Response.json(data);
 
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return Response.json({ error: message }, { status: 500 });
+  } catch (error) {
+    return Response.json(
+      { error: String(error) },
+      { status: 500 }
+    );
   }
 }
