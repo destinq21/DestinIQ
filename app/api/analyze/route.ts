@@ -1,8 +1,16 @@
+# Terminal commands:
+cd destiniq   # or wherever your project is
+
+# Remove old route if it exists
+rm -rf app/api/destiniq
+
+# Create the correct path
+mkdir -p app/api/analyze
+cat > app/api/analyze/route.ts << 'EOF'
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // 1. Validate input
     const message = body.message?.trim();
 
     if (!message) {
@@ -12,12 +20,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Check API key
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error("Missing ANTHROPIC_API_KEY environment variable");
     }
 
-    // 3. Call Claude API
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -28,7 +34,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
-        temperature: 0.85,   // Slightly reduced from 0.9 for better control
+        temperature: 0.85,
         top_p: 0.95,
 
         system: `
@@ -37,22 +43,15 @@ You are DestinIQ — a highly intelligent, adaptive life strategist.
 Behavior rules:
 - Never repeat the same structure twice
 - Avoid generic or copy-paste advice
-- Adapt tone based on user input (serious, analytical, motivational, strategic)
+- Adapt tone based on user input
 - Be practical, specific, and insight-driven
-- Focus on real-world decisions, growth, and clarity
 - Every response must feel fresh and uniquely generated
         `,
 
-        messages: [
-          {
-            role: "user",
-            content: message,   // Clean user input only
-          },
-        ],
+        messages: [{ role: "user", content: message }],
       }),
     });
 
-    // 4. Handle API errors
     if (!response.ok) {
       let errorMsg = "Unknown error";
       try {
@@ -62,31 +61,20 @@ Behavior rules:
       throw new Error(`Anthropic API error: ${errorMsg}`);
     }
 
-    // 5. Extract response safely
     const data = await response.json();
     const text = data?.content?.[0]?.text || "No response generated";
 
-    // 6. Return clean output
-    return new Response(
-      JSON.stringify({ text }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ text }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
 
   } catch (error) {
     console.error("DestinIQ API error:", error);
-
     return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-        message: String(error),
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: "Internal server error", message: String(error) }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }
+EOF
