@@ -332,13 +332,22 @@ function Ring({score,color,size=96,label}){
 // API
 // ─────────────────────────────────────────────────────────────────────────────
 async function callAPI(messages, system){
-  const res = await fetch("/api/analyze", {
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system,messages}),
-  });
-  if(!r.ok) throw new Error("api");
-  const d=await r.json();
-  return d.content?.find(b=>b.type==="text")?.text||"";
+  try {
+    const res = await fetch("/api/analyze", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system,messages}),
+    });
+    console.log("API Status:", res.status);
+    const d = await res.json();
+    console.log("API Response:", JSON.stringify(d).slice(0, 200));
+    const text = d.content?.find(b=>b.type==="text")?.text||"";
+    console.log("Extracted text:", text.slice(0, 100));
+    return text;
+  } catch(e) {
+    console.log("API Error:", e.message);
+    return "";
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
