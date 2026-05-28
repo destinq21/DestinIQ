@@ -331,7 +331,7 @@ function Ring({score,color,size=96,label}){
 // ─────────────────────────────────────────────────────────────────────────────
 // API
 // ─────────────────────────────────────────────────────────────────────────────
-async function callAPI(messages, system){
+async function ask(messages, system){
   try {
     const res = await fetch("/api/analyze", {
       method:"POST",
