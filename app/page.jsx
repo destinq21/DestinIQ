@@ -336,7 +336,7 @@ async function ask(messages, system){
     const res = await fetch("/api/analyze", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:1000,system,messages}),
+      body:JSON.stringify({model:"claude-sonnet-4-5-20250514",max_tokens:1000,system,messages}),
     });
     console.log("API Status:", res.status);
     const d = await res.json();
