@@ -10,7 +10,7 @@ export async function POST(request: Request) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-3-5-sonnet-20240620", // The ACTUAL model name
+        model: "claude-sonnet-4-20250514", // The ACTUAL model name
         max_tokens: 1000,
         system: body.system || "",
         // Anthropic crashes if 'messages' isn't formatted perfectly. This forces it to work.
@@ -21,8 +21,8 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json();
-
-    return new Response(JSON.stringify(data), {
+const text = data.content?.find((b: any) => b.type === "text")?.text || "";
+return new Response(JSON.stringify({ text }), {
       status: response.status,
       headers: { "Content-Type": "application/json" },
     });

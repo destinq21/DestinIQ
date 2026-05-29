@@ -290,7 +290,7 @@ function sanitize(s){
 // ═══════════════════════════════════════════════════════════════════════════════
 async function callAPI({messages,system,userId,isPremium}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
+   =await fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:isPremium?2200:900,system,messages}),
   });
