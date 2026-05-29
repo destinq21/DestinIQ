@@ -290,10 +290,18 @@ function sanitize(s){
 // ═══════════════════════════════════════════════════════════════════════════════
 async function callAPI({messages,system,userId,isPremium}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:isPremium?2200:900,system,messages}),
-  });
+ const res = await fetch("/api/analyze", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    messages,
+    system,
+    userId,
+    isPremium
+  }),
+});
   if(res.status===401) throw new Error("API_KEY_MISSING");
   if(res.status===429) throw new Error("RATE_LIMITED");
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`);}
