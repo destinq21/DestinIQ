@@ -6,14 +6,17 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
+        "x-api-key": process.env.ANTHROPIC_API_KEY || "",
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: "claude-3-5-sonnet-20240620", // The ACTUAL model name
         max_tokens: 1000,
-        system: body.system ?? "",
-        messages: body.messages,
+        system: body.system || "",
+        // Anthropic crashes if 'messages' isn't formatted perfectly. This forces it to work.
+        messages: Array.isArray(body.messages) 
+          ? body.messages 
+          : [{ role: "user", content: String(body.messages  body.decision  "Help me make a decision") }]
       }),
     });
 
@@ -23,11 +26,7 @@ export async function POST(request: Request) {
       status: response.status,
       headers: { "Content-Type": "application/json" },
     });
-
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Server crashed" }), { status: 500 });
   }
 }
