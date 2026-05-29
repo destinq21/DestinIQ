@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         // Anthropic crashes if 'messages' isn't formatted perfectly. This forces it to work.
         messages: Array.isArray(body.messages) 
           ? body.messages 
-          : [{ role: "user", content: String(body.messages  body.decision  "Help me make a decision") }]
+          : [{ role: "user", content: String(body.messages || body.decision || "Help me make a decision") }]
       }),
     });
 
