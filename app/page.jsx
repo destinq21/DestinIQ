@@ -1,4 +1,3 @@
-"use client"
 import { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -307,15 +306,17 @@ function sanitize(s){
 // ═══════════════════════════════════════════════════════════════════════════════
 async function callAPI({messages,system,userId,isPremium}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:isPremium?4000:1800,system,messages}),
+  const res=await fetch("/api/analyze",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({system,messages,max_tokens:isPremium?4000:1800}),
   });
-  if(res.status===401) throw new Error("API_KEY_MISSING");
-  if(res.status===429) throw new Error("RATE_LIMITED");
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`);}
+  if(!res.ok){
+    const e=await res.json().catch(()=>({}));
+    throw new Error(e?.error||`Request failed (${res.status})`);
+  }
   const d=await res.json();
-  const text=d.content?.find(b=>b.type==="text")?.text||"";
+  const text=d.text||"";
   if(!text) throw new Error("Empty response");
   return text;
 }
@@ -2704,4 +2705,3 @@ export default function DestinIQ(){
     </>
   );
 }
-

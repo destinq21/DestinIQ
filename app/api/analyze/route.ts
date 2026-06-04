@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514", // The ACTUAL model name
-        max_tokens: 1000,
+        max_tokens: body.max_tokens || 1800,
         system: body.system || "",
         // Anthropic crashes if 'messages' isn't formatted perfectly. This forces it to work.
         messages: Array.isArray(body.messages) 
@@ -30,3 +30,5 @@ return new Response(JSON.stringify({ text }), {
     return new Response(JSON.stringify({ error: "Server crashed" }), { status: 500 });
   }
 }
+
+
