@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2167,6 +2167,239 @@ function Loading(){
 // ═══════════════════════════════════════════════════════════════════════════════
 // RELOCATION EXPLORER — Universal country picker with deep AI-generated reports
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTH SCREEN — Login / Signup with Email, Phone, Google, Apple
+// ═══════════════════════════════════════════════════════════════════════════════
+function AuthScreen({onAuth}){
+  const [mode,setMode]=useState("login"); // login | signup | phone | forgot
+  const [tab,setTab]=useState("email");   // email | phone
+  const [email,setEmail]=useState("");
+  const [phone,setPhone]=useState("");
+  const [password,setPassword]=useState("");
+  const [name,setName]=useState("");
+  const [otp,setOtp]=useState(["","","","","",""]);
+  const [otpSent,setOtpSent]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [showPass,setShowPass]=useState(false);
+  const otpRefs=[useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
+
+  const saveUser=(user)=>{
+    localStorage.setItem("diq_user",JSON.stringify(user));
+    onAuth(user);
+  };
+
+  const handleEmail=async()=>{
+    if(!email.trim()||!password.trim()){setError("Please fill in all fields.");return;}
+    if(mode==="signup"&&!name.trim()){setError("Please enter your name.");return;}
+    setLoading(true);setError("");
+    try{
+      const res=await fetch("/api/auth",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:mode,email:email.trim(),password,name:name.trim()}),
+      });
+      const d=await res.json();
+      if(!res.ok) throw new Error(d.error||"Something went wrong");
+      saveUser(d.user);
+    }catch(e){setError(e.message);}
+    setLoading(false);
+  };
+
+  const handleSendOTP=async()=>{
+    if(!phone.trim()){setError("Please enter your phone number.");return;}
+    setLoading(true);setError("");
+    try{
+      const res=await fetch("/api/auth",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"send_otp",phone:phone.trim()}),
+      });
+      const d=await res.json();
+      if(!res.ok) throw new Error(d.error||"Failed to send code");
+      setOtpSent(true);
+      setTimeout(()=>otpRefs[0].current?.focus(),100);
+    }catch(e){setError(e.message);}
+    setLoading(false);
+  };
+
+  const handleVerifyOTP=async()=>{
+    const code=otp.join("");
+    if(code.length<6){setError("Please enter the 6-digit code.");return;}
+    setLoading(true);setError("");
+    try{
+      const res=await fetch("/api/auth",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"verify_otp",phone:phone.trim(),code}),
+      });
+      const d=await res.json();
+      if(!res.ok) throw new Error(d.error||"Invalid code");
+      saveUser(d.user);
+    }catch(e){setError(e.message);}
+    setLoading(false);
+  };
+
+  const handleOTPInput=(i,val)=>{
+    if(!/^\d*$/.test(val)) return;
+    const next=[...otp]; next[i]=val.slice(-1);
+    setOtp(next);
+    if(val&&i<5) otpRefs[i+1].current?.focus();
+  };
+
+  const handleOTPKey=(i,e)=>{
+    if(e.key==="Backspace"&&!otp[i]&&i>0) otpRefs[i-1].current?.focus();
+  };
+
+  const handleGoogle=()=>{window.location.href="/api/auth/google";};
+  const handleApple=()=>{window.location.href="/api/auth/apple";};
+
+  const btnStyle={width:"100%",padding:"14px",borderRadius:12,border:"1px solid var(--cream-15)",background:"var(--night)",color:"var(--cream)",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.2s",marginBottom:10};
+  const inputStyle={width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12};
+
+  return(
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div style={{width:"100%",maxWidth:420}}>
+
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:28,fontWeight:800,letterSpacing:"-0.5px",color:"var(--cream)",marginBottom:8}}>
+            Destin<b style={{color:"var(--gold)"}}>IQ</b>
+          </div>
+          <div style={{fontSize:15,color:"var(--cream-60)"}}>
+            {mode==="signup"?"Create your account":"Welcome back"}
+          </div>
+        </div>
+
+        {/* Card */}
+        <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"28px 24px"}}>
+
+          {/* Google + Apple */}
+          <button style={{...btnStyle}} onClick={handleGoogle}
+            onMouseEnter={e=>e.currentTarget.style.background="var(--midnight)"}
+            onMouseLeave={e=>e.currentTarget.style.background="var(--night)"}>
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Continue with Google
+          </button>
+
+          <button style={{...btnStyle}} onClick={handleApple}
+            onMouseEnter={e=>e.currentTarget.style.background="var(--midnight)"}
+            onMouseLeave={e=>e.currentTarget.style.background="var(--night)"}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--cream)"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Continue with Apple
+          </button>
+
+          {/* Divider */}
+          <div style={{display:"flex",alignItems:"center",gap:12,margin:"4px 0 16px"}}>
+            <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
+            <span style={{fontSize:12,color:"var(--cream-40)"}}>or</span>
+            <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
+          </div>
+
+          {/* Email / Phone tabs */}
+          <div style={{display:"flex",gap:6,marginBottom:18,background:"var(--midnight)",borderRadius:10,padding:4}}>
+            {["email","phone"].map(t=>(
+              <button key={t} onClick={()=>{setTab(t);setError("");setOtpSent(false);}}
+                style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:tab===t?"var(--night)":"transparent",color:tab===t?"var(--cream)":"var(--cream-40)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.2s"}}>
+                {t==="email"?"📧 Email":"📱 Phone"}
+              </button>
+            ))}
+          </div>
+
+          {/* Email form */}
+          {tab==="email"&&(
+            <>
+              {mode==="signup"&&(
+                <input value={name} onChange={e=>setName(e.target.value)}
+                  placeholder="Your full name" style={inputStyle}/>
+              )}
+              <input value={email} onChange={e=>setEmail(e.target.value)}
+                placeholder="Email address" type="email" style={inputStyle}/>
+              <div style={{position:"relative",marginBottom:12}}>
+                <input value={password} onChange={e=>setPassword(e.target.value)}
+                  placeholder="Password" type={showPass?"text":"password"}
+                  style={{...inputStyle,marginBottom:0,paddingRight:44}}
+                  onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
+                <button onClick={()=>setShowPass(!showPass)}
+                  style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13}}>
+                  {showPass?"Hide":"Show"}
+                </button>
+              </div>
+              {mode==="login"&&(
+                <div style={{textAlign:"right",marginBottom:12}}>
+                  <span onClick={()=>setMode("forgot")} style={{fontSize:12,color:"var(--gold)",cursor:"pointer"}}>Forgot password?</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Phone form */}
+          {tab==="phone"&&!otpSent&&(
+            <div style={{marginBottom:12}}>
+              <input value={phone} onChange={e=>setPhone(e.target.value)}
+                placeholder="+1 234 567 8900" type="tel" style={inputStyle}
+                onKeyDown={e=>e.key==="Enter"&&handleSendOTP()}/>
+              <div style={{fontSize:12,color:"var(--cream-40)",marginBottom:8}}>Include country code (e.g. +1 for US, +44 for UK)</div>
+            </div>
+          )}
+
+          {/* OTP input */}
+          {tab==="phone"&&otpSent&&(
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:13,color:"var(--cream-60)",marginBottom:14,textAlign:"center"}}>
+                We sent a 6-digit code to <b style={{color:"var(--cream)"}}>{phone}</b>
+              </div>
+              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:12}}>
+                {otp.map((v,i)=>(
+                  <input key={i} ref={otpRefs[i]} value={v}
+                    onChange={e=>handleOTPInput(i,e.target.value)}
+                    onKeyDown={e=>handleOTPKey(i,e)}
+                    maxLength={1} type="text" inputMode="numeric"
+                    style={{width:44,height:52,textAlign:"center",fontSize:20,fontWeight:700,background:"var(--midnight)",border:`1px solid ${v?"var(--gold)":"var(--cream-15)"}`,borderRadius:10,color:"var(--cream)",outline:"none"}}/>
+                ))}
+              </div>
+              <div style={{textAlign:"center",marginBottom:8}}>
+                <span onClick={()=>{setOtpSent(false);setOtp(["","","","","",""]);}} style={{fontSize:12,color:"var(--gold)",cursor:"pointer"}}>Change number</span>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#F87171"}}>{error}</div>}
+
+          {/* Main CTA button */}
+          <button onClick={tab==="email"?handleEmail:otpSent?handleVerifyOTP:handleSendOTP}
+            disabled={loading}
+            style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"var(--cream-15)":"var(--gold)",color:loading?"var(--cream-40)":"#000",fontSize:15,fontWeight:700,cursor:loading?"not-allowed":"pointer",transition:"all 0.2s",marginBottom:16}}>
+            {loading?"One moment…":
+             tab==="phone"&&!otpSent?"Send verification code":
+             tab==="phone"&&otpSent?"Verify & continue":
+             mode==="login"?"Sign in":"Create account"}
+          </button>
+
+          {/* Toggle login/signup */}
+          <div style={{textAlign:"center",fontSize:13,color:"var(--cream-50)"}}>
+            {mode==="login"?(
+              <>Don't have an account?{" "}
+                <span onClick={()=>{setMode("signup");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600}}>Sign up free</span>
+              </>
+            ):(
+              <>Already have an account?{" "}
+                <span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600}}>Sign in</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"var(--cream-30)"}}>
+          By continuing you agree to our Terms of Service and Privacy Policy
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RelocationExplorer({suggestedCountries, formData, userId, isPremium, isPaid, onUnlock}){
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -2593,6 +2826,9 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function DestinIQ(){
+  const [user, setUser]=useState(()=>{
+    try{ const u=localStorage.getItem("diq_user"); return u?JSON.parse(u):null; }catch{return null;}
+  });
   const [screen,    setScreen   ]=useState("landing");
   const [formData,  setFormData ]=useState(null);
   const [report,    setReport   ]=useState(null);
@@ -2653,10 +2889,15 @@ export default function DestinIQ(){
       <div className="bg bg-grid"/>
       <div className="root">
 
+        {/* AUTH GATE — show login if not authenticated */}
+        {!user&&<AuthScreen onAuth={(u)=>{setUser(u);}}/>}
+        {user&&<>
+
         <nav className="nav">
           <div className="logo" onClick={restart}>Destin<b>IQ</b></div>
           <div className="nav-r">
             {screen!=="landing"&&<PremiumToggle isPremium={isPremium} onToggle={()=>setIsPremium(p=>!p)}/>}
+            {user&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{localStorage.removeItem("diq_user");setUser(null);}} title="Sign out">Sign out</button>}
             {screen==="results"&&(
               <button className="btn btn-ghost" style={{fontSize:12,padding:"6px 12px"}} onClick={()=>setShowNotif(true)} title="Set daily notification">
                 🔔
@@ -2702,8 +2943,8 @@ export default function DestinIQ(){
           <NotificationPanel profile={formData} userId={userId} onClose={()=>setShowNotif(false)}/>
         )}
 
+        </>}
       </div>
     </>
   );
 }
-
