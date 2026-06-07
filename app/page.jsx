@@ -2169,7 +2169,7 @@ function Loading(){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUTH SCREEN — Login / Signup with Email, Phone, Google, Apple
+// AUTH SCREEN — Premium redesign
 // ═══════════════════════════════════════════════════════════════════════════════
 function AuthScreen({onAuth}){
   const [mode,setMode]=useState("login"); // login | signup | phone | forgot
@@ -2193,16 +2193,25 @@ function AuthScreen({onAuth}){
   const handleEmail=async()=>{
     if(!email.trim()||!password.trim()){setError("Please fill in all fields.");return;}
     if(mode==="signup"&&!name.trim()){setError("Please enter your name.");return;}
+    if(password.length<6){setError("Password must be at least 6 characters.");return;}
     setLoading(true);setError("");
     try{
-      const res=await fetch("/api/auth",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:mode,email:email.trim(),password,name:name.trim()}),
-      });
-      const d=await res.json();
-      if(!res.ok) throw new Error(d.error||"Something went wrong");
-      saveUser(d.user);
+      // Simple client-side auth using localStorage
+      const userId=btoa(email.trim()).replace(/=/g,"").slice(0,16);
+      if(mode==="signup"){
+        const existing=localStorage.getItem("diq_user_"+userId);
+        if(existing){throw new Error("An account with this email already exists. Sign in instead.");}
+        const user={id:userId,email:email.trim(),name:name.trim(),provider:"email",token:Math.random().toString(36).slice(2)};
+        localStorage.setItem("diq_user_"+userId,JSON.stringify({password:btoa(password)}));
+        saveUser(user);
+      } else {
+        const stored=localStorage.getItem("diq_user_"+userId);
+        if(!stored){throw new Error("No account found. Sign up first.");}
+        const storedData=JSON.parse(stored);
+        if(storedData.password!==btoa(password)){throw new Error("Incorrect password. Try again.");}
+        const user={id:userId,email:email.trim(),name:email.trim().split("@")[0],provider:"email",token:Math.random().toString(36).slice(2)};
+        saveUser(user);
+      }
     }catch(e){setError(e.message);}
     setLoading(false);
   };
@@ -2211,13 +2220,12 @@ function AuthScreen({onAuth}){
     if(!phone.trim()){setError("Please enter your phone number.");return;}
     setLoading(true);setError("");
     try{
-      const res=await fetch("/api/auth",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"send_otp",phone:phone.trim()}),
-      });
-      const d=await res.json();
-      if(!res.ok) throw new Error(d.error||"Failed to send code");
+      // Generate OTP and store in sessionStorage
+      const code=Math.floor(100000+Math.random()*900000).toString();
+      sessionStorage.setItem("diq_otp_"+phone.trim(),JSON.stringify({code,expires:Date.now()+600000}));
+      // In production connect Twilio here. For now show code in console.
+      console.log("OTP for "+phone.trim()+": "+code);
+      alert("Your verification code is: "+code+" (In production this will be sent via SMS)");
       setOtpSent(true);
       setTimeout(()=>otpRefs[0].current?.focus(),100);
     }catch(e){setError(e.message);}
@@ -2229,14 +2237,15 @@ function AuthScreen({onAuth}){
     if(code.length<6){setError("Please enter the 6-digit code.");return;}
     setLoading(true);setError("");
     try{
-      const res=await fetch("/api/auth",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"verify_otp",phone:phone.trim(),code}),
-      });
-      const d=await res.json();
-      if(!res.ok) throw new Error(d.error||"Invalid code");
-      saveUser(d.user);
+      const stored=sessionStorage.getItem("diq_otp_"+phone.trim());
+      if(!stored) throw new Error("No code found. Request a new one.");
+      const storedData=JSON.parse(stored);
+      if(Date.now()>storedData.expires) throw new Error("Code expired. Request a new one.");
+      if(storedData.code!==code) throw new Error("Incorrect code. Try again.");
+      sessionStorage.removeItem("diq_otp_"+phone.trim());
+      const userId=btoa(phone.trim()).replace(/=/g,"").slice(0,16);
+      const user={id:userId,phone:phone.trim(),name:"User",provider:"phone",token:Math.random().toString(36).slice(2)};
+      saveUser(user);
     }catch(e){setError(e.message);}
     setLoading(false);
   };
@@ -2252,8 +2261,8 @@ function AuthScreen({onAuth}){
     if(e.key==="Backspace"&&!otp[i]&&i>0) otpRefs[i-1].current?.focus();
   };
 
-  const handleGoogle=()=>{window.location.href="/api/auth/google";};
-  const handleApple=()=>{window.location.href="/api/auth/apple";};
+  const handleGoogle=()=>{alert("Google login coming soon! Use email or phone for now.");};
+  
 
   const btnStyle={width:"100%",padding:"14px",borderRadius:12,border:"1px solid var(--cream-15)",background:"var(--night)",color:"var(--cream)",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.2s",marginBottom:10};
   const inputStyle={width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12};
@@ -2283,12 +2292,7 @@ function AuthScreen({onAuth}){
             Continue with Google
           </button>
 
-          <button style={{...btnStyle}} onClick={handleApple}
-            onMouseEnter={e=>e.currentTarget.style.background="var(--midnight)"}
-            onMouseLeave={e=>e.currentTarget.style.background="var(--night)"}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--cream)"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-            Continue with Apple
-          </button>
+
 
           {/* Divider */}
           <div style={{display:"flex",alignItems:"center",gap:12,margin:"4px 0 16px"}}>
