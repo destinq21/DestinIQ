@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "signup") {
-      if (!body.email  !body.password  !body.name) return NextResponse.json({ error: "All fields required" }, { status: 400 });
+      if (!body.email || !body.password || !body.name) return NextResponse.json({ error: "All fields required" }, { status: 400 });
       const user = { id: hashPassword(body.email).slice(0, 16), email: body.email, name: body.name, provider: "email", token: generateToken() };
       return NextResponse.json({ user });
     }
