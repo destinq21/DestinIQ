@@ -121,7 +121,7 @@
  */
 
 
-import React, { useState, useEffect, useRef, useCallback, Component } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
@@ -4407,34 +4407,7 @@ async function triggerWelcomeEmail(user){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ERROR BOUNDARY
-// Catches React render errors so a broken module doesn't white-screen the app.
-// ═══════════════════════════════════════════════════════════════════════════════
-class ErrorBoundary extends Component {
-  constructor(props){ super(props); this.state={hasError:false,error:null}; }
-  static getDerivedStateFromError(e){ return{hasError:true,error:e}; }
-  componentDidCatch(e,info){ console.error("ErrorBoundary caught:",e,info); }
-  render(){
-    if(this.state.hasError){
-      return(
-        <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 24px"}}>
-          <div style={{textAlign:"center",maxWidth:400}}>
-            <div style={{fontSize:36,marginBottom:16}}>⚠</div>
-            <div style={{fontFamily:"var(--f-display)",fontSize:22,color:"var(--cream)",marginBottom:8}}>Something went wrong</div>
-            <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.7,marginBottom:24}}>
-              {this.props.friendlyMessage||"A part of the page ran into an error. Your data is safe — try refreshing."}
-            </p>
-            <button onClick={()=>{this.setState({hasError:false,error:null});this.props.onReset&&this.props.onReset();}}
-              style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"11px 24px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>
-              Try again
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // OFFLINE BANNER
@@ -4931,10 +4904,8 @@ or
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
         {screen==="results"  &&report&&(
-          <ErrorBoundary friendlyMessage="The dashboard ran into an issue. Your report is safe — try refreshing." onReset={()=>{}}>
-            <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
+          <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
-          </ErrorBoundary>
         )}
 
         {showNotif&&formData&&(
