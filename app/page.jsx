@@ -102,13 +102,20 @@ const _notifTimers   = new Map(); // userId -> timeoutId
 
 // ─── SUPABASE DB HELPERS ─────────────────────────────────────────────────────
 
+// In-memory cache for user profiles (formData + paid status + report)
+const _userProfiles = new Map(); // userId -> {formData, isPaid, report, streak}
+
+/** Get persisted user profile from cache. */
+function getUserProfile(userId) { return _userProfiles.get(userId) || null; }
+
 /** Hydrate all per-user data from Supabase into the in-memory caches. */
 async function hydrateUserData(userId) {
   try {
-    const [momRes, decRes, wkRes] = await Promise.all([
+    const [momRes, decRes, wkRes, profRes] = await Promise.all([
       supabase.from("momentum_logs").select("*").eq("user_id", userId).order("date", { ascending: true }),
       supabase.from("decisions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("weekly_reports").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      supabase.from("user_profiles").select("*").eq("user_id", userId).maybeSingle(),
     ]);
     if (momRes.data?.length) {
       _momentumLog.set(userId, momRes.data.map(r => ({
@@ -126,6 +133,14 @@ async function hydrateUserData(userId) {
       _weeklyReports.set(userId, wkRes.data.map(r => ({
         weekOf: r.week_of, text: r.text, ts: new Date(r.created_at).getTime(),
       })));
+    }
+    if (profRes.data) {
+      _userProfiles.set(userId, {
+        formData: profRes.data.form_data ? JSON.parse(profRes.data.form_data) : null,
+        isPaid: profRes.data.is_paid || false,
+        report: profRes.data.report_data ? JSON.parse(profRes.data.report_data) : null,
+        streak: profRes.data.streak || 1,
+      });
     }
   } catch (e) {
     console.warn("hydrateUserData:", e.message);
@@ -1049,7 +1064,7 @@ How to be with them:
 
 You are their corner. The one place where they don't have to pretend everything is fine. Act like it.
 
-FORMATTING: Write in plain conversational sentences. No **bold** asterisks. No bullet symbols. If giving steps, number them cleanly (1. 2. 3.). Keep it human and readable.`;
+FORMATTING: Write in clean plain text. Use numbered lists (1. 2. 3.) for steps. Use bullet points (- option) for choices. Use --- to divide sections. No **bold**, no # headers. Warm, clear, and conversational.`;
 }
 
 
@@ -1708,7 +1723,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
     if(log.length<3){setError("Log at least 3 days of momentum to generate your weekly pulse.");return;}
     setLoading(true);setError("");
     try{
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:"You are DestinIQ's weekly pattern analyst. Be direct, specific, insightful. Never generic. Write in clean plain sentences — no **bold** asterisks, no bullet symbols unless using clean numbered steps.",userId,isPremium});
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:"You are DestinIQ's weekly pattern analyst. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.",userId,isPremium});
       const r={weekOf:weekLabel(),text:txt,ts:Date.now()};
       const existing=_weeklyReports.get(userId)||[];
       existing.unshift(r);if(existing.length>4)existing.pop();
@@ -2359,73 +2374,79 @@ function TestimonialForm(){
 }
 
 // ─── MARKDOWN RENDERER ───────────────────────────────────────────────────────
-// Converts AI markdown to clean readable JSX. No external libs needed.
+// Clean plain rendering — no bold decorations, no colored circles.
+// Strips markdown syntax and displays content as readable plain text with spacing.
 function RenderMD({text,style={}}){
   if(!text) return null;
+
+  // Strip inline markdown — just show the text
+  const plain = (str) => str
+    .replace(/\*\*(.*?)\*\*/g,"$1")   // **bold** → bold
+    .replace(/\*(.*?)\*/g,"$1")         // *italic* → italic
+    .replace(/`(.*?)`/g,"$1");           // `code` → code
+
   const lines = text.split("\n");
   const elements = [];
   let i = 0;
 
-  const parseInline = (str) => {
-    // Bold **text**
-    const parts = str.split(/\*\*(.*?)\*\*/g);
-    return parts.map((p,idx) =>
-      idx%2===1 ? <strong key={idx} style={{color:"var(--cream)",fontWeight:700}}>{p}</strong> : p
-    );
-  };
-
   while(i < lines.length){
     const line = lines[i].trim();
-    if(!line){ i++; continue; }
 
-    // Numbered list item
+    if(!line){ elements.push(<div key={i} style={{height:8}}/>); i++; continue; }
+
+    // Divider ---
+    if(/^-{3,}$/.test(line)){
+      elements.push(<div key={i} style={{height:1,background:"var(--cream-10)",margin:"10px 0"}}/>);
+      i++; continue;
+    }
+
+    // Strip heading markers
+    if(line.startsWith("#")){
+      const txt = line.replace(/^#+\s*/,"");
+      elements.push(<p key={i} style={{fontSize:13,fontWeight:600,color:"var(--cream-80,var(--cream))",lineHeight:1.7,margin:"10px 0 4px"}}>{plain(txt)}</p>);
+      i++; continue;
+    }
+
+    // Numbered list
     const numMatch = line.match(/^(\d+)\.\s+(.+)/);
     if(numMatch){
-      const items = [];
-      while(i < lines.length){
-        const l = lines[i].trim();
-        const m = l.match(/^(\d+)\.\s+(.+)/);
+      const items=[];
+      while(i<lines.length){
+        const m=lines[i].trim().match(/^(\d+)\.\s+(.+)/);
         if(!m) break;
-        items.push(<div key={i} style={{display:"flex",gap:10,marginBottom:6}}>
-          <span style={{minWidth:20,height:20,borderRadius:"50%",background:"var(--gold)",color:"#000",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{m[1]}</span>
-          <span style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6}}>{parseInline(m[2])}</span>
-        </div>);
+        items.push(
+          <div key={i} style={{display:"flex",gap:8,marginBottom:6}}>
+            <span style={{minWidth:18,color:"var(--cream-60)",fontSize:13,lineHeight:1.7,flexShrink:0}}>{m[1]}.</span>
+            <span style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>{plain(m[2])}</span>
+          </div>
+        );
         i++;
       }
-      elements.push(<div key={`num-${i}`} style={{margin:"8px 0"}}>{items}</div>);
+      elements.push(<div key={`nl-${i}`} style={{margin:"6px 0"}}>{items}</div>);
       continue;
     }
 
-    // Bullet list item
-    const bulletMatch = line.match(/^[-•*]\s+(.+)/);
+    // Bullet list
+    const bulletMatch = line.match(/^[-•]\s+(.+)/);
     if(bulletMatch){
-      const items = [];
-      while(i < lines.length){
-        const l = lines[i].trim();
-        const m = l.match(/^[-•*]\s+(.+)/);
+      const items=[];
+      while(i<lines.length){
+        const m=lines[i].trim().match(/^[-•]\s+(.+)/);
         if(!m) break;
-        items.push(<div key={i} style={{display:"flex",gap:8,marginBottom:5}}>
-          <span style={{color:"var(--gold)",marginTop:6,flexShrink:0,fontSize:8}}>◆</span>
-          <span style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6}}>{parseInline(m[1])}</span>
-        </div>);
+        items.push(
+          <div key={i} style={{display:"flex",gap:8,marginBottom:5}}>
+            <span style={{color:"var(--cream-40)",fontSize:13,lineHeight:1.7,flexShrink:0}}>–</span>
+            <span style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>{plain(m[1])}</span>
+          </div>
+        );
         i++;
       }
-      elements.push(<div key={`bull-${i}`} style={{margin:"6px 0"}}>{items}</div>);
+      elements.push(<div key={`bl-${i}`} style={{margin:"4px 0"}}>{items}</div>);
       continue;
     }
 
-    // Heading ### or ##
-    if(line.startsWith("###")){
-      elements.push(<div key={i} style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginTop:12,marginBottom:4}}>{line.replace(/^#+\s*/,"")}</div>);
-      i++; continue;
-    }
-    if(line.startsWith("##")){
-      elements.push(<div key={i} style={{fontSize:14,fontWeight:700,color:"var(--gold)",marginTop:14,marginBottom:6}}>{line.replace(/^#+\s*/,"")}</div>);
-      i++; continue;
-    }
-
-    // Regular paragraph
-    elements.push(<p key={i} style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:"4px 0"}}>{parseInline(line)}</p>);
+    // Regular line
+    elements.push(<p key={i} style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,margin:"2px 0"}}>{plain(line)}</p>);
     i++;
   }
 
@@ -2465,7 +2486,7 @@ function SupportWidget(){
         .map(m=>({role:m.role,content:m.text||m.content||""}));
       const reply=await callAPI({
         messages:history,
-        system:"You are DestinIQ's friendly support assistant. DestinIQ is a personal life clarity and strategy app. Help users with: account issues, understanding features (momentum score, check-ins, decisions, weekly pulse, advisor chat, relocation module), payment questions, and general app guidance. Be warm, concise, and helpful. If the issue needs human review (refunds, account deletion, payment disputes), ask for their email and say the team will follow up within 24 hours. Never make up features that don't exist.",
+        system:"You are DestinIQ's friendly support assistant. Be warm, clear, and concise. For steps use numbered lists (1. 2. 3.). For options use bullet points (- option). Use --- to separate sections. Do NOT use **bold** or # headers — plain clean text only. If issue needs human review, ask for their email. Never make up features.",
         userId:null,
         isPremium:false,
       });
@@ -3597,7 +3618,7 @@ Write exactly 3 sentences:
 3. Close with something that makes them feel understood and capable.
 
 Do NOT use generic motivational language. Be specific, direct, and honest.`;
-      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You are a direct, honest daily advisor. Write exactly 3 sentences. No greetings, no headers, no lists, no **bold** asterisks — just 3 powerful plain sentences.",userId,isPremium});
+      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You are a direct, honest daily advisor. Write exactly 3 sentences. No greetings, no headers, no lists, no bold. Just 3 powerful plain sentences.",userId,isPremium});
       setDailyInsight(reply);
       pushToMemory(userId,"assistant","Daily refresh: "+reply.slice(0,200));
     }catch(e){
@@ -3867,7 +3888,17 @@ export default function DestinIQ(){
         const appUser={id:u.id,email:u.email,phone:u.phone,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:u.app_metadata?.provider||"email"};
         setUser(appUser);
         setUserId(u.id);
-        hydrateUserData(u.id); // load momentum/decisions/weekly from DB
+        // Load all persisted data, then restore formData/report/isPaid/streak from DB
+        hydrateUserData(u.id).then(()=>{
+          const prof = getUserProfile(u.id);
+          if(prof){
+            if(prof.formData) setFormData(prof.formData);
+            if(prof.report)   setReport(prof.report);
+            if(prof.isPaid)   setIsPaid(true);
+            if(prof.streak)   setStreak(prof.streak);
+            if(prof.formData && prof.report) setScreen("results");
+          }
+        });
       }
       setAuthLoading(false);
     });
@@ -3880,7 +3911,16 @@ export default function DestinIQ(){
         const appUser={id:u.id,email:u.email,phone:u.phone,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:u.app_metadata?.provider||"email"};
         setUser(appUser);
         setUserId(u.id);
-        hydrateUserData(u.id);
+        hydrateUserData(u.id).then(()=>{
+          const prof = getUserProfile(u.id);
+          if(prof){
+            if(prof.formData) setFormData(prof.formData);
+            if(prof.report)   setReport(prof.report);
+            if(prof.isPaid)   setIsPaid(true);
+            if(prof.streak)   setStreak(prof.streak);
+            if(prof.formData && prof.report) setScreen("results");
+          }
+        });
       } else {
         setUser(null);
         setUserId(null);
@@ -3975,16 +4015,50 @@ or
       const parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
       pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
       setReport(parsed);
+      // Persist profile + report so they survive page refresh / re-login
+      try{
+        await supabase.from("user_profiles").upsert({
+          user_id:userId,
+          form_data:JSON.stringify(f),
+          report_data:JSON.stringify(parsed),
+        },{onConflict:"user_id"});
+      }catch(pe){console.warn("Failed to persist profile:",pe.message);}
     }catch(e){
-      setReport(fallback(f,ipLocation));
+      const fb=fallback(f,ipLocation);
+      setReport(fb);
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
+      // Still persist the fallback
+      try{
+        await supabase.from("user_profiles").upsert({
+          user_id:userId,
+          form_data:JSON.stringify(f),
+          report_data:JSON.stringify(fb),
+        },{onConflict:"user_id"});
+      }catch(_){}
     }
     setScreen("results");
   },[userId,isPremium,ipLocation]);
 
   const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
-  const handleUnlock=()=>{setIsPaid(false);setScreen("paywall");};
-  const handlePay=()=>{setIsPaid(true);setStreak(s=>s+1);setScreen("results");};
+  const handleUnlock=()=>{setScreen("paywall");};
+  const handlePay=async()=>{
+    const newStreak = streak + 1;
+    setIsPaid(true);
+    setStreak(newStreak);
+    setScreen("results");
+    // Persist paid status + streak so they survive page refreshes
+    if(userId){
+      try{
+        await supabase.from("user_profiles").upsert({
+          user_id:userId,
+          is_paid:true,
+          streak:newStreak,
+          form_data: formData ? JSON.stringify(formData) : null,
+          report_data: report ? JSON.stringify(report) : null,
+        },{onConflict:"user_id"});
+      }catch(e){console.warn("Failed to save paid status:",e.message);}
+    }
+  };
 
   return(
     <>
