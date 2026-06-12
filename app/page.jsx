@@ -121,7 +121,7 @@
  */
 
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, Component } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
@@ -4410,7 +4410,7 @@ async function triggerWelcomeEmail(user){
 // ERROR BOUNDARY
 // Catches React render errors so a broken module doesn't white-screen the app.
 // ═══════════════════════════════════════════════════════════════════════════════
-class ErrorBoundary extends React.Component {
+class ErrorBoundary extends Component {
   constructor(props){ super(props); this.state={hasError:false,error:null}; }
   static getDerivedStateFromError(e){ return{hasError:true,error:e}; }
   componentDidCatch(e,info){ console.error("ErrorBoundary caught:",e,info); }
