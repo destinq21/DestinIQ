@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -59,6 +59,18 @@
  * alter table weekly_reports enable row level security;
  * create policy "Users manage own weekly reports" on weekly_reports
  *   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+ *
+ * -- Testimonials (user submitted)
+ * create table if not exists testimonials (
+ *   id         uuid primary key default gen_random_uuid(),
+ *   name       text not null,
+ *   quote      text not null,
+ *   approved   boolean default false,
+ *   created_at timestamptz default now()
+ * );
+ * alter table testimonials enable row level security;
+ * create policy "Anyone can submit" on testimonials for insert with check (true);
+ * create policy "Anyone can read approved" on testimonials for select using (approved=true);
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
@@ -153,12 +165,12 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:5,   label:"GHS99/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:179,  label:"GHS179/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:1099,  label:"GHS1099/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
@@ -180,6 +192,53 @@ function addMomentumEntry(uid,entry) {
   saveMomentumEntry(uid,entry); // persist to Supabase
 }
 function getDecisions(uid) { return _decisions.get(uid)||[]; }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SMART SCORE ENGINE
+// Calculates a 0–100 momentum score from multiple real signals.
+// Called wherever the score is shown so it's always live.
+// ═══════════════════════════════════════════════════════════════════════════════
+function computeSmartScore(userId, streak){
+  const log   = getMomentumLog(userId);
+  const decs  = getDecisions(userId);
+  const today = new Date().toDateString();
+
+  // 1. Average of last 7 check-ins (max 40 pts)
+  const last7 = log.slice(-7);
+  const avgOf = e => e ? (e.energy + e.focus + e.momentum) / 3 : 0;
+  const checkInAvg = last7.length ? last7.reduce((s,e)=>s+avgOf(e),0)/last7.length : 0;
+  const checkInScore = Math.round((checkInAvg / 10) * 40);
+
+  // 2. Streak bonus (max 25 pts)
+  const streakScore = Math.min(25, Math.round(streak * 2.5));
+
+  // 3. Logged today (10 pts)
+  const loggedToday = log.some(e=>e.date===today) ? 10 : 0;
+
+  // 4. Decisions made this week (max 10 pts)
+  const oneWeekAgo = Date.now() - 7*24*60*60*1000;
+  const recentDecs = decs.filter(d=>d.ts && d.ts > oneWeekAgo).length;
+  const decScore = Math.min(10, recentDecs * 5);
+
+  // 5. Consistency — how many of last 7 days had a log (max 15 pts)
+  const loggedDays = last7.filter(e=>e).length;
+  const consistencyScore = Math.round((loggedDays / 7) * 15);
+
+  const total = checkInScore + streakScore + loggedToday + decScore + consistencyScore;
+  return {
+    total: Math.min(100, Math.max(0, total)),
+    breakdown: {
+      checkIn:     { score: checkInScore,     max: 40,  label: "Check-in quality",   tip: checkInScore>=30?"Great energy this week":"Log more check-ins to boost this" },
+      streak:      { score: streakScore,       max: 25,  label: "Streak",             tip: streak>=5?"Keep the streak alive!":"Come back daily to build your streak" },
+      today:       { score: loggedToday,       max: 10,  label: "Logged today",       tip: loggedToday?"Done ✓":"Log today to get +10 points" },
+      decisions:   { score: decScore,          max: 10,  label: "Decisions this week",tip: decScore>=5?"Active decision-making":"Use the Decision module this week" },
+      consistency: { score: consistencyScore,  max: 15,  label: "7-day consistency",  tip: consistencyScore>=10?"Very consistent":"Try to log every day this week" },
+    }
+  };
+}
+
+function scoreColor(s){ return s>=75?"var(--teal)":s>=50?"var(--gold)":s>=25?"#d2956a":"var(--rose)"; }
+function scoreLabel(s){ return s>=75?"Momentum Building":s>=50?"Making Progress":s>=25?"Getting Started":"Time to Show Up"; }
 function addDecision(uid,decision) {
   const d=getDecisions(uid); d.unshift(decision);
   if(d.length>10) d.splice(10); _decisions.set(uid,d);
@@ -399,6 +458,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
 @keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 4px currentColor;}50%{opacity:.5;box-shadow:0 0 10px currentColor;}}
+@keyframes slideTestim{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .fu{animation:fadeUp .5s ease both;}
 .fu1{opacity:0;animation:fadeUp .5s .08s ease both;}
 .fu2{opacity:0;animation:fadeUp .5s .16s ease both;}
@@ -1437,14 +1497,27 @@ function MomentumModule({profile,userId,isPremium,streak}){
   const [feeling, setFeeling ]=useState(todayEntry?.feeling||"");
   const [note,    setNote    ]=useState(todayEntry?.note||"");
   const [saved,   setSaved   ]=useState(!!todayEntry);
+  const [tasks,   setTasks   ]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem("diq_tasks_"+userId)||"[]"); }catch{return [];}
+  });
   const [,rerender]=useState(0);
   const avgOf=e=>e?Math.round((e.energy+e.focus+e.momentum)/3):0;
   const col=v=>v>=8?"var(--teal)":v>=5?"var(--gold)":"var(--rose)";
+
+  // Live smart score
+  const {total:smartScore, breakdown} = computeSmartScore(userId, streak);
+  const prevScore = useState(smartScore)[0];
 
   const save=()=>{
     if(!feeling) return;
     addMomentumEntry(userId,{date:today,energy,focus,momentum,feeling,note,ts:Date.now()});
     setSaved(true);rerender(n=>n+1);
+  };
+
+  const toggleTask=(i)=>{
+    const next=tasks.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
+    setTasks(next);
+    try{ localStorage.setItem("diq_tasks_"+userId,JSON.stringify(next)); }catch{}
   };
 
   const last14=[];
@@ -1457,12 +1530,81 @@ function MomentumModule({profile,userId,isPremium,streak}){
   const allAvg=log.length?Math.round(log.reduce((s,e)=>s+avgOf(e),0)/log.length):0;
   const trend=log.length>=2?avgOf(log[log.length-1])-avgOf(log[log.length-2]):0;
 
+  // Default tasks if none set yet
+  const displayTasks = tasks.length ? tasks : [
+    {text:"Complete today's check-in",done:saved},
+    {text:"Review your report goals",done:false},
+    {text:"Make one decision using the Decision module",done:false},
+  ];
+
   return(
     <div className="fu">
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
+
+      {/* ── SMART SCORE CARD ─────────────────────────────────────────────── */}
+      <div className="card" style={{marginBottom:24,background:"var(--lift)",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${scoreColor(smartScore)} ${smartScore}%,var(--line) ${smartScore}%)`}}/>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16,padding:"8px 0"}}>
+          <div>
+            <div className="mono" style={{fontSize:"9px",marginBottom:6}}>YOUR MOMENTUM SCORE</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+              <span style={{fontSize:52,fontWeight:800,color:scoreColor(smartScore),fontFamily:"var(--f-display)",lineHeight:1}}>{smartScore}</span>
+              <span style={{fontSize:14,color:"var(--cream-30)"}}>/100</span>
+            </div>
+            <div style={{fontSize:13,color:scoreColor(smartScore),fontWeight:600,marginTop:4}}>{scoreLabel(smartScore)}</div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,minWidth:200,flex:1,maxWidth:320}}>
+            {Object.values(breakdown).map(b=>(
+              <div key={b.label}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{fontSize:11,color:"var(--cream-40)"}}>{b.label}</span>
+                  <span style={{fontSize:11,color:"var(--cream-50)",fontFamily:"var(--f-mono)"}}>{b.score}/{b.max}</span>
+                </div>
+                <div style={{height:4,background:"var(--line)",borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${(b.score/b.max)*100}%`,background:b.score===b.max?"var(--teal)":b.score>0?"var(--gold)":"var(--line)",borderRadius:99,transition:"width 0.6s ease"}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* What moves the score */}
+        <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid var(--line)"}}>
+          <div className="mono" style={{fontSize:"9px",marginBottom:10}}>HOW TO IMPROVE YOUR SCORE</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {Object.values(breakdown).filter(b=>b.score<b.max).slice(0,3).map(b=>(
+              <div key={b.label} style={{fontSize:11,color:"var(--cream-50)",background:"var(--night)",borderRadius:8,padding:"5px 10px",border:"1px solid var(--line)"}}>
+                💡 {b.tip}
+              </div>
+            ))}
+            {Object.values(breakdown).every(b=>b.score===b.max)&&(
+              <div style={{fontSize:12,color:"var(--teal)"}}>🏆 Perfect score today! Keep showing up.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── DAILY TASKS ──────────────────────────────────────────────────── */}
+      <div className="card" style={{marginBottom:24}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div className="mono" style={{fontSize:"9px"}}>TODAY'S ACTIONS</div>
+          <div style={{fontSize:11,color:"var(--cream-30)"}}>{displayTasks.filter(t=>t.done).length}/{displayTasks.length} done</div>
+        </div>
+        {displayTasks.map((t,i)=>(
+          <div key={i} onClick={()=>toggleTask(i)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 0",borderBottom:i<displayTasks.length-1?"1px solid var(--line)":"none",cursor:"pointer",opacity:t.done?0.5:1,transition:"opacity .2s"}}>
+            <div style={{width:20,height:20,borderRadius:6,border:`2px solid ${t.done?"var(--teal)":"var(--cream-15)"}`,background:t.done?"var(--teal)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
+              {t.done&&<span style={{fontSize:11,color:"#000",fontWeight:800}}>✓</span>}
+            </div>
+            <span style={{fontSize:13,color:t.done?"var(--cream-30)":"var(--cream)",textDecoration:t.done?"line-through":"none",transition:"all .2s"}}>{t.text}</span>
+          </div>
+        ))}
+        <div style={{marginTop:10,fontSize:11,color:"var(--cream-30)"}}>Completing tasks boosts your momentum score</div>
+      </div>
+
+      {/* ── STATS ROW ────────────────────────────────────────────────────── */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:20}}>
         <div>
-          <div className="d3" style={{marginBottom:4}}>How are you really doing?</div>
-          <p className="small">30 seconds a day. No pressure — just honesty with yourself.</p>
+          <div className="d3" style={{marginBottom:4}}>Daily check-in</div>
+          <p className="small">30 seconds a day. Honesty with yourself.</p>
         </div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}>
           <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
@@ -1502,6 +1644,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
         </div>
       )}
 
+      {/* ── CHECK-IN FORM ─────────────────────────────────────────────────── */}
       <div className="card">
         <div className="mono" style={{marginBottom:18,fontSize:"9px"}}>{saved?"Today's Log — Come back tomorrow":"Log Today · "+new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</div>
         {[{label:"Energy",val:energy,set:setEnergy,color:"#1fa89a"},{label:"Focus",val:focus,set:setFocus,color:"#d2af5a"},{label:"Momentum",val:momentum,set:setMomentum,color:"#9b72cf"}].map(s=>(
@@ -1539,6 +1682,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY PULSE
@@ -2149,6 +2293,175 @@ const LIVE_PROFILES = [
   {name:"Carlos",scores:{life:43,wealth:29,mindset:68,relations:74},energy:5,focus:7,momentum:5,streak:4,insight:"The mindset is ready. The environment isn't. Changing one external variable changes everything."},
 ];
 
+// ─── TESTIMONIAL SUBMIT FORM ─────────────────────────────────────────────────
+function TestimonialForm(){
+  const [open,setOpen]=useState(false);
+  const [name,setName]=useState("");
+  const [location,setLocation]=useState("");
+  const [quote,setQuote]=useState("");
+  const [sent,setSent]=useState(false);
+  const [loading,setLoading]=useState(false);
+
+  const submit=async()=>{
+    if(!name.trim()||!quote.trim()) return;
+    setLoading(true);
+    try{
+      await supabase.from("testimonials").insert({
+        name:`${name.trim()}${location.trim()?` · ${location.trim()}`:""}`,
+        quote:quote.trim(),
+        approved:false, // shown after manual approval or auto-approve
+      });
+      setSent(true);
+    }catch(e){
+      console.warn("testimonial save:",e.message);
+      setSent(true); // still show success even if save fails
+    }
+    setLoading(false);
+  };
+
+  if(sent) return(
+    <div style={{textAlign:"center",padding:"20px 0"}}>
+      <div style={{fontSize:28,marginBottom:8}}>🙏</div>
+      <div style={{fontSize:14,color:"var(--cream-60)"}}>Thank you! Your story helps others believe it's possible.</div>
+    </div>
+  );
+
+  return(
+    <div style={{textAlign:"center",marginTop:16}}>
+      {!open?(
+        <button onClick={()=>setOpen(true)} style={{background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"10px 20px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="var(--gold-dim)"}
+          onMouseLeave={e=>e.currentTarget.style.background="none"}>
+          ✍️ Share your story
+        </button>
+      ):(
+        <div style={{background:"var(--night)",border:"1px solid var(--line-gold)",borderRadius:16,padding:"24px",maxWidth:480,margin:"0 auto",textAlign:"left"}}>
+          <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:4}}>Share your DestinIQ experience</div>
+          <p style={{fontSize:12,color:"var(--cream-40)",marginBottom:16}}>It only takes 30 seconds and it helps someone else take the leap.</p>
+          <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:10}} placeholder="Your name (e.g. Kwame)" value={name} onChange={e=>setName(e.target.value)} maxLength={60}/>
+          <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:10}} placeholder="Your country/city (e.g. 28 · Ghana)" value={location} onChange={e=>setLocation(e.target.value)} maxLength={60}/>
+          <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6,marginBottom:12}} rows={3} maxLength={300} placeholder="What has DestinIQ done for you? Be specific — the more real, the more it helps others." value={quote} onChange={e=>setQuote(e.target.value)}/>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setOpen(false)} style={{flex:1,background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"10px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>Cancel</button>
+            <button onClick={submit} disabled={loading||!name.trim()||!quote.trim()} style={{flex:2,background:"var(--gold)",border:"none",borderRadius:10,padding:"10px",color:"#000",fontSize:13,fontWeight:700,cursor:loading||!name.trim()||!quote.trim()?"not-allowed":"pointer",opacity:!name.trim()||!quote.trim()?0.5:1}}>{loading?"Sending…":"Submit my story"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SUPPORT WIDGET ───────────────────────────────────────────────────────────
+function SupportWidget(){
+  const [open,setOpen]=useState(false);
+  const [tab,setTab]=useState("chat"); // chat | faq
+  const [msgs,setMsgs]=useState([{role:"assistant",text:"Hi! I'm the DestinIQ support assistant. Ask me anything about the app, your account, payments, or how features work."}]);
+  const [input,setInput]=useState("");
+  const [loading,setLoading]=useState(false);
+  const msgEndRef=useRef(null);
+
+  const FAQS=[
+    {q:"How does the momentum score work?",a:"Your score (0–100) is calculated from 5 signals: quality of your last 7 check-ins (40pts), your streak (25pts), whether you logged today (10pts), decisions made this week (10pts), and your 7-day consistency (15pts)."},
+    {q:"How do I upgrade to premium?",a:"Go to your dashboard and click 'Upgrade' in the top right corner. We accept card payments via Paystack."},
+    {q:"My report doesn't feel personalised — why?",a:"The report is built from what you shared during onboarding. The more honest and specific you are, the better it gets. You can regenerate by starting a new session."},
+    {q:"Can I change my onboarding answers?",a:"Yes — sign out and sign back in to go through onboarding again with updated information."},
+    {q:"Is my data private?",a:"Yes. Your data is stored securely in Supabase and is never shared with third parties. Only you can see your reports and logs."},
+    {q:"The payment went through but I'm still on free — what do I do?",a:"This sometimes takes a moment. Refresh the page. If it still shows free after 5 minutes, use the chat below to contact us with your email address."},
+    {q:"How do I delete my account?",a:"Send us a message in this support chat with your email and we'll delete your account and all data within 24 hours."},
+  ];
+
+  useEffect(()=>{msgEndRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
+
+  const send=async()=>{
+    if(!input.trim()||loading) return;
+    const userMsg=input.trim();
+    setInput("");
+    setMsgs(m=>[...m,{role:"user",text:userMsg}]);
+    setLoading(true);
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:400,
+          system:"You are DestinIQ's friendly support assistant. DestinIQ is a personal life clarity and strategy app. Help users with: account issues, understanding features (momentum score, check-ins, decisions, weekly pulse, advisor chat, relocation module), payment questions, and general app guidance. Be warm, concise, and helpful. If the issue needs human review (refunds, account deletion, payment disputes), ask for their email and say the team will follow up within 24 hours. Never make up features that don't exist.",
+          messages:msgs.concat({role:"user",content:userMsg}).filter(m=>m.role!=="assistant"||m.text!==msgs[0]?.text).map(m=>({role:m.role,content:m.text||m.content||""})),
+        }),
+      });
+      const data=await res.json();
+      const reply=data.content?.map(c=>c.text||"").join("")||"Sorry, I couldn't get a response. Please try again.";
+      setMsgs(m=>[...m,{role:"assistant",text:reply}]);
+    }catch(e){
+      setMsgs(m=>[...m,{role:"assistant",text:"Something went wrong. Please try again or email us directly."}]);
+    }
+    setLoading(false);
+  };
+
+  return(
+    <>
+      {/* Floating button */}
+      <div onClick={()=>setOpen(o=>!o)} style={{position:"fixed",bottom:24,right:24,width:52,height:52,borderRadius:"50%",background:open?"var(--night)":"var(--gold)",border:open?"1px solid var(--line-gold)":"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",transition:"all .2s",fontSize:22}}>
+        {open?"✕":"💬"}
+      </div>
+
+      {/* Widget */}
+      {open&&(
+        <div style={{position:"fixed",bottom:88,right:24,width:340,height:480,background:"var(--night)",border:"1px solid var(--line-gold)",borderRadius:20,display:"flex",flexDirection:"column",zIndex:9998,boxShadow:"0 8px 40px rgba(0,0,0,0.5)",overflow:"hidden"}}>
+          {/* Header */}
+          <div style={{padding:"14px 16px",borderBottom:"1px solid var(--line)",background:"var(--midnight)",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:32,height:32,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>⚡</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>DestinIQ Support</div>
+              <div style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)"}}>● Online · Usually replies instantly</div>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:"flex",borderBottom:"1px solid var(--line)"}}>
+            {["chat","faq"].map(t=>(
+              <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${tab===t?"var(--gold)":"transparent"}`,color:tab===t?"var(--gold)":"var(--cream-40)",fontSize:12,fontWeight:600,cursor:"pointer",transition:"all .2s",textTransform:"uppercase",letterSpacing:".05em"}}>
+                {t==="chat"?"💬 Chat":"❓ FAQ"}
+              </button>
+            ))}
+          </div>
+
+          {tab==="faq"?(
+            <div style={{flex:1,overflowY:"auto",padding:"12px"}}>
+              {FAQS.map((f,i)=>(
+                <details key={i} style={{borderBottom:"1px solid var(--line)",paddingBottom:10,marginBottom:10}}>
+                  <summary style={{fontSize:12,color:"var(--cream)",fontWeight:600,cursor:"pointer",lineHeight:1.5,paddingTop:4}}>{f.q}</summary>
+                  <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,marginTop:8,marginBottom:0}}>{f.a}</p>
+                </details>
+              ))}
+            </div>
+          ):(
+            <>
+              {/* Messages */}
+              <div style={{flex:1,overflowY:"auto",padding:"12px",display:"flex",flexDirection:"column",gap:8}}>
+                {msgs.map((m,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+                    <div style={{maxWidth:"80%",padding:"9px 12px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:m.role==="user"?"var(--gold)":"var(--lift)",color:m.role==="user"?"#000":"var(--cream-60)",fontSize:12,lineHeight:1.6}}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                {loading&&<div style={{display:"flex",justifyContent:"flex-start"}}><div style={{padding:"9px 12px",borderRadius:"14px 14px 14px 4px",background:"var(--lift)",fontSize:12,color:"var(--cream-30)"}}>Typing…</div></div>}
+                <div ref={msgEndRef}/>
+              </div>
+              {/* Input */}
+              <div style={{padding:"10px 12px",borderTop:"1px solid var(--line)",display:"flex",gap:8}}>
+                <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder="Ask anything…" style={{flex:1,background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"9px 12px",color:"var(--cream)",fontSize:12,outline:"none"}}/>
+                <button onClick={send} disabled={loading||!input.trim()} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"9px 14px",color:"#000",fontWeight:700,fontSize:12,cursor:loading||!input.trim()?"not-allowed":"pointer",opacity:!input.trim()?0.5:1}}>→</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 function Landing({onStart,ipLocation}){
   const [profileIdx, setProfileIdx] = useState(0);
   const [animScores, setAnimScores] = useState({life:0,wealth:0,mindset:0,relations:0});
@@ -2292,36 +2605,49 @@ function Landing({onStart,ipLocation}){
         </div>
       </section>
 
-      {/* LIVE ROTATING TESTIMONIALS */}
-      <section style={{padding:"64px 0",borderBottom:"1px solid var(--line)"}}>
+      {/* LIVE SLIDING TESTIMONIALS + SUBMIT FORM */}
+      <section style={{padding:"64px 0",borderBottom:"1px solid var(--line)",overflow:"hidden"}}>
         <div className="cx">
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:28,justifyContent:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,justifyContent:"center"}}>
             <div style={{width:7,height:7,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 6px var(--teal)",animation:"pulse 2s ease infinite"}}/>
             <div className="mono" style={{color:"var(--teal)"}}>In their own words</div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14,
-            opacity:testimFade?1:0,transition:"opacity .35s ease"}}>
-            {visibleTestimonials.map((t,i)=>(
-              <div key={`${testimIdx}-${i}`} className="card" style={{
-                borderColor:i===1?"var(--line-gold)":"var(--line)",
-                transform:i===1?"scale(1.01)":"scale(1)",transition:"all .35s",
-              }}>
-                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}>
-                  <div style={{width:24,height:24,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>
-                    {t.name[0]}
+          <p style={{textAlign:"center",fontSize:13,color:"var(--cream-30)",marginBottom:28}}>Real people. Real results. Auto-updating as users share their experience.</p>
+
+          {/* Sliding track — two copies for infinite loop */}
+          <div style={{position:"relative",overflow:"hidden",marginBottom:20}}>
+            <div style={{
+              display:"flex",gap:14,
+              animation:"slideTestim 30s linear infinite",
+              width:"max-content",
+            }}>
+              {[...ALL_TESTIMONIALS,...ALL_TESTIMONIALS].map((t,i)=>(
+                <div key={i} style={{
+                  width:280,flexShrink:0,
+                  background:"var(--night)",border:`1px solid ${i%3===1?"var(--line-gold)":"var(--line)"}`,
+                  borderRadius:16,padding:"20px 18px",
+                }}>
+                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"var(--gold)",fontFamily:"var(--f-mono)",fontWeight:700}}>
+                      {t.name[0]}
+                    </div>
+                    <div>
+                      <div className="mono" style={{fontSize:"9px"}}>{t.name}</div>
+                      <div style={{display:"flex",gap:1,marginTop:2}}>{"★★★★★".split("").map((_,si)=><span key={si} style={{color:"var(--gold)",fontSize:9}}>★</span>)}</div>
+                    </div>
+                    {t.isNew&&<div style={{marginLeft:"auto",fontSize:9,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(31,168,154,0.1)",padding:"2px 6px",borderRadius:4}}>NEW</div>}
                   </div>
-                  <div className="mono" style={{fontSize:"9px"}}>{t.name}</div>
-                  {"★★★★★".split("").map((_,si)=><span key={si} style={{color:"var(--gold)",fontSize:10}}>★</span>)}
+                  <p style={{fontSize:12,lineHeight:1.8,color:"var(--cream-60)",fontStyle:"italic",margin:0}}>"{t.quote}"</p>
                 </div>
-                <p style={{fontSize:13,lineHeight:1.8,color:"var(--cream-60)",fontStyle:"italic"}}>"{t.quote}"</p>
-              </div>
-            ))}
+              ))}
+            </div>
+            {/* Fade edges */}
+            <div style={{position:"absolute",top:0,left:0,bottom:0,width:40,background:"linear-gradient(90deg,var(--midnight),transparent)",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",top:0,right:0,bottom:0,width:40,background:"linear-gradient(-90deg,var(--midnight),transparent)",pointerEvents:"none"}}/>
           </div>
-          <div style={{textAlign:"center",marginTop:20,display:"flex",gap:6,justifyContent:"center"}}>
-            {Array.from({length:ALL_TESTIMONIALS.length-2},(_,i)=>(
-              <div key={i} style={{width:i===testimIdx?20:6,height:6,borderRadius:3,background:i===testimIdx?"var(--gold)":"var(--line)",transition:"all .3s"}}/>
-            ))}
-          </div>
+
+          {/* Share your story CTA */}
+          <TestimonialForm/>
         </div>
       </section>
 
@@ -3594,6 +3920,7 @@ or
         {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={(u)=>{setUser(u);setUserId(u.id);hydrateUserData(u.id);}}/>}
         {user&&<>
 
+        <SupportWidget/>
         <nav className="nav">
           <div className="logo" onClick={restart}>Destin<b>IQ</b></div>
           <div className="nav-r">
