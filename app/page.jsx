@@ -3974,10 +3974,60 @@ function PolicyPage({type,onBack}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // 2. PROFILE PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onManageSubscription}){
+function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onManageSubscription,onPhotoUpdate}){
   const [name,setName]=useState(user?.name||"");
   const [saved,setSaved]=useState(false);
   const [loading,setLoading]=useState(false);
+  const [photoURL,setPhotoURL]=useState(null);
+  const [photoUploading,setPhotoUploading]=useState(false);
+
+  // Load existing photo on mount
+  useEffect(()=>{
+    if(!user?.id) return;
+    const{data}=supabase.storage.from("avatars").getPublicUrl(`${user.id}/avatar`);
+    // Check if it actually exists by trying to load it
+    const img=new Image();
+    img.onload=()=>setPhotoURL(data.publicUrl+"?t="+Date.now());
+    img.onerror=()=>setPhotoURL(null);
+    img.src=data.publicUrl;
+  },[user?.id]);
+
+  const handlePhotoUpload=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    // Validate size (max 3MB) and type
+    if(file.size>3*1024*1024){alert("Photo must be under 3MB.");return;}
+    if(!file.type.startsWith("image/")){alert("Please select an image file.");return;}
+    setPhotoUploading(true);
+    try{
+      // Resize/compress by drawing to canvas
+      const bitmap=await createImageBitmap(file);
+      const canvas=document.createElement("canvas");
+      const MAX=400;
+      const scale=Math.min(MAX/bitmap.width,MAX/bitmap.height,1);
+      canvas.width=bitmap.width*scale;
+      canvas.height=bitmap.height*scale;
+      canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const blob=await new Promise(res=>canvas.toBlob(res,"image/jpeg",0.85));
+
+      const{error}=await supabase.storage.from("avatars").upload(`${user.id}/avatar`,blob,{
+        contentType:"image/jpeg",
+        upsert:true,
+      });
+      if(error) throw error;
+
+      const{data}=supabase.storage.from("avatars").getPublicUrl(`${user.id}/avatar`);
+      const newUrl=data.publicUrl+"?t="+Date.now();
+      setPhotoURL(newUrl);
+      onPhotoUpdate&&onPhotoUpdate(newUrl);
+
+      // Save photo URL to profile
+      await saveUserProfile(user.id,{photo_url:data.publicUrl});
+    }catch(err){
+      alert("Upload failed: "+err.message);
+    }
+    setPhotoUploading(false);
+  };
 
   const save=async()=>{
     setLoading(true);
@@ -3997,15 +4047,26 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
       <div style={{maxWidth:560,margin:"0 auto",padding:"0 24px"}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
 
-        {/* Avatar */}
+        {/* Avatar with photo upload */}
         <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:32}}>
-          <div style={{width:64,height:64,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:700,color:"#000"}}>
-            {(user?.name||user?.email||"U")[0].toUpperCase()}
+          <div style={{position:"relative",flexShrink:0}}>
+            <div style={{width:72,height:72,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:700,color:"#000",overflow:"hidden",border:"2px solid var(--line-gold)"}}>
+              {photoURL
+                ?<img src={photoURL} alt="Profile" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                :(user?.name||user?.email||"U")[0].toUpperCase()
+              }
+            </div>
+            {/* Upload button overlay */}
+            <label htmlFor="photo-upload" style={{position:"absolute",bottom:0,right:0,width:24,height:24,borderRadius:"50%",background:"var(--gold)",border:"2px solid var(--midnight)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:12}}>
+              {photoUploading?"…":"📷"}
+            </label>
+            <input id="photo-upload" type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoUpload}/>
           </div>
           <div>
             <div style={{fontSize:20,fontWeight:700,color:"var(--cream)"}}>{user?.name||"Your Profile"}</div>
             <div style={{fontSize:13,color:"var(--cream-40)"}}>{user?.email||user?.phone||""}</div>
             <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:4,padding:"2px 10px",borderRadius:20,border:`1px solid ${planColor}`,fontSize:11,color:planColor,fontFamily:"var(--f-mono)"}}>{planLabel} Plan</div>
+            {photoURL&&<div style={{fontSize:11,color:"var(--teal)",marginTop:4}}>✓ Photo saved</div>}
           </div>
         </div>
 
@@ -4526,7 +4587,11 @@ or
 
         <SupportWidget/>
         <nav className="nav">
-          <div className="logo" onClick={restart}>Destin<b>IQ</b></div>
+          <div className="logo" onClick={()=>{
+            if(report) setScreen("results");
+            else if(user) setScreen("landing");
+            else setScreen("landing");
+          }}>Destin<b>IQ</b></div>
           <div className="nav-r">
             {screen!=="landing"&&<PremiumToggle isPremium={isPremium} onToggle={()=>setIsPremium(p=>!p)}/>}
             {user&&<button onClick={()=>setShowProfile(true)} style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"none",cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center"}} title="Profile">{(user.name||user.email||"U")[0].toUpperCase()}</button>}
@@ -4539,7 +4604,7 @@ or
             {screen==="results"&&!isPaid&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={handleUnlock}>Upgrade</button>}
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
             {screen==="results"&&report&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setShowShare(true)}>Share 📤</button>}
-            {screen!=="landing"&&<button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={restart}>← Home</button>}
+            {screen!=="landing"&&screen!=="results"&&<button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>report?setScreen("results"):setScreen("landing")}>← Home</button>}
             {screen==="landing"&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("intake")}>Begin →</button>}
           </div>
         </nav>
@@ -4569,6 +4634,7 @@ or
 
         {/* Profile page */}
         {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} streak={streak}
+          onPhotoUpdate={(url)=>setNavPhotoURL(url)}
           onBack={()=>setShowProfile(false)}
           onSignOut={async()=>{await supabase.auth.signOut();setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);setShowProfile(false);}}
           onManageSubscription={()=>{setShowProfile(false);handleUnlock();}}/>}
