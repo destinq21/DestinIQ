@@ -1047,7 +1047,9 @@ How to be with them:
 - Match their energy — if they're anxious, be calm. If they're excited, match it
 - End with a question that invites them to go deeper — not a summary
 
-You are their corner. The one place where they don't have to pretend everything is fine. Act like it.`;
+You are their corner. The one place where they don't have to pretend everything is fine. Act like it.
+
+FORMATTING: Write in plain conversational sentences. No **bold** asterisks. No bullet symbols. If giving steps, number them cleanly (1. 2. 3.). Keep it human and readable.`;
 }
 
 
@@ -1706,7 +1708,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
     if(log.length<3){setError("Log at least 3 days of momentum to generate your weekly pulse.");return;}
     setLoading(true);setError("");
     try{
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:"You are DestinIQ's weekly pattern analyst. Be direct, specific, insightful. Never generic.",userId,isPremium});
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:"You are DestinIQ's weekly pattern analyst. Be direct, specific, insightful. Never generic. Write in clean plain sentences — no **bold** asterisks, no bullet symbols unless using clean numbered steps.",userId,isPremium});
       const r={weekOf:weekLabel(),text:txt,ts:Date.now()};
       const existing=_weeklyReports.get(userId)||[];
       existing.unshift(r);if(existing.length>4)existing.pop();
@@ -1771,7 +1773,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
               <button className="btn btn-ghost btn-sm" onClick={generate} disabled={loading}>{loading?"Refreshing…":"↺ Refresh"}</button>
             </div>
             <div className="card" style={{background:"var(--lift)"}}>
-              <div style={{fontSize:15,lineHeight:1.85,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap"}}>{report.text}</div>
+              <RenderMD text={report.text} style={{fontSize:15,lineHeight:1.85,fontWeight:300}}/>
             </div>
             {(_weeklyReports.get(userId)||[]).length>1&&(
               <div style={{marginTop:20}}>
@@ -2235,7 +2237,12 @@ function AdvisorChat({profile,reportData,userId,isPremium}){
           {msgs.map((m,i)=>(
             <div key={i} className={`chat-msg msg-in ${m.role==="user"?"me":""}`}>
               <div className={`av ${m.role==="user"?"av-u":"av-d"}`}>{m.role==="user"?profile.name[0]?.toUpperCase():"IQ"}</div>
-              <div className={`bubble ${m.role==="user"?"bubble-u":"bubble-d"}`} style={{whiteSpace:"pre-wrap"}}>{m.content}</div>
+              <div className={`bubble ${m.role==="user"?"bubble-u":"bubble-d"}`}>
+                {m.role==="user"
+                  ?<span style={{whiteSpace:"pre-wrap"}}>{m.content}</span>
+                  :<RenderMD text={m.content}/>
+                }
+              </div>
             </div>
           ))}
           {loading&&(
@@ -2349,6 +2356,80 @@ function TestimonialForm(){
       )}
     </div>
   );
+}
+
+// ─── MARKDOWN RENDERER ───────────────────────────────────────────────────────
+// Converts AI markdown to clean readable JSX. No external libs needed.
+function RenderMD({text,style={}}){
+  if(!text) return null;
+  const lines = text.split("\n");
+  const elements = [];
+  let i = 0;
+
+  const parseInline = (str) => {
+    // Bold **text**
+    const parts = str.split(/\*\*(.*?)\*\*/g);
+    return parts.map((p,idx) =>
+      idx%2===1 ? <strong key={idx} style={{color:"var(--cream)",fontWeight:700}}>{p}</strong> : p
+    );
+  };
+
+  while(i < lines.length){
+    const line = lines[i].trim();
+    if(!line){ i++; continue; }
+
+    // Numbered list item
+    const numMatch = line.match(/^(\d+)\.\s+(.+)/);
+    if(numMatch){
+      const items = [];
+      while(i < lines.length){
+        const l = lines[i].trim();
+        const m = l.match(/^(\d+)\.\s+(.+)/);
+        if(!m) break;
+        items.push(<div key={i} style={{display:"flex",gap:10,marginBottom:6}}>
+          <span style={{minWidth:20,height:20,borderRadius:"50%",background:"var(--gold)",color:"#000",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{m[1]}</span>
+          <span style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6}}>{parseInline(m[2])}</span>
+        </div>);
+        i++;
+      }
+      elements.push(<div key={`num-${i}`} style={{margin:"8px 0"}}>{items}</div>);
+      continue;
+    }
+
+    // Bullet list item
+    const bulletMatch = line.match(/^[-•*]\s+(.+)/);
+    if(bulletMatch){
+      const items = [];
+      while(i < lines.length){
+        const l = lines[i].trim();
+        const m = l.match(/^[-•*]\s+(.+)/);
+        if(!m) break;
+        items.push(<div key={i} style={{display:"flex",gap:8,marginBottom:5}}>
+          <span style={{color:"var(--gold)",marginTop:6,flexShrink:0,fontSize:8}}>◆</span>
+          <span style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6}}>{parseInline(m[1])}</span>
+        </div>);
+        i++;
+      }
+      elements.push(<div key={`bull-${i}`} style={{margin:"6px 0"}}>{items}</div>);
+      continue;
+    }
+
+    // Heading ### or ##
+    if(line.startsWith("###")){
+      elements.push(<div key={i} style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginTop:12,marginBottom:4}}>{line.replace(/^#+\s*/,"")}</div>);
+      i++; continue;
+    }
+    if(line.startsWith("##")){
+      elements.push(<div key={i} style={{fontSize:14,fontWeight:700,color:"var(--gold)",marginTop:14,marginBottom:6}}>{line.replace(/^#+\s*/,"")}</div>);
+      i++; continue;
+    }
+
+    // Regular paragraph
+    elements.push(<p key={i} style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:"4px 0"}}>{parseInline(line)}</p>);
+    i++;
+  }
+
+  return <div style={{...style}}>{elements}</div>;
 }
 
 // ─── SUPPORT WIDGET ───────────────────────────────────────────────────────────
@@ -3516,7 +3597,7 @@ Write exactly 3 sentences:
 3. Close with something that makes them feel understood and capable.
 
 Do NOT use generic motivational language. Be specific, direct, and honest.`;
-      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You are a direct, honest daily advisor. Write exactly 3 sentences. No greetings, no headers, no lists — just 3 powerful sentences.",userId,isPremium});
+      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You are a direct, honest daily advisor. Write exactly 3 sentences. No greetings, no headers, no lists, no **bold** asterisks — just 3 powerful plain sentences.",userId,isPremium});
       setDailyInsight(reply);
       pushToMemory(userId,"assistant","Daily refresh: "+reply.slice(0,200));
     }catch(e){
