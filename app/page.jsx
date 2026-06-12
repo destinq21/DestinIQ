@@ -2379,21 +2379,18 @@ function SupportWidget(){
     setMsgs(m=>[...m,{role:"user",text:userMsg}]);
     setLoading(true);
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-6",
-          max_tokens:400,
-          system:"You are DestinIQ's friendly support assistant. DestinIQ is a personal life clarity and strategy app. Help users with: account issues, understanding features (momentum score, check-ins, decisions, weekly pulse, advisor chat, relocation module), payment questions, and general app guidance. Be warm, concise, and helpful. If the issue needs human review (refunds, account deletion, payment disputes), ask for their email and say the team will follow up within 24 hours. Never make up features that don't exist.",
-          messages:msgs.concat({role:"user",content:userMsg}).filter(m=>m.role!=="assistant"||m.text!==msgs[0]?.text).map(m=>({role:m.role,content:m.text||m.content||""})),
-        }),
+      const history = msgs.concat({role:"user",content:userMsg})
+        .filter(m=>m.role!=="assistant"||m.text!==msgs[0]?.text)
+        .map(m=>({role:m.role,content:m.text||m.content||""}));
+      const reply=await callAPI({
+        messages:history,
+        system:"You are DestinIQ's friendly support assistant. DestinIQ is a personal life clarity and strategy app. Help users with: account issues, understanding features (momentum score, check-ins, decisions, weekly pulse, advisor chat, relocation module), payment questions, and general app guidance. Be warm, concise, and helpful. If the issue needs human review (refunds, account deletion, payment disputes), ask for their email and say the team will follow up within 24 hours. Never make up features that don't exist.",
+        userId:null,
+        isPremium:false,
       });
-      const data=await res.json();
-      const reply=data.content?.map(c=>c.text||"").join("")||"Sorry, I couldn't get a response. Please try again.";
       setMsgs(m=>[...m,{role:"assistant",text:reply}]);
     }catch(e){
-      setMsgs(m=>[...m,{role:"assistant",text:"Something went wrong. Please try again or email us directly."}]);
+      setMsgs(m=>[...m,{role:"assistant",text:"Something went wrong. Please try again."}]);
     }
     setLoading(false);
   };
