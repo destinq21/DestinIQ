@@ -72,6 +72,34 @@
  * create policy "Anyone can submit" on testimonials for insert with check (true);
  * create policy "Anyone can read approved" on testimonials for select using (approved=true);
  *
+ * -- User profiles (onboarding data + subscription)
+ * create table if not exists user_profiles (
+ *   user_id     uuid primary key references auth.users(id) on delete cascade,
+ *   name        text,
+ *   form_data   jsonb,
+ *   report      jsonb,
+ *   is_paid     boolean default false,
+ *   is_premium  boolean default false,
+ *   streak      int default 1,
+ *   created_at  timestamptz default now(),
+ *   updated_at  timestamptz default now()
+ * );
+ * alter table user_profiles enable row level security;
+ * create policy "Users manage own profile" on user_profiles
+ *   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+ *
+ * -- Referrals
+ * create table if not exists referrals (
+ *   id          uuid primary key default gen_random_uuid(),
+ *   referrer_id uuid references auth.users(id) on delete cascade,
+ *   referred_id uuid references auth.users(id) on delete cascade,
+ *   created_at  timestamptz default now(),
+ *   unique(referred_id)
+ * );
+ * alter table referrals enable row level security;
+ * create policy "Users see own referrals" on referrals
+ *   for select using (auth.uid() = referrer_id);
+ *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
@@ -102,21 +130,15 @@ const _notifTimers   = new Map(); // userId -> timeoutId
 
 // ─── SUPABASE DB HELPERS ─────────────────────────────────────────────────────
 
-// In-memory cache for user profiles (formData + paid status + report)
-const _userProfiles = new Map(); // userId -> {formData, isPaid, report, streak}
-
-/** Get persisted user profile from cache. */
-function getUserProfile(userId) { return _userProfiles.get(userId) || null; }
-
 /** Hydrate all per-user data from Supabase into the in-memory caches. */
 async function hydrateUserData(userId) {
   try {
-    const [momRes, decRes, wkRes, profRes] = await Promise.all([
+    const [momRes, decRes, wkRes] = await Promise.all([
       supabase.from("momentum_logs").select("*").eq("user_id", userId).order("date", { ascending: true }),
       supabase.from("decisions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("weekly_reports").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-      supabase.from("user_profiles").select("*").eq("user_id", userId).maybeSingle(),
     ]);
+    // Note: profile (onboarding + subscription) is loaded separately via loadUserProfile
     if (momRes.data?.length) {
       _momentumLog.set(userId, momRes.data.map(r => ({
         date: r.date, energy: r.energy, focus: r.focus,
@@ -133,14 +155,6 @@ async function hydrateUserData(userId) {
       _weeklyReports.set(userId, wkRes.data.map(r => ({
         weekOf: r.week_of, text: r.text, ts: new Date(r.created_at).getTime(),
       })));
-    }
-    if (profRes.data) {
-      _userProfiles.set(userId, {
-        formData: profRes.data.form_data ? JSON.parse(profRes.data.form_data) : null,
-        isPaid: profRes.data.is_paid || false,
-        report: profRes.data.report_data ? JSON.parse(profRes.data.report_data) : null,
-        streak: profRes.data.streak || 1,
-      });
     }
   } catch (e) {
     console.warn("hydrateUserData:", e.message);
@@ -169,6 +183,25 @@ async function saveDecision(userId, decision) {
   } catch (e) { console.warn("saveDecision:", e.message); }
 }
 
+/** Save or update user profile (onboarding data + subscription status). */
+async function saveUserProfile(userId, data) {
+  try {
+    await supabase.from("user_profiles").upsert({
+      user_id: userId,
+      ...data,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+  } catch (e) { console.warn("saveUserProfile:", e.message); }
+}
+
+/** Load user profile from Supabase. Returns null if not found. */
+async function loadUserProfile(userId) {
+  try {
+    const { data } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single();
+    return data || null;
+  } catch (e) { return null; }
+}
+
 /** Upsert a weekly report. */
 async function saveWeeklyReport(userId, report) {
   try {
@@ -180,12 +213,12 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:1,   label:"GHS99/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:15,  label:"GHS179/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:99,  label:"GHS1099/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
@@ -474,6 +507,23 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 @keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 4px currentColor;}50%{opacity:.5;box-shadow:0 0 10px currentColor;}}
 @keyframes slideTestim{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@media(max-width:640px){
+  .cx{padding:0 16px;}
+  .cx-md{padding:0 16px;}
+  .d1{font-size:clamp(32px,9vw,52px)!important;}
+  .d2{font-size:clamp(22px,6vw,36px)!important;}
+  .card{padding:16px!important;}
+  .nav{padding:0 16px!important;}
+  .fu{padding:0 16px 40px!important;}
+  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
+  .results-grid{grid-template-columns:1fr!important;}
+  .score-grid{grid-template-columns:1fr 1fr!important;}
+}
+@media(max-width:400px){
+  .d1{font-size:28px!important;}
+  .nav-logo{font-size:16px!important;}
+}
 .fu{animation:fadeUp .5s ease both;}
 .fu1{opacity:0;animation:fadeUp .5s .08s ease both;}
 .fu2{opacity:0;animation:fadeUp .5s .16s ease both;}
@@ -3425,7 +3475,10 @@ function AuthScreen({onAuth}){
         </div>
 
         <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"var(--cream-30)"}}>
-          By continuing you agree to our Terms of Service and Privacy Policy
+          By continuing you agree to our{" "}
+          <span onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"terms"}))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
+          {" "}and{" "}
+          <span onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
         </div>
       </div>
     </div>
@@ -3724,6 +3777,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           )}
 
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
+            {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
@@ -3861,6 +3915,410 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. PRIVACY POLICY & TERMS OF SERVICE
+// ═══════════════════════════════════════════════════════════════════════════════
+function PolicyPage({type,onBack}){
+  const isPrivacy = type==="privacy";
+  return(
+    <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
+      <div className="cx-md">
+        <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
+        <div style={{fontFamily:"var(--f-display)",fontSize:36,color:"var(--cream)",marginBottom:8}}>{isPrivacy?"Privacy Policy":"Terms of Service"}</div>
+        <div style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:40}}>Last updated: June 2026</div>
+
+        {isPrivacy?(
+          <div style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.9}}>
+            {[
+              ["What We Collect","We collect the information you provide during onboarding (name, age, country, goals, challenges), your daily check-in data, decisions you log, and your payment information processed securely via Paystack. We also collect your email address and, if you sign in with Google, your Google profile name."],
+              ["How We Use Your Data","Your data is used exclusively to generate your personalised DestinIQ reports, track your momentum over time, and improve the accuracy of your advisor. We do not use your data for advertising. We do not sell your data to any third party, ever."],
+              ["Data Storage","All data is stored securely on Supabase (hosted on AWS). Your report data and check-in logs are encrypted at rest. Only you can access your personal data through your authenticated account."],
+              ["AI Processing","Your profile information is sent to Anthropic's Claude AI to generate your personalised reports and advisor responses. This data is processed under Anthropic's data processing agreement and is not used to train their models."],
+              ["Payments","Payments are processed by Paystack. We do not store your card details. Paystack's privacy policy applies to payment data."],
+              ["Your Rights","You can request deletion of your account and all associated data at any time by contacting us through the support chat or emailing us directly. We will process deletion requests within 24 hours."],
+              ["Cookies","We use only essential cookies required for authentication. We do not use tracking or advertising cookies."],
+              ["Contact","For any privacy concerns, contact us via the support widget in the app or email destiniq@gmail.com."],
+            ].map(([h,b])=>(
+              <div key={h} style={{marginBottom:28}}>
+                <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
+                <p style={{margin:0}}>{b}</p>
+              </div>
+            ))}
+          </div>
+        ):(
+          <div style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.9}}>
+            {[
+              ["Acceptance","By creating a DestinIQ account and using the service, you agree to these Terms of Service. If you do not agree, please do not use the service."],
+              ["The Service","DestinIQ provides AI-powered personal clarity reports, momentum tracking, decision support, and life advisory services. The service is for personal use only and is not a substitute for professional financial, legal, medical, or psychological advice."],
+              ["Your Account","You are responsible for maintaining the security of your account credentials. You must be at least 18 years old to use DestinIQ. You agree to provide accurate information during onboarding."],
+              ["Subscriptions & Payments","DestinIQ offers free and paid subscription tiers. Paid subscriptions are billed monthly or annually via Paystack. Subscriptions renew automatically unless cancelled. Refunds are handled on a case-by-case basis — contact support within 7 days of a charge for assistance."],
+              ["Acceptable Use","You agree not to use DestinIQ to plan or facilitate illegal activities, harm others, or circumvent the platform's intent. Accounts found in violation will be terminated without refund."],
+              ["Intellectual Property","All DestinIQ content, design, and code is owned by DestinIQ. Your personal data and reports belong to you."],
+              ["Limitation of Liability","DestinIQ provides guidance and tools, not guarantees. We are not liable for decisions you make based on the app's output. Use the service as one input among many in your life decisions."],
+              ["Changes","We may update these terms from time to time. Continued use of the service after changes constitutes acceptance of the new terms."],
+              ["Contact","Questions about these terms? Contact us via the in-app support chat or email destiniq@gmail.com."],
+            ].map(([h,b])=>(
+              <div key={h} style={{marginBottom:28}}>
+                <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
+                <p style={{margin:0}}>{b}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. PROFILE PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onManageSubscription}){
+  const [name,setName]=useState(user?.name||"");
+  const [saved,setSaved]=useState(false);
+  const [loading,setLoading]=useState(false);
+
+  const save=async()=>{
+    setLoading(true);
+    try{
+      await supabase.auth.updateUser({data:{name}});
+      await saveUserProfile(user.id,{name});
+      setSaved(true);setTimeout(()=>setSaved(false),2000);
+    }catch(e){console.warn(e);}
+    setLoading(false);
+  };
+
+  const planLabel = isPaid&&isPremium?"Premium":isPaid?"Essential":"Free";
+  const planColor = isPaid?"var(--gold)":"var(--cream-30)";
+
+  return(
+    <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
+      <div style={{maxWidth:560,margin:"0 auto",padding:"0 24px"}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
+
+        {/* Avatar */}
+        <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:32}}>
+          <div style={{width:64,height:64,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:700,color:"#000"}}>
+            {(user?.name||user?.email||"U")[0].toUpperCase()}
+          </div>
+          <div>
+            <div style={{fontSize:20,fontWeight:700,color:"var(--cream)"}}>{user?.name||"Your Profile"}</div>
+            <div style={{fontSize:13,color:"var(--cream-40)"}}>{user?.email||user?.phone||""}</div>
+            <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:4,padding:"2px 10px",borderRadius:20,border:`1px solid ${planColor}`,fontSize:11,color:planColor,fontFamily:"var(--f-mono)"}}>{planLabel} Plan</div>
+          </div>
+        </div>
+
+        {/* Edit name */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",marginBottom:10}}>DISPLAY NAME</div>
+          <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"12px 14px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12}} value={name} onChange={e=>setName(e.target.value)} maxLength={60}/>
+          <button onClick={save} disabled={loading||!name.trim()} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"10px 20px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            {saved?"✓ Saved":loading?"Saving…":"Save changes"}
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",marginBottom:14}}>YOUR STATS</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+            {[["🔥","Streak",`${streak} days`],["📍","Country",formData?.country||"—"],["🎯","Goal",formData?.bigGoal||formData?.goals?.slice(0,20)||"—"]].map(([icon,label,val])=>(
+              <div key={label} style={{textAlign:"center",padding:"12px 8px",background:"var(--midnight)",borderRadius:10}}>
+                <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
+                <div style={{fontSize:12,fontWeight:700,color:"var(--cream)",marginBottom:2}}>{val}</div>
+                <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Subscription */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",marginBottom:14}}>SUBSCRIPTION</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{planLabel}</div>
+              <div style={{fontSize:12,color:"var(--cream-40)"}}>{isPaid?"Active subscription":"Free tier"}</div>
+            </div>
+            {!isPaid&&<button onClick={onManageSubscription} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"9px 18px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>Upgrade</button>}
+            {isPaid&&<button onClick={onManageSubscription} style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"9px 18px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>Manage</button>}
+          </div>
+        </div>
+
+        {/* Sign out & delete */}
+        <div className="card">
+          <button onClick={onSignOut} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Sign out</button>
+          <p style={{fontSize:11,color:"var(--cream-20)",textAlign:"center",margin:0}}>To delete your account and all data, contact us via the support chat.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. SHARE REPORT CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+function ShareCard({report,formData,onClose}){
+  const [copied,setCopied]=useState(false);
+  const scores=[
+    {label:"Life",    val:report?.life||report?.sections?.[0]?.score||52},
+    {label:"Wealth",  val:report?.wealth||report?.sections?.[1]?.score||38},
+    {label:"Mindset", val:report?.mindset||report?.sections?.[2]?.score||61},
+    {label:"Relations",val:report?.relationships||report?.sections?.[3]?.score||45},
+  ];
+  const overall=report?.overall||Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
+  const shareText=`My DestinIQ Clarity Score: ${overall}/100
+
+Life: ${scores[0].val} · Wealth: ${scores[1].val} · Mindset: ${scores[2].val}
+
+Discover your own clarity score at destiniq.vercel.app`;
+
+  const copy=()=>{
+    navigator.clipboard.writeText(shareText);
+    setCopied(true);setTimeout(()=>setCopied(false),2000);
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:24}}>
+      <div style={{background:"var(--night)",border:"1px solid var(--line-gold)",borderRadius:20,padding:28,maxWidth:400,width:"100%"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div style={{fontSize:16,fontWeight:700,color:"var(--cream)"}}>Share your clarity score</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:18}}>✕</button>
+        </div>
+
+        {/* Card preview */}
+        <div style={{background:"linear-gradient(135deg,#0d0b00,#1a1500)",border:"1px solid var(--line-gold)",borderRadius:16,padding:24,marginBottom:20,textAlign:"center"}}>
+          <div style={{fontFamily:"var(--f-display)",fontSize:13,color:"var(--gold)",letterSpacing:".1em",marginBottom:8}}>DESTINIQ CLARITY SCORE</div>
+          <div style={{fontFamily:"var(--f-display)",fontSize:56,color:"var(--gold)",fontWeight:400,lineHeight:1}}>{overall}</div>
+          <div style={{fontSize:11,color:"var(--cream-40)",marginBottom:16}}>/100</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+            {scores.map(s=>(
+              <div key={s.label} style={{background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"8px"}}>
+                <div style={{fontSize:18,fontWeight:700,color:"var(--cream)"}}>{s.val}</div>
+                <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{s.label.toUpperCase()}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:"var(--cream-30)"}}>destiniq.vercel.app</div>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={copy} style={{flex:1,background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            {copied?"✓ Copied!":"Copy to share"}
+          </button>
+          {navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. REFERRAL SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+function ReferralWidget({user,isPaid}){
+  const [copied,setCopied]=useState(false);
+  const [referrals,setReferrals]=useState(0);
+  const refCode = user?.id?.slice(0,8)||"destiq";
+  const refLink = `https://destiniq.vercel.app?ref=${refCode}`;
+
+  useEffect(()=>{
+    if(!user?.id) return;
+    supabase.from("referrals").select("id",{count:"exact"}).eq("referrer_id",user.id).then(({count})=>setReferrals(count||0));
+  },[user?.id]);
+
+  const copy=()=>{ navigator.clipboard.writeText(refLink); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  return(
+    <div className="card" style={{marginBottom:24}}>
+      <div style={{fontSize:11,color:"var(--gold)",fontWeight:600,letterSpacing:".06em",marginBottom:4,fontFamily:"var(--f-mono)"}}>INVITE A FRIEND</div>
+      <div style={{fontSize:18,fontWeight:700,color:"var(--cream)",marginBottom:6}}>Give 1 month free. Get 1 month free.</div>
+      <p style={{fontSize:13,color:"var(--cream-50)",marginBottom:16,lineHeight:1.6}}>Share your link. When a friend signs up and subscribes, you both get a free month added.</p>
+
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <div style={{flex:1,background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",fontSize:12,color:"var(--cream-40)",fontFamily:"var(--f-mono)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{refLink}</div>
+        <button onClick={copy} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"11px 18px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>{copied?"✓":"Copy"}</button>
+      </div>
+
+      <div style={{display:"flex",gap:12}}>
+        <div style={{flex:1,textAlign:"center",padding:"12px",background:"var(--midnight)",borderRadius:10}}>
+          <div style={{fontSize:24,fontWeight:800,color:"var(--gold)"}}>{referrals}</div>
+          <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>FRIENDS REFERRED</div>
+        </div>
+        <div style={{flex:1,textAlign:"center",padding:"12px",background:"var(--midnight)",borderRadius:10}}>
+          <div style={{fontSize:24,fontWeight:800,color:"var(--teal)"}}>{referrals}</div>
+          <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>FREE MONTHS EARNED</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. ADMIN DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+const ADMIN_EMAILS=["destiniq@gmail.com"]; // Add your email here
+
+function AdminDashboard({user,onBack}){
+  const [stats,setStats]=useState(null);
+  const [testimonials,setTestimonials]=useState([]);
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const isAdmin=ADMIN_EMAILS.includes(user?.email);
+
+  useEffect(()=>{
+    if(!isAdmin) return;
+    Promise.all([
+      supabase.from("user_profiles").select("*",{count:"exact"}),
+      supabase.from("testimonials").select("*").order("created_at",{ascending:false}).limit(20),
+      supabase.from("user_profiles").select("user_id,name,is_paid,is_premium,streak,created_at").order("created_at",{ascending:false}).limit(20),
+      supabase.from("referrals").select("*",{count:"exact"}),
+    ]).then(([prof,test,usr,refs])=>{
+      const paid=prof.data?.filter(p=>p.is_paid).length||0;
+      setStats({
+        totalUsers:prof.count||0,
+        paidUsers:paid,
+        freeUsers:(prof.count||0)-paid,
+        testimonialsPending:test.data?.filter(t=>!t.approved).length||0,
+        totalReferrals:refs.count||0,
+      });
+      setTestimonials(test.data||[]);
+      setUsers(usr.data||[]);
+      setLoading(false);
+    });
+  },[isAdmin]);
+
+  const approveTestimonial=async(id,approved)=>{
+    await supabase.from("testimonials").update({approved}).eq("id",id);
+    setTestimonials(t=>t.map(x=>x.id===id?{...x,approved}:x));
+  };
+
+  if(!isAdmin) return(
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{fontSize:14,color:"var(--cream-30)"}}>Access denied.</div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
+      <div className="cx">
+        <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
+        <div style={{fontFamily:"var(--f-display)",fontSize:32,color:"var(--cream)",marginBottom:4}}>Admin Dashboard</div>
+        <div style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:32}}>DestinIQ · Internal</div>
+
+        {loading?<div style={{color:"var(--cream-30)"}}>Loading…</div>:(
+          <>
+            {/* Stats */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:32}}>
+              {[
+                ["👥","Total Users",stats.totalUsers],
+                ["💳","Paid",stats.paidUsers],
+                ["🆓","Free",stats.freeUsers],
+                ["⭐","Testimonials pending",stats.testimonialsPending],
+                ["🔗","Referrals",stats.totalReferrals],
+              ].map(([icon,label,val])=>(
+                <div key={label} className="card" style={{textAlign:"center"}}>
+                  <div style={{fontSize:24,marginBottom:4}}>{icon}</div>
+                  <div style={{fontSize:26,fontWeight:800,color:"var(--gold)"}}>{val}</div>
+                  <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{label.toUpperCase()}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Testimonials to approve */}
+            <div className="card" style={{marginBottom:24}}>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginBottom:16}}>Testimonials ({testimonials.length})</div>
+              {testimonials.length===0&&<div style={{fontSize:13,color:"var(--cream-30)"}}>No testimonials yet.</div>}
+              {testimonials.map(t=>(
+                <div key={t.id} style={{borderBottom:"1px solid var(--line)",paddingBottom:12,marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:2}}>{t.name}</div>
+                      <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>"{t.quote}"</div>
+                      <div style={{fontSize:10,color:"var(--cream-20)",marginTop:4,fontFamily:"var(--f-mono)"}}>{new Date(t.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      {!t.approved&&<button onClick={()=>approveTestimonial(t.id,true)} style={{background:"var(--teal)",border:"none",borderRadius:8,padding:"6px 12px",color:"#000",fontSize:11,fontWeight:700,cursor:"pointer"}}>Approve</button>}
+                      {t.approved&&<button onClick={()=>approveTestimonial(t.id,false)} style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:8,padding:"6px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer"}}>Revoke</button>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Recent users */}
+            <div className="card">
+              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginBottom:16}}>Recent Users</div>
+              {users.map(u=>(
+                <div key={u.user_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid var(--line)"}}>
+                  <div>
+                    <div style={{fontSize:13,color:"var(--cream)"}}>{u.name||"Unknown"}</div>
+                    <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{new Date(u.created_at).toLocaleDateString()} · 🔥{u.streak||0} streak</div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    {u.is_paid&&<span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",border:"1px solid var(--line-gold)",borderRadius:4,padding:"2px 6px"}}>PAID</span>}
+                    {u.is_premium&&<span style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)",border:"1px solid rgba(20,184,154,0.3)",borderRadius:4,padding:"2px 6px"}}>PREMIUM</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. EMPTY STATE (shown when user has no report yet)
+// ═══════════════════════════════════════════════════════════════════════════════
+function EmptyState({onStart,name}){
+  const steps=[
+    {icon:"📋",title:"Complete your profile",desc:"Tell us about yourself — your goals, challenges, where you are in life."},
+    {icon:"🧠",title:"Get your clarity report",desc:"A personalised report built around your specific situation. Not generic advice."},
+    {icon:"📈",title:"Track your momentum",desc:"Check in daily. Watch your score grow as you take real action."},
+  ];
+  return(
+    <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 24px"}}>
+      <div style={{maxWidth:520,textAlign:"center"}}>
+        <div style={{fontSize:48,marginBottom:16}}>👋</div>
+        <div style={{fontFamily:"var(--f-display)",fontSize:28,color:"var(--cream)",marginBottom:8}}>Welcome{name?`, ${name}`:""}</div>
+        <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:36,lineHeight:1.7}}>You're one step away from your personal clarity report. It takes about 3 minutes and will change how you see your next move.</p>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32,textAlign:"left"}}>
+          {steps.map((s,i)=>(
+            <div key={i} style={{display:"flex",gap:14,padding:"14px 16px",background:"var(--night)",border:"1px solid var(--line)",borderRadius:14,alignItems:"flex-start"}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{s.icon}</div>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginBottom:3}}>{s.title}</div>
+                <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={onStart} style={{background:"var(--gold)",border:"none",borderRadius:12,padding:"14px 36px",color:"#000",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(212,175,55,0.3)"}}>
+          Build my report →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. WELCOME EMAIL (triggered on signup — sent via Supabase Edge Function)
+// NOTE: Add a Supabase Edge Function called "welcome-email" to send the email.
+// This component just triggers it.
+// ═══════════════════════════════════════════════════════════════════════════════
+async function triggerWelcomeEmail(user){
+  try{
+    await supabase.functions.invoke("welcome-email",{
+      body:{
+        to: user.email,
+        name: user.name||user.email?.split("@")[0]||"there",
+      }
+    });
+  }catch(e){ console.warn("Welcome email:",e.message); }
+}
+
 export default function DestinIQ(){
   const [user, setUser]=useState(null);
   const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
@@ -3877,53 +4335,72 @@ export default function DestinIQ(){
   const [ipLocation,setIpLocation]=useState(null);
   const [ipLoaded,  setIpLoaded ]=useState(false);
   const [userId, setUserId]=useState(null);
+  const [showProfile, setShowProfile]=useState(false);
+  const [showAdmin,   setShowAdmin  ]=useState(false);
+  const [showPolicy,  setShowPolicy ]=useState(null); // "privacy"|"terms"|null
+  const [showShare,   setShowShare  ]=useState(false);
+  const [showReferral,setShowReferral]=useState(false);
 
   // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
+  const restoreUserSession = async (supaUser) => {
+    const u = supaUser;
+    const meta = u.user_metadata || {};
+    const appUser = {
+      id: u.id, email: u.email, phone: u.phone,
+      name: meta.name || meta.full_name || (u.email?.split("@")[0]) || "User",
+      provider: u.app_metadata?.provider || "email"
+    };
+    setUser(appUser);
+    setUserId(u.id);
+    hydrateUserData(u.id);
+
+    // Load saved profile (onboarding answers + subscription)
+    const profile = await loadUserProfile(u.id);
+    if (profile) {
+      if (profile.form_data) {
+        setFormData(profile.form_data);
+        setScreen("results"); // skip onboarding, go straight to dashboard
+      }
+      if (profile.is_paid)    setIsPaid(true);
+      if (profile.is_premium) setIsPremium(true);
+      if (profile.streak)     setStreak(profile.streak);
+      if (profile.report)     setReport(profile.report);
+    }
+  };
+
   useEffect(()=>{
     // Check for an existing session on mount (handles OAuth redirects too)
     supabase.auth.getSession().then(({data:{session}})=>{
       if(session?.user){
-        const u=session.user;
-        const meta=u.user_metadata||{};
-        const appUser={id:u.id,email:u.email,phone:u.phone,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:u.app_metadata?.provider||"email"};
-        setUser(appUser);
-        setUserId(u.id);
-        // Load all persisted data, then restore formData/report/isPaid/streak from DB
-        hydrateUserData(u.id).then(()=>{
-          const prof = getUserProfile(u.id);
-          if(prof){
-            if(prof.formData) setFormData(prof.formData);
-            if(prof.report)   setReport(prof.report);
-            if(prof.isPaid)   setIsPaid(true);
-            if(prof.streak)   setStreak(prof.streak);
-            if(prof.formData && prof.report) setScreen("results");
-          }
-        });
+        restoreUserSession(session.user);
       }
       setAuthLoading(false);
     });
 
     // Listen for sign-in / sign-out events (including OAuth callback)
-    const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+    const{data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,session)=>{
       if(session?.user){
-        const u=session.user;
-        const meta=u.user_metadata||{};
-        const appUser={id:u.id,email:u.email,phone:u.phone,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:u.app_metadata?.provider||"email"};
-        setUser(appUser);
-        setUserId(u.id);
-        hydrateUserData(u.id).then(()=>{
-          const prof = getUserProfile(u.id);
-          if(prof){
-            if(prof.formData) setFormData(prof.formData);
-            if(prof.report)   setReport(prof.report);
-            if(prof.isPaid)   setIsPaid(true);
-            if(prof.streak)   setStreak(prof.streak);
-            if(prof.formData && prof.report) setScreen("results");
+        restoreUserSession(session.user);
+        // Track referral if URL has ?ref=
+        if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
+          const ref=new URLSearchParams(window.location.search).get("ref");
+          if(ref){
+            // Find referrer by their id prefix
+            const{data:profiles}=await supabase.from("user_profiles").select("user_id").ilike("user_id",ref+"%").limit(1);
+            if(profiles?.[0]){
+              await supabase.from("referrals").insert({referrer_id:profiles[0].user_id,referred_id:session.user.id}).onConflict("referred_id").ignore();
+            }
+            window.history.replaceState({},"",window.location.pathname);
           }
-        });
+        }
       } else {
         setUser(null);
         setUserId(null);
+        setFormData(null);
+        setReport(null);
+        setIsPaid(false);
+        setIsPremium(false);
+        setScreen("landing");
       }
     });
     return()=>subscription.unsubscribe();
@@ -3935,6 +4412,13 @@ export default function DestinIQ(){
       setIpLocation(loc);
       setIpLoaded(true);
     });
+  },[]);
+
+  // Listen for policy events from auth screen footer links
+  useEffect(()=>{
+    const handler=(e)=>setShowPolicy(e.detail);
+    window.addEventListener("showPolicy",handler);
+    return()=>window.removeEventListener("showPolicy",handler);
   },[]);
 
   const handleSubmit=useCallback(async(f)=>{
@@ -4015,50 +4499,18 @@ or
       const parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
       pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
       setReport(parsed);
-      // Persist profile + report so they survive page refresh / re-login
-      try{
-        await supabase.from("user_profiles").upsert({
-          user_id:userId,
-          form_data:JSON.stringify(f),
-          report_data:JSON.stringify(parsed),
-        },{onConflict:"user_id"});
-      }catch(pe){console.warn("Failed to persist profile:",pe.message);}
+      // Save profile + report to Supabase so it persists on next login
+      saveUserProfile(userId,{form_data:f,report:parsed,is_paid:isPaid,is_premium:isPremium,streak});
     }catch(e){
-      const fb=fallback(f,ipLocation);
-      setReport(fb);
+      setReport(fallback(f,ipLocation));
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
-      // Still persist the fallback
-      try{
-        await supabase.from("user_profiles").upsert({
-          user_id:userId,
-          form_data:JSON.stringify(f),
-          report_data:JSON.stringify(fb),
-        },{onConflict:"user_id"});
-      }catch(_){}
     }
     setScreen("results");
   },[userId,isPremium,ipLocation]);
 
   const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
-  const handleUnlock=()=>{setScreen("paywall");};
-  const handlePay=async()=>{
-    const newStreak = streak + 1;
-    setIsPaid(true);
-    setStreak(newStreak);
-    setScreen("results");
-    // Persist paid status + streak so they survive page refreshes
-    if(userId){
-      try{
-        await supabase.from("user_profiles").upsert({
-          user_id:userId,
-          is_paid:true,
-          streak:newStreak,
-          form_data: formData ? JSON.stringify(formData) : null,
-          report_data: report ? JSON.stringify(report) : null,
-        },{onConflict:"user_id"});
-      }catch(e){console.warn("Failed to save paid status:",e.message);}
-    }
-  };
+  const handleUnlock=()=>{setIsPaid(false);setScreen("paywall");};
+  const handlePay=()=>{setIsPaid(true);setStreak(s=>s+1);setScreen("results");};
 
   return(
     <>
@@ -4069,7 +4521,7 @@ or
       <div className="root">
 
         {/* AUTH GATE — show login if not authenticated */}
-        {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={(u)=>{setUser(u);setUserId(u.id);hydrateUserData(u.id);}}/>}
+        {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={(u)=>{setUser(u);setUserId(u.id);hydrateUserData(u.id);if(u.isNew)triggerWelcomeEmail(u);}}/>}
         {user&&<>
 
         <SupportWidget/>
@@ -4077,7 +4529,8 @@ or
           <div className="logo" onClick={restart}>Destin<b>IQ</b></div>
           <div className="nav-r">
             {screen!=="landing"&&<PremiumToggle isPremium={isPremium} onToggle={()=>setIsPremium(p=>!p)}/>}
-            {user&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={async()=>{await supabase.auth.signOut();setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);}} title="Sign out">Sign out</button>}
+            {user&&<button onClick={()=>setShowProfile(true)} style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"none",cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center"}} title="Profile">{(user.name||user.email||"U")[0].toUpperCase()}</button>}
+            {user&&ADMIN_EMAILS.includes(user.email)&&<button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}} onClick={()=>setShowAdmin(true)}>Admin</button>}
             {screen==="results"&&(
               <button className="btn btn-ghost" style={{fontSize:12,padding:"6px 12px"}} onClick={()=>setShowNotif(true)} title="Set daily notification">
                 🔔
@@ -4085,6 +4538,7 @@ or
             )}
             {screen==="results"&&!isPaid&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={handleUnlock}>Upgrade</button>}
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
+            {screen==="results"&&report&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setShowShare(true)}>Share 📤</button>}
             {screen!=="landing"&&<button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={restart}>← Home</button>}
             {screen==="landing"&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("intake")}>Begin →</button>}
           </div>
@@ -4110,7 +4564,24 @@ or
           </div>
         )}
 
-        {screen==="landing"  &&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
+        {/* Policy pages */}
+        {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
+
+        {/* Profile page */}
+        {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} streak={streak}
+          onBack={()=>setShowProfile(false)}
+          onSignOut={async()=>{await supabase.auth.signOut();setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);setShowProfile(false);}}
+          onManageSubscription={()=>{setShowProfile(false);handleUnlock();}}/>}
+
+        {/* Admin dashboard */}
+        {showAdmin&&<AdminDashboard user={user} onBack={()=>setShowAdmin(false)}/>}
+
+        {/* Share card modal */}
+        {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
+
+        {!showPolicy&&!showProfile&&!showAdmin&&<>
+        {screen==="landing"  &&!user&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
+        {screen==="landing"  &&user&&!formData&&<EmptyState onStart={()=>setScreen("intake")} name={user?.name}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
@@ -4122,6 +4593,7 @@ or
         {showNotif&&formData&&(
           <NotificationPanel profile={formData} userId={userId} onClose={()=>setShowNotif(false)}/>
         )}
+        </>}
 
         </>}
       </div>
