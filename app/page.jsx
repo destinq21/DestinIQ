@@ -156,9 +156,9 @@ async function saveWeeklyReport(userId, report) {
 const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
-  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
-  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
+  basic:  { name:"Essential", amount:9,   label:"GHS99/month",  currency:"GHS" },
+  pro:    { name:"Premium",   amount:15,  label:"GHS179/month", currency:"GHS" },
+  annual: { name:"Annual Pro",amount:99,  label:"GHS999/year",  currency:"GHS" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
