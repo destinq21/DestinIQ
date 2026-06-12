@@ -180,10 +180,10 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  basic:  { name:"Essential", amount:99,   label:"$9/month",  currency:"USD" },
   pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
   annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
