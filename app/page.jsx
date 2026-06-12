@@ -1730,7 +1730,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
 
       {/* ── CHECK-IN FORM ─────────────────────────────────────────────────── */}
       <div className="card">
-        <div className="mono" style={{marginBottom:18,fontSize:"9px"}}>{saved?"Today's Log — Come back tomorrow":"Log Today · "+new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</div>
+        <div className="mono" style={{marginBottom:18,fontSize:"9px"}} suppressHydrationWarning>{saved?"Today's Log — Come back tomorrow":"Log Today · "+new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</div>
         {[{label:"Energy",val:energy,set:setEnergy,color:"#1fa89a"},{label:"Focus",val:focus,set:setFocus,color:"#d2af5a"},{label:"Momentum",val:momentum,set:setMomentum,color:"#9b72cf"}].map(s=>(
           <div className="mom-slider-row" key={s.label}>
             <span className="mom-slider-label">{s.label}</span>
@@ -2034,7 +2034,7 @@ function Paywall({onUnlock,teaser,userEmail}){
   const [email,setEmail]=useState(userEmail||"");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
-  const [scriptReady,setScriptReady]=useState(typeof window!=="undefined"&&!!window.PaystackPop);
+  const [scriptReady,setScriptReady]=useState(false);
 
   // Load Paystack script once
   useEffect(()=>{
@@ -2698,7 +2698,7 @@ function Landing({onStart,ipLocation}){
             <div className="fu" style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <div style={{width:8,height:8,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 8px var(--teal)",animation:"pulse 2s ease infinite"}}/>
-                <div className="mono" style={{color:"var(--teal)"}}>Real people · {liveCount.toLocaleString()} on their journey</div>
+                <div className="mono" style={{color:"var(--teal)"}} suppressHydrationWarning>Real people · {liveCount.toLocaleString()} on their journey</div>
               </div>
               {ipLocation&&ipLocation.city&&(
                 <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20}}>
@@ -3786,7 +3786,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               <div className="d3" style={{marginBottom:20}}>What we want you to hold onto today</div>
               <div className="insight" style={{marginBottom:24}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,gap:10,flexWrap:"wrap"}}>
-                  <div className="mono" style={{fontSize:"9px"}}>Written for you · {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
+                  <div className="mono" style={{fontSize:"9px"}} suppressHydrationWarning>Written for you · {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
                   <button className="btn btn-ghost btn-sm" onClick={refreshDailyInsight} disabled={refreshingInsight} style={{fontSize:11,padding:"4px 12px"}}>
                     {refreshingInsight?"Refreshing…":"↺ Refresh today's insight"}
                   </button>
@@ -3935,7 +3935,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           )}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
-            <div className="small">Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
+            <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
             <div style={{display:"flex",gap:8}}>
               {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}}>Download PDF</button>}
               {!isPaid&&<button className="btn btn-gold" onClick={onUnlock}>See the full picture</button>}
@@ -4193,7 +4193,7 @@ Discover your own clarity score at destiniq.vercel.app`;
           <button onClick={copy} style={{flex:1,background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
             {copied?"✓ Copied!":"Copy to share"}
           </button>
-          {navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
+          {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
         </div>
       </div>
     </div>
@@ -4829,7 +4829,7 @@ or
       <div className="bg bg-mesh"/>
       <div className="bg bg-noise"/>
       <div className="bg bg-grid"/>
-      <div className="root">
+      <div className="root" suppressHydrationWarning>
 
         {/* AUTH GATE — show login if not authenticated */}
         {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={async(u)=>{if(u.isNew)triggerWelcomeEmail(u);await restoreUserSession({id:u.id,email:u.email,phone:u.phone,user_metadata:{name:u.name,full_name:u.name},app_metadata:{provider:u.provider}});}}/>}
