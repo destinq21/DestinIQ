@@ -1,8 +1,86 @@
 "use client";
+/*
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SUPABASE SETUP
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * 1. Install: npm install @supabase/supabase-js
+ *
+ * 2. Create .env.local:
+ *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *
+ * 3. Enable Auth providers in Supabase Dashboard:
+ *    - Email / Password (enable "Confirm email" or turn it off for dev)
+ *    - Phone / OTP (requires Twilio integration in Supabase → Auth → Providers → Phone)
+ *    - Google OAuth (Auth → Providers → Google, set your Client ID & Secret)
+ *    - Redirect URL: https://your-domain.com (add to Auth → URL Configuration)
+ *
+ * 4. Run this SQL in Supabase SQL Editor to create the required tables:
+ *
+ * -- Momentum logs (one row per user per day)
+ * create table if not exists momentum_logs (
+ *   id          uuid primary key default gen_random_uuid(),
+ *   user_id     uuid references auth.users(id) on delete cascade not null,
+ *   date        text not null,                -- e.g. "Mon Jun 09 2025"
+ *   energy      int  not null default 5,
+ *   focus       int  not null default 5,
+ *   momentum    int  not null default 5,
+ *   feeling     text,
+ *   note        text,
+ *   created_at  timestamptz default now(),
+ *   unique(user_id, date)
+ * );
+ * alter table momentum_logs enable row level security;
+ * create policy "Users manage own momentum" on momentum_logs
+ *   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+ *
+ * -- Decisions
+ * create table if not exists decisions (
+ *   id           uuid primary key default gen_random_uuid(),
+ *   user_id      uuid references auth.users(id) on delete cascade not null,
+ *   question     text not null,
+ *   framework    text not null,
+ *   display_date text,
+ *   created_at   timestamptz default now()
+ * );
+ * alter table decisions enable row level security;
+ * create policy "Users manage own decisions" on decisions
+ *   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+ *
+ * -- Weekly reports
+ * create table if not exists weekly_reports (
+ *   id         uuid primary key default gen_random_uuid(),
+ *   user_id    uuid references auth.users(id) on delete cascade not null,
+ *   week_of    text not null,
+ *   text       text not null,
+ *   created_at timestamptz default now()
+ * );
+ * alter table weekly_reports enable row level security;
+ * create policy "Users manage own weekly reports" on weekly_reports
+ *   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+
 import { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SUPABASE CLIENT
+// Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
+// ═══════════════════════════════════════════════════════════════════════════════
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  "https://cuocngswamioyyvzozaf.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA"
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MEMORY & DAILY STORES
+// In-memory cache layered on top of Supabase for instant UI updates.
+// On app load, data is hydrated from the DB; writes go to both layers.
 // ═══════════════════════════════════════════════════════════════════════════════
 const _memoryStore   = new Map(); // userId -> Message[]
 const _momentumLog   = new Map(); // userId -> [{date,energy,focus,momentum,feeling,note}]
@@ -10,7 +88,78 @@ const _weeklyReports = new Map(); // userId -> [{weekOf,text,ts}]
 const _decisions     = new Map(); // userId -> [{id,question,framework,date}]
 const _notifTimers   = new Map(); // userId -> timeoutId
 
-function genUserId() { return "u_" + Date.now().toString(36) + Math.random().toString(36).substr(2,6); }
+// ─── SUPABASE DB HELPERS ─────────────────────────────────────────────────────
+
+/** Hydrate all per-user data from Supabase into the in-memory caches. */
+async function hydrateUserData(userId) {
+  try {
+    const [momRes, decRes, wkRes] = await Promise.all([
+      supabase.from("momentum_logs").select("*").eq("user_id", userId).order("date", { ascending: true }),
+      supabase.from("decisions").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      supabase.from("weekly_reports").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    ]);
+    if (momRes.data?.length) {
+      _momentumLog.set(userId, momRes.data.map(r => ({
+        date: r.date, energy: r.energy, focus: r.focus,
+        momentum: r.momentum, feeling: r.feeling, note: r.note, ts: new Date(r.created_at).getTime(),
+      })));
+    }
+    if (decRes.data?.length) {
+      _decisions.set(userId, decRes.data.map(r => ({
+        id: r.id, question: r.question, framework: r.framework,
+        date: r.display_date,
+      })));
+    }
+    if (wkRes.data?.length) {
+      _weeklyReports.set(userId, wkRes.data.map(r => ({
+        weekOf: r.week_of, text: r.text, ts: new Date(r.created_at).getTime(),
+      })));
+    }
+  } catch (e) {
+    console.warn("hydrateUserData:", e.message);
+  }
+}
+
+/** Upsert a momentum log entry. */
+async function saveMomentumEntry(userId, entry) {
+  try {
+    await supabase.from("momentum_logs").upsert({
+      user_id: userId, date: entry.date,
+      energy: entry.energy, focus: entry.focus, momentum: entry.momentum,
+      feeling: entry.feeling, note: entry.note,
+    }, { onConflict: "user_id,date" });
+  } catch (e) { console.warn("saveMomentumEntry:", e.message); }
+}
+
+/** Insert a decision. */
+async function saveDecision(userId, decision) {
+  try {
+    const { data } = await supabase.from("decisions").insert({
+      user_id: userId, question: decision.question,
+      framework: decision.framework, display_date: decision.date,
+    }).select("id").single();
+    if (data?.id) decision.id = data.id;
+  } catch (e) { console.warn("saveDecision:", e.message); }
+}
+
+/** Upsert a weekly report. */
+async function saveWeeklyReport(userId, report) {
+  try {
+    await supabase.from("weekly_reports").insert({
+      user_id: userId, week_of: report.weekOf, text: report.text,
+    });
+  } catch (e) { console.warn("saveWeeklyReport:", e.message); }
+}
+
+// ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
+// Replace with your real Paystack public key from paystack.com → Settings → API Keys
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+
+const PLANS = {
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
+};
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
   const h=getHistory(uid); h.push({role,content:content.slice(0,800)});
@@ -28,11 +177,13 @@ function addMomentumEntry(uid,entry) {
   if(idx>=0) log[idx]=entry; else log.push(entry);
   if(log.length>30) log.splice(0,log.length-30);
   _momentumLog.set(uid,log);
+  saveMomentumEntry(uid,entry); // persist to Supabase
 }
 function getDecisions(uid) { return _decisions.get(uid)||[]; }
 function addDecision(uid,decision) {
   const d=getDecisions(uid); d.unshift(decision);
   if(d.length>10) d.splice(10); _decisions.set(uid,d);
+  saveDecision(uid,decision); // persist to Supabase
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -356,7 +507,7 @@ async function getLocalContext(city,country){
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
-        model:"claude-sonnet-4-20250514",
+        model:"claude-sonnet-4-5",
         max_tokens:900,
         tools:[{"type":"web_search_20250305","name":"web_search"}],
         system:"You are a local economic researcher. Today is "+today+". Search for real current data. Give specific numbers, local currency, real examples. Be factual and precise.",
@@ -657,9 +808,12 @@ ${originFacts}
 THEIR FULL PROFILE:
 Name: ${sanitize(f.name)} | Age: ${ageNum} | Gender: ${f.gender||"not stated"} | Country: ${sanitize(f.country)}
 Relationship: ${f.relationship||"not stated"} | Education: ${f.education||"not stated"} | Monthly income: ${f.income||"not stated"}
-Work: ${sanitize(f.career)} | Skills: ${sanitize(f.skills)||"not stated"} | Habits: ${sanitize(f.habits)||"not stated"}
-Goals: ${sanitize(f.goals)}
-Challenge: ${sanitize(f.challenge)}
+Current situation: ${f.situation?f.situation+" — "+sanitize(f.career||""):sanitize(f.career)||"not stated"}
+Skills: ${sanitize(f.skills)||"not stated"} | Habits: ${sanitize(f.habits)||"not stated"}
+Primary goal category: ${f.bigGoal||"not stated"}
+Goals (in their words): ${sanitize(f.goals)}
+Challenge (in their words): ${sanitize(f.challenge)}
+What they want from this app: ${f.wantFrom||"not stated"}
 
 ABSOLUTE RULES:
 1. The report must be built around their PRIMARY GOAL — what they said they want. Don't give them general life advice if they told you they want to start a business in Africa. Give them Africa business advice.
@@ -1413,6 +1567,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
       const existing=_weeklyReports.get(userId)||[];
       existing.unshift(r);if(existing.length>4)existing.pop();
       _weeklyReports.set(userId,existing);setReport(r);
+      saveWeeklyReport(userId,r); // persist to Supabase
       pushToMemory(userId,"assistant","Weekly pulse: "+txt.slice(0,300));
     }catch(e){
       console.error("Decision error:",e);
@@ -1499,7 +1654,10 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
   const [question,setQuestion]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
-  const [decisions,setDecisions]=useState(()=>getDecisions(userId));
+  const [decisions,setDecisions]=useState([]);
+
+  // Re-sync from in-memory cache whenever userId changes (catches post-hydration updates)
+  useEffect(()=>{ if(userId) setDecisions(getDecisions(userId)); },[userId]);
 
   const submit=async()=>{
     if(!question.trim()||loading) return;
@@ -1643,16 +1801,82 @@ function NotificationPanel({profile,userId,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAYWALL
 // ═══════════════════════════════════════════════════════════════════════════════
-function Paywall({onUnlock,teaser}){
+function Paywall({onUnlock,teaser,userEmail}){
   const [sel,setSel]=useState("pro");
+  const [email,setEmail]=useState(userEmail||"");
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [scriptReady,setScriptReady]=useState(typeof window!=="undefined"&&!!window.PaystackPop);
+
+  // Load Paystack script once
+  useEffect(()=>{
+    if(window.PaystackPop){setScriptReady(true);return;}
+    const script=document.createElement("script");
+    script.src="https://js.paystack.co/v1/inline.js";
+    script.async=true;
+    script.onload=()=>setScriptReady(true);
+    script.onerror=()=>setError("Could not load payment system. Check your connection and try again.");
+    document.head.appendChild(script);
+    return()=>{};
+  },[]);
+
   const plans=[
-    {id:"basic",price:"$9",period:"/month",name:"Essential",color:"var(--teal)",
+    {id:"basic", price:"$9", period:"/month",name:"Essential",  color:"var(--teal)",
      features:["Full life analysis report","Daily momentum tracker","Check-in & daily insight","Roadmap access"]},
-    {id:"pro",price:"$15",period:"/month",name:"Premium",color:"var(--gold)",featured:true,
+    {id:"pro",   price:"$15",period:"/month",name:"Premium",    color:"var(--gold)",featured:true,
      features:["Everything in Essential","Weekly Pulse AI report","Decisions (unlimited)","Live advisor conversations","Career & relocation intel","Streak tracking & history"]},
-    {id:"annual",price:"$99",period:"/year",name:"Annual Pro",color:"var(--violet)",
+    {id:"annual",price:"$99",period:"/year", name:"Annual Pro", color:"var(--violet)",
      features:["Everything in Premium","Save $81 vs monthly","Downloadable PDF reports","Early access to new modules"]},
   ];
+
+  const handlePaystack=()=>{
+    // Validate email
+    if(!email.trim()||!email.includes("@")){
+      setError("Please enter a valid email address to continue.");
+      return;
+    }
+    if(!scriptReady||!window.PaystackPop){
+      setError("Payment system still loading. Please wait a moment and try again.");
+      return;
+    }
+    if(PAYSTACK_PUBLIC_KEY==="pk_test_your_key_here"){
+      setError("Paystack key not configured. Add your key to PAYSTACK_PUBLIC_KEY in page.jsx.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const plan=PLANS[sel]||PLANS.pro;
+    const ref="diq_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+
+    try{
+      const handler=window.PaystackPop.setup({
+        key:      PAYSTACK_PUBLIC_KEY,
+        email:    email.trim(),
+        amount:   plan.amount * 100, // Paystack uses smallest unit (cents for USD)
+        currency: plan.currency,
+        ref:      ref,
+        label:    "DestinIQ "+plan.name,
+        metadata: { plan:sel, custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}] },
+        callback:(response)=>{
+          // Payment successful — grant access
+          console.log("Payment successful:", response.reference);
+          setLoading(false);
+          onUnlock(); // unlock premium access
+        },
+        onClose:()=>{
+          // User closed the popup without paying
+          setLoading(false);
+        },
+      });
+      handler.openIframe();
+    }catch(e){
+      setLoading(false);
+      setError("Something went wrong opening the payment window. Try again.");
+    }
+  };
+
   return(
     <div style={{padding:"60px 0"}}>
       <div className="cx-sm" style={{textAlign:"center"}}>
@@ -1665,6 +1889,8 @@ function Paywall({onUnlock,teaser}){
             <p style={{fontSize:12,color:"var(--cream-30)",marginTop:8}}>This came up in your profile. The full report gets into it.</p>
           </div>
         </div>
+
+        {/* PLAN CARDS */}
         <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:32}}>
           {plans.map(p=>(
             <div key={p.id} className={`plan-card ${p.featured?"featured":""}`} onClick={()=>setSel(p.id)}
@@ -1677,23 +1903,67 @@ function Paywall({onUnlock,teaser}){
             </div>
           ))}
         </div>
-        <div className="fu4">
-          <button className="btn btn-gold btn-lg btn-full" style={{maxWidth:360,margin:"0 auto",display:"flex"}} onClick={onUnlock}>I'm ready — show me everything</button>
-          <p style={{marginTop:12,fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".1em"}}>Cancel any time. No catch.</p>
 
-          {/* HOW IT WORKS — subscription model explanation */}
-          <div style={{marginTop:40,maxWidth:560,marginLeft:"auto",marginRight:"auto"}}>
+        {/* EMAIL + PAY BUTTON */}
+        <div className="fu4" style={{maxWidth:400,margin:"0 auto"}}>
+          <div className="field" style={{marginBottom:12,textAlign:"left"}}>
+            <label className="fl">Your email address</label>
+            <input
+              className="fi"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e=>{setEmail(e.target.value);setError("");}}
+              style={{fontSize:15,padding:"13px 16px"}}
+            />
+            <p style={{fontSize:11,color:"var(--cream-30)",marginTop:5,fontFamily:"var(--f-mono)"}}>
+              Used for your receipt and account access only.
+            </p>
+          </div>
+
+          {error&&(
+            <div className="err-box" style={{marginBottom:12,textAlign:"left"}}>⚠ {error}</div>
+          )}
+
+          <button
+            className="btn btn-gold btn-lg btn-full"
+            onClick={handlePaystack}
+            disabled={loading||!scriptReady}
+            style={{marginBottom:10}}
+          >
+            {loading?"Opening payment…":!scriptReady?"Loading payment…":`Pay ${(PLANS[sel]||PLANS.pro).label} →`}
+          </button>
+
+          {/* Security note */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:24}}>
+            <span style={{fontSize:11,color:"var(--cream-30)"}}>🔒</span>
+            <span style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
+              SECURED BY PAYSTACK · CANCEL ANYTIME
+            </span>
+          </div>
+
+          {/* Payment methods accepted */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:32,flexWrap:"wrap"}}>
+            {["Visa","Mastercard","MTN Mobile Money","Vodafone Cash","Bank Transfer"].map(m=>(
+              <div key={m} style={{padding:"4px 10px",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:6,fontSize:11,color:"var(--cream-30)"}}>
+                {m}
+              </div>
+            ))}
+          </div>
+
+          {/* How it works */}
+          <div style={{textAlign:"left"}}>
             <div className="mono" style={{marginBottom:16,textAlign:"center"}}>How it works after you subscribe</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
               {[
-                {icon:"📋",title:"Your report is yours — permanently",desc:"We generate it once from what you shared and it's yours to keep. Think of it as a baseline — a photograph of where you are right now, with a map of where you can go."},
-                {icon:"🔁",title:"Something for today refreshes every single day",desc:"Hit 'Refresh today's insight' on your dashboard and get a brand-new reflection written for today specifically — your current challenge, today's date, a concrete action you can take right now. It's never recycled."},
-                {icon:"⚡",title:"Track how you're actually doing",desc:"A 30-second daily check-in. Over weeks, you'll start seeing your real patterns — when you're sharp, when you're burning out, and what actually makes a difference. Most people are surprised by what they find."},
-                {icon:"↗",title:"A real weekly reflection — not a template",desc:"Every Sunday, we write a fresh weekly reflection based on how your actual week went. It connects your daily check-ins into a bigger picture. It reads like it was written by someone who was paying attention — because it was."},
-                {icon:"⬡",title:"An advisor who actually knows you",desc:"Your advisor knows your full report, your scores, and everything you've shared. You don't have to re-explain yourself. Just ask. The more you talk to it, the more useful it gets."},
-                {icon:"◈",title:"Your decisions, saved forever",desc:"Every decision you work through stays in your log. Come back six months later and see what you chose, what changed, and what you'd think differently now. A lot of people find this the most valuable thing we offer."},
+                {icon:"📋",title:"Your report is yours — permanently",desc:"Generated once from what you shared and yours to keep. A baseline — a photograph of where you are right now, with a map of where you can go."},
+                {icon:"🔁",title:"Fresh insight every single day",desc:"Hit 'Refresh today's insight' and get a brand-new reflection written for today specifically. Never recycled."},
+                {icon:"⚡",title:"Track how you're actually doing",desc:"30-second daily check-in. Over weeks you'll see your real patterns — when you're sharp, when you're burning out."},
+                {icon:"↗",title:"A real weekly reflection",desc:"Every week we write a fresh reflection based on how your actual week went. It reads like someone was paying attention — because we were."},
+                {icon:"⬡",title:"An advisor who knows you",desc:"Knows your full report, your scores, everything you shared. You don't re-explain yourself. Just ask."},
+                {icon:"◈",title:"Your decisions, saved forever",desc:"Every decision you work through stays in your log. Come back months later and see what changed."},
               ].map(item=>(
-                <div key={item.title} style={{display:"flex",gap:14,padding:"14px 16px",background:"var(--raised)",border:"1px solid var(--line)",borderRadius:12,textAlign:"left"}}>
+                <div key={item.title} style={{display:"flex",gap:14,padding:"14px 16px",background:"var(--raised)",border:"1px solid var(--line)",borderRadius:12}}>
                   <span style={{fontSize:20,flexShrink:0,marginTop:1}}>{item.icon}</span>
                   <div>
                     <div style={{fontSize:13,fontWeight:500,marginBottom:4,color:"var(--cream)"}}>{item.title}</div>
@@ -2072,63 +2342,305 @@ function Landing({onStart,ipLocation}){
 // INTAKE
 // ═══════════════════════════════════════════════════════════════════════════════
 function Intake({onSubmit}){
+  const TOTAL=6;
   const [step,setStep]=useState(1);
-  const [f,setF]=useState({name:"",age:"",gender:"",country:"",relationship:"",income:"",education:"",career:"",skills:"",habits:"",goals:"",challenge:""});
+  const [animating,setAnimating]=useState(false);
+  const [direction,setDirection]=useState("forward");
+  const [f,setF]=useState({
+    name:"",age:"",gender:"",country:"",relationship:"",income:"",
+    education:"",career:"",skills:"",habits:"",goals:"",challenge:"",
+    situation:"",bigGoal:"",wantFrom:""
+  });
   const [err,setErr]=useState("");
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const SITUATIONS=[
+    {id:"employed",icon:"💼",label:"Employed",sub:"Working for someone else"},
+    {id:"selfemployed",icon:"🚀",label:"Self-employed",sub:"Running my own thing"},
+    {id:"student",icon:"📚",label:"Student",sub:"Still in school or university"},
+    {id:"unemployed",icon:"🔍",label:"Job seeking",sub:"Looking for opportunities"},
+    {id:"freelance",icon:"💻",label:"Freelancer",sub:"Project to project"},
+    {id:"business",icon:"🏢",label:"Business owner",sub:"I have a team"},
+  ];
+
+  const BIG_GOALS=[
+    {id:"relocate",icon:"✈️",label:"Move abroad",sub:"Start fresh in a new country"},
+    {id:"business",icon:"🏗️",label:"Build a business",sub:"Create something of my own"},
+    {id:"career",icon:"📈",label:"Level up my career",sub:"Better role, better pay"},
+    {id:"financial",icon:"💰",label:"Financial freedom",sub:"Money working for me"},
+    {id:"personal",icon:"🌱",label:"Personal growth",sub:"Become my best self"},
+    {id:"family",icon:"🏡",label:"Provide for family",sub:"Security and stability"},
+  ];
+
+  const WANT_FROM=[
+    {id:"plan",icon:"🗺️",label:"A real plan",sub:"Step-by-step roadmap"},
+    {id:"accountability",icon:"🔥",label:"Accountability",sub:"Keep me on track daily"},
+    {id:"clarity",icon:"🔮",label:"Clarity",sub:"Help me figure out what I want"},
+    {id:"insights",icon:"💡",label:"Insights",sub:"Data and trends about my path"},
+    {id:"all",icon:"⚡",label:"All of it",sub:"Give me everything"},
+  ];
+
   const validate=()=>{
-    if(step===1&&(!f.name.trim()||!f.age||!f.country.trim())) return"Please fill in your name, age, and country.";
-    if(step===1&&(parseInt(f.age)<13||parseInt(f.age)>99)) return"Please enter a valid age.";
-    if(step===2&&!f.career.trim()) return"Please describe your current situation.";
-    if(step===3&&(!f.goals.trim()||!f.challenge.trim())) return"Please describe your goals and your biggest challenge.";
-    return"";
+    if(step===1&&!f.name.trim()) return "Please enter your name.";
+    if(step===2&&(!f.age||parseInt(f.age)<13||parseInt(f.age)>99)) return "Please enter a valid age.";
+    if(step===2&&!f.country.trim()) return "Please enter your country.";
+    if(step===3&&!f.situation) return "Please select your current situation.";
+    if(step===4&&!f.bigGoal) return "Please select your main goal.";
+    if(step===5&&!f.goals.trim()) return "Please describe what you want.";
+    if(step===5&&!f.challenge.trim()) return "Please describe your challenge.";
+    if(step===6&&!f.wantFrom) return "Please select what you want from DestinIQ.";
+    return "";
   };
-  const next=()=>{const e=validate();if(e){setErr(e);return;}setErr("");step<3?setStep(s=>s+1):onSubmit(f);};
+
+  const goTo=(nextStep)=>{
+    const e=validate();
+    if(e){setErr(e);return;}
+    setErr("");
+    setDirection(nextStep>step?"forward":"back");
+    setAnimating(true);
+    setTimeout(()=>{
+      setStep(nextStep);
+      setAnimating(false);
+    },220);
+  };
+
+  const next=()=>{
+    if(step<TOTAL) goTo(step+1);
+    else{
+      const e=validate();
+      if(e){setErr(e);return;}
+      // Map new fields onto the shape the rest of the app expects
+      const combined={
+        ...f,
+        career: f.career||(f.situation?SITUATIONS.find(s=>s.id===f.situation)?.label:""),
+        goals: f.goals||(f.bigGoal?BIG_GOALS.find(g=>g.id===f.bigGoal)?.label:""),
+      };
+      onSubmit(combined);
+    }
+  };
+  const back=()=>{ if(step>1) goTo(step-1); };
+
+  const prog=(step/TOTAL)*100;
+
+  const cardStyle={
+    background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,
+    padding:"32px 28px",
+    opacity:animating?0:1,
+    transform:animating?(direction==="forward"?"translateX(30px)":"translateX(-30px)"):"translateX(0)",
+    transition:"opacity 0.22s ease, transform 0.22s ease",
+  };
+
+  const optionStyle=(selected)=>({
+    display:"flex",alignItems:"center",gap:14,padding:"14px 16px",
+    borderRadius:14,border:`1.5px solid ${selected?"var(--gold)":"var(--cream-10)"}`,
+    background:selected?"rgba(var(--gold-rgb,212,175,55),0.08)":"transparent",
+    cursor:"pointer",transition:"all 0.18s",marginBottom:10,
+  });
+
+  const greetings=["Hey","Hi","Hello","Hey there"];
+  const greeting=greetings[f.name.length%greetings.length]||"Hey";
+
   return(
-    <div style={{paddingTop:60,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"100px 24px 60px"}}>
-      <div style={{width:"100%",maxWidth:600}}>
-        <div style={{marginBottom:32,textAlign:"center"}}>
-          <div className="mono fu" style={{marginBottom:8}}>Step {step} of 3</div>
-          <h2 className="d3 fu1" style={{marginBottom:6}}>{step===1?"Let's start with you":step===2?"What does your day-to-day look like?":"What are you actually after?"}</h2>
-          <p className="small fu2" style={{marginBottom:20}}>{step===1?"Be honest here. The more real you are, the more this will actually mean something to you.":step===2?"Tell us where life has you right now. No judgement — just what's true.":"This is the most important part. What you write here shapes everything that follows."}</p>
-          <div className="pbar"><div className="pfill" style={{width:`${(step/3)*100}%`}}/></div>
-        </div>
-        <div className="card fu2">
-          {step===1&&<>
-            <div className="row2">
-              <div className="field"><label className="fl">Full Name</label><input className="fi" placeholder="Your name" value={f.name} onChange={e=>set("name",e.target.value)} maxLength={60}/></div>
-              <div className="field"><label className="fl">Age</label><input className="fi" type="number" min="13" max="99" placeholder="e.g. 26" value={f.age} onChange={e=>set("age",e.target.value)}/></div>
-            </div>
-            <div className="row2">
-              <div className="field"><label className="fl">Gender</label><select className="fs" value={f.gender} onChange={e=>set("gender",e.target.value)}><option value="">— Select —</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option></select></div>
-              <div className="field"><label className="fl">Country</label><input className="fi" placeholder="e.g. Ghana" value={f.country} onChange={e=>set("country",e.target.value)} maxLength={60}/></div>
-            </div>
-            <div className="row2">
-              <div className="field"><label className="fl">Relationship Status</label><select className="fs" value={f.relationship} onChange={e=>set("relationship",e.target.value)}><option value="">— Select —</option><option>Single</option><option>In a relationship</option><option>Engaged</option><option>Married</option><option>Divorced</option></select></div>
-              <div className="field"><label className="fl">Monthly Income</label><select className="fs" value={f.income} onChange={e=>set("income",e.target.value)}><option value="">— Select —</option><option>Under $500</option><option>$500–$1,500</option><option>$1,500–$4,000</option><option>$4,000–$10,000</option><option>$10,000+</option></select></div>
-            </div>
-            <div className="field"><label className="fl">Highest Education</label><select className="fs" value={f.education} onChange={e=>set("education",e.target.value)}><option value="">— Select —</option><option>High School</option><option>Some College</option><option>Bachelor's Degree</option><option>Master's Degree</option><option>Doctorate</option><option>Self-taught / Vocational</option></select></div>
-          </>}
-          {step===2&&<>
-            <div className="field"><label className="fl">What do you do for work right now?</label><textarea className="ft" rows={3} maxLength={800} placeholder="e.g. I work in sales, earning $700/month. Been there 2 years and feel stuck." value={f.career} onChange={e=>set("career",e.target.value)}/></div>
-            <div className="field"><label className="fl">Your Skills & Strengths</label><textarea className="ft" rows={2} maxLength={500} placeholder="e.g. Social media, video editing, writing, coding basics…" value={f.skills} onChange={e=>set("skills",e.target.value)}/></div>
-            <div className="field"><label className="fl">Daily Habits (Sleep, Exercise, Stress, Diet)</label><textarea className="ft" rows={2} maxLength={500} placeholder="e.g. 6 hours sleep, no gym, high stress, skip breakfast" value={f.habits} onChange={e=>set("habits",e.target.value)}/></div>
-          </>}
-          {step===3&&<>
-            <div className="field"><label className="fl">What do you actually want from your life?</label><textarea className="ft" rows={3} maxLength={600} placeholder="Don't filter yourself. Financial freedom, a business, moving abroad, feeling less stuck — whatever it honestly is." value={f.goals} onChange={e=>set("goals",e.target.value)}/></div>
-            <div className="field"><label className="fl">What's actually getting in the way?</label><textarea className="ft" rows={3} maxLength={600} placeholder="What keeps coming back, no matter what you try? Be honest — this is just for you." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/></div>
-            <div className="insight teal"><p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75}}><strong style={{color:"var(--teal)"}}>This matters most.</strong> The people who get the most out of DestinIQ are the ones who are honest here. You're not being judged — you're being understood.</p></div>
-          </>}
-          {err&&<div className="err-box">⚠ {err}</div>}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
-            {step>1?<button className="btn btn-ghost" onClick={()=>{setStep(s=>s-1);setErr("");}}>← Back</button>:<div/>}
-            <button className="btn btn-gold" onClick={next}>{step<3?"Continue →":"Generate My Report"}</button>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"80px 20px 40px"}}>
+      <div style={{width:"100%",maxWidth:560}}>
+
+        {/* Progress bar */}
+        <div style={{marginBottom:28}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>STEP {step} OF {TOTAL}</span>
+            <span style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{Math.round(prog)}%</span>
+          </div>
+          <div style={{height:4,background:"var(--cream-10)",borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",background:"var(--gold)",borderRadius:99,width:`${prog}%`,transition:"width 0.4s cubic-bezier(.4,0,.2,1)"}}/>
           </div>
         </div>
+
+        <div style={cardStyle}>
+
+          {/* STEP 1 — Name */}
+          {step===1&&(
+            <div>
+              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>WELCOME TO DESTINIQ</div>
+              <h2 style={{fontSize:26,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>Let's start with your name.</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:28,lineHeight:1.6}}>This isn't just a form. What you share here shapes a plan built entirely around you.</p>
+              <div style={{marginBottom:20}}>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>FULL NAME</label>
+                <input
+                  autoFocus
+                  style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"15px 18px",color:"var(--cream)",fontSize:18,fontWeight:600,outline:"none",boxSizing:"border-box",letterSpacing:".01em"}}
+                  placeholder="Type your name…"
+                  value={f.name}
+                  onChange={e=>set("name",e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&next()}
+                  maxLength={60}
+                />
+              </div>
+              {f.name.trim()&&<p style={{fontSize:13,color:"var(--cream-40)",marginBottom:4}}>Nice to meet you, <strong style={{color:"var(--cream)"}}>{f.name}</strong> 👋</p>}
+            </div>
+          )}
+
+          {/* STEP 2 — Age, Country, Gender */}
+          {step===2&&(
+            <div>
+              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>{greeting.toUpperCase()}, {f.name.toUpperCase()}!</div>
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>Tell us a little about yourself.</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>Where you are right now shapes where you can go.</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+                <div>
+                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>AGE</label>
+                  <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:15,outline:"none",boxSizing:"border-box"}} type="number" min="13" max="99" placeholder="e.g. 24" value={f.age} onChange={e=>set("age",e.target.value)}/>
+                </div>
+                <div>
+                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>GENDER</label>
+                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.gender?"var(--cream)":"var(--cream-30)",fontSize:15,outline:"none",boxSizing:"border-box"}} value={f.gender} onChange={e=>set("gender",e.target.value)}>
+                    <option value="">Select…</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>COUNTRY</label>
+                <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:15,outline:"none",boxSizing:"border-box"}} placeholder="e.g. Ghana" value={f.country} onChange={e=>set("country",e.target.value)} maxLength={60}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+                <div>
+                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>RELATIONSHIP</label>
+                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.relationship?"var(--cream)":"var(--cream-30)",fontSize:14,outline:"none",boxSizing:"border-box"}} value={f.relationship} onChange={e=>set("relationship",e.target.value)}>
+                    <option value="">Select…</option><option>Single</option><option>In a relationship</option><option>Engaged</option><option>Married</option><option>Divorced</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>MONTHLY INCOME</label>
+                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.income?"var(--cream)":"var(--cream-30)",fontSize:14,outline:"none",boxSizing:"border-box"}} value={f.income} onChange={e=>set("income",e.target.value)}>
+                    <option value="">Select…</option><option>Under $500</option><option>$500–$1,500</option><option>$1,500–$4,000</option><option>$4,000–$10,000</option><option>$10,000+</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 — Current situation */}
+          {step===3&&(
+            <div>
+              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>YOUR CURRENT REALITY</div>
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>What does your life look like right now?</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>No judgement here. We just need to know where you're starting from.</p>
+              {SITUATIONS.map(s=>(
+                <div key={s.id} style={optionStyle(f.situation===s.id)} onClick={()=>set("situation",s.id)}>
+                  <span style={{fontSize:24}}>{s.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{s.label}</div>
+                    <div style={{fontSize:12,color:"var(--cream-40)"}}>{s.sub}</div>
+                  </div>
+                  {f.situation===s.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:700}}>✓</div>}
+                </div>
+              ))}
+              {(f.situation==="employed"||f.situation==="selfemployed"||f.situation==="business")&&(
+                <div style={{marginTop:14}}>
+                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>BRIEFLY DESCRIBE YOUR WORK</label>
+                  <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none"}} rows={2} maxLength={300} placeholder="e.g. Sales rep at a telecoms company, $600/month" value={f.career} onChange={e=>set("career",e.target.value)}/>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 4 — Big goal */}
+          {step===4&&(
+            <div>
+              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>YOUR AMBITION</div>
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>What's the big thing you're working towards?</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>Pick the one that feels most like you right now.</p>
+              {BIG_GOALS.map(g=>(
+                <div key={g.id} style={optionStyle(f.bigGoal===g.id)} onClick={()=>set("bigGoal",g.id)}>
+                  <span style={{fontSize:24}}>{g.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{g.label}</div>
+                    <div style={{fontSize:12,color:"var(--cream-40)"}}>{g.sub}</div>
+                  </div>
+                  {f.bigGoal===g.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:700}}>✓</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* STEP 5 — Goals & Challenge */}
+          {step===5&&(
+            <div>
+              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>THE REAL TALK</div>
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>In your own words, {f.name}.</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>This is the most important part. The more honest you are, the more powerful your report will be.</p>
+              <div style={{marginBottom:18}}>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT DO YOU ACTUALLY WANT FROM LIFE?</label>
+                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder={`Don't filter yourself. Financial freedom, moving to ${f.country==="Ghana"?"Europe":"another country"}, a business, feeling less stuck — whatever it honestly is.`} value={f.goals} onChange={e=>set("goals",e.target.value)}/>
+                <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.goals.length}/600</div>
+              </div>
+              <div>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT'S ACTUALLY GETTING IN THE WAY?</label>
+                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder="What keeps coming back no matter what you try? Money, time, fear, family pressure, no connections — be real." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/>
+                <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.challenge.length}/600</div>
+              </div>
+              <div style={{marginTop:16,padding:"14px 16px",background:"rgba(20,184,166,0.06)",border:"1px solid rgba(20,184,166,0.15)",borderRadius:12}}>
+                <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,margin:0}}><strong style={{color:"var(--teal)"}}>This matters most.</strong> People who are honest here get reports that actually change how they see their future. You're not being judged — you're being understood.</p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6 — What they want from DestinIQ + launch */}
+          {step===6&&(
+            <div>
+              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>ALMOST THERE</div>
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>What do you want DestinIQ to do for you?</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>We'll shape your experience around this.</p>
+              {WANT_FROM.map(w=>(
+                <div key={w.id} style={optionStyle(f.wantFrom===w.id)} onClick={()=>set("wantFrom",w.id)}>
+                  <span style={{fontSize:24}}>{w.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{w.label}</div>
+                    <div style={{fontSize:12,color:"var(--cream-40)"}}>{w.sub}</div>
+                  </div>
+                  {f.wantFrom===w.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:700}}>✓</div>}
+                </div>
+              ))}
+              {f.wantFrom&&(
+                <div style={{marginTop:16,padding:"16px",background:"rgba(212,175,55,0.06)",border:"1px solid rgba(212,175,55,0.15)",borderRadius:12,textAlign:"center"}}>
+                  <div style={{fontSize:22,marginBottom:6}}>🚀</div>
+                  <p style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.6,margin:0}}>You're ready, <strong style={{color:"var(--cream)"}}>{f.name}</strong>. We're about to build your personal report. This takes about 30 seconds.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error */}
+          {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:16,fontSize:13,color:"#F87171"}}>⚠ {err}</div>}
+
+          {/* Navigation */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:24}}>
+            {step>1
+              ?<button onClick={back} style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"10px 18px",color:"var(--cream-50)",fontSize:14,cursor:"pointer",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.color="var(--cream)"} onMouseLeave={e=>e.currentTarget.style.color="var(--cream-50)"}>← Back</button>
+              :<div/>
+            }
+            <button
+              onClick={next}
+              style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"12px 28px",color:"#000",fontSize:15,fontWeight:700,cursor:"pointer",transition:"all .2s",boxShadow:"0 4px 20px rgba(212,175,55,0.25)"}}
+              onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
+              onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+            >
+              {step<TOTAL?"Continue →":"Generate My Report ✨"}
+            </button>
+          </div>
+        </div>
+
+        {/* Step dots */}
+        <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:20}}>
+          {Array.from({length:TOTAL},(_,i)=>(
+            <div key={i} style={{width:i+1===step?20:6,height:6,borderRadius:99,background:i+1<=step?"var(--gold)":"var(--cream-10)",transition:"all .3s"}}/>
+          ))}
+        </div>
+
       </div>
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOADING
@@ -2172,7 +2684,7 @@ function Loading(){
 // AUTH SCREEN — Premium redesign
 // ═══════════════════════════════════════════════════════════════════════════════
 function AuthScreen({onAuth}){
-  const [mode,setMode]=useState("login"); // login | signup | phone | forgot
+  const [mode,setMode]=useState("login"); // login | signup | forgot | forgot_sent | reset
   const [tab,setTab]=useState("email");   // email | phone
   const [email,setEmail]=useState("");
   const [phone,setPhone]=useState("");
@@ -2183,52 +2695,58 @@ function AuthScreen({onAuth}){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [showPass,setShowPass]=useState(false);
+  const [newPassword,setNewPassword]=useState("");
+  const [showNewPass,setShowNewPass]=useState(false);
   const otpRefs=[useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
-  const saveUser=(user)=>{
-    localStorage.setItem("diq_user",JSON.stringify(user));
-    onAuth(user);
-  };
+  // Detect password-reset redirect from email link
+  useEffect(()=>{
+    if(typeof window!=="undefined"&&window.location.search.includes("reset=true")){
+      setMode("reset");
+      // Clean up the URL
+      window.history.replaceState({},"",window.location.pathname);
+    }
+  },[]);
 
+  // ── EMAIL / PASSWORD AUTH ────────────────────────────────────────────────
   const handleEmail=async()=>{
     if(!email.trim()||!password.trim()){setError("Please fill in all fields.");return;}
     if(mode==="signup"&&!name.trim()){setError("Please enter your name.");return;}
     if(password.length<6){setError("Password must be at least 6 characters.");return;}
     setLoading(true);setError("");
     try{
-      // Simple client-side auth using localStorage
-      const userId=btoa(email.trim()).replace(/=/g,"").slice(0,16);
       if(mode==="signup"){
-        const existing=localStorage.getItem("diq_user_"+userId);
-        if(existing){throw new Error("An account with this email already exists. Sign in instead.");}
-        const user={id:userId,email:email.trim(),name:name.trim(),provider:"email",token:Math.random().toString(36).slice(2)};
-        localStorage.setItem("diq_user_"+userId,JSON.stringify({password:btoa(password)}));
-        saveUser(user);
+        const{data,error:err}=await supabase.auth.signUp({
+          email:email.trim(),
+          password,
+          options:{data:{name:name.trim()}},
+        });
+        if(err) throw err;
+        if(data.user&&!data.session){
+          setError("Check your email to confirm your account, then sign in.");
+          setLoading(false);return;
+        }
+        if(data.user) onAuth({id:data.user.id,email:data.user.email,name:name.trim(),provider:"email"});
       } else {
-        const stored=localStorage.getItem("diq_user_"+userId);
-        if(!stored){throw new Error("No account found. Sign up first.");}
-        const storedData=JSON.parse(stored);
-        if(storedData.password!==btoa(password)){throw new Error("Incorrect password. Try again.");}
-        const user={id:userId,email:email.trim(),name:email.trim().split("@")[0],provider:"email",token:Math.random().toString(36).slice(2)};
-        saveUser(user);
+        const{data,error:err}=await supabase.auth.signInWithPassword({email:email.trim(),password});
+        if(err) throw err;
+        const meta=data.user.user_metadata||{};
+        onAuth({id:data.user.id,email:data.user.email,name:meta.name||email.trim().split("@")[0],provider:"email"});
       }
-    }catch(e){setError(e.message);}
+    }catch(e){setError(e.message||"Authentication failed.");}
     setLoading(false);
   };
 
+  // ── PHONE / OTP AUTH ─────────────────────────────────────────────────────
   const handleSendOTP=async()=>{
     if(!phone.trim()){setError("Please enter your phone number.");return;}
     setLoading(true);setError("");
     try{
-      // Generate OTP and store in sessionStorage
-      const code=Math.floor(100000+Math.random()*900000).toString();
-      sessionStorage.setItem("diq_otp_"+phone.trim(),JSON.stringify({code,expires:Date.now()+600000}));
-      // In production connect Twilio here. For now show code in console.
-      console.log("OTP for "+phone.trim()+": "+code);
-      alert("Your verification code is: "+code+" (In production this will be sent via SMS)");
+      const{error:err}=await supabase.auth.signInWithOtp({phone:phone.trim()});
+      if(err) throw err;
       setOtpSent(true);
       setTimeout(()=>otpRefs[0].current?.focus(),100);
-    }catch(e){setError(e.message);}
+    }catch(e){setError(e.message||"Failed to send code. Check the number and try again.");}
     setLoading(false);
   };
 
@@ -2237,16 +2755,56 @@ function AuthScreen({onAuth}){
     if(code.length<6){setError("Please enter the 6-digit code.");return;}
     setLoading(true);setError("");
     try{
-      const stored=sessionStorage.getItem("diq_otp_"+phone.trim());
-      if(!stored) throw new Error("No code found. Request a new one.");
-      const storedData=JSON.parse(stored);
-      if(Date.now()>storedData.expires) throw new Error("Code expired. Request a new one.");
-      if(storedData.code!==code) throw new Error("Incorrect code. Try again.");
-      sessionStorage.removeItem("diq_otp_"+phone.trim());
-      const userId=btoa(phone.trim()).replace(/=/g,"").slice(0,16);
-      const user={id:userId,phone:phone.trim(),name:"User",provider:"phone",token:Math.random().toString(36).slice(2)};
-      saveUser(user);
-    }catch(e){setError(e.message);}
+      const{data,error:err}=await supabase.auth.verifyOtp({phone:phone.trim(),token:code,type:"sms"});
+      if(err) throw err;
+      const u=data.user;
+      onAuth({id:u.id,phone:u.phone,name:"User",provider:"phone"});
+    }catch(e){setError(e.message||"Incorrect code. Try again.");}
+    setLoading(false);
+  };
+
+  // ── GOOGLE OAUTH ─────────────────────────────────────────────────────────
+  const handleGoogle=async()=>{
+    setLoading(true);setError("");
+    const{error:err}=await supabase.auth.signInWithOAuth({
+      provider:"google",
+      options:{redirectTo:window.location.origin},
+    });
+    if(err){setError(err.message);setLoading(false);}
+    // On success the page redirects; onAuthStateChange in the root picks up the session.
+  };
+
+  // ── FORGOT PASSWORD ────────────────────────────────────────────────────
+  const handleForgot=async()=>{
+    if(!email.trim()){setError("Enter your email address first.");return;}
+    setLoading(true);setError("");
+    try{
+      const{error:err}=await supabase.auth.resetPasswordForEmail(email.trim(),{
+        redirectTo:window.location.origin+"?reset=true",
+      });
+      if(err) throw err;
+      setMode("forgot_sent");
+    }catch(e){setError(e.message||"Failed to send reset email.");}
+    setLoading(false);
+  };
+
+  // ── RESET PASSWORD (after redirect back) ────────────────────────────────
+  const handleReset=async()=>{
+    if(newPassword.length<6){setError("Password must be at least 6 characters.");return;}
+    setLoading(true);setError("");
+    try{
+      const{error:err}=await supabase.auth.updateUser({password:newPassword});
+      if(err) throw err;
+      setMode("login");setError("");
+      setNewPassword("");
+      // Session is already active after reset — trigger onAuth
+      const{data:{session}}=await supabase.auth.getSession();
+      if(session?.user){
+        const u=session.user;
+        const meta=u.user_metadata||{};
+        onAuth({id:u.id,email:u.email,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:"email"});
+      }
+    }catch(e){setError(e.message||"Failed to update password.");}
     setLoading(false);
   };
 
@@ -2261,11 +2819,66 @@ function AuthScreen({onAuth}){
     if(e.key==="Backspace"&&!otp[i]&&i>0) otpRefs[i-1].current?.focus();
   };
 
-  const handleGoogle=()=>{alert("Google login coming soon! Use email or phone for now.");};
-  
-
   const btnStyle={width:"100%",padding:"14px",borderRadius:12,border:"1px solid var(--cream-15)",background:"var(--night)",color:"var(--cream)",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"all 0.2s",marginBottom:10};
   const inputStyle={width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12};
+
+  // ── FORGOT PASSWORD SCREEN ────────────────────────────────────────────────
+  if(mode==="forgot"){
+    return(
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+        <div style={{width:"100%",maxWidth:420}}>
+          <div style={{textAlign:"center",marginBottom:32}}>
+            <div style={{fontSize:28,fontWeight:800,color:"var(--cream)",marginBottom:8}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></div>
+            <div style={{fontSize:15,color:"var(--cream-60)"}}>Reset your password</div>
+          </div>
+          <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"28px 24px"}}>
+            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:16,lineHeight:1.6}}>Enter the email address on your account and we'll send you a reset link.</p>
+            <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12}} type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleForgot()}/>
+            {error&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#F87171"}}>{error}</div>}
+            <button onClick={handleForgot} disabled={loading} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"var(--cream-15)":"var(--gold)",color:loading?"var(--cream-40)":"#000",fontSize:15,fontWeight:700,cursor:loading?"not-allowed":"pointer",marginBottom:16}}>{loading?"Sending…":"Send reset link"}</button>
+            <div style={{textAlign:"center",fontSize:13}}><span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--cream-40)",cursor:"pointer",textDecoration:"underline"}}>Back to sign in</span></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if(mode==="forgot_sent"){
+    return(
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+        <div style={{width:"100%",maxWidth:420,textAlign:"center"}}>
+          <div style={{fontSize:28,fontWeight:800,color:"var(--cream)",marginBottom:8}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></div>
+          <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"36px 24px",marginTop:24}}>
+            <div style={{fontSize:40,marginBottom:16}}>📬</div>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--cream)",marginBottom:12}}>Check your inbox</div>
+            <p style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.7,marginBottom:24}}>We sent a password reset link to <b style={{color:"var(--cream)"}}>{email}</b>. Click the link in the email to set a new password.</p>
+            <span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600,fontSize:14}}>Back to sign in</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if(mode==="reset"){
+    return(
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+        <div style={{width:"100%",maxWidth:420}}>
+          <div style={{textAlign:"center",marginBottom:32}}>
+            <div style={{fontSize:28,fontWeight:800,color:"var(--cream)",marginBottom:8}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></div>
+            <div style={{fontSize:15,color:"var(--cream-60)"}}>Set a new password</div>
+          </div>
+          <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"28px 24px"}}>
+            <div style={{position:"relative",marginBottom:12}}>
+              <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 44px 13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box"}} type={showNewPass?"text":"password"} placeholder="New password (min 6 characters)" value={newPassword} onChange={e=>setNewPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleReset()}/>
+              <button onClick={()=>setShowNewPass(p=>!p)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--cream-30)",cursor:"pointer",fontSize:13}}>{showNewPass?"Hide":"Show"}</button>
+            </div>
+            {error&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#F87171"}}>{error}</div>}
+            <button onClick={handleReset} disabled={loading} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"var(--cream-15)":"var(--gold)",color:loading?"var(--cream-40)":"#000",fontSize:15,fontWeight:700,cursor:loading?"not-allowed":"pointer"}}>{loading?"Updating…":"Update password"}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return(
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
@@ -2284,77 +2897,59 @@ function AuthScreen({onAuth}){
         {/* Card */}
         <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"28px 24px"}}>
 
-          {/* Google + Apple */}
-          <button style={{...btnStyle}} onClick={handleGoogle}
+          {/* Google OAuth */}
+          <button style={{...btnStyle}} onClick={handleGoogle} disabled={loading}
             onMouseEnter={e=>e.currentTarget.style.background="var(--midnight)"}
             onMouseLeave={e=>e.currentTarget.style.background="var(--night)"}>
             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
             Continue with Google
           </button>
 
-
-
           {/* Divider */}
           <div style={{display:"flex",alignItems:"center",gap:12,margin:"4px 0 16px"}}>
             <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
-            <span style={{fontSize:12,color:"var(--cream-40)"}}>or</span>
+            <span style={{fontSize:12,color:"var(--cream-30)"}}>or</span>
             <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
           </div>
 
           {/* Email / Phone tabs */}
-          <div style={{display:"flex",gap:6,marginBottom:18,background:"var(--midnight)",borderRadius:10,padding:4}}>
+          <div style={{display:"flex",background:"var(--midnight)",borderRadius:10,padding:3,gap:3,marginBottom:20}}>
             {["email","phone"].map(t=>(
-              <button key={t} onClick={()=>{setTab(t);setError("");setOtpSent(false);}}
-                style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:tab===t?"var(--night)":"transparent",color:tab===t?"var(--cream)":"var(--cream-40)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.2s"}}>
-                {t==="email"?"📧 Email":"📱 Phone"}
+              <button key={t} onClick={()=>{setTab(t);setError("");setOtpSent(false);setOtp(["","","","","",""]);}}
+                style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:500,
+                  background:tab===t?"var(--night)":"transparent",
+                  color:tab===t?"var(--cream)":"var(--cream-30)",transition:"all .2s"}}>
+                {t.charAt(0).toUpperCase()+t.slice(1)}
               </button>
             ))}
           </div>
 
-          {/* Email form */}
+          {/* Name field (signup only) */}
+          {tab==="email"&&mode==="signup"&&(
+            <input style={{...inputStyle}} placeholder="Your name" value={name} onChange={e=>setName(e.target.value)}/>
+          )}
+
+          {/* Email fields */}
           {tab==="email"&&(
             <>
-              {mode==="signup"&&(
-                <input value={name} onChange={e=>setName(e.target.value)}
-                  placeholder="Your full name" style={inputStyle}/>
-              )}
-              <input value={email} onChange={e=>setEmail(e.target.value)}
-                placeholder="Email address" type="email" style={inputStyle}/>
+              <input style={{...inputStyle}} type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
               <div style={{position:"relative",marginBottom:12}}>
-                <input value={password} onChange={e=>setPassword(e.target.value)}
-                  placeholder="Password" type={showPass?"text":"password"}
-                  style={{...inputStyle,marginBottom:0,paddingRight:44}}
-                  onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
-                <button onClick={()=>setShowPass(!showPass)}
-                  style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13}}>
-                  {showPass?"Hide":"Show"}
-                </button>
+                <input style={{...inputStyle,marginBottom:0,paddingRight:44}} type={showPass?"text":"password"} placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
+                <button onClick={()=>setShowPass(p=>!p)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--cream-30)",cursor:"pointer",fontSize:13}}>{showPass?"Hide":"Show"}</button>
               </div>
-              {mode==="login"&&(
-                <div style={{textAlign:"right",marginBottom:12}}>
-                  <span onClick={()=>setMode("forgot")} style={{fontSize:12,color:"var(--gold)",cursor:"pointer"}}>Forgot password?</span>
-                </div>
-              )}
             </>
           )}
 
-          {/* Phone form */}
+          {/* Phone fields */}
           {tab==="phone"&&!otpSent&&(
-            <div style={{marginBottom:12}}>
-              <input value={phone} onChange={e=>setPhone(e.target.value)}
-                placeholder="+1 234 567 8900" type="tel" style={inputStyle}
-                onKeyDown={e=>e.key==="Enter"&&handleSendOTP()}/>
-              <div style={{fontSize:12,color:"var(--cream-40)",marginBottom:8}}>Include country code (e.g. +1 for US, +44 for UK)</div>
-            </div>
+            <input style={{...inputStyle}} type="tel" placeholder="+1 234 567 8900" value={phone} onChange={e=>setPhone(e.target.value)}/>
           )}
 
           {/* OTP input */}
           {tab==="phone"&&otpSent&&(
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:13,color:"var(--cream-60)",marginBottom:14,textAlign:"center"}}>
-                We sent a 6-digit code to <b style={{color:"var(--cream)"}}>{phone}</b>
-              </div>
-              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:12}}>
+            <div>
+              <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:14,textAlign:"center"}}>Enter the 6-digit code sent to {phone}</p>
+              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
                 {otp.map((v,i)=>(
                   <input key={i} ref={otpRefs[i]} value={v}
                     onChange={e=>handleOTPInput(i,e.target.value)}
@@ -2382,18 +2977,26 @@ function AuthScreen({onAuth}){
              mode==="login"?"Sign in":"Create account"}
           </button>
 
-          {/* Toggle login/signup */}
-          <div style={{textAlign:"center",fontSize:13,color:"var(--cream-50)"}}>
-            {mode==="login"?(
+          {/* Toggle login/signup + forgot password */}
+          {mode==="login"&&(
+            <div style={{textAlign:"center",fontSize:13,color:"var(--cream-50)"}}>
               <>Don't have an account?{" "}
                 <span onClick={()=>{setMode("signup");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600}}>Sign up free</span>
               </>
-            ):(
+            </div>
+          )}
+          {mode==="signup"&&(
+            <div style={{textAlign:"center",fontSize:13,color:"var(--cream-50)"}}>
               <>Already have an account?{" "}
                 <span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600}}>Sign in</span>
               </>
-            )}
-          </div>
+            </div>
+          )}
+          {mode==="login"&&tab==="email"&&(
+            <div style={{textAlign:"center",marginTop:10,fontSize:13}}>
+              <span onClick={()=>{setMode("forgot");setError("");}} style={{color:"var(--cream-40)",cursor:"pointer",textDecoration:"underline"}}>Forgot password?</span>
+            </div>
+          )}
         </div>
 
         <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"var(--cream-30)"}}>
@@ -2403,6 +3006,10 @@ function AuthScreen({onAuth}){
     </div>
   );
 }
+
+// ── FORGOT PASSWORD SCREENS (rendered inside AuthScreen return) ─────────────
+// These replace the main card when mode is "forgot", "forgot_sent", or "reset".
+
 
 function RelocationExplorer({suggestedCountries, formData, userId, isPremium, isPaid, onUnlock}){
   const [search, setSearch] = useState("");
@@ -2830,9 +3437,8 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function DestinIQ(){
-  const [user, setUser]=useState(()=>{
-    try{ const u=localStorage.getItem("diq_user"); return u?JSON.parse(u):null; }catch{return null;}
-  });
+  const [user, setUser]=useState(null);
+  const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
   const [screen,    setScreen   ]=useState("landing");
   const [formData,  setFormData ]=useState(null);
   const [report,    setReport   ]=useState(null);
@@ -2845,7 +3451,39 @@ export default function DestinIQ(){
   const [nudge,     setNudge    ]=useState(false);
   const [ipLocation,setIpLocation]=useState(null);
   const [ipLoaded,  setIpLoaded ]=useState(false);
-  const [userId]=useState(()=>genUserId());
+  const [userId, setUserId]=useState(null);
+
+  // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
+  useEffect(()=>{
+    // Check for an existing session on mount (handles OAuth redirects too)
+    supabase.auth.getSession().then(({data:{session}})=>{
+      if(session?.user){
+        const u=session.user;
+        const meta=u.user_metadata||{};
+        const appUser={id:u.id,email:u.email,phone:u.phone,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:u.app_metadata?.provider||"email"};
+        setUser(appUser);
+        setUserId(u.id);
+        hydrateUserData(u.id); // load momentum/decisions/weekly from DB
+      }
+      setAuthLoading(false);
+    });
+
+    // Listen for sign-in / sign-out events (including OAuth callback)
+    const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      if(session?.user){
+        const u=session.user;
+        const meta=u.user_metadata||{};
+        const appUser={id:u.id,email:u.email,phone:u.phone,name:meta.name||meta.full_name||(u.email?.split("@")[0])||"User",provider:u.app_metadata?.provider||"email"};
+        setUser(appUser);
+        setUserId(u.id);
+        hydrateUserData(u.id);
+      } else {
+        setUser(null);
+        setUserId(null);
+      }
+    });
+    return()=>subscription.unsubscribe();
+  },[]);
 
   // Silently fetch IP location as soon as app loads
   useEffect(()=>{
@@ -2856,13 +3494,72 @@ export default function DestinIQ(){
   },[]);
 
   const handleSubmit=useCallback(async(f)=>{
+    if(!userId) return; // not yet authenticated
     setFormData(f);setScreen("loading");setApiError("");
-    pushToMemory(userId,"user",`Profile: ${f.name}, ${f.age}, ${f.country}, Goals: ${f.goals}, Challenge: ${f.challenge}`);
+    pushToMemory(userId,"user",`Profile: ${f.name}, ${f.age}, ${f.country}, Situation: ${f.situation||f.career}, Goal: ${f.bigGoal||""}, Goals: ${f.goals}, Challenge: ${f.challenge}, Wants from app: ${f.wantFrom||""}`);
 
     // Fetch live local context for their area (parallel with report generation feel)
     const localCtx = await getLocalContext(ipLocation?.city||"", f.country).catch(()=>null);
 
     try{
+      // ── INTENT MODERATION ────────────────────────────────────────────────
+      // Before generating the report, check whether the user's stated goals
+      // or challenges describe harmful, illegal, or destructive intent.
+      // If so, skip the normal report and return a caring redirect instead.
+      const intentCheckPrompt = `A person named ${f.name}, age ${f.age}, from ${f.country} submitted the following:
+Goals: "${f.goals}"
+Challenge: "${f.challenge}"
+Skills: "${f.skills||""}"
+
+Does this person describe any harmful, illegal, violent, criminal, or clearly self-destructive intent (e.g. robbery, drug dealing, scamming, trafficking, violence, fraud, gang activity, or anything that would hurt themselves or others)?
+
+Reply ONLY with a JSON object in this exact format — no extra text:
+{"harmful":true,"underlying_desire":"what they probably actually want (money, respect, freedom, excitement, etc.)","redirect":"a warm but firm 2-3 sentence message to them explaining why that path destroys their future, then suggesting a specific legitimate path that gives them what they actually want"}
+or
+{"harmful":false}`;
+
+      const intentRaw = await callAPI({
+        messages:[{role:"user",content:intentCheckPrompt}],
+        system:"You are a content moderation assistant. Reply ONLY with valid JSON, nothing else.",
+        userId, isPremium
+      });
+      let intentResult = {harmful:false};
+      try{
+        const ic = intentRaw.replace(/\`\`\`json|\`\`\`/g,"").trim();
+        intentResult = JSON.parse(ic.slice(ic.indexOf("{"), ic.lastIndexOf("}")+1));
+      }catch(_){}
+
+      if(intentResult.harmful){
+        // Build a caring redirect report instead of a normal life plan
+        const redirectReport = {
+          overall: "Let's Talk Honestly",
+          summary: intentResult.redirect || `${f.name}, we need to be real with you. The path you described leads to prison, early death, or a life of regret — not the life you actually deserve. You clearly have drive and ambition. Let's point that energy somewhere that actually builds your future.`,
+          sections:[
+            {
+              title:"The Truth About That Path",
+              content:`Here's what actually happens to people who go down that road: it doesn't end in wealth or respect. It ends in loss — of freedom, family, and often life itself. The people who look successful in that world are either in debt to someone dangerous, hiding from authorities, or already gone. That's not the future your potential deserves.`
+            },
+            {
+              title:`What You Actually Want`,
+              content:`You want ${intentResult.underlying_desire||"a better life, real money, and to be respected"}. That's completely valid. Those desires are not the problem — the method is. The good news is everything you want is achievable through paths that don't put you in a cell or a grave.`
+            },
+            {
+              title:"A Real Alternative for You",
+              content:`Your age, your country, your drive — these are genuine assets. People with your level of hunger have built businesses, learned trades, broken into tech, built communities. The skills that make someone good at street survival — reading people, staying calm under pressure, hustle, loyalty — are the exact skills that make someone exceptional in sales, entrepreneurship, logistics, and leadership. You already have what it takes. You just need to aim it differently.`
+            },
+            {
+              title:"Your Next Step",
+              content:`Start with one thing: find one person in your area who is making legitimate money and ask them how they started. Not to copy them — to understand that it's possible. Then come back and tell us your real goals. We'll build you a plan that actually works.`
+            }
+          ],
+          redirect: true
+        };
+        setReport(redirectReport);
+        setScreen("results");
+        return;
+      }
+      // ── END INTENT CHECK ─────────────────────────────────────────────────
+
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
@@ -2894,14 +3591,14 @@ export default function DestinIQ(){
       <div className="root">
 
         {/* AUTH GATE — show login if not authenticated */}
-        {!user&&<AuthScreen onAuth={(u)=>{setUser(u);}}/>}
+        {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={(u)=>{setUser(u);setUserId(u.id);hydrateUserData(u.id);}}/>}
         {user&&<>
 
         <nav className="nav">
           <div className="logo" onClick={restart}>Destin<b>IQ</b></div>
           <div className="nav-r">
             {screen!=="landing"&&<PremiumToggle isPremium={isPremium} onToggle={()=>setIsPremium(p=>!p)}/>}
-            {user&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>{localStorage.removeItem("diq_user");setUser(null);}} title="Sign out">Sign out</button>}
+            {user&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={async()=>{await supabase.auth.signOut();setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);}} title="Sign out">Sign out</button>}
             {screen==="results"&&(
               <button className="btn btn-ghost" style={{fontSize:12,padding:"6px 12px"}} onClick={()=>setShowNotif(true)} title="Set daily notification">
                 🔔
@@ -2937,7 +3634,7 @@ export default function DestinIQ(){
         {screen==="landing"  &&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
-        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""}/>}
+        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
         {screen==="results"  &&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
             streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
