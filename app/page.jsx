@@ -3886,6 +3886,51 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIFE HACKS MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUDIO PLAYER — Text-to-speech using Web Speech API
+// ═══════════════════════════════════════════════════════════════════════════════
+function AudioPlayer({text,label="Listen to this"}){
+  const [playing,setPlaying]=useState(false);
+  const [supported]=useState(()=>typeof window!=="undefined"&&"speechSynthesis" in window);
+
+  const play=()=>{
+    if(!supported) return;
+    if(playing){
+      window.speechSynthesis.cancel();
+      setPlaying(false);
+      return;
+    }
+    const clean=(text||"").replace(/\*\*/g,"").replace(/[#*`]/g,"").replace(/\n+/g," ").trim();
+    if(!clean) return;
+    const utt=new SpeechSynthesisUtterance(clean);
+    utt.rate=0.92;
+    utt.pitch=1;
+    utt.volume=1;
+    const voices=window.speechSynthesis.getVoices();
+    const preferred=voices.find(v=>v.lang.startsWith("en")&&(v.name.includes("Google")||v.name.includes("Natural")||v.name.includes("Premium")));
+    if(preferred) utt.voice=preferred;
+    utt.onend=()=>setPlaying(false);
+    utt.onerror=()=>setPlaying(false);
+    window.speechSynthesis.speak(utt);
+    setPlaying(true);
+  };
+
+  useEffect(()=>()=>{ if(typeof window!=="undefined") window.speechSynthesis?.cancel(); },[]);
+
+  if(!supported) return null;
+
+  return(
+    <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 14px",color:"var(--cream-50)",fontSize:12,cursor:"pointer",transition:"all .2s",marginTop:8}}
+      onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
+      onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-50)";}}>
+      {playing
+        ?<><span style={{fontSize:14}}>⏹</span> Stop audio</>
+        :<><span style={{fontSize:14}}>🔊</span> {label}</>
+      }
+    </button>
+  );
+}
+
 function LifeHacksModule({data,formData}){
   const hacks=Array.isArray(data?.life_hacks)?data.life_hacks:[];
   const emotional=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
