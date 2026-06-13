@@ -336,37 +336,13 @@ function addDecision(uid,decision) {
 // Browser Notifications API. Works in deployed Next.js.
 // For true background push (app closed): add service worker + Web Push + VAPID keys.
 // ═══════════════════════════════════════════════════════════════════════════════
-const NOTIF_MSGS_MORNING = [
+const NOTIF_MSGS = [
   (n)=>`Hey ${n} — how's today going? Take 30 seconds to check in with yourself.`,
   (n)=>`${n}, you showed up yesterday. Show up again today. 30 seconds is all it takes.`,
   (n)=>`Your streak is waiting, ${n}. Don't let today be the one you look back on.`,
-  (n)=>`${n} — one honest check-in. That's the whole habit.`,
-  (n)=>`${n}, the people who hit their goals don't feel ready. They just show up anyway.`,
-  (n)=>`Quick check-in, ${n}. How's your energy? Your focus? 30 seconds.`,
   ()=>`DestinIQ: One honest question. One honest answer. That's all today needs.`,
-  (n)=>`${n} — what would make today count? Log it now.`,
+  (n)=>`${n} — what moved today? Even something small counts. Log it now.`,
 ];
-const NOTIF_MSGS_MIDDAY = [
-  (n)=>`${n} — you're halfway through the day. Is it moving in the right direction?`,
-  (n)=>`Afternoon check, ${n}. What's the one thing that would make today count?`,
-  (n)=>`${n}, how you spend the next hour matters more than how you started the day.`,
-  ()=>`The path you're on takes showing up when you don't feel like it. Today counts.`,
-  (n)=>`${n} — one small move today. That's how the gap closes.`,
-];
-const NOTIF_MSGS_EVENING = [
-  (n)=>`${n}, before the day ends — did you move toward your goal today? Log it.`,
-  (n)=>`Evening, ${n}. What happened today that was worth remembering?`,
-  (n)=>`${n} — the day isn't over yet. One more honest step before you close out.`,
-  ()=>`DestinIQ evening check: How'd the day actually go? Log it before you forget.`,
-  (n)=>`${n}, nights are for reflecting. Days are for moving. Which did you do today?`,
-];
-function pickMsg(arr,name){ return arr[Math.floor(Math.random()*arr.length)](name||"you"); }
-
-function fireNotif(body){
-  if(Notification.permission!=="granted") return;
-  const n=new Notification("DestinIQ",{body,tag:"destiniq-nudge",icon:"/favicon.ico"});
-  n.onclick=()=>{ window.focus(); window.location.href="https://destiniq.vercel.app"; n.close(); };
-}
 
 async function requestNotifPermission() {
   if(!("Notification" in window)) return "unsupported";
@@ -376,36 +352,21 @@ async function requestNotifPermission() {
 }
 
 function scheduleNotification(uid, name, timeStr, onFire) {
-  if(_notifTimers.has(uid)){
-    const t=_notifTimers.get(uid);
-    (Array.isArray(t)?t:[t]).forEach(x=>clearTimeout(x));
-  }
+  if(_notifTimers.has(uid)) clearTimeout(_notifTimers.get(uid));
   const [h,m]=timeStr.split(":").map(Number);
   const now=new Date(), next=new Date();
   next.setHours(h,m,0,0);
   if(next<=now) next.setDate(next.getDate()+1);
   const delay=next-now;
-  // Main daily nudge
-  const t1=setTimeout(()=>{
-    fireNotif(pickMsg(NOTIF_MSGS_MORNING,name));
+  const tid=setTimeout(()=>{
+    const msg=NOTIF_MSGS[Math.floor(Math.random()*NOTIF_MSGS.length)](name);
+    if(Notification.permission==="granted") {
+      new Notification("DestinIQ",{body:msg,tag:"destiniq-daily"});
+    }
     onFire&&onFire();
     scheduleNotification(uid,name,timeStr,onFire);
   },delay);
-  // Random midday nudge (12–3pm), only if main notif is morning
-  let t2=null;
-  if(h<12){
-    const md=new Date(); md.setHours(12+Math.floor(Math.random()*3),Math.floor(Math.random()*59),0,0);
-    if(md<=now) md.setDate(md.getDate()+1);
-    t2=setTimeout(()=>fireNotif(pickMsg(NOTIF_MSGS_MIDDAY,name)),md-now);
-  }
-  // Random evening nudge (7–9pm), only if main notif is not evening
-  let t3=null;
-  if(h<19){
-    const ev=new Date(); ev.setHours(19+Math.floor(Math.random()*2),Math.floor(Math.random()*59),0,0);
-    if(ev<=now) ev.setDate(ev.getDate()+1);
-    t3=setTimeout(()=>fireNotif(pickMsg(NOTIF_MSGS_EVENING,name)),ev-now);
-  }
-  _notifTimers.set(uid,[t1,t2,t3].filter(Boolean));
+  _notifTimers.set(uid,tid);
   return delay;
 }
 
@@ -1046,45 +1007,88 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
   "roadmap": [
     {
       "phase": "0–90 Days",
-      "title": "A title specific to THEIR goal — if they want Africa business, say something like 'Choose Your Country, Validate Your Idea'",
+      "title": "Make it personal and exciting — e.g. 'Your First 90 Days: From Stuck to Moving'",
       "steps": [
-        "Step 1 written FOR THEIR SPECIFIC GOAL. Example: if they want Africa business, 'Research the 3 African countries that fit your skills and budget: Ghana (English, $500 company registration), Rwanda (easiest in Africa, $30 registration), Kenya (tech hub, $150 registration). This week: read the World Bank Doing Business reports for each.' NOT generic advice.",
-        "Step 2 with real example tied to their goal and skills.",
-        "Step 3 with a real platform, org, or contact type they can action this week.",
-        "Step 4 with a specific milestone that marks completion of this phase."
+        "Specific action with real platform names and costs. E.g. 'Search your top skill on Upwork and Fiverr right now. Screenshot the rate range — that number is your income target. Do this today, not tomorrow.'",
+        "A concrete research or outreach action tied to their goal with a real deadline and method",
+        "A skill or network action they can start this week with zero money",
+        "A measurable milestone that proves phase 1 complete — a number, a conversation, a file created"
       ],
-      "desc": "3 sentences on why this specific phase matters for their specific goal. What changes after they complete it.",
-      "win": "The one most important action for THIS WEEK — specific enough that they know exactly what to do."
+      "desc": "3 sentences on why this 90-day window is critical for their specific situation. Make it urgent and personal — what becomes possible after this phase that wasn't before.",
+      "win": "The single most important thing to do in the next 24 hours — specific enough to open, search, write, or say right now."
     },
-    {"phase":"3–12 Months","title":"Specific to their goal","steps":["Specific step with real platform or org","Step with measurable milestone","Step building on phase 1 output","What 12 months in looks like if they execute"],"desc":"3 sentences: what this phase looks like in daily life, what gets harder, what gets easier.","win":"The one action that unlocks this whole phase — specific enough to do in a day.","support":"One honest sentence acknowledging where they'll be emotionally at this point."},
-    {"phase":"1–3 Years","title":"","steps":["","",""],"desc":"","win":"","support":""},
-    {"phase":"3–5 Years","title":"","steps":["",""],"desc":"","win":"","support":""}
+    {
+      "phase": "3–12 Months",
+      "title": "What they are building toward in this phase",
+      "steps": [
+        "First income milestone with real numbers and the specific action that creates it",
+        "How to grow from first income to consistent income — platform, method, target",
+        "One relationship or network move that opens the next level",
+        "The financial milestone that marks this phase complete"
+      ],
+      "desc": "3 sentences on what life looks like after this phase — what doors open, what becomes easier.",
+      "win": "The highest-leverage single action this month."
+    },
+    {
+      "phase": "1–3 Years",
+      "title": "The transformation phase",
+      "steps": [
+        "How they go from active income to an asset — something that earns without direct time",
+        "The upgrade — skill, location, network, or product that multiplies their income",
+        "How they protect what they have built — savings, legal structure, or diversification"
+      ],
+      "desc": "3 sentences on what freedom looks like at this stage — what they can afford, do, or stop doing.",
+      "win": "The decision that locks in this phase."
+    },
+    {
+      "phase": "3–5 Years",
+      "title": "The destination — where this leads",
+      "steps": [
+        "What their life looks like if they execute this plan — specific and personal, use their name",
+        "The one thing that determines whether they hit this or fall short"
+      ],
+      "desc": "2 sentences painting where they are in 5 years. Use their name and their stated goal.",
+      "win": "What they should never lose sight of on hard days."
+    }
   ],
   "mindset": {
-    "pattern": "Name the EXACT mental block — use their own words from the challenge field. Specific enough that they feel seen. E.g. 'You keep circling back to starting but find a reason to wait — the reason changes but the waiting doesn't.' NOT generic like 'fear of failure'.",
-    "reframe": "A reframe that ONLY works for their specific situation and goal. Should feel like a quiet revelation. E.g. 'The instability you're trying to escape isn't a sign you're not ready — it's proof that what you have now is already costing you.' Not a motivational quote.",
-    "practice": "One morning habit written as if coaching them in person. Name exact steps, exact duration, why it works for THEIR specific pattern. Concrete enough to do tomorrow.",
-    "emotional": "4 sentences written directly TO them. (1) Name what it actually feels like to carry what they're carrying — use their goal and challenge. (2) Acknowledge the invisible cost of where they are. (3) Something true about their resilience they're probably not giving themselves credit for. (4) One honest thing about what's possible from here that they may have stopped letting themselves believe.",
-    "encouragement": "2 sentences — warm but not hollow. Acknowledge the specific difficulty of their path (their country, situation, goal), then name something real they have going for them. No generic 'you've got this'."
+    "pattern": "Name the EXACT mental block visible in their words. Not generic — e.g. 'You keep calling it a resource problem but what you wrote describes waiting for certainty before starting. That is a permission problem, not a money problem.' Use their actual words from their challenge field.",
+    "reframe": "A completely different lens on their specific situation. Not motivation — a new way of seeing that makes the path obvious. Something that could only apply to them, not anyone else.",
+    "practice": "One daily practice with EXACT instructions: what to do, when, how long, what to notice. Tied directly to their goal. E.g. 'Every morning before checking your phone, write one sentence: the one roadmap action you are doing today. Not a list — one thing. Do it before noon.'",
+    "emotional": "3 honest sentences about what it actually feels like to be them right now. Not validation — real recognition. Like a friend paying close attention. Use their name. Reference their actual situation. Make them feel genuinely seen, not managed."
   },
   "career": [
     {
-      "title": "Specific role or business type — name it exactly. E.g. 'B2B SaaS Account Executive (Remote)' not 'Sales job'",
-      "why": "3 sentences: (1) Why this fits their specific skills — name the skill. (2) Why this serves their stated goal. (3) Realistic income at entry AND at 2 years with local + USD figures.",
+      "title": "Specific path connecting their skills to their goal — not vague. E.g. 'Remote Graphic Designer for European Brands via Toptal'",
+      "why": "3 sentences: (1) Why this matches their specific skills and current situation. (2) Why this serves their stated goal better than obvious alternatives. (3) Realistic income trajectory — low to high in their local currency AND USD.",
       "how": [
-        "Step 1: Exact platform, company type, or person to contact — name it. E.g. 'Search RemoteOK and We Work Remotely filtering to your role this week.'",
-        "Step 2: The skill gap to close or portfolio to build — name what it should look like.",
-        "Step 3: How to get to first income — name the exact pitch or outreach approach.",
-        "Step 4: What 6 months in looks like if they execute — income, lifestyle, next step."
+        "What to do in the next 7 days to test this path — real platform name, real search term, or real person type to contact",
+        "How to get the first client or income — specific method with a real example of how someone in their exact situation has done it",
+        "How to grow from first income to consistent monthly income — what changes, what they focus on, what milestone they hit"
       ],
       "effort": "low|medium|high",
-      "timeline": "X–Y months to first income",
-      "income": "Entry: [local] / [USD] → 2 years: [local] / [USD]",
-      "type": "job|business|freelance",
-      "reality_check": "One honest sentence about the biggest obstacle for their country — and one sentence on how people actually get around it."
+      "timeline": "Realistic time to first income",
+      "income": "Use their actual local currency AND USD — e.g. GHS 3,500–8,000/month ($280–$650)",
+      "type": "job|business|freelance"
     },
-    {"title":"","why":"","how":[],"effort":"","timeline":"","income":"","type":"","reality_check":""},
-    {"title":"","why":"","how":[],"effort":"","timeline":"","income":"","type":"","reality_check":""}
+    {
+      "title": "Second path — different type from the first. If first is freelance, make this business or job.",
+      "why": "3 sentences — why this path, why now, what the income trajectory looks like",
+      "how": ["Step 1 specific to this path with real example","Step 2 with real platform or org","Step 3 showing path to first income"],
+      "effort": "low|medium|high",
+      "timeline": "X months to first income",
+      "income": "Local currency AND USD range",
+      "type": "job|business|freelance"
+    },
+    {
+      "title": "Third path — the highest ceiling option, even if it takes longer",
+      "why": "3 sentences — why this has the highest ceiling for their specific skills and goal, and why it is worth the longer timeline",
+      "how": ["Step 1","Step 2","Step 3 showing the longer path to higher income"],
+      "effort": "low|medium|high",
+      "timeline": "X months",
+      "income": "Local currency AND USD — show the higher ceiling",
+      "type": "job|business|freelance"
+    }
   ],
   "relocation": [
     {
@@ -2041,10 +2045,10 @@ function NotificationPanel({profile,userId,onClose}){
       setEnabled(true);
     }
   };
-  const disable=()=>{if(_notifTimers.has(userId)){const t=_notifTimers.get(userId);(Array.isArray(t)?t:[t]).forEach(x=>clearTimeout(x));_notifTimers.delete(userId);}setEnabled(false);setSched(null);};
+  const disable=()=>{if(_notifTimers.has(userId)){clearTimeout(_notifTimers.get(userId));_notifTimers.delete(userId);}setEnabled(false);setSched(null);};
   const test=()=>{
     if(Notification.permission!=="granted") return;
-    fireNotif(`Hey ${profile.name} — this is what your nudges look like. Tap to open DestinIQ.`);
+    new Notification("DestinIQ",{body:`Hey ${profile.name} — how's today going? Take 30 seconds to check in with yourself.`,tag:"destiniq-test"});
     setTested(true);setTimeout(()=>setTested(false),3000);
   };
 
@@ -3938,10 +3942,6 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                         </div>
                       )}
                       {r.win&&<div className="t-win"><strong>Do this first:</strong> {r.win}</div>}
-                      {r.support&&<div style={{display:"flex",gap:8,alignItems:"flex-start",padding:"10px 14px",background:"rgba(31,168,154,0.04)",borderRadius:9,border:"1px solid rgba(31,168,154,0.12)",marginTop:10}}>
-                        <span style={{color:"var(--teal)",flexShrink:0}}>✦</span>
-                        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,fontStyle:"italic"}}>{r.support}</p>
-                      </div>}
                     </div>
                   </div>
                 ))}
@@ -3959,7 +3959,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                   {icon:"◎",title:"What's really happening emotionally",key:"emotional",accent:"violet"},
                   {icon:"◈",title:"One thing to try every morning",key:"practice",accent:"teal"},
                 ].map(s=>(
-                  <div className="card" key={s.key} style={{marginBottom:14,borderLeft:`2px solid var(--${s.accent})`}}>
+                  <div className="card" key={s.key} style={{marginBottom:14}}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
                       <span style={{color:`var(--${s.accent})`,fontFamily:"var(--f-mono)",fontSize:18}}>{s.icon}</span>
                       <span style={{fontFamily:"var(--f-display)",fontSize:18,fontWeight:500}}>{s.title}</span>
@@ -3967,15 +3967,6 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                     <p className="body">{data.mindset?.[s.key]}</p>
                   </div>
                 ))}
-                {data.mindset?.encouragement&&(
-                  <div style={{marginTop:8,padding:"20px 24px",background:"rgba(210,175,90,0.06)",border:"1px solid var(--line-gold)",borderRadius:16,display:"flex",gap:14,alignItems:"flex-start"}}>
-                    <span style={{fontSize:20,flexShrink:0}}>✦</span>
-                    <div>
-                      <div style={{fontFamily:"var(--f-mono)",fontSize:"9px",color:"var(--gold)",letterSpacing:".1em",marginBottom:8}}>SOMETHING TRUE ABOUT YOU</div>
-                      <p style={{fontSize:15,color:"var(--cream-60)",lineHeight:1.85,fontStyle:"italic"}}>{data.mindset.encouragement}</p>
-                    </div>
-                  </div>
-                )}
               </div>
             </LockGate>
           )}
@@ -4007,7 +3998,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                     {o.desc&&!o.why&&<p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,marginBottom:12}}>{o.desc}</p>}
                     {/* How to start — numbered steps */}
                     {o.how&&Array.isArray(o.how)&&o.how.length>0&&(
-                      <div style={{marginBottom:o.reality_check?12:0}}>
+                      <div>
                         <div className="mono" style={{fontSize:"8px",marginBottom:8}}>How to start — step by step</div>
                         {o.how.map((step,si)=>(
                           <div key={si} style={{display:"flex",gap:10,marginBottom:7,padding:"9px 12px",background:"var(--lift)",borderRadius:7,border:"1px solid var(--line)"}}>
@@ -4015,15 +4006,6 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                             <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6,fontWeight:300}}>{step}</p>
                           </div>
                         ))}
-                      </div>
-                    )}
-                    {o.reality_check&&(
-                      <div style={{display:"flex",gap:10,alignItems:"flex-start",padding:"11px 14px",background:"rgba(196,100,90,0.04)",borderRadius:9,border:"1px solid rgba(196,100,90,0.15)"}}>
-                        <span style={{color:"var(--rose)",flexShrink:0,marginTop:2}}>◎</span>
-                        <div>
-                          <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",color:"var(--rose)",letterSpacing:".08em",marginBottom:4}}>HONEST REALITY CHECK</div>
-                          <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7}}>{o.reality_check}</p>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -4908,7 +4890,7 @@ or
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
-        system:"You are a deeply personal life advisor writing a report for ONE specific person. Your job is to make them feel genuinely seen, understood, and equipped with a real plan. CRITICAL: The entire report must be built around what they said they WANT — their goals drive everything. If they want to start a business in Africa, every section is about Africa business. If they want to leave their country, every section is about leaving. Never give generic life advice when they told you their specific goal. Write TO them, not about them. Use their name. Use their own words back at them. Return ONLY valid JSON — no markdown, no code fences, no text outside the JSON. Complete and parseable.",
+        system:"You are a world-class personal strategy advisor — part therapist, part career coach, part business mentor. Write an intensely personal report for ONE specific person. RULES: (1) Every roadmap step, career option, and mindset insight must directly serve their stated goal — no generic advice ever. (2) ROADMAP: 4 concrete steps per phase with real platform names, real costs in local currency, and a specific 24-hour action in the win field. (3) CAREER: 3 paths matched to actual skills and goal. Real income in local currency AND USD. Steps actionable this week. (4) MINDSET: Name the EXACT mental block from their own words. Reframe must be a new lens on their specific situation only. Practice must have exact instructions — time, method, what to notice. (5) Write TO them using their name and their own words. (6) No markdown asterisks in text. (7) Return ONLY valid JSON — no code fences. Complete and parseable.",
         userId,isPremium
       });
       const cleaned=raw.replace(/```json|```/g,"").trim();
@@ -5109,3 +5091,4 @@ or
     </ErrorBoundary>
   );
 }
+
