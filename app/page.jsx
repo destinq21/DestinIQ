@@ -124,6 +124,28 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ERROR BOUNDARY
+// ═══════════════════════════════════════════════════════════════════════════════
+class ErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={hasError:false,error:null}; }
+  static getDerivedStateFromError(e){ return{hasError:true,error:e}; }
+  componentDidCatch(e,info){ console.error("DestinIQ crash:",e,info); }
+  render(){
+    if(this.state.hasError) return(
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0a0800"}}>
+        <div style={{maxWidth:400,textAlign:"center"}}>
+          <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
+          <div style={{fontSize:22,fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
+          <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
+          <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>Refresh page</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2081,6 +2103,7 @@ function Paywall({onUnlock,teaser,userEmail}){
     try{
       const handler=window.PaystackPop.setup({
         key:      PAYSTACK_PUBLIC_KEY,
+        metadata: { userId: userId||"" },
         email:    email.trim(),
         amount:   plan.amount * 100, // Paystack uses smallest unit (cents for USD)
         currency: plan.currency,
@@ -4147,22 +4170,43 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
 // ═══════════════════════════════════════════════════════════════════════════════
 function ShareCard({report,formData,onClose}){
   const [copied,setCopied]=useState(false);
+
+  // Extract scores — handle both number scores and section-based reports
+  const getScore=(field,idx,def)=>{
+    if(typeof report?.[field]==="number") return report[field];
+    const s=report?.sections?.find(x=>x.title?.toLowerCase().includes(field));
+    if(s?.score) return s.score;
+    return report?.sections?.[idx]?.score||def;
+  };
   const scores=[
-    {label:"Life",    val:report?.life||report?.sections?.[0]?.score||52},
-    {label:"Wealth",  val:report?.wealth||report?.sections?.[1]?.score||38},
-    {label:"Mindset", val:report?.mindset||report?.sections?.[2]?.score||61},
-    {label:"Relations",val:report?.relationships||report?.sections?.[3]?.score||45},
+    {label:"Life",     val:getScore("life",0,52)},
+    {label:"Wealth",   val:getScore("wealth",1,38)},
+    {label:"Mindset",  val:getScore("mindset",2,61)},
+    {label:"Relations",val:getScore("relationships",3,45)},
   ];
-  const overall=report?.overall||Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
+  const overall=typeof report?.overall==="number"
+    ?report.overall
+    :Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
+
   const shareText=`My DestinIQ Clarity Score: ${overall}/100
 
 Life: ${scores[0].val} · Wealth: ${scores[1].val} · Mindset: ${scores[2].val}
 
 Discover your own clarity score at destiniq.vercel.app`;
 
-  const copy=()=>{
-    navigator.clipboard.writeText(shareText);
-    setCopied(true);setTimeout(()=>setCopied(false),2000);
+  const copy=async()=>{
+    try{
+      await navigator.clipboard.writeText(shareText);
+    }catch{
+      // Fallback for browsers that block clipboard
+      const el=document.createElement("textarea");
+      el.value=shareText;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);setTimeout(()=>setCopied(false),2500);
   };
 
   return(
@@ -4857,6 +4901,7 @@ or
   },[]);
 
   return(
+    <ErrorBoundary>
     <>
       <style>{CSS}</style>
       <OfflineBanner/>
@@ -4957,6 +5002,7 @@ or
         </>}
       </div>
     </>
+    </ErrorBoundary>
   );
 }
 
