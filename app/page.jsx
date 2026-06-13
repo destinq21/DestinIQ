@@ -4771,9 +4771,21 @@ or
       pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
       setReport(parsed);
       setScreen("results");
-      // Save profile + report to Supabase — await to ensure it completes
+      // Save profile + report to Supabase — strip heavy fields to keep size small
       try{
-        await saveUserProfile(userId,{form_data:f,report:parsed,is_paid:isPaid,is_premium:isPremium,streak});
+        // Only save the essential report fields needed to restore the dashboard
+        const reportToSave = {
+          overall: parsed.overall,
+          summary: parsed.summary,
+          life: parsed.life,
+          wealth: parsed.wealth,
+          mindset: parsed.mindset,
+          relationships: parsed.relationships,
+          sections: parsed.sections?.map(s=>({title:s.title,content:s.content?.slice(0,800)})),
+          teaser: parsed.teaser,
+          suggestedCountries: parsed.suggestedCountries,
+        };
+        await saveUserProfile(userId,{form_data:f,report:reportToSave,is_paid:isPaid,is_premium:isPremium,streak});
       }catch(saveErr){
         console.warn("Profile save failed:",saveErr.message);
       }
@@ -4783,7 +4795,8 @@ or
       setReport(fb);
       setScreen("results");
       try{
-        await saveUserProfile(userId,{form_data:f,report:fb,is_paid:isPaid,is_premium:isPremium,streak});
+        const fbToSave={overall:fb.overall,summary:fb.summary,life:fb.life,wealth:fb.wealth,mindset:fb.mindset,relationships:fb.relationships,sections:fb.sections?.map(s=>({title:s.title,content:s.content?.slice(0,800)})),teaser:fb.teaser};
+        await saveUserProfile(userId,{form_data:f,report:fbToSave,is_paid:isPaid,is_premium:isPremium,streak});
       }catch(_){}
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
     }
