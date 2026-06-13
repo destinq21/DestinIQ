@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
