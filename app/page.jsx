@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -602,13 +602,16 @@ const PILLARS=[
 const MODULES=[
   {id:"today",    icon:"◎", label:"My Report"},
   {id:"momentum", icon:"⚡", label:"Daily Check-in"},
+  {id:"hacks",    icon:"💡", label:"Life Hacks"},
+  {id:"money",    icon:"💰", label:"Money"},
+  {id:"online",   icon:"🌐", label:"Earn Online"},
+  {id:"business", icon:"🏗️", label:"Start Business"},
   {id:"decisions",icon:"◈", label:"Big Decisions"},
   {id:"weekly",   icon:"↗", label:"Weekly Pulse"},
   {id:"roadmap",  icon:"⟶", label:"My Roadmap"},
   {id:"mindset",  icon:"◇", label:"Mindset"},
   {id:"career",   icon:"◈", label:"Career Path"},
   {id:"relocate", icon:"✦", label:"Relocate"},
-  {id:"lifehacks",icon:"💡", label:"Life Hacks"},
   {id:"advisor",  icon:"⬡", label:"My Advisor"},
 ];
 const LOADING_PHRASES=["Reading what you shared…","Thinking about your situation…","Writing your roadmap…","Looking at what's really possible for you…","Almost there…","One moment more…"];
@@ -1130,7 +1133,81 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
     "Strength specific to their skills or background in context of their goal",
     "Something true about their stage of life or position they may be underselling"
   ],
-  "closing": "One sentence they'll screenshot. Not motivational — true. Something only they'd recognise as written for them."
+  "closing": "One sentence they'll screenshot. Not motivational — true. Something only they'd recognise as written for them.",
+  "life_hacks": [
+    "Life hack 1 specific to their goal and country — a real shortcut they probably don't know",
+    "Life hack 2 — practical time or money saving tip relevant to their situation",
+    "Life hack 3 — a specific tool, app, or method that helps people in their country get ahead faster",
+    "Life hack 4 — a networking or visibility hack for their field",
+    "Life hack 5 — something about their specific city or country that most people overlook"
+  ],
+  "money_protection": {
+    "rule": "The single most important money rule for their income level and country",
+    "savings_target": "What percentage to save and where to put it — specific account type or platform in their country",
+    "avoid": "The 2-3 specific things people at their income level waste money on in their country",
+    "first_investment": "The smallest possible first investment they can make right now with almost no money — specific platform or method in their country"
+  },
+  "emotional_strength": [
+    "Practice 1: specific to the challenge they described — exact instructions, when to do it, what it prevents",
+    "Practice 2: how to not let setbacks spiral into giving up — with a specific trigger and response",
+    "Practice 3: how to separate their emotions from their financial decisions — one specific method"
+  ],
+  "online_income": [
+    {
+      "method": "Name of the method",
+      "why_it_works": "Why this works specifically in their country and for their skills",
+      "url": "https://actual-website.com",
+      "first_step": "What to do today to start"
+    },
+    {
+      "method": "Second method",
+      "why_it_works": "Why this fits them",
+      "url": "https://actual-website.com",
+      "first_step": "First action"
+    },
+    {
+      "method": "Third method",
+      "why_it_works": "Why this fits them",
+      "url": "https://actual-website.com",
+      "first_step": "First action"
+    }
+  ],
+  "zero_income_business": {
+    "idea": "Specific business idea that matches their skills and requires zero capital",
+    "why_zero": "Why this can start with no money — the exact model",
+    "day_one": "What to do on day one — specific action with no money needed",
+    "first_revenue": "How and when they get their first income — specific amount and method",
+    "scale": "How to grow it once they have their first GHS/NGN/KES 500 or equivalent"
+  },
+  "product_business": [
+    {
+      "product": "Product type — e.g. Phone accessories",
+      "why": "Why this sells daily in their specific country/city",
+      "supplier_links": ["https://alibaba.com/...", "https://dhgate.com/..."],
+      "startup_cost": "Estimated minimum startup in their local currency",
+      "profit_margin": "Expected margin percentage"
+    },
+    {
+      "product": "Second product",
+      "why": "Why it works",
+      "supplier_links": ["https://made-in-china.com/..."],
+      "startup_cost": "Amount in local currency",
+      "profit_margin": "Margin %"
+    },
+    {
+      "product": "Third product",
+      "why": "Why it works",
+      "supplier_links": ["https://alibaba.com/..."],
+      "startup_cost": "Amount",
+      "profit_margin": "Margin %"
+    }
+  ],
+  "real_estate_hack": {
+    "method": "The easiest way to make money in real estate with little or no capital in their country",
+    "how_it_works": "2-3 sentences explaining the model — rental arbitrage, agent commissions, land flipping, etc.",
+    "platform": "Specific website, Facebook group, or app to use in their country — with the actual name",
+    "first_deal": "How to close their first deal — what to say, where to post, what to charge"
+  }
 }`;
 }
 
@@ -2067,7 +2144,7 @@ function NotificationPanel({profile,userId,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAYWALL
 // ═══════════════════════════════════════════════════════════════════════════════
-function Paywall({onUnlock,teaser,userEmail,userId}){
+function Paywall({onUnlock,teaser,userEmail}){
   const [sel,setSel]=useState("pro");
   const [email,setEmail]=useState(userEmail||"");
   const [loading,setLoading]=useState(false);
@@ -3066,10 +3143,11 @@ function Intake({onSubmit}){
                 </div>
               </div>
               <div style={{marginTop:14}}>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>YOUR SKILLS <span style={{fontWeight:400,color:"var(--cream-30)"}}>(what are you good at?)</span></label>
-                <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box"}} placeholder="e.g. Graphic design, sales, coding, teaching, cooking, writing, social media…" value={f.skills||""} onChange={e=>set("skills",e.target.value)} maxLength={200}/>
-                <div style={{fontSize:11,color:"var(--cream-20)",marginTop:4,textAlign:"right"}}>{(f.skills||"").length}/200 · List 2–5, even ones you think are small</div>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>YOUR SKILLS</label>
+                <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box"}} placeholder="e.g. graphic design, driving, cooking, coding, sales…" value={f.skills} onChange={e=>set("skills",e.target.value)} maxLength={200}/>
               </div>
+            </div>
+          )}
 
           {/* STEP 3 — Current situation */}
           {step===3&&(
@@ -3801,164 +3879,168 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LIFE HACKS MODULE — Real hacks, money protection, emotional strength,
-// zero-budget business, online income by country, supplier sourcing
+// LIFE HACKS MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
-function buildLifeHacksPrompt(profile, topic, isPremium) {
-  const name = sanitize(profile.name)||"friend";
-  const country = sanitize(profile.country)||"their country";
-  const income = profile.income||"Under $500";
-  const skills = sanitize(profile.skills)||"general skills";
-  const goals = sanitize(profile.goals)||"financial freedom";
-
-  const topics = {
-    money_hacks: `Give ${name} from ${country} 8 REAL life hacks to protect and stretch their money (income: ${income}). Be HYPER-LOCAL — name specific apps, banks, markets, and strategies that actually work in ${country}. Cover: (1) how to save even on a tiny income — name the exact savings method and target amount, (2) which bank accounts in ${country} give the best interest, (3) the most common money mistake people in ${country} make and how to avoid it, (4) how to cut the 3 biggest unnecessary costs without feeling poor, (5) a specific investment or savings vehicle available in ${country} that earns more than a regular bank account, (6) how to negotiate prices in ${country} — specific markets and products where this works, (7) how to avoid impulse buying — a specific system that works, (8) the ONE money habit that separates people who build wealth from people who stay broke in ${country}. Give real numbers in local currency. No vague advice.`,
-
-    emotional_strength: `${name} needs practical ways to stop emotions from ruining their decisions and life. Give 7 REAL emotional strength strategies — not therapy talk, real techniques that work: (1) The exact thing to do in the first 60 seconds when you feel anger/panic/jealousy about to make you do something stupid — a specific physical action, (2) How to deal with people who drain your energy and pull you down — without burning bridges, (3) The one mindset shift about failure that separates people who keep going from people who quit — name a real person who used this, (4) How to handle the days when nothing is working and you feel like giving up — a specific routine with times and actions, (5) How to stop comparing yourself to others on social media — practical techniques, not just "log off", (6) How to make decisions without letting fear make them for you — a specific 3-step process, (7) How to build emotional resilience when life in ${country} keeps throwing obstacles — specific to their environment. Be direct. Be real. This is the advice a good coach gives behind closed doors.`,
-
-    zero_budget_business: `${name} has ${income} income and skills in: ${skills}. Give them a REAL business they can start with ZERO money in ${country}. Include: (1) The exact business model — what they sell, to whom, and how they get paid, (2) The first 5 steps in the first 7 days — specific actions with times (Day 1: do X, Day 2: do Y), (3) How to get the FIRST paying customer with zero budget — name exactly where to find them in ${country} (specific Facebook groups, WhatsApp communities, markets, streets, buildings), (4) What to say to get that first customer — give a real script they can copy, (5) How much they can realistically earn in Month 1, Month 3, and Month 6 in local currency, (6) The one thing that will kill this business if they're not careful — and how to avoid it, (7) A real story of someone who started this same type of business with nothing and succeeded — name the person or brand if possible, (8) How to grow from hustle to a real business — at what income level do they hire help, set up formally, and scale. Give them HOPE that is backed by SPECIFICS.`,
-
-    online_money: `${name} lives in ${country}. Give them 6 SPECIFIC ways to make money online that ACTUALLY WORK from ${country} — including the exact websites, apps, or platforms. For each one: (a) the exact site/app name and URL, (b) what skills are needed (are their skills: ${skills} enough?), (c) how much a beginner realistically earns per month in USD and in local currency, (d) how to get started in the next 48 hours — 3 specific steps, (e) one common mistake beginners make on this platform. Platforms to cover if relevant: Upwork, Fiverr, Toptal, 99designs, PeoplePerHour, Remotasks, Clickworker, Appen, Amazon MTurk, Rev.com, TranscribeMe, Preply (teaching), Cambly (English teaching), UserTesting, TestingTime, Prolific (research studies), YouTube, TikTok Creator Fund, Substack, Gumroad, local classified sites, and any platforms specific to ${country}. Also name 3 platforms to AVOID in ${country} because of payment issues or scams.`,
-
-    products_suppliers: `${name} in ${country} wants to start a product business. Give a complete guide: (1) The TOP 5 in-demand products that sell every day in ${country} right now — explain WHY each sells, who buys it, and what markup is realistic (e.g. buy at X, sell at Y), (2) For each product, name a REAL supplier where they can source it: include actual websites like Alibaba.com, 1688.com, DHgate.com, Made-in-China.com, Global Sources, Wholesale05.com, local importers in ${country} if any. Give real price ranges per unit at wholesale, (3) How to order from China safely — step by step: how to find a good supplier, what to check, how to negotiate, minimum order quantities, shipping methods and costs to ${country}, customs duties, total landed cost, (4) Real estate / property commission model: how someone with NO money can post properties for sale, find buyers, and earn 2–5% commission in ${country} — specific steps, where to post ads (named websites and Facebook groups), how to find landlords/sellers, what to say, how to get paid, (5) Phone & accessories business: where to source from China or Dubai, which models sell fastest in ${country}, what margin is realistic, (6) Perfumes: where to get authentic or high-quality replica perfumes at wholesale, what sells in ${country}, pricing strategy, (7) Building materials: which suppliers offer credit or consignment in ${country}, which materials have the best margins, how to find contractors who need regular supply. Use real website names and real price examples throughout.`,
-  };
-
-  const systemPrompt = `You are a real, street-smart advisor who has lived and worked in ${country}. You give advice that actually works — not textbook theory. Write in clean, direct paragraphs. Use numbered lists (1. 2. 3.) for steps. Use --- to separate sections. No **bold** headers. No AI preamble. Get straight to the useful information. Everything must be specific to ${country} — local platforms, local prices in local currency, local realities. This is life-changing advice, not generic tips.`;
-
-  return { userPrompt: topics[topic] || topics.money_hacks, systemPrompt };
-}
-
-const LIFE_HACK_TOPICS = [
-  { id: "money_hacks",       icon: "💰", label: "Money Protection Hacks",    sub: "Protect & grow every cent you have" },
-  { id: "emotional_strength",icon: "🧠", label: "Emotional Strength",         sub: "Don't let emotions ruin your life" },
-  { id: "zero_budget_business",icon:"🚀",label: "Start a Business with Zero", sub: "How to build something from nothing" },
-  { id: "online_money",      icon: "🌐", label: "Make Money Online",           sub: "Specific sites for your country" },
-  { id: "products_suppliers",icon: "📦", label: "Products & Suppliers",        sub: "What to sell & where to source it" },
-];
-
-function LifeHacksModule({profile, userId, isPremium, isPaid, onUnlock}) {
-  const [activeTopic, setActiveTopic] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState("");
-  const [error, setError] = useState("");
-  const [cache, setCache] = useState({});
-
-  const generate = async (topicId) => {
-    if (cache[topicId]) { setActiveTopic(topicId); setResult(cache[topicId]); return; }
-    setActiveTopic(topicId);
-    setLoading(true);
-    setError("");
-    setResult("");
-    try {
-      const { userPrompt, systemPrompt } = buildLifeHacksPrompt(profile, topicId, isPremium);
-      const txt = await callAPI({
-        messages: [{ role: "user", content: userPrompt }],
-        system: systemPrompt,
-        userId,
-        isPremium,
-      });
-      setResult(txt);
-      setCache(c => ({ ...c, [topicId]: txt }));
-      pushToMemory(userId, "assistant", "Life hack (" + topicId + "): " + txt.slice(0, 200));
-    } catch (e) {
-      setError("Couldn't load this section right now. Please try again.");
-    }
-    setLoading(false);
-  };
-
-  const activeMeta = LIFE_HACK_TOPICS.find(t => t.id === activeTopic);
-
-  return (
-    <LockGate isPaid={isPaid} onUnlock={onUnlock}>
-      <div className="fu">
-        <div style={{ marginBottom: 28 }}>
-          <div className="d3" style={{ marginBottom: 6 }}>Life Hacks Built for Your Reality</div>
-          <p className="body" style={{ color: "var(--cream-60)" }}>
-            Real, specific advice for someone in <strong style={{ color: "var(--gold)" }}>{sanitize(profile.country)}</strong>. Not generic tips — tools that actually work where you are.
-          </p>
-        </div>
-
-        {/* Topic selector */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
-          {LIFE_HACK_TOPICS.map(t => (
-            <div
-              key={t.id}
-              onClick={() => generate(t.id)}
-              style={{
-                display: "flex", alignItems: "center", gap: 14, padding: "16px 18px",
-                background: activeTopic === t.id ? "rgba(210,175,90,0.1)" : "var(--raised)",
-                border: `1.5px solid ${activeTopic === t.id ? "var(--gold)" : "var(--line)"}`,
-                borderRadius: 14, cursor: "pointer", transition: "all .2s",
-              }}
-            >
-              <span style={{ fontSize: 24, flexShrink: 0 }}>{t.icon}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: activeTopic === t.id ? "var(--gold)" : "var(--cream)", marginBottom: 2 }}>{t.label}</div>
-                <div style={{ fontSize: 12, color: "var(--cream-40)" }}>{t.sub}</div>
-              </div>
-              {cache[t.id] && activeTopic !== t.id && <span style={{ fontSize: 10, color: "var(--teal)", fontFamily: "var(--f-mono)" }}>✓ LOADED</span>}
-              {activeTopic === t.id && loading && <span style={{ fontSize: 10, color: "var(--gold)", fontFamily: "var(--f-mono)" }}>LOADING…</span>}
-              {activeTopic !== t.id && <span style={{ color: "var(--cream-30)", fontSize: 16 }}>→</span>}
+function LifeHacksModule({data,formData}){
+  const hacks=data?.life_hacks||[];
+  const emotional=data?.emotional_strength||[];
+  return(
+    <div className="fu">
+      <div className="card" style={{marginBottom:20}}>
+        <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--gold)"}}>LIFE HACKS FOR YOUR SITUATION</div>
+        {hacks.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see personalised life hacks.</p>}
+        {hacks.map((h,i)=>(
+          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid var(--line)":"none"}}>
+            <div style={{width:26,height:26,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
+            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0}}>{h}</p>
+          </div>
+        ))}
+      </div>
+      {emotional.length>0&&(
+        <div className="card">
+          <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--teal)"}}>EMOTIONAL STRENGTH PRACTICES</div>
+          {emotional.map((e,i)=>(
+            <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid var(--line)":"none"}}>
+              <span style={{fontSize:18,flexShrink:0}}>🧘</span>
+              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0}}>{e}</p>
             </div>
           ))}
         </div>
-
-        {/* Result panel */}
-        {activeTopic && (
-          <div className="card" style={{ background: "var(--lift)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 22 }}>{activeMeta?.icon}</span>
-                <div>
-                  <div style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 500 }}>{activeMeta?.label}</div>
-                  <div style={{ fontFamily: "var(--f-mono)", fontSize: "9px", color: "var(--gold)", letterSpacing: ".1em", marginTop: 2 }}>
-                    PERSONALISED FOR {(profile.country || "").toUpperCase()}
-                  </div>
-                </div>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => generate(activeTopic)} disabled={loading} style={{ fontSize: 11, padding: "5px 12px" }}>
-                {loading ? "Loading…" : "↺ Refresh"}
-              </button>
-            </div>
-
-            {error && <div className="err-box">⚠ {error}</div>}
-
-            {loading && (
-              <div style={{ textAlign: "center", padding: "32px 0" }}>
-                <div style={{ width: 36, height: 36, border: "3px solid var(--cream-10)", borderTop: "3px solid var(--gold)", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-                <p style={{ fontSize: 13, color: "var(--cream-30)" }}>Gathering real, specific advice for {sanitize(profile.country)}…</p>
-              </div>
-            )}
-
-            {!loading && result && (
-              <div>
-                <RenderMD text={result} style={{ fontSize: 14, lineHeight: 1.85, fontWeight: 300 }} />
-                <div style={{ marginTop: 20, padding: "14px 16px", background: "rgba(210,175,90,0.05)", border: "1px solid rgba(210,175,90,0.15)", borderRadius: 10 }}>
-                  <p style={{ fontSize: 12, color: "var(--cream-40)", margin: 0, lineHeight: 1.7 }}>
-                    💡 This is based on your profile and country. Save the links and steps that apply to you. Come back to refresh with updated advice anytime.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {!activeTopic && (
-          <div style={{ textAlign: "center", padding: "32px 0" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>💡</div>
-            <div className="d3" style={{ marginBottom: 8 }}>Pick a topic above to get started</div>
-            <p className="body" style={{ maxWidth: 400, margin: "0 auto", color: "var(--cream-60)" }}>
-              Each section is built specifically for your country, your income level, and your skills. Real advice. Real platforms. Real prices.
-            </p>
-          </div>
-        )}
-      </div>
-    </LockGate>
+      )}
+    </div>
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MONEY MODULE
+// ═══════════════════════════════════════════════════════════════════════════════
+function MoneyModule({data,formData}){
+  const mp=data?.money_protection||{};
+  const re=data?.real_estate_hack||{};
+  return(
+    <div className="fu">
+      <div className="card" style={{marginBottom:20}}>
+        <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--gold)"}}>PROTECT YOUR MONEY</div>
+        {!mp.rule&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see your money protection plan.</p>}
+        {mp.rule&&(
+          <>
+            <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
+              <div style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:6}}>THE GOLDEN RULE</div>
+              <p style={{fontSize:14,fontWeight:600,color:"var(--cream)",margin:0,lineHeight:1.6}}>{mp.rule}</p>
+            </div>
+            {[{label:"SAVINGS TARGET",val:mp.savings_target,c:"var(--teal)"},{label:"STOP WASTING ON",val:mp.avoid,c:"#F87171"},{label:"FIRST INVESTMENT",val:mp.first_investment,c:"var(--gold)"}].map(({label,val,c})=>val&&(
+              <div key={label} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
+                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{label}</div>
+                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{val}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+      {re.method&&(
+        <div className="card">
+          <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--gold)"}}>REAL ESTATE HACK</div>
+          <div style={{padding:"14px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
+            <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{re.method}</div>
+            <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{re.how_it_works}</p>
+          </div>
+          {re.platform&&<p style={{fontSize:13,color:"var(--cream-50)",marginBottom:8}}>Where to start: <span style={{color:"var(--gold)"}}>{re.platform}</span></p>}
+          {re.first_deal&&<div style={{padding:"10px 14px",background:"rgba(212,175,55,0.06)",borderRadius:10,fontSize:13,color:"var(--cream-60)",lineHeight:1.6,borderLeft:"2px solid var(--gold)"}}><b style={{color:"var(--cream)"}}>First deal: </b>{re.first_deal}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ONLINE INCOME MODULE
+// ═══════════════════════════════════════════════════════════════════════════════
+function OnlineIncomeModule({data,formData}){
+  const online=data?.online_income||[];
+  return(
+    <div className="fu">
+      <div className="card">
+        <div className="mono" style={{fontSize:"9px",marginBottom:4,color:"var(--gold)"}}>MAKE MONEY ONLINE</div>
+        <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>Specific to {formData?.country||"your country"} and your skills</p>
+        {online.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see online income methods for your country.</p>}
+        {online.map((o,i)=>(
+          <div key={i} style={{padding:"16px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid var(--line)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)"}}>{o.method}</div>
+              <span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 8px"}}>{i===0?"BEST FIT":i===1?"GOOD FIT":"HIGH CEILING"}</span>
+            </div>
+            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6,marginBottom:10}}>{o.why_it_works}</p>
+            {o.url&&<a href={o.url} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:8}}>🔗 {o.url}</a>}
+            {o.first_step&&<div style={{padding:"8px 12px",background:"rgba(20,184,154,0.06)",borderRadius:8,fontSize:12,color:"var(--cream-60)",borderLeft:"2px solid var(--teal)"}}><b style={{color:"var(--teal)"}}>Start today: </b>{o.first_step}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUSINESS MODULE
+// ═══════════════════════════════════════════════════════════════════════════════
+function BusinessModule({data,formData}){
+  const zb=data?.zero_income_business||{};
+  const pb=data?.product_business||[];
+  return(
+    <div className="fu">
+      <div className="card" style={{marginBottom:20}}>
+        <div className="mono" style={{fontSize:"9px",marginBottom:4,color:"var(--gold)"}}>START A BUSINESS WITH ZERO MONEY</div>
+        <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>You can start. Here is exactly how.</p>
+        {!zb.idea&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see your zero-capital business plan.</p>}
+        {zb.idea&&(
+          <>
+            <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line-gold)"}}>
+              <div style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:6}}>THE IDEA</div>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{zb.idea}</div>
+              <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{zb.why_zero}</p>
+            </div>
+            {[{label:"DAY ONE ACTION",val:zb.day_one,c:"var(--teal)"},{label:"FIRST REVENUE",val:zb.first_revenue,c:"var(--gold)"},{label:"HOW TO SCALE",val:zb.scale,c:"#9b72cf"}].map(({label,val,c})=>val&&(
+              <div key={label} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
+                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{label}</div>
+                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{val}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+      {pb.length>0&&(
+        <div className="card">
+          <div className="mono" style={{fontSize:"9px",marginBottom:4,color:"var(--gold)"}}>SELL PHYSICAL PRODUCTS</div>
+          <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>Things people buy every day — with supplier links</p>
+          {pb.map((p,i)=>(
+            <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{p.product}</div>
+                {p.profit_margin&&<span style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(20,184,154,0.1)",borderRadius:4,padding:"2px 6px"}}>{p.profit_margin} margin</span>}
+              </div>
+              <p style={{fontSize:12,color:"var(--cream-50)",marginBottom:8,lineHeight:1.5}}>{p.why}</p>
+              {p.startup_cost&&<div style={{fontSize:12,color:"var(--gold)",marginBottom:10}}>Startup cost: {p.startup_cost}</div>}
+              {p.supplier_links?.length>0&&(
+                <div>
+                  <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:6}}>SUPPLIER LINKS</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {p.supplier_links.map((link,li)=>(
+                      <a key={li} href={link.startsWith("http")?link:`https://${link}`} target="_blank" rel="noopener noreferrer"
+                        style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.08)",borderRadius:6,padding:"3px 8px",textDecoration:"none",border:"1px solid rgba(20,184,154,0.2)"}}>
+                        {link.replace("https://","").replace("http://","").split("/")[0]}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
   const [mod,setMod]=useState("today");
   const [aScores,setAScores]=useState({life:0,wealth:0,mindset:0,relations:0});
   const [dailyInsight,setDailyInsight]=useState(data.daily_insight||"");
@@ -4098,9 +4180,12 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
 
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
+            {mod==="hacks"&&<LifeHacksModule data={data} formData={formData}/>}
+            {mod==="money"&&<MoneyModule data={data} formData={formData}/>}
+            {mod==="online"&&<OnlineIncomeModule data={data} formData={formData}/>}
+            {mod==="business"&&<BusinessModule data={data} formData={formData}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="lifehacks"&&<LifeHacksModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
           {mod==="roadmap"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
@@ -5047,10 +5132,10 @@ export default function DestinIQ(){
   },[]);
 
   const handleSubmit=useCallback(async(f)=>{
-    if(!userId) return; // not yet authenticated
-    // Rate limit free users
+    try{
+    if(!userId) return;
     if(isRateLimited(isPaid)){
-      setApiError(`You've generated ${FREE_REPORT_LIMIT} reports on the free plan. Upgrade to generate more.`);
+      setApiError("You've used your free reports. Upgrade to generate more.");
       setScreen("paywall");
       return;
     }
@@ -5062,68 +5147,11 @@ export default function DestinIQ(){
     const localCtx = await getLocalContext(ipLocation?.city||"", f.country).catch(()=>null);
 
     try{
-      // ── INTENT MODERATION ────────────────────────────────────────────────
-      // Before generating the report, check whether the user's stated goals
-      // or challenges describe harmful, illegal, or destructive intent.
-      // If so, skip the normal report and return a caring redirect instead.
-      const intentCheckPrompt = `A person named ${f.name}, age ${f.age}, from ${f.country} submitted the following:
-Goals: "${f.goals}"
-Challenge: "${f.challenge}"
-Skills: "${f.skills||""}"
-
-Does this person describe any harmful, illegal, violent, criminal, or clearly self-destructive intent (e.g. robbery, drug dealing, scamming, trafficking, violence, fraud, gang activity, or anything that would hurt themselves or others)?
-
-Reply ONLY with a JSON object in this exact format — no extra text:
-{"harmful":true,"underlying_desire":"what they probably actually want (money, respect, freedom, excitement, etc.)","redirect":"a warm but firm 2-3 sentence message to them explaining why that path destroys their future, then suggesting a specific legitimate path that gives them what they actually want"}
-or
-{"harmful":false}`;
-
-      const intentRaw = await callAPI({
-        messages:[{role:"user",content:intentCheckPrompt}],
-        system:"You are a content moderation assistant. Reply ONLY with valid JSON, nothing else.",
-        userId, isPremium
-      });
-      let intentResult = {harmful:false};
-      try{
-        const ic = intentRaw.replace(/\`\`\`json|\`\`\`/g,"").trim();
-        intentResult = JSON.parse(ic.slice(ic.indexOf("{"), ic.lastIndexOf("}")+1));
-      }catch(_){}
-
-      if(intentResult.harmful){
-        // Build a caring redirect report instead of a normal life plan
-        const redirectReport = {
-          overall: "Let's Talk Honestly",
-          summary: intentResult.redirect || `${f.name}, we need to be real with you. The path you described leads to prison, early death, or a life of regret — not the life you actually deserve. You clearly have drive and ambition. Let's point that energy somewhere that actually builds your future.`,
-          sections:[
-            {
-              title:"The Truth About That Path",
-              content:`Here's what actually happens to people who go down that road: it doesn't end in wealth or respect. It ends in loss — of freedom, family, and often life itself. The people who look successful in that world are either in debt to someone dangerous, hiding from authorities, or already gone. That's not the future your potential deserves.`
-            },
-            {
-              title:`What You Actually Want`,
-              content:`You want ${intentResult.underlying_desire||"a better life, real money, and to be respected"}. That's completely valid. Those desires are not the problem — the method is. The good news is everything you want is achievable through paths that don't put you in a cell or a grave.`
-            },
-            {
-              title:"A Real Alternative for You",
-              content:`Your age, your country, your drive — these are genuine assets. People with your level of hunger have built businesses, learned trades, broken into tech, built communities. The skills that make someone good at street survival — reading people, staying calm under pressure, hustle, loyalty — are the exact skills that make someone exceptional in sales, entrepreneurship, logistics, and leadership. You already have what it takes. You just need to aim it differently.`
-            },
-            {
-              title:"Your Next Step",
-              content:`Start with one thing: find one person in your area who is making legitimate money and ask them how they started. Not to copy them — to understand that it's possible. Then come back and tell us your real goals. We'll build you a plan that actually works.`
-            }
-          ],
-          redirect: true
-        };
-        setReport(redirectReport);
-        setScreen("results");
-        return;
-      }
-      // ── END INTENT CHECK ─────────────────────────────────────────────────
 
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
-        system:"You are a world-class personal strategy advisor — part therapist, part career coach, part business mentor. Write an intensely personal report for ONE specific person. RULES: (1) Every roadmap step, career option, and mindset insight must directly serve their stated goal — no generic advice ever. (2) ROADMAP: 4 concrete steps per phase with real platform names, real costs in local currency, and a specific 24-hour action in the win field. (3) CAREER: 3 paths matched to actual skills and goal. Real income in local currency AND USD. Steps actionable this week. (4) MINDSET: Name the EXACT mental block from their own words. Reframe must be a new lens on their specific situation only. Practice must have exact instructions — time, method, what to notice. (5) Write TO them using their name and their own words. (6) No markdown asterisks in text. (7) Return ONLY valid JSON — no code fences. Complete and parseable.",
+        system:"You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person. Beyond the standard report sections, you MUST include these additional sections in your JSON response that will genuinely change how this person sees their options:\n\n- life_hacks: 5 specific, practical life hacks tailored to their goal and country. Real shortcuts. Real tips. Not generic advice.\n- money_protection: 3-4 specific rules for protecting whatever income they have — budgeting method, savings target, what NOT to spend on, and one investment they can start with almost nothing.\n- emotional_strength: 3 practices for not letting emotions derail their progress. Specific to what they said about their challenges.\n- online_income: 3 ways to make money online that work specifically in their country, with the exact website URLs they should go to (e.g. Upwork.com, Fiverr.com, Jumia.com etc). Be specific about which works best for their skills.\n- zero_income_business: How to start a business with zero money in their specific country. Real first step. Real business idea that matches their skills.\n- product_business: 3 physical product business ideas that sell daily (phones/accessories, perfumes, food, building materials etc) with real wholesale supplier links (e.g. Alibaba.com, DHgate.com, Made-in-China.com, local market names). Include estimated startup cost and profit margin.\n- real_estate_hack: How someone with little money can make money in real estate in their country right now — rental arbitrage, posting ads for commissions, connecting buyers and sellers. Include specific platforms or groups they can use.\n\nAll other rules still apply: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.",
         userId,isPremium
       });
       const cleaned=raw.replace(/```json|```/g,"").trim();
@@ -5170,7 +5198,13 @@ or
       }catch(_){}
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
     }
-  },[userId,isPaid,isPremium,ipLocation,streak]);
+    }catch(outerErr){
+      console.error("Report generation crash:", outerErr?.message||outerErr);
+      const fb=fallback(f||{},ipLocation);
+      setReport(fb);
+      setScreen("results");
+    }
+  },[userId,isPremium,ipLocation]);
 
   const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
   const handleUnlock=()=>{setScreen("paywall");};
@@ -5301,7 +5335,7 @@ or
         {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
-        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId}/>}
+        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
