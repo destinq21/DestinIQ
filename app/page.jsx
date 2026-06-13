@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -127,17 +127,22 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 // ERROR BOUNDARY
 // ═══════════════════════════════════════════════════════════════════════════════
 class ErrorBoundary extends React.Component {
-  constructor(props){ super(props); this.state={hasError:false,error:null}; }
+  constructor(props){ super(props); this.state={hasError:false,error:null,info:null}; }
   static getDerivedStateFromError(e){ return{hasError:true,error:e}; }
-  componentDidCatch(e,info){ console.error("DestinIQ crash:",e,info); }
+  componentDidCatch(e,info){ console.error("DestinIQ crash:",e,info); this.setState({info}); }
   render(){
     if(this.state.hasError) return(
       <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0a0800"}}>
-        <div style={{maxWidth:400,textAlign:"center"}}>
+        <div style={{maxWidth:600,textAlign:"center"}}>
           <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
           <div style={{fontSize:22,fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
           <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
-          <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>Refresh page</button>
+          <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:16}}>Refresh page</button>
+          <div style={{textAlign:"left",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:16,fontSize:11,color:"#F87171",fontFamily:"monospace",overflow:"auto",maxHeight:300,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+            <div style={{color:"#FCA5A5",fontWeight:700,marginBottom:8}}>{this.state.error?.toString()}</div>
+            <div>{this.state.error?.stack}</div>
+            {this.state.info?.componentStack&&<div style={{marginTop:12,color:"#FDBA74"}}>{this.state.info.componentStack}</div>}
+          </div>
         </div>
       </div>
     );
@@ -3882,8 +3887,8 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 // LIFE HACKS MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
 function LifeHacksModule({data,formData}){
-  const hacks=data?.life_hacks||[];
-  const emotional=data?.emotional_strength||[];
+  const hacks=Array.isArray(data?.life_hacks)?data.life_hacks:[];
+  const emotional=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
@@ -3915,8 +3920,8 @@ function LifeHacksModule({data,formData}){
 // MONEY MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
 function MoneyModule({data,formData}){
-  const mp=data?.money_protection||{};
-  const re=data?.real_estate_hack||{};
+  const mp=(data?.money_protection&&typeof data.money_protection==="object")?data.money_protection:{};
+  const re=(data?.real_estate_hack&&typeof data.real_estate_hack==="object")?data.real_estate_hack:{};
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
@@ -3956,7 +3961,7 @@ function MoneyModule({data,formData}){
 // ONLINE INCOME MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
 function OnlineIncomeModule({data,formData}){
-  const online=data?.online_income||[];
+  const online=Array.isArray(data?.online_income)?data.online_income:[];
   return(
     <div className="fu">
       <div className="card">
@@ -3983,8 +3988,8 @@ function OnlineIncomeModule({data,formData}){
 // BUSINESS MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
 function BusinessModule({data,formData}){
-  const zb=data?.zero_income_business||{};
-  const pb=data?.product_business||[];
+  const zb=(data?.zero_income_business&&typeof data.zero_income_business==="object")?data.zero_income_business:{};
+  const pb=Array.isArray(data?.product_business)?data.product_business:[];
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
@@ -4019,11 +4024,11 @@ function BusinessModule({data,formData}){
               </div>
               <p style={{fontSize:12,color:"var(--cream-50)",marginBottom:8,lineHeight:1.5}}>{p.why}</p>
               {p.startup_cost&&<div style={{fontSize:12,color:"var(--gold)",marginBottom:10}}>Startup cost: {p.startup_cost}</div>}
-              {p.supplier_links?.length>0&&(
+              {Array.isArray(p.supplier_links)&&p.supplier_links.length>0&&(
                 <div>
                   <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:6}}>SUPPLIER LINKS</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {p.supplier_links.map((link,li)=>(
+                    {p.supplier_links.filter(l=>typeof l==="string"&&l).map((link,li)=>(
                       <a key={li} href={link.startsWith("http")?link:`https://${link}`} target="_blank" rel="noopener noreferrer"
                         style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.08)",borderRadius:6,padding:"3px 8px",textDecoration:"none",border:"1px solid rgba(20,184,154,0.2)"}}>
                         {link.replace("https://","").replace("http://","").split("/")[0]}
