@@ -202,13 +202,12 @@ async function saveDecision(userId, decision) {
 
 /** Save or update user profile (onboarding data + subscription status). */
 async function saveUserProfile(userId, data) {
-  try {
-    await supabase.from("user_profiles").upsert({
-      user_id: userId,
-      ...data,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-  } catch (e) { console.warn("saveUserProfile:", e.message); }
+  const { error } = await supabase.from("user_profiles").upsert({
+    user_id: userId,
+    ...data,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "user_id" });
+  if (error) throw new Error(error.message);
 }
 
 /** Load user profile from Supabase. Returns null if not found. */
@@ -4771,13 +4770,23 @@ or
       const parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
       pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
       setReport(parsed);
-      // Save profile + report to Supabase so it persists on next login
-      saveUserProfile(userId,{form_data:f,report:parsed,is_paid:isPaid,is_premium:isPremium,streak});
+      setScreen("results");
+      // Save profile + report to Supabase — await to ensure it completes
+      try{
+        await saveUserProfile(userId,{form_data:f,report:parsed,is_paid:isPaid,is_premium:isPremium,streak});
+      }catch(saveErr){
+        console.warn("Profile save failed:",saveErr.message);
+      }
+      return;
     }catch(e){
-      setReport(fallback(f,ipLocation));
+      const fb=fallback(f,ipLocation);
+      setReport(fb);
+      setScreen("results");
+      try{
+        await saveUserProfile(userId,{form_data:f,report:fb,is_paid:isPaid,is_premium:isPremium,streak});
+      }catch(_){}
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
     }
-    setScreen("results");
   },[userId,isPremium,ipLocation]);
 
   const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
