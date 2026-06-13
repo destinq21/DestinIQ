@@ -612,6 +612,15 @@ const MODULES=[
 ];
 const LOADING_PHRASES=["Reading what you shared…","Thinking about your situation…","Writing your roadmap…","Looking at what's really possible for you…","Almost there…","One moment more…"];
 
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const rawData=window.atob(base64);
+  const out=new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;i++) out[i]=rawData.charCodeAt(i);
+  return out;
+}
+
 function sanitize(s){
   if(typeof s!=="string") return "";
   return s.replace(/<[^>]*>/g,"").replace(/[^\w\s.,!?'"()\-:;@#%+=/]/g,"").slice(0,2000).trim();
@@ -3303,10 +3312,10 @@ function AuthScreen({onAuth}){
         });
         if(err) throw err;
         if(data.user&&!data.session){
-          setError("✉ Check your inbox — we sent a confirmation link. Click it, then come back and sign in.");
+          setMode("email_sent");
           setLoading(false);return;
         }
-        if(data.user) onAuth({id:data.user.id,email:data.user.email,name:name.trim(),provider:"email"});
+        if(data.user) onAuth({id:data.user.id,email:data.user.email,name:name.trim(),provider:"email",isNew:true});
       } else {
         const{data,error:err}=await supabase.auth.signInWithPassword({email:email.trim(),password});
         if(err) throw err;
@@ -3417,6 +3426,25 @@ function AuthScreen({onAuth}){
             {error&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#F87171"}}>{error}</div>}
             <button onClick={handleForgot} disabled={loading} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"var(--cream-15)":"var(--gold)",color:loading?"var(--cream-40)":"#000",fontSize:15,fontWeight:700,cursor:loading?"not-allowed":"pointer",marginBottom:16}}>{loading?"Sending…":"Send reset link"}</button>
             <div style={{textAlign:"center",fontSize:13}}><span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--cream-40)",cursor:"pointer",textDecoration:"underline"}}>Back to sign in</span></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if(mode==="email_sent"){
+    return(
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+        <div style={{width:"100%",maxWidth:420,textAlign:"center"}}>
+          <div style={{fontSize:28,fontWeight:800,color:"var(--cream)",marginBottom:8}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></div>
+          <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"36px 24px",marginTop:24}}>
+            <div style={{fontSize:40,marginBottom:16}}>✉️</div>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--cream)",marginBottom:12}}>Confirm your email</div>
+            <p style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.7,marginBottom:8}}>We sent a confirmation link to <b style={{color:"var(--cream)"}}>{email}</b>.</p>
+            <p style={{fontSize:13,color:"var(--cream-40)",lineHeight:1.7,marginBottom:24}}>Click the link in the email to activate your account, then come back to sign in. Check your spam if you don't see it.</p>
+            <button onClick={async()=>{await supabase.auth.resend({type:"signup",email:email.trim()});alert("Confirmation email resent!");}} style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"10px 20px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:16}}>Resend email</button>
+            <br/>
+            <span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600,fontSize:14}}>Back to sign in</span>
           </div>
         </div>
       </div>
@@ -4235,6 +4263,11 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
 
         {/* Sign out & delete */}
         <div className="card">
+          {isPaid&&<button onClick={async()=>{
+            if(!confirm("Cancel your subscription? You keep access until end of billing period.")) return;
+            await saveUserProfile(user.id,{is_paid:false,is_premium:false});
+            alert("Subscription cancelled. Contact support for refunds.");
+          }} style={{width:"100%",background:"none",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"12px",color:"#F87171",fontSize:13,cursor:"pointer",marginBottom:10}}>Cancel subscription</button>}
           <button onClick={onSignOut} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Sign out</button>
           <p style={{fontSize:11,color:"var(--cream-20)",textAlign:"center",margin:0}}>To delete your account and all data, contact us via the support chat.</p>
         </div>
@@ -4808,6 +4841,36 @@ export default function DestinIQ(){
       setIpLoaded(true);
     });
   },[]);
+
+  // Register service worker for push notifications
+  useEffect(()=>{
+    if(typeof window==="undefined"||!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(e=>console.warn("SW:",e));
+  },[]);
+
+  // Subscribe to push after login (wait 30s so user is engaged first)
+  useEffect(()=>{
+    if(!userId||typeof window==="undefined"||!("PushManager" in window)) return;
+    const timer=setTimeout(async()=>{
+      try{
+        const reg=await navigator.serviceWorker.ready;
+        const existing=await reg.pushManager.getSubscription();
+        if(existing) return;
+        const perm=await Notification.requestPermission();
+        if(perm!=="granted") return;
+        const vapidKey=process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY||"";
+        if(!vapidKey) return;
+        const sub=await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:urlBase64ToUint8Array(vapidKey),
+        });
+        await supabase.from("user_profiles").update({
+          push_subscription:JSON.parse(JSON.stringify(sub))
+        }).eq("user_id",userId);
+      }catch(e){ console.warn("Push sub failed:",e); }
+    },30000);
+    return()=>clearTimeout(timer);
+  },[userId]);
 
   // Listen for policy events from auth screen footer links
   useEffect(()=>{

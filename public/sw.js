@@ -1,31 +1,54 @@
-const CACHE = "destiniq-v1";
-const ASSETS = ["/", "/manifest.json"];
+// DestinIQ Service Worker — handles push notifications and brings user back to app
+const APP_URL = "https://destiniq.vercel.app";
 
-self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS))
-  );
-  self.skipWaiting();
-});
+// ── PUSH NOTIFICATION HANDLER ─────────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
 
-self.addEventListener("activate", e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
+  let data = {};
+  try { data = event.data.json(); } catch { data = { title: "DestinIQ", body: event.data.text() }; }
 
-self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
-      })
-      .catch(() => caches.match(e.request))
+  const options = {
+    body: data.body || "Tap to open DestinIQ",
+    icon: "/favicon.ico",
+    badge: "/favicon.ico",
+    tag: data.tag || "destiniq-nudge",
+    renotify: true,
+    requireInteraction: false,
+    data: { url: data.url || APP_URL },
+    actions: [
+      { action: "open", title: "Open app" },
+      { action: "dismiss", title: "Later" },
+    ],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "DestinIQ", options)
   );
 });
+
+// ── NOTIFICATION CLICK — brings user back to app ───────────────────────────────
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "dismiss") return;
+
+  const urlToOpen = event.notification.data?.url || APP_URL;
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // If app is already open, focus it
+      for (const client of clientList) {
+        if (client.url.includes("destiniq.vercel.app") && "focus" in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (clients.openWindow) return clients.openWindow(urlToOpen);
+    })
+  );
+});
+
+// ── INSTALL & ACTIVATE ────────────────────────────────────────────────────────
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(clients.claim()));

@@ -1,159 +1,107 @@
-/**
- * DestinIQ — Paystack Webhook Handler
- * File: src/app/api/paystack-webhook/route.js
- *
- * PURPOSE:
- * When a user pays via Paystack, this endpoint receives a server-to-server
- * notification from Paystack and writes is_paid=true to Supabase.
- * This is the AUTHORITATIVE source of truth for subscription status —
- * the client-side write in Paywall is a best-effort optimistic update;
- * this webhook is the guaranteed fallback.
- *
- * SETUP:
- * 1. Add to Vercel env vars:
- *    PAYSTACK_SECRET_KEY=sk_live_xxxx          (your Paystack secret key)
- *    PAYSTACK_WEBHOOK_SECRET=whsec_xxxx        (from Paystack Dashboard → Settings → Webhooks)
- *    SUPABASE_URL=https://xxx.supabase.co      (same as NEXT_PUBLIC_SUPABASE_URL)
- *    SUPABASE_SERVICE_ROLE_KEY=eyJxxx          (from Supabase → Settings → API → service_role key)
- *
- * 2. In Paystack Dashboard → Settings → Webhooks:
- *    Add URL: https://your-domain.vercel.app/api/paystack-webhook
- *    Select events: charge.success, subscription.disable
- *
- * 3. Deploy — Vercel will handle the rest.
- */
+// app/api/paystack-webhook/route.ts
+// Receives Paystack payment events and updates Supabase accordingly.
+// Add PAYSTACK_SECRET_KEY to your .env.local and Vercel environment variables.
 
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase admin client — bypasses RLS so we can write any user's profile
+// Service role key bypasses RLS — only used server-side in webhooks
 const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } }
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!, // Add this to .env.local
 );
 
-/**
- * Verify the webhook signature from Paystack.
- * Paystack signs requests with HMAC-SHA512 using your secret key.
- */
-function verifyPaystackSignature(rawBody, signature) {
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) {
-    console.warn("PAYSTACK_WEBHOOK_SECRET not set — skipping signature verification");
-    return true; // Allow in dev; require in prod
-  }
+export async function POST(req: NextRequest) {
+  const body = await req.text();
+  const signature = req.headers.get("x-paystack-signature") || "";
+
+  // 1. Verify the request is genuinely from Paystack
   const hash = crypto
-    .createHmac("sha512", secret)
-    .update(rawBody)
+    .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY || "")
+    .update(body)
     .digest("hex");
-  return hash === signature;
-}
 
-/**
- * Find a user by email in Supabase auth.
- * Paystack sends us the customer email, not the user_id.
- */
-async function findUserByEmail(email) {
-  try {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-    if (error) throw error;
-    return data.users.find(u => u.email?.toLowerCase() === email?.toLowerCase()) || null;
-  } catch (e) {
-    console.error("findUserByEmail:", e.message);
-    return null;
-  }
-}
-
-export async function POST(request) {
-  // ── 1. Read raw body (needed for signature verification) ──────────────────
-  const rawBody = await request.text();
-  const signature = request.headers.get("x-paystack-signature") || "";
-
-  // ── 2. Verify signature ───────────────────────────────────────────────────
-  if (!verifyPaystackSignature(rawBody, signature)) {
-    console.error("Paystack webhook: invalid signature");
-    return new Response("Invalid signature", { status: 401 });
+  if (hash !== signature) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  // ── 3. Parse event ────────────────────────────────────────────────────────
-  let event;
-  try {
-    event = JSON.parse(rawBody);
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
-  }
+  const event = JSON.parse(body);
 
-  const { event: eventType, data } = event;
-  console.log("Paystack webhook received:", eventType, data?.reference);
+  // 2. Handle charge success
+  if (event.event === "charge.success") {
+    const { customer, metadata, amount, plan } = event.data;
+    const email = customer?.email;
+    const userId = metadata?.userId; // Pass userId in Paystack metadata when initiating payment
 
-  // ── 4. Handle events ──────────────────────────────────────────────────────
-
-  // charge.success — a one-time payment or subscription charge succeeded
-  if (eventType === "charge.success") {
-    const email = data?.customer?.email;
-    const reference = data?.reference;
-    const plan = data?.metadata?.plan || "pro";
-    const amount = data?.amount; // in smallest currency unit
-
-    if (!email) {
-      console.warn("charge.success: no customer email in event");
-      return new Response("OK", { status: 200 }); // still 200 so Paystack doesn't retry
+    if (!email && !userId) {
+      return NextResponse.json({ error: "No user identifier" }, { status: 400 });
     }
 
-    // Find the user in Supabase
-    const user = await findUserByEmail(email);
-    if (!user) {
-      console.warn(`charge.success: no user found for email ${email}`);
-      // Could be a new user who paid before confirming email — log and continue
-      return new Response("OK", { status: 200 });
+    // Determine plan type from amount (in kobo/pesewas)
+    const amountInMain = amount / 100;
+    const isPremium = amountInMain >= 15; // GHS 15+ = Premium
+    const isAnnual = amountInMain >= 99;  // GHS 99+ = Annual
+
+    // Find user by email if no userId in metadata
+    let targetUserId = userId;
+    if (!targetUserId && email) {
+      const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+      const match = users?.users?.find(u => u.email === email);
+      targetUserId = match?.id;
     }
 
-    // Write is_paid=true to user_profiles
+    if (!targetUserId) {
+      console.error("Paystack webhook: user not found for email", email);
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Update user profile in Supabase
     const { error } = await supabaseAdmin
       .from("user_profiles")
       .upsert({
-        user_id: user.id,
+        user_id: targetUserId,
         is_paid: true,
-        paystack_ref: reference,
-        paid_plan: plan,
-        paid_at: new Date().toISOString(),
+        is_premium: isPremium,
+        subscription_plan: isAnnual ? "annual" : isPremium ? "pro" : "basic",
+        subscription_start: new Date().toISOString(),
+        subscription_end: isAnnual
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
     if (error) {
-      console.error("charge.success DB write error:", error.message);
-      return new Response("DB error", { status: 500 });
+      console.error("Supabase update error:", error);
+      return NextResponse.json({ error: "DB update failed" }, { status: 500 });
     }
 
-    console.log(`✓ is_paid=true written for user ${user.id} (ref: ${reference})`);
+    console.log(`✓ Payment confirmed for user ${targetUserId} — plan: ${isPremium ? "premium" : "basic"}`);
   }
 
-  // subscription.disable — subscription was cancelled or expired
-  if (eventType === "subscription.disable") {
-    const email = data?.customer?.email;
+  // 3. Handle subscription cancellation / charge failure
+  if (event.event === "subscription.disable" || event.event === "charge.failed") {
+    const email = event.data?.customer?.email;
+    const userId = event.data?.metadata?.userId;
 
-    if (email) {
-      const user = await findUserByEmail(email);
-      if (user) {
-        await supabaseAdmin
-          .from("user_profiles")
-          .upsert({
-            user_id: user.id,
-            is_paid: false,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "user_id" });
+    let targetUserId = userId;
+    if (!targetUserId && email) {
+      const { data: users } = await supabaseAdmin.auth.admin.listUsers();
+      const match = users?.users?.find(u => u.email === email);
+      targetUserId = match?.id;
+    }
 
-        console.log(`✓ is_paid=false written for user ${user.id} (subscription disabled)`);
-      }
+    if (targetUserId) {
+      await supabaseAdmin.from("user_profiles").update({
+        is_paid: false,
+        is_premium: false,
+        subscription_plan: null,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", targetUserId);
+
+      console.log(`Subscription disabled for user ${targetUserId}`);
     }
   }
 
-  // Always return 200 so Paystack doesn't keep retrying
-  return new Response("OK", { status: 200 });
-}
-
-// Paystack sends POST only
-export async function GET() {
-  return new Response("DestinIQ Paystack webhook endpoint", { status: 200 });
+  return NextResponse.json({ received: true });
 }
