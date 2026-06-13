@@ -251,7 +251,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
   basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
@@ -608,6 +608,7 @@ const MODULES=[
   {id:"mindset",  icon:"◇", label:"Mindset"},
   {id:"career",   icon:"◈", label:"Career Path"},
   {id:"relocate", icon:"✦", label:"Relocate"},
+  {id:"lifehacks",icon:"💡", label:"Life Hacks"},
   {id:"advisor",  icon:"⬡", label:"My Advisor"},
 ];
 const LOADING_PHRASES=["Reading what you shared…","Thinking about your situation…","Writing your roadmap…","Looking at what's really possible for you…","Almost there…","One moment more…"];
@@ -2066,7 +2067,7 @@ function NotificationPanel({profile,userId,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAYWALL
 // ═══════════════════════════════════════════════════════════════════════════════
-function Paywall({onUnlock,teaser,userEmail}){
+function Paywall({onUnlock,teaser,userEmail,userId}){
   const [sel,setSel]=useState("pro");
   const [email,setEmail]=useState(userEmail||"");
   const [loading,setLoading]=useState(false);
@@ -3064,8 +3065,11 @@ function Intake({onSubmit}){
                   </select>
                 </div>
               </div>
-            </div>
-          )}
+              <div style={{marginTop:14}}>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>YOUR SKILLS <span style={{fontWeight:400,color:"var(--cream-30)"}}>(what are you good at?)</span></label>
+                <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box"}} placeholder="e.g. Graphic design, sales, coding, teaching, cooking, writing, social media…" value={f.skills||""} onChange={e=>set("skills",e.target.value)} maxLength={200}/>
+                <div style={{fontSize:11,color:"var(--cream-20)",marginTop:4,textAlign:"right"}}>{(f.skills||"").length}/200 · List 2–5, even ones you think are small</div>
+              </div>
 
           {/* STEP 3 — Current situation */}
           {step===3&&(
@@ -3796,7 +3800,165 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 }
 
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIFE HACKS MODULE — Real hacks, money protection, emotional strength,
+// zero-budget business, online income by country, supplier sourcing
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildLifeHacksPrompt(profile, topic, isPremium) {
+  const name = sanitize(profile.name)||"friend";
+  const country = sanitize(profile.country)||"their country";
+  const income = profile.income||"Under $500";
+  const skills = sanitize(profile.skills)||"general skills";
+  const goals = sanitize(profile.goals)||"financial freedom";
+
+  const topics = {
+    money_hacks: `Give ${name} from ${country} 8 REAL life hacks to protect and stretch their money (income: ${income}). Be HYPER-LOCAL — name specific apps, banks, markets, and strategies that actually work in ${country}. Cover: (1) how to save even on a tiny income — name the exact savings method and target amount, (2) which bank accounts in ${country} give the best interest, (3) the most common money mistake people in ${country} make and how to avoid it, (4) how to cut the 3 biggest unnecessary costs without feeling poor, (5) a specific investment or savings vehicle available in ${country} that earns more than a regular bank account, (6) how to negotiate prices in ${country} — specific markets and products where this works, (7) how to avoid impulse buying — a specific system that works, (8) the ONE money habit that separates people who build wealth from people who stay broke in ${country}. Give real numbers in local currency. No vague advice.`,
+
+    emotional_strength: `${name} needs practical ways to stop emotions from ruining their decisions and life. Give 7 REAL emotional strength strategies — not therapy talk, real techniques that work: (1) The exact thing to do in the first 60 seconds when you feel anger/panic/jealousy about to make you do something stupid — a specific physical action, (2) How to deal with people who drain your energy and pull you down — without burning bridges, (3) The one mindset shift about failure that separates people who keep going from people who quit — name a real person who used this, (4) How to handle the days when nothing is working and you feel like giving up — a specific routine with times and actions, (5) How to stop comparing yourself to others on social media — practical techniques, not just "log off", (6) How to make decisions without letting fear make them for you — a specific 3-step process, (7) How to build emotional resilience when life in ${country} keeps throwing obstacles — specific to their environment. Be direct. Be real. This is the advice a good coach gives behind closed doors.`,
+
+    zero_budget_business: `${name} has ${income} income and skills in: ${skills}. Give them a REAL business they can start with ZERO money in ${country}. Include: (1) The exact business model — what they sell, to whom, and how they get paid, (2) The first 5 steps in the first 7 days — specific actions with times (Day 1: do X, Day 2: do Y), (3) How to get the FIRST paying customer with zero budget — name exactly where to find them in ${country} (specific Facebook groups, WhatsApp communities, markets, streets, buildings), (4) What to say to get that first customer — give a real script they can copy, (5) How much they can realistically earn in Month 1, Month 3, and Month 6 in local currency, (6) The one thing that will kill this business if they're not careful — and how to avoid it, (7) A real story of someone who started this same type of business with nothing and succeeded — name the person or brand if possible, (8) How to grow from hustle to a real business — at what income level do they hire help, set up formally, and scale. Give them HOPE that is backed by SPECIFICS.`,
+
+    online_money: `${name} lives in ${country}. Give them 6 SPECIFIC ways to make money online that ACTUALLY WORK from ${country} — including the exact websites, apps, or platforms. For each one: (a) the exact site/app name and URL, (b) what skills are needed (are their skills: ${skills} enough?), (c) how much a beginner realistically earns per month in USD and in local currency, (d) how to get started in the next 48 hours — 3 specific steps, (e) one common mistake beginners make on this platform. Platforms to cover if relevant: Upwork, Fiverr, Toptal, 99designs, PeoplePerHour, Remotasks, Clickworker, Appen, Amazon MTurk, Rev.com, TranscribeMe, Preply (teaching), Cambly (English teaching), UserTesting, TestingTime, Prolific (research studies), YouTube, TikTok Creator Fund, Substack, Gumroad, local classified sites, and any platforms specific to ${country}. Also name 3 platforms to AVOID in ${country} because of payment issues or scams.`,
+
+    products_suppliers: `${name} in ${country} wants to start a product business. Give a complete guide: (1) The TOP 5 in-demand products that sell every day in ${country} right now — explain WHY each sells, who buys it, and what markup is realistic (e.g. buy at X, sell at Y), (2) For each product, name a REAL supplier where they can source it: include actual websites like Alibaba.com, 1688.com, DHgate.com, Made-in-China.com, Global Sources, Wholesale05.com, local importers in ${country} if any. Give real price ranges per unit at wholesale, (3) How to order from China safely — step by step: how to find a good supplier, what to check, how to negotiate, minimum order quantities, shipping methods and costs to ${country}, customs duties, total landed cost, (4) Real estate / property commission model: how someone with NO money can post properties for sale, find buyers, and earn 2–5% commission in ${country} — specific steps, where to post ads (named websites and Facebook groups), how to find landlords/sellers, what to say, how to get paid, (5) Phone & accessories business: where to source from China or Dubai, which models sell fastest in ${country}, what margin is realistic, (6) Perfumes: where to get authentic or high-quality replica perfumes at wholesale, what sells in ${country}, pricing strategy, (7) Building materials: which suppliers offer credit or consignment in ${country}, which materials have the best margins, how to find contractors who need regular supply. Use real website names and real price examples throughout.`,
+  };
+
+  const systemPrompt = `You are a real, street-smart advisor who has lived and worked in ${country}. You give advice that actually works — not textbook theory. Write in clean, direct paragraphs. Use numbered lists (1. 2. 3.) for steps. Use --- to separate sections. No **bold** headers. No AI preamble. Get straight to the useful information. Everything must be specific to ${country} — local platforms, local prices in local currency, local realities. This is life-changing advice, not generic tips.`;
+
+  return { userPrompt: topics[topic] || topics.money_hacks, systemPrompt };
+}
+
+const LIFE_HACK_TOPICS = [
+  { id: "money_hacks",       icon: "💰", label: "Money Protection Hacks",    sub: "Protect & grow every cent you have" },
+  { id: "emotional_strength",icon: "🧠", label: "Emotional Strength",         sub: "Don't let emotions ruin your life" },
+  { id: "zero_budget_business",icon:"🚀",label: "Start a Business with Zero", sub: "How to build something from nothing" },
+  { id: "online_money",      icon: "🌐", label: "Make Money Online",           sub: "Specific sites for your country" },
+  { id: "products_suppliers",icon: "📦", label: "Products & Suppliers",        sub: "What to sell & where to source it" },
+];
+
+function LifeHacksModule({profile, userId, isPremium, isPaid, onUnlock}) {
+  const [activeTopic, setActiveTopic] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState("");
+  const [error, setError] = useState("");
+  const [cache, setCache] = useState({});
+
+  const generate = async (topicId) => {
+    if (cache[topicId]) { setActiveTopic(topicId); setResult(cache[topicId]); return; }
+    setActiveTopic(topicId);
+    setLoading(true);
+    setError("");
+    setResult("");
+    try {
+      const { userPrompt, systemPrompt } = buildLifeHacksPrompt(profile, topicId, isPremium);
+      const txt = await callAPI({
+        messages: [{ role: "user", content: userPrompt }],
+        system: systemPrompt,
+        userId,
+        isPremium,
+      });
+      setResult(txt);
+      setCache(c => ({ ...c, [topicId]: txt }));
+      pushToMemory(userId, "assistant", "Life hack (" + topicId + "): " + txt.slice(0, 200));
+    } catch (e) {
+      setError("Couldn't load this section right now. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  const activeMeta = LIFE_HACK_TOPICS.find(t => t.id === activeTopic);
+
+  return (
+    <LockGate isPaid={isPaid} onUnlock={onUnlock}>
+      <div className="fu">
+        <div style={{ marginBottom: 28 }}>
+          <div className="d3" style={{ marginBottom: 6 }}>Life Hacks Built for Your Reality</div>
+          <p className="body" style={{ color: "var(--cream-60)" }}>
+            Real, specific advice for someone in <strong style={{ color: "var(--gold)" }}>{sanitize(profile.country)}</strong>. Not generic tips — tools that actually work where you are.
+          </p>
+        </div>
+
+        {/* Topic selector */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
+          {LIFE_HACK_TOPICS.map(t => (
+            <div
+              key={t.id}
+              onClick={() => generate(t.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 14, padding: "16px 18px",
+                background: activeTopic === t.id ? "rgba(210,175,90,0.1)" : "var(--raised)",
+                border: `1.5px solid ${activeTopic === t.id ? "var(--gold)" : "var(--line)"}`,
+                borderRadius: 14, cursor: "pointer", transition: "all .2s",
+              }}
+            >
+              <span style={{ fontSize: 24, flexShrink: 0 }}>{t.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: activeTopic === t.id ? "var(--gold)" : "var(--cream)", marginBottom: 2 }}>{t.label}</div>
+                <div style={{ fontSize: 12, color: "var(--cream-40)" }}>{t.sub}</div>
+              </div>
+              {cache[t.id] && activeTopic !== t.id && <span style={{ fontSize: 10, color: "var(--teal)", fontFamily: "var(--f-mono)" }}>✓ LOADED</span>}
+              {activeTopic === t.id && loading && <span style={{ fontSize: 10, color: "var(--gold)", fontFamily: "var(--f-mono)" }}>LOADING…</span>}
+              {activeTopic !== t.id && <span style={{ color: "var(--cream-30)", fontSize: 16 }}>→</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Result panel */}
+        {activeTopic && (
+          <div className="card" style={{ background: "var(--lift)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22 }}>{activeMeta?.icon}</span>
+                <div>
+                  <div style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 500 }}>{activeMeta?.label}</div>
+                  <div style={{ fontFamily: "var(--f-mono)", fontSize: "9px", color: "var(--gold)", letterSpacing: ".1em", marginTop: 2 }}>
+                    PERSONALISED FOR {(profile.country || "").toUpperCase()}
+                  </div>
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => generate(activeTopic)} disabled={loading} style={{ fontSize: 11, padding: "5px 12px" }}>
+                {loading ? "Loading…" : "↺ Refresh"}
+              </button>
+            </div>
+
+            {error && <div className="err-box">⚠ {error}</div>}
+
+            {loading && (
+              <div style={{ textAlign: "center", padding: "32px 0" }}>
+                <div style={{ width: 36, height: 36, border: "3px solid var(--cream-10)", borderTop: "3px solid var(--gold)", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+                <p style={{ fontSize: 13, color: "var(--cream-30)" }}>Gathering real, specific advice for {sanitize(profile.country)}…</p>
+              </div>
+            )}
+
+            {!loading && result && (
+              <div>
+                <RenderMD text={result} style={{ fontSize: 14, lineHeight: 1.85, fontWeight: 300 }} />
+                <div style={{ marginTop: 20, padding: "14px 16px", background: "rgba(210,175,90,0.05)", border: "1px solid rgba(210,175,90,0.15)", borderRadius: 10 }}>
+                  <p style={{ fontSize: 12, color: "var(--cream-40)", margin: 0, lineHeight: 1.7 }}>
+                    💡 This is based on your profile and country. Save the links and steps that apply to you. Come back to refresh with updated advice anytime.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!activeTopic && (
+          <div style={{ textAlign: "center", padding: "32px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>💡</div>
+            <div className="d3" style={{ marginBottom: 8 }}>Pick a topic above to get started</div>
+            <p className="body" style={{ maxWidth: 400, margin: "0 auto", color: "var(--cream-60)" }}>
+              Each section is built specifically for your country, your income level, and your skills. Real advice. Real platforms. Real prices.
+            </p>
+          </div>
+        )}
+      </div>
+    </LockGate>
+  );
+}
+
+
+
   const [mod,setMod]=useState("today");
   const [aScores,setAScores]=useState({life:0,wealth:0,mindset:0,relations:0});
   const [dailyInsight,setDailyInsight]=useState(data.daily_insight||"");
@@ -3938,6 +4100,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="lifehacks"&&<LifeHacksModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
           {mod==="roadmap"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
@@ -5007,7 +5170,7 @@ or
       }catch(_){}
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
     }
-  },[userId,isPremium,ipLocation]);
+  },[userId,isPaid,isPremium,ipLocation,streak]);
 
   const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
   const handleUnlock=()=>{setScreen("paywall");};
@@ -5138,7 +5301,7 @@ or
         {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
-        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
+        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
