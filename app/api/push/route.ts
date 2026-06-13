@@ -2,9 +2,9 @@
 // Sends push notifications to subscribed users via Web Push API.
 // Requires VAPID keys — generate once with: npx web-push generate-vapid-keys
 // Add to .env.local:
-//   NEXT_PUBLIC_VAPID_PUBLIC_KEY=your_public_key
-//   VAPID_PRIVATE_KEY=your_private_key
-//   VAPID_EMAIL=mailto:your@email.com
+//   NEXT_PUBLIC_VAPID_PUBLIC_KEY=BK2_fbqSHPaWm5EB9tEWQuxYNBGZjhJb6XcgNt_RjdlYzT6t0RX0dhTdGjdtvk-xlWXQF_jOpSWPFOkN4kP5Afg
+//   VAPID_PRIVATE_KEY=w5nyRKZz549CYg-BSfrJ9e81cgjfBJzMDR9L3VXHoJI
+//   VAPID_EMAIL=mailto:destiniq21@email.com
 
 import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
