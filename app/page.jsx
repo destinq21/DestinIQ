@@ -4625,10 +4625,8 @@ export default function DestinIQ(){
         // Only go to results if BOTH formData and report exist
         if (profile.form_data && profile.report) {
           setScreen("results");
-        } else if (profile.form_data && !profile.report) {
-          // Has onboarding data but no saved report — send to intake to regenerate
-          setScreen("intake");
         }
+        // Otherwise stay on landing — user will see the home page and can click Begin
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
@@ -4776,9 +4774,8 @@ or
       pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
       setReport(parsed);
       setScreen("results");
-      // Save profile + report to Supabase — strip heavy fields to keep size small
+      // Save profile + report to Supabase
       try{
-        // Only save the essential report fields needed to restore the dashboard
         const reportToSave = {
           overall: parsed.overall,
           summary: parsed.summary,
@@ -4786,11 +4783,21 @@ or
           wealth: parsed.wealth,
           mindset: parsed.mindset,
           relationships: parsed.relationships,
-          sections: parsed.sections?.map(s=>({title:s.title,content:s.content?.slice(0,800)})),
+          sections: (parsed.sections||[]).map(s=>({title:s.title,content:(s.content||"").slice(0,600)})),
           teaser: parsed.teaser,
-          suggestedCountries: parsed.suggestedCountries,
+          suggestedCountries: (parsed.suggestedCountries||[]).slice(0,3),
         };
-        await saveUserProfile(userId,{form_data:f,report:reportToSave,is_paid:isPaid,is_premium:isPremium,streak});
+        const {error:saveError} = await supabase.from("user_profiles").upsert({
+          user_id: userId,
+          form_data: f,
+          report: reportToSave,
+          is_paid: isPaid,
+          is_premium: isPremium,
+          streak,
+          updated_at: new Date().toISOString(),
+        },{onConflict:"user_id"});
+        if(saveError) console.warn("Profile save error:",saveError.message);
+        else console.log("✓ Profile saved successfully");
       }catch(saveErr){
         console.warn("Profile save failed:",saveErr.message);
       }
@@ -4925,8 +4932,7 @@ or
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
-        {screen==="landing"  &&!user&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
-        {screen==="landing"  &&user&&!formData&&<EmptyState onStart={()=>setScreen("intake")} name={user?.name}/>}
+        {screen==="landing"  &&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
@@ -4953,3 +4959,4 @@ or
     </>
   );
 }
+
