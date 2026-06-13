@@ -4622,8 +4622,13 @@ export default function DestinIQ(){
         if (profile.streak)     setStreak(profile.streak);
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
-        // Set screen last — after both formData and report are in state
-        if (profile.form_data)  setScreen("results");
+        // Only go to results if BOTH formData and report exist
+        if (profile.form_data && profile.report) {
+          setScreen("results");
+        } else if (profile.form_data && !profile.report) {
+          // Has onboarding data but no saved report — send to intake to regenerate
+          setScreen("intake");
+        }
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
@@ -4948,4 +4953,3 @@ or
     </>
   );
 }
-
