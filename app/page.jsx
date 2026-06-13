@@ -121,29 +121,13 @@
  */
 
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ERROR BOUNDARY
 // ═══════════════════════════════════════════════════════════════════════════════
-class ErrorBoundary extends React.Component {
-  constructor(props){ super(props); this.state={hasError:false,error:null}; }
-  static getDerivedStateFromError(e){ return{hasError:true,error:e}; }
-  componentDidCatch(e,info){ console.error("DestinIQ crash:",e,info); }
-  render(){
-    if(this.state.hasError) return(
-      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0a0800"}}>
-        <div style={{maxWidth:400,textAlign:"center"}}>
-          <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
-          <div style={{fontSize:22,fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
-          <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
-          <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>Refresh page</button>
-        </div>
-      </div>
-    );
-    return this.props.children;
-  }
-}
+// ErrorBoundary removed — using mounted guard instead to prevent hydration errors.
+// If needed, add a class-based ErrorBoundary in a separate file using React.Component.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
@@ -2106,7 +2090,12 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
 // NOTIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function NotificationPanel({profile,userId,onClose}){
-  const [perm,  setPerm  ]=useState(typeof Notification!=="undefined"?Notification.permission:"unsupported");
+  const [perm,  setPerm  ]=useState("default");
+  useEffect(()=>{
+    if(typeof window==="undefined") return;
+    if(!("Notification" in window)) setPerm("unsupported");
+    else setPerm(Notification.permission);
+  },[]);
   const [time,  setTime  ]=useState("08:00");
   const [enabled,setEnabled]=useState(false);
   const [sched, setSched ]=useState(null);
@@ -4451,7 +4440,7 @@ Discover your own clarity score at destiniq.vercel.app`;
           <button onClick={copy} style={{flex:1,background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
             {copied?"✓ Copied!":"Copy to share"}
           </button>
-          {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
+          {typeof window!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
         </div>
       </div>
     </div>
@@ -4580,7 +4569,7 @@ function AdminDashboard({user,onBack}){
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:2}}>{t.name}</div>
                       <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>"{t.quote}"</div>
-                      <div style={{fontSize:10,color:"var(--cream-20)",marginTop:4,fontFamily:"var(--f-mono)"}}>{new Date(t.created_at).toLocaleDateString()}</div>
+                      <div style={{fontSize:10,color:"var(--cream-20)",marginTop:4,fontFamily:"var(--f-mono)"}} suppressHydrationWarning>{new Date(t.created_at).toLocaleDateString()}</div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
                       {!t.approved&&<button onClick={()=>approveTestimonial(t.id,true)} style={{background:"var(--teal)",border:"none",borderRadius:8,padding:"6px 12px",color:"#000",fontSize:11,fontWeight:700,cursor:"pointer"}}>Approve</button>}
@@ -4598,7 +4587,7 @@ function AdminDashboard({user,onBack}){
                 <div key={u.user_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid var(--line)"}}>
                   <div>
                     <div style={{fontSize:13,color:"var(--cream)"}}>{u.name||"Unknown"}</div>
-                    <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{new Date(u.created_at).toLocaleDateString()} · 🔥{u.streak||0} streak</div>
+                    <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}} suppressHydrationWarning>{new Date(u.created_at).toLocaleDateString()} · 🔥{u.streak||0} streak</div>
                   </div>
                   <div style={{display:"flex",gap:6}}>
                     {u.is_paid&&<span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",border:"1px solid var(--line-gold)",borderRadius:4,padding:"2px 6px"}}>PAID</span>}
@@ -4835,6 +4824,8 @@ function SubscriptionCard({isPaid,isPremium,userId,onManageSubscription}){
 }
 
 export default function DestinIQ(){
+  const [mounted,setMounted]=useState(false);
+  useEffect(()=>setMounted(true),[]);
   const [user, setUser]=useState(null);
   const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
   const [screen,    setScreen   ]=useState("landing");
@@ -5114,8 +5105,9 @@ or
     setMeta("twitter:image","https://destiniq.vercel.app/og-image.png");
   },[]);
 
+  if(!mounted) return null;
+
   return(
-    <ErrorBoundary>
     <>
       <style>{CSS}</style>
       <OfflineBanner/>
@@ -5221,7 +5213,6 @@ or
         </>}
       </div>
     </>
-    </ErrorBoundary>
   );
 }
 
