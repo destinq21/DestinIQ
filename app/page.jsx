@@ -72,19 +72,6 @@
  * create policy "Anyone can submit" on testimonials for insert with check (true);
  * create policy "Anyone can read approved" on testimonials for select using (approved=true);
  *
- * -- Cancellation requests (written by client; processed by webhook/admin)
- * create table if not exists cancellation_requests (
- *   id           uuid primary key default gen_random_uuid(),
- *   user_id      uuid references auth.users(id) on delete cascade not null,
- *   requested_at timestamptz not null,
- *   reason       text,
- *   processed    boolean default false,
- *   created_at   timestamptz default now()
- * );
- * alter table cancellation_requests enable row level security;
- * create policy "Users insert own cancellation" on cancellation_requests
- *   for insert with check (auth.uid() = user_id);
- *
  * -- User profiles (onboarding data + subscription)
  * create table if not exists user_profiles (
  *   user_id     uuid primary key references auth.users(id) on delete cascade,
@@ -94,10 +81,6 @@
  *   is_paid     boolean default false,
  *   is_premium  boolean default false,
  *   streak      int default 1,
- *   paystack_ref text,
- *   paid_plan   text,
- *   paid_at     timestamptz,
- *   photo_url   text,
  *   created_at  timestamptz default now(),
  *   updated_at  timestamptz default now()
  * );
@@ -121,7 +104,7 @@
  */
 
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
@@ -230,7 +213,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
   basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
@@ -1730,7 +1713,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
 
       {/* ── CHECK-IN FORM ─────────────────────────────────────────────────── */}
       <div className="card">
-        <div className="mono" style={{marginBottom:18,fontSize:"9px"}} suppressHydrationWarning>{saved?"Today's Log — Come back tomorrow":"Log Today · "+new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</div>
+        <div className="mono" style={{marginBottom:18,fontSize:"9px"}}>{saved?"Today's Log — Come back tomorrow":"Log Today · "+new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</div>
         {[{label:"Energy",val:energy,set:setEnergy,color:"#1fa89a"},{label:"Focus",val:focus,set:setFocus,color:"#d2af5a"},{label:"Momentum",val:momentum,set:setMomentum,color:"#9b72cf"}].map(s=>(
           <div className="mom-slider-row" key={s.label}>
             <span className="mom-slider-label">{s.label}</span>
@@ -2034,7 +2017,7 @@ function Paywall({onUnlock,teaser,userEmail}){
   const [email,setEmail]=useState(userEmail||"");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
-  const [scriptReady,setScriptReady]=useState(false);
+  const [scriptReady,setScriptReady]=useState(typeof window!=="undefined"&&!!window.PaystackPop);
 
   // Load Paystack script once
   useEffect(()=>{
@@ -2087,30 +2070,11 @@ function Paywall({onUnlock,teaser,userEmail}){
         ref:      ref,
         label:    "DestinIQ "+plan.name,
         metadata: { plan:sel, custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}] },
-        callback:async(response)=>{
-          // Payment verified by Paystack popup — write to DB immediately.
-          // The webhook at /api/paystack-webhook also does this server-side
-          // as a backup, so the user never loses their subscription on refresh.
+        callback:(response)=>{
+          // Payment successful — grant access
           console.log("Payment successful:", response.reference);
-          try{
-            // Write is_paid to Supabase right now from the client
-            const{data:{session}}=await supabase.auth.getSession();
-            if(session?.user){
-              await supabase.from("user_profiles").upsert({
-                user_id:session.user.id,
-                is_paid:true,
-                paystack_ref:response.reference,
-                paid_plan:sel,
-                paid_at:new Date().toISOString(),
-                updated_at:new Date().toISOString(),
-              },{onConflict:"user_id"});
-            }
-          }catch(saveErr){
-            console.warn("Could not save payment to DB:", saveErr.message);
-            // Still unlock — the webhook will catch it
-          }
           setLoading(false);
-          onUnlock(response.reference);
+          onUnlock(); // unlock premium access
         },
         onClose:()=>{
           // User closed the popup without paying
@@ -2698,7 +2662,7 @@ function Landing({onStart,ipLocation}){
             <div className="fu" style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <div style={{width:8,height:8,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 8px var(--teal)",animation:"pulse 2s ease infinite"}}/>
-                <div className="mono" style={{color:"var(--teal)"}} suppressHydrationWarning>Real people · {liveCount.toLocaleString()} on their journey</div>
+                <div className="mono" style={{color:"var(--teal)"}}>Real people · {liveCount.toLocaleString()} on their journey</div>
               </div>
               {ipLocation&&ipLocation.city&&(
                 <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20}}>
@@ -3234,7 +3198,7 @@ function AuthScreen({onAuth}){
         });
         if(err) throw err;
         if(data.user&&!data.session){
-          setError("✉ Check your inbox — we sent a confirmation link. Click it, then come back and sign in.");
+          setError("Check your email to confirm your account, then sign in.");
           setLoading(false);return;
         }
         if(data.user) onAuth({id:data.user.id,email:data.user.email,name:name.trim(),provider:"email"});
@@ -3786,7 +3750,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               <div className="d3" style={{marginBottom:20}}>What we want you to hold onto today</div>
               <div className="insight" style={{marginBottom:24}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,gap:10,flexWrap:"wrap"}}>
-                  <div className="mono" style={{fontSize:"9px"}} suppressHydrationWarning>Written for you · {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
+                  <div className="mono" style={{fontSize:"9px"}}>Written for you · {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
                   <button className="btn btn-ghost btn-sm" onClick={refreshDailyInsight} disabled={refreshingInsight} style={{fontSize:11,padding:"4px 12px"}}>
                     {refreshingInsight?"Refreshing…":"↺ Refresh today's insight"}
                   </button>
@@ -3935,7 +3899,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           )}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
-            <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
+            <div className="small">Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
             <div style={{display:"flex",gap:8}}>
               {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}}>Download PDF</button>}
               {!isPaid&&<button className="btn btn-gold" onClick={onUnlock}>See the full picture</button>}
@@ -4130,7 +4094,17 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
         </div>
 
         {/* Subscription */}
-        <SubscriptionCard isPaid={isPaid} isPremium={isPremium} userId={user?.id} onManageSubscription={onManageSubscription}/>
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{fontSize:11,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",marginBottom:14}}>SUBSCRIPTION</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{planLabel}</div>
+              <div style={{fontSize:12,color:"var(--cream-40)"}}>{isPaid?"Active subscription":"Free tier"}</div>
+            </div>
+            {!isPaid&&<button onClick={onManageSubscription} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"9px 18px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>Upgrade</button>}
+            {isPaid&&<button onClick={onManageSubscription} style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"9px 18px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>Manage</button>}
+          </div>
+        </div>
 
         {/* Sign out & delete */}
         <div className="card">
@@ -4193,7 +4167,7 @@ Discover your own clarity score at destiniq.vercel.app`;
           <button onClick={copy} style={{flex:1,background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
             {copied?"✓ Copied!":"Copy to share"}
           </button>
-          {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
+          {navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
         </div>
       </div>
     </div>
@@ -4406,176 +4380,6 @@ async function triggerWelcomeEmail(user){
   }catch(e){ console.warn("Welcome email:",e.message); }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// OFFLINE BANNER
-// Shows a banner when the user loses internet connection.
-// ═══════════════════════════════════════════════════════════════════════════════
-function OfflineBanner(){
-  const [offline,setOffline]=useState(false);
-  useEffect(()=>{
-    const on=()=>setOffline(false);
-    const off=()=>setOffline(true);
-    window.addEventListener("online",on);
-    window.addEventListener("offline",off);
-    return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
-  },[]);
-  if(!offline) return null;
-  return(
-    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"rgba(196,100,90,0.95)",backdropFilter:"blur(8px)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-      <span style={{fontSize:16}}>📡</span>
-      <span style={{fontSize:13,color:"#fff",fontWeight:500}}>You're offline — check your connection. Your data is saved.</span>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOADING SKELETON
-// Shown while profile/report is loading from Supabase after login.
-// ═══════════════════════════════════════════════════════════════════════════════
-function LoadingSkeleton(){
-  const bar=(w,h=12,mb=8)=>(
-    <div style={{width:w,height:h,borderRadius:6,background:"var(--lift)",marginBottom:mb,animation:"shimmer 1.4s ease-in-out infinite"}}/>
-  );
-  return(
-    <>
-      <style>{`@keyframes shimmer{0%,100%{opacity:0.4}50%{opacity:0.8}}`}</style>
-      <div style={{paddingTop:80,padding:"80px 24px 40px",maxWidth:640,margin:"0 auto"}}>
-        <div style={{display:"flex",gap:16,marginBottom:32}}>
-          <div style={{width:80,height:80,borderRadius:"50%",background:"var(--lift)",animation:"shimmer 1.4s ease-in-out infinite",flexShrink:0}}/>
-          <div style={{flex:1}}>
-            {bar("60%",20,10)}{bar("40%",14,0)}
-          </div>
-        </div>
-        {bar("100%",120,20)}
-        {bar("100%",80,16)}
-        {bar("80%",16,0)}
-      </div>
-    </>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// RATE LIMITER (client-side guard)
-// Prevents free users from spamming AI report generation.
-// The real enforcement should also be server-side (Edge Function).
-// ═══════════════════════════════════════════════════════════════════════════════
-const RATE_LIMIT_KEY="destiniq_report_count";
-const RATE_LIMIT_DATE_KEY="destiniq_report_date";
-const FREE_REPORT_LIMIT=3; // free users get 3 reports total
-
-function getRateLimit(){
-  if(typeof window==="undefined") return{count:0,date:null};
-  try{
-    const date=localStorage.getItem(RATE_LIMIT_DATE_KEY);
-    const count=parseInt(localStorage.getItem(RATE_LIMIT_KEY)||"0",10);
-    return{count,date};
-  }catch{return{count:0,date:null};}
-}
-
-function incrementRateLimit(){
-  if(typeof window==="undefined") return;
-  try{
-    const{count}=getRateLimit();
-    localStorage.setItem(RATE_LIMIT_KEY,String(count+1));
-    localStorage.setItem(RATE_LIMIT_DATE_KEY,new Date().toDateString());
-  }catch{}
-}
-
-function isRateLimited(isPaid){
-  if(isPaid) return false; // paid users have no limit
-  const{count}=getRateLimit();
-  return count>=FREE_REPORT_LIMIT;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SUBSCRIPTION CARD (replaces the old "contact support" manage button)
-// ═══════════════════════════════════════════════════════════════════════════════
-function SubscriptionCard({isPaid,isPremium,userId,onManageSubscription}){
-  const [cancelling,setCancelling]=useState(false);
-  const [cancelled,setCancelled]=useState(false);
-  const [showConfirm,setShowConfirm]=useState(false);
-  const planLabel=isPaid&&isPremium?"Premium":isPaid?"Essential":"Free";
-  const planColor=isPaid?"var(--gold)":"var(--cream-30)";
-
-  const handleCancel=async()=>{
-    setCancelling(true);
-    try{
-      // Write cancellation request to Supabase — your backend/webhook
-      // or a Supabase function should handle the actual Paystack cancellation.
-      await supabase.from("cancellation_requests").insert({
-        user_id:userId,
-        requested_at:new Date().toISOString(),
-        reason:"user_self_cancel",
-      });
-      // Optimistically mark as cancelled in the UI
-      // The actual is_paid will be set to false by your webhook when the
-      // current billing period ends.
-      setCancelled(true);
-      setShowConfirm(false);
-      // Note: don't set is_paid=false here — they keep access until period ends
-    }catch(e){
-      console.warn("Cancel error:",e.message);
-    }
-    setCancelling(false);
-  };
-
-  if(cancelled){
-    return(
-      <div className="card" style={{marginBottom:16}}>
-        <div style={{fontSize:11,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",marginBottom:14}}>SUBSCRIPTION</div>
-        <div style={{padding:"14px",background:"rgba(196,100,90,0.08)",border:"1px solid rgba(196,100,90,0.2)",borderRadius:10}}>
-          <div style={{fontSize:13,fontWeight:600,color:"var(--rose)",marginBottom:4}}>Cancellation requested</div>
-          <p style={{fontSize:12,color:"var(--cream-40)",margin:0,lineHeight:1.6}}>
-            Your subscription will remain active until the end of your current billing period. 
-            We'll send a confirmation email. Changed your mind? Contact support.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return(
-    <div className="card" style={{marginBottom:16}}>
-      <div style={{fontSize:11,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",marginBottom:14}}>SUBSCRIPTION</div>
-      {!showConfirm?(
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{planLabel}</div>
-            <div style={{fontSize:12,color:"var(--cream-40)"}}>{isPaid?"Active subscription":"Free tier"}</div>
-          </div>
-          {!isPaid&&<button onClick={onManageSubscription} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"9px 18px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>Upgrade</button>}
-          {isPaid&&(
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setShowConfirm(true)} style={{background:"none",border:"1px solid rgba(196,100,90,0.3)",borderRadius:10,padding:"9px 18px",color:"var(--rose)",fontSize:12,cursor:"pointer"}}>
-                Cancel plan
-              </button>
-            </div>
-          )}
-        </div>
-      ):(
-        <div>
-          <div style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginBottom:8}}>Cancel your subscription?</div>
-          <p style={{fontSize:13,color:"var(--cream-50)",marginBottom:16,lineHeight:1.6}}>
-            You'll keep full access until the end of your billing period. This cannot be undone automatically — 
-            contact support if you change your mind.
-          </p>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setShowConfirm(false)} style={{flex:1,background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"10px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>
-              Keep my plan
-            </button>
-            <button onClick={handleCancel} disabled={cancelling} style={{flex:1,background:"rgba(196,100,90,0.15)",border:"1px solid rgba(196,100,90,0.3)",borderRadius:10,padding:"10px",color:"var(--rose)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
-              {cancelling?"Cancelling…":"Yes, cancel"}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function DestinIQ(){
   const [user, setUser]=useState(null);
   const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
@@ -4597,7 +4401,6 @@ export default function DestinIQ(){
   const [showPolicy,  setShowPolicy ]=useState(null); // "privacy"|"terms"|null
   const [showShare,   setShowShare  ]=useState(false);
   const [showReferral,setShowReferral]=useState(false);
-  const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
 
   // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
   const restoreUserSession = async (supaUser) => {
@@ -4610,26 +4413,19 @@ export default function DestinIQ(){
     };
     setUser(appUser);
     setUserId(u.id);
-    setProfileLoading(true); // show skeleton while we load saved data
     hydrateUserData(u.id);
 
     // Load saved profile (onboarding answers + subscription)
-    try{
-      const profile = await loadUserProfile(u.id);
-      if (profile) {
-        if (profile.form_data) {
-          setFormData(profile.form_data);
-          setScreen("results"); // skip onboarding, go straight to dashboard
-        }
-        if (profile.is_paid)    setIsPaid(true);
-        if (profile.is_premium) setIsPremium(true);
-        if (profile.streak)     setStreak(profile.streak);
-        if (profile.report)     setReport(profile.report);
+    const profile = await loadUserProfile(u.id);
+    if (profile) {
+      if (profile.form_data) {
+        setFormData(profile.form_data);
+        setScreen("results"); // skip onboarding, go straight to dashboard
       }
-    }catch(e){
-      console.warn("restoreUserSession profile load error:",e.message);
-    }finally{
-      setProfileLoading(false);
+      if (profile.is_paid)    setIsPaid(true);
+      if (profile.is_premium) setIsPremium(true);
+      if (profile.streak)     setStreak(profile.streak);
+      if (profile.report)     setReport(profile.report);
     }
   };
 
@@ -4688,13 +4484,6 @@ export default function DestinIQ(){
 
   const handleSubmit=useCallback(async(f)=>{
     if(!userId) return; // not yet authenticated
-    // Rate limit free users
-    if(isRateLimited(isPaid)){
-      setApiError(`You've generated ${FREE_REPORT_LIMIT} reports on the free plan. Upgrade to generate more.`);
-      setScreen("paywall");
-      return;
-    }
-    incrementRateLimit();
     setFormData(f);setScreen("loading");setApiError("");
     pushToMemory(userId,"user",`Profile: ${f.name}, ${f.age}, ${f.country}, Situation: ${f.situation||f.career}, Goal: ${f.bigGoal||""}, Goals: ${f.goals}, Challenge: ${f.challenge}, Wants from app: ${f.wantFrom||""}`);
 
@@ -4781,61 +4570,20 @@ or
   },[userId,isPremium,ipLocation]);
 
   const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
-  const handleUnlock=()=>{setScreen("paywall");};
-  // handlePay: called after Paystack confirms payment in the Paywall component.
-  // We write is_paid:true to Supabase immediately so it survives any refresh.
-  const handlePay=async(paystackRef)=>{
-    setIsPaid(true);
-    setStreak(s=>s+1);
-    setScreen("results");
-    if(userId){
-      try{
-        await saveUserProfile(userId,{
-          is_paid:true,
-          paystack_ref:paystackRef||null,
-          paid_at:new Date().toISOString(),
-          form_data:formData,
-          report:report,
-        });
-      }catch(e){console.warn("handlePay save:",e.message);}
-    }
-  };
-
-  // SEO meta tags — set once on mount
-  useEffect(()=>{
-    document.title="DestinIQ — Your Personal Clarity Report";
-    const setMeta=(name,content,prop=false)=>{
-      const key=prop?"property":"name";
-      let el=document.querySelector(`meta[${key}="${name}"]`);
-      if(!el){el=document.createElement("meta");el.setAttribute(key,name);document.head.appendChild(el);}
-      el.setAttribute("content",content);
-    };
-    setMeta("description","DestinIQ gives you a personalised life intelligence report — built around your goals, your country, and your real situation. Not generic advice.");
-    setMeta("og:title","DestinIQ — Your Personal Clarity Report",true);
-    setMeta("og:description","Find out exactly where you are, what's holding you back, and what to do next. Built for you, not for everyone.",true);
-    setMeta("og:image","https://destiniq.vercel.app/og-image.png",true);
-    setMeta("og:url","https://destiniq.vercel.app",true);
-    setMeta("og:type","website",true);
-    setMeta("twitter:card","summary_large_image");
-    setMeta("twitter:title","DestinIQ — Your Personal Clarity Report");
-    setMeta("twitter:description","A personalised life intelligence report built around your goals and situation.");
-    setMeta("twitter:image","https://destiniq.vercel.app/og-image.png");
-  },[]);
+  const handleUnlock=()=>{setIsPaid(false);setScreen("paywall");};
+  const handlePay=()=>{setIsPaid(true);setStreak(s=>s+1);setScreen("results");};
 
   return(
     <>
       <style>{CSS}</style>
-      <OfflineBanner/>
       <div className="bg bg-mesh"/>
       <div className="bg bg-noise"/>
       <div className="bg bg-grid"/>
-      <div className="root" suppressHydrationWarning>
+      <div className="root">
 
         {/* AUTH GATE — show login if not authenticated */}
-        {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={async(u)=>{if(u.isNew)triggerWelcomeEmail(u);await restoreUserSession({id:u.id,email:u.email,phone:u.phone,user_metadata:{name:u.name,full_name:u.name},app_metadata:{provider:u.provider}});}}/>}
-        {/* Show skeleton while loading saved profile from DB */}
-        {user&&profileLoading&&<LoadingSkeleton/>}
-        {user&&!profileLoading&&<>
+        {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={(u)=>{setUser(u);setUserId(u.id);hydrateUserData(u.id);if(u.isNew)triggerWelcomeEmail(u);}}/>}
+        {user&&<>
 
         <SupportWidget/>
         <nav className="nav">
@@ -4905,7 +4653,7 @@ or
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
         {screen==="results"  &&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
-              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
+            streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
         )}
 
         {showNotif&&formData&&(
