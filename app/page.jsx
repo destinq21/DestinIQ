@@ -3643,17 +3643,19 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
       const parsed = JSON.parse(clean.slice(start, end+1));
       if(!parsed.country) parsed.country = country;
       setCustomReport(parsed);
+      setLoading(false);
     } catch(e){
       console.warn(`Relocation report failed (attempt ${attempt}):`, e.message);
       if(attempt < 2){
-        // Auto retry once
+        // Auto retry once — keep loading spinner active
         setTimeout(()=>generateReport(country, attempt+1), 1500);
-        return;
+        return; // don't setLoading(false) yet
       }
+      // Both attempts failed — show retry button
       setCustomReport({
         country,
         fit: 0,
-        tagline: `Tap to retry loading the ${country} report.`,
+        tagline: "Couldn't load this report right now.",
         overview: "",
         pros: [],
         cons: [],
@@ -3667,8 +3669,8 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
         verdict: "",
         error: true,
       });
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const RelocCard = ({r, idx})=>{
@@ -3747,23 +3749,40 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
         </p>
 
         {/* Country search */}
-        <div style={{marginBottom:24,position:"relative"}}>
+        <div style={{marginBottom:24}}>
           <div style={{fontSize:11,fontWeight:700,color:"var(--cream-40)",letterSpacing:"0.08em",marginBottom:8}}>HAVE A COUNTRY IN MIND?</div>
           <div style={{position:"relative"}}>
             <input
               value={search}
               onChange={e=>setSearch(e.target.value)}
-              placeholder={`Search any country... (you're from ${formData.country||"your country"})`}
+              onBlur={()=>setTimeout(()=>setSearch(""),200)}
+              placeholder={`Search any country...`}
               style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"12px 16px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box"}}
             />
             {search.length>1&&filtered.length>0&&(
-              <div style={{position:"fixed",top:"auto",left:"auto",width:"min(400px,90vw)",background:"var(--night)",border:"1px solid var(--gold)",borderRadius:12,overflow:"auto",maxHeight:280,zIndex:9999,boxShadow:"0 16px 48px rgba(0,0,0,0.8)",marginTop:4}}>
+              <div style={{
+                position:"absolute",
+                top:"calc(100% + 6px)",
+                left:0,
+                right:0,
+                background:"var(--midnight)",
+                border:"2px solid var(--gold)",
+                borderRadius:12,
+                overflow:"hidden auto",
+                maxHeight:260,
+                zIndex:9999,
+                boxShadow:"0 20px 60px rgba(0,0,0,0.95)",
+              }}>
                 {filtered.map(c=>(
-                  <div key={c} onClick={()=>{setSearch("");generateReport(c);}}
-                    style={{padding:"12px 18px",cursor:"pointer",fontSize:14,color:"var(--cream)",borderBottom:"1px solid var(--cream-10)",transition:"background 0.15s",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="var(--midnight)"}
-                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}
-                  ><span>{c}</span><span style={{color:"var(--gold)",fontSize:12}}>→</span></div>
+                  <div key={c}
+                    onMouseDown={(e)=>{e.preventDefault();setSearch("");generateReport(c);}}
+                    style={{padding:"13px 18px",cursor:"pointer",fontSize:14,color:"var(--cream)",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--midnight)"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="var(--night)"}
+                    onMouseLeave={e=>e.currentTarget.style.background="var(--midnight)"}
+                  >
+                    <span>{c}</span>
+                    <span style={{color:"var(--gold)",fontSize:13,fontWeight:600}}>→</span>
+                  </div>
                 ))}
               </div>
             )}
@@ -4296,11 +4315,14 @@ function ShareCard({report,formData,onClose}){
     {label:"Mindset",  val:getScore("mindset",2,61)},
     {label:"Relations",val:getScore("relationship",3,45)},
   ];
-  const overall=typeof report?.overall==="number"
-    ?report.overall
-    :(typeof report?.overall==="string"&&!isNaN(parseInt(report.overall)))
-      ?parseInt(report.overall)
-      :Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
+  // Parse overall — handle string "46" or number 46 or object with value
+  const parseOverall=(v)=>{
+    if(typeof v==="number") return v;
+    if(typeof v==="string"&&!isNaN(parseInt(v))) return parseInt(v);
+    if(v?.value) return parseInt(v.value);
+    return null;
+  };
+  const overall=parseOverall(report?.overall)||Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
 
   const shareText=`My DestinIQ Clarity Score: ${overall}/100
 
@@ -4771,8 +4793,19 @@ export default function DestinIQ(){
     };
     setUser(appUser);
     setUserId(u.id);
-    setProfileLoading(true); // show skeleton while we load saved data
+    setProfileLoading(true);
     hydrateUserData(u.id);
+
+    // Load avatar for nav bar
+    try{
+      const{data:avatarData}=supabase.storage.from("avatars").getPublicUrl(`${u.id}/avatar`);
+      if(avatarData?.publicUrl){
+        const testImg=new Image();
+        testImg.onload=()=>setNavPhotoURL(avatarData.publicUrl+"?t="+Date.now());
+        testImg.onerror=()=>setNavPhotoURL(null);
+        testImg.src=avatarData.publicUrl;
+      }
+    }catch(_){}
 
     // Load saved profile (onboarding answers + subscription)
     try{
