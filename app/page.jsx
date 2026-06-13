@@ -251,7 +251,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
   basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
@@ -1243,56 +1243,16 @@ const WORLD_COUNTRIES = [
 // Works for ANY origin → ANY destination (US→Ghana, Togo→Rwanda, India→Germany, etc.)
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildSingleCountryRelocationPrompt(profile, targetCountry, isPremium){
-  const today = new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
-  const depth = isPremium
-    ? "This is a premium report. Go deep on every single section. Give real numbers, real neighbourhood names, real visa costs, real business setup costs. This person is seriously considering this move."
-    : "Be genuinely helpful. Give real numbers where you can. Be honest about both the opportunity and the challenges.";
+  const name = sanitize(profile.name)||"them";
+  const from = sanitize(profile.country)||"their country";
+  const skills = sanitize(profile.skills)||"general professional skills";
+  const goals = sanitize(profile.goals)||"better opportunities";
+  return `Relocation briefing for ${name}, age ${profile.age||"unknown"}, from ${from}, considering moving to ${targetCountry}. Skills: ${skills}. Goal: ${goals}. Income: ${profile.income||"not stated"}.
 
-  return `You are a relocation expert and trusted advisor writing a personal, detailed briefing for ${sanitize(profile.name)}.
+Return ONLY a JSON object. Start with { and end with }. No other text.
 
-TODAY: ${today}
-THEIR ORIGIN: ${sanitize(profile.country)} (this is CRITICAL — their experience moving to ${targetCountry} depends entirely on where they're coming from)
-TARGET COUNTRY: ${targetCountry}
-THEIR PROFILE: Age ${profile.age}, ${profile.gender||"not specified"}, ${profile.relationship||"not specified"}, income ${profile.income||"not specified"}, skills: ${sanitize(profile.skills)||"not specified"}, career: ${sanitize(profile.career)}, goals: ${sanitize(profile.goals)}
-
-${depth}
-
-CRITICAL RULES:
-1. This report is for someone going FROM ${sanitize(profile.country)} TO ${targetCountry} — the visa pathway, cultural adjustment, and income comparison must reflect this exact journey
-2. If they're going from a wealthy country to a developing one (e.g. USA→Ghana): focus on business opportunities, cost arbitrage, quality of life, expat community, safety, infrastructure reality
-3. If they're going from a developing country to a developed one (e.g. Ghana→UK): focus on visa pathway, income jump, cultural adjustment, what to expect
-4. If intra-African or intra-regional: focus on ECOWAS/regional agreements, language, practical differences in living standards
-5. Use real 2025 numbers. Real neighbourhood names. Real visa costs in USD. Real business setup costs.
-6. Write like a caring, honest friend who has done this journey themselves — not like a travel brochure or a government website
-
-Return ONLY valid JSON:
-{
-  "country": "${targetCountry}",
-  "fit": <0-100 honest match score for this specific person going from their country>,
-  "tagline": "One sentence that captures the single most important truth about this move for THIS person specifically",
-  "overview": "3-4 sentences. What is this move actually like for someone from ${sanitize(profile.country)} going to ${targetCountry}? Name the community that's already there from their country if any. Be honest about what the first 3 months typically look like.",
-  "pros": [
-    "Advantage 1 — specific to someone from their origin country, with a real number or example",
-    "Advantage 2 — practical benefit with specifics",
-    "Advantage 3 — financial or lifestyle advantage",
-    "Advantage 4 — opportunity specific to their skills or background"
-  ],
-  "cons": [
-    "Challenge 1 — honest, specific difficulty for someone from their background",
-    "Challenge 2 — practical obstacle with real detail and what to do about it",
-    "Challenge 3 — financial or social challenge with honest assessment"
-  ],
-  "business": "5-6 sentences covering: (1) exactly how to register a company in ${targetCountry} as a foreigner from ${sanitize(profile.country)} — the process, the cost in USD, the time it takes; (2) what type of business works best for someone with their specific skills; (3) realistic first-year revenue target; (4) who tends to succeed vs struggle; (5) any restrictions or gotchas foreigners from their country face specifically",
-  "living": "Give a real cost breakdown for 2025 with specific neighbourhood names: rent for a decent 1-bedroom apartment (give 2-3 area options with price range), monthly food budget, transport, utilities, healthcare if private, and total comfortable monthly budget in local currency AND USD. Compare this to what they currently earn.",
-  "visa_detail": "Specific visa pathway for someone with a ${sanitize(profile.country)} passport going to ${targetCountry}: which visa type(s) they qualify for, the exact cost in USD, processing time, documents needed, any common mistakes or gotchas, and what happens after the first visa expires (renewal/PR pathway)",
-  "opportunity": <0-100 opportunity score for their specific skills in this destination>,
-  "cost": "low|medium|high",
-  "visa": "easy|moderate|complex",
-  "timeline": "Realistic breakdown: how long to get the visa + how long to arrive and settle + how long before earning comfortably",
-  "verdict": "One direct, honest sentence — is this the right move for this specific person right now, given their age, income, skills, and where they're coming from? Name a condition if relevant."
-}`;
+{"country":"${targetCountry}","fit":<0-100 match score>,"tagline":"<one sentence: the single most important truth about this move for them>","overview":"<2-3 sentences about what moving from ${from} to ${targetCountry} is actually like, what the first 90 days look like>","pros":["<advantage 1 with real detail>","<advantage 2>","<advantage 3>"],"cons":["<challenge 1 with honest detail>","<challenge 2>","<challenge 3>"],"business":"<2-3 sentences: company registration process and cost, what business works for their skills>","living":"<2 sentences: monthly cost in local currency and USD, neighbourhood examples>","visa_detail":"<2 sentences: visa type for ${from} passport, cost in USD, processing time>","opportunity":<0-100>,"cost":"low|medium|high","visa":"easy|moderate|complex","timeline":"<time to visa + time to settle + time to first income>","verdict":"<one honest sentence: is this right for them right now?>"}`;
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FALLBACK
@@ -2419,7 +2379,7 @@ function AdvisorChat({profile,reportData,userId,isPremium}){
               <div className={`bubble ${m.role==="user"?"bubble-u":"bubble-d"}`}>
                 {m.role==="user"
                   ?<span style={{whiteSpace:"pre-wrap"}}>{m.content}</span>
-                  :<RenderMD text={m.content}/>
+                  :<><RenderMD text={m.content}/><AudioPlayer text={m.content} label="Listen"/></>
                 }
               </div>
             </div>
@@ -3634,7 +3594,7 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
   const generateReport = async(country, attempt=1)=>{
     setLoading(true); setCustomReport(null); setSelected(country); setView("custom");
     try{
-      const sys = "You are a relocation expert. Return ONLY valid JSON — no markdown, no code fences, no text outside the JSON object.";
+      const sys = "You are a relocation expert. You MUST return ONLY a valid JSON object. No markdown. No code fences. No explanation. No text before or after. Start your response with { and end with }.";
       const prompt = buildSingleCountryRelocationPrompt(formData, country, isPremium);
       const raw = await callAPI({messages:[{role:"user",content:prompt}], system:sys, userId, isPremium});
       const clean = raw.replace(/```json|```/g,"").trim();
@@ -3843,6 +3803,16 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
   const [refreshingInsight,setRefreshingInsight]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
 
+  // Auto-generate fresh insight if saved one is empty or generic
+  useEffect(()=>{
+    const saved = data.daily_insight||"";
+    const isGeneric = !saved || saved.includes("I need more information") || saved.includes("generic") || saved.length < 40;
+    if(isGeneric && formData?.challenge && formData?.goals && userId){
+      refreshDailyInsight();
+    }
+  // eslint-disable-next-line
+  },[]);
+
   const refreshDailyInsight=async()=>{
     if(refreshingInsight) return;
     setRefreshingInsight(true);
@@ -3900,7 +3870,10 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               ))}
             </div>
           </div>
-          <div className="insight fu4"><p className="body">{data.headline}</p></div>
+          <div className="insight fu4">
+            <p className="body">{data.headline}</p>
+            <AudioPlayer text={[data.headline,data.score_explanations?.life,data.score_explanations?.wealth].filter(Boolean).join(" ")} label="Listen to your report"/>
+          </div>
 
           {/* Score explanations — why each pillar is the score it is */}
           {data.score_explanations&&(
@@ -4420,7 +4393,7 @@ function ReferralWidget({user,isPaid}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // 5. ADMIN DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-const ADMIN_EMAILS=["destiniq@gmail.com"]; // Add your email here
+const ADMIN_EMAILS=["destiniq21@gmail.com"]; // Add your email here
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -4893,9 +4866,11 @@ export default function DestinIQ(){
           userVisibleOnly:true,
           applicationServerKey:urlBase64ToUint8Array(vapidKey),
         });
-        await supabase.from("user_profiles").update({
-          push_subscription:JSON.parse(JSON.stringify(sub))
-        }).eq("user_id",userId);
+        await supabase.from("user_profiles").upsert({
+          user_id:userId,
+          push_subscription:JSON.parse(JSON.stringify(sub)),
+          updated_at:new Date().toISOString(),
+        },{onConflict:"user_id"});
       }catch(e){ console.warn("Push sub failed:",e); }
     },30000);
     return()=>clearTimeout(timer);
