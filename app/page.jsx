@@ -121,13 +121,29 @@
  */
 
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ERROR BOUNDARY
 // ═══════════════════════════════════════════════════════════════════════════════
-// ErrorBoundary removed — using mounted guard instead to prevent hydration errors.
-// If needed, add a class-based ErrorBoundary in a separate file using React.Component.
+class ErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={hasError:false,error:null}; }
+  static getDerivedStateFromError(e){ return{hasError:true,error:e}; }
+  componentDidCatch(e,info){ console.error("DestinIQ crash:",e,info); }
+  render(){
+    if(this.state.hasError) return(
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0a0800"}}>
+        <div style={{maxWidth:400,textAlign:"center"}}>
+          <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
+          <div style={{fontSize:22,fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
+          <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
+          <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>Refresh page</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
@@ -317,33 +333,26 @@ function addDecision(uid,decision) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATION SYSTEM
-// Browser Notifications API with deep link back to app when tapped.
-// Randomised messages and randomised extra nudge windows keep it feeling alive.
+// Browser Notifications API. Works in deployed Next.js.
 // For true background push (app closed): add service worker + Web Push + VAPID keys.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// Daily check-in nudges
-const NOTIF_MSGS_CHECKIN = [
-  (n)=>`Hey ${n} — how's today going? Take 30 seconds to log your momentum.`,
+const NOTIF_MSGS_MORNING = [
+  (n)=>`Hey ${n} — how's today going? Take 30 seconds to check in with yourself.`,
   (n)=>`${n}, you showed up yesterday. Show up again today. 30 seconds is all it takes.`,
   (n)=>`Your streak is waiting, ${n}. Don't let today be the one you look back on.`,
-  (n)=>`${n} — what moved today? Even something small counts. Log it now.`,
-  (n)=>`One honest check-in, ${n}. That's all today needs from you.`,
-  ()=>`DestinIQ: One honest question. One honest answer. That's the whole habit.`,
-  (n)=>`${n}, the people who hit their goals don't feel ready. They just log anyway.`,
+  (n)=>`${n} — one honest check-in. That's the whole habit.`,
+  (n)=>`${n}, the people who hit their goals don't feel ready. They just show up anyway.`,
   (n)=>`Quick check-in, ${n}. How's your energy? Your focus? 30 seconds.`,
+  ()=>`DestinIQ: One honest question. One honest answer. That's all today needs.`,
+  (n)=>`${n} — what would make today count? Log it now.`,
 ];
-
-// Random mid-day motivational nudges (fire at a random time between 12–3pm)
 const NOTIF_MSGS_MIDDAY = [
-  (n)=>`${n} — you're in the middle of the day. What's the one thing that would make today count?`,
-  (n)=>`Afternoon check, ${n}. Is today moving in the right direction?`,
+  (n)=>`${n} — you're halfway through the day. Is it moving in the right direction?`,
+  (n)=>`Afternoon check, ${n}. What's the one thing that would make today count?`,
   (n)=>`${n}, how you spend the next hour matters more than how you started the day.`,
   ()=>`The path you're on takes showing up when you don't feel like it. Today counts.`,
   (n)=>`${n} — one small move today. That's how the gap closes.`,
 ];
-
-// Evening reflection nudges
 const NOTIF_MSGS_EVENING = [
   (n)=>`${n}, before the day ends — did you move toward your goal today? Log it.`,
   (n)=>`Evening, ${n}. What happened today that was worth remembering?`,
@@ -351,10 +360,12 @@ const NOTIF_MSGS_EVENING = [
   ()=>`DestinIQ evening check: How'd the day actually go? Log it before you forget.`,
   (n)=>`${n}, nights are for reflecting. Days are for moving. Which did you do today?`,
 ];
+function pickMsg(arr,name){ return arr[Math.floor(Math.random()*arr.length)](name||"you"); }
 
-function pickRandom(arr, name) {
-  const fn = arr[Math.floor(Math.random()*arr.length)];
-  return fn(name||"you");
+function fireNotif(body){
+  if(Notification.permission!=="granted") return;
+  const n=new Notification("DestinIQ",{body,tag:"destiniq-nudge",icon:"/favicon.ico"});
+  n.onclick=()=>{ window.focus(); window.location.href="https://destiniq.vercel.app"; n.close(); };
 }
 
 async function requestNotifPermission() {
@@ -364,72 +375,37 @@ async function requestNotifPermission() {
   return await Notification.requestPermission();
 }
 
-function fireNotification(title, body, url) {
-  if(Notification.permission!=="granted") return;
-  // icon and badge make it feel like a real app notification
-  const notif = new Notification(title, {
-    body,
-    tag: "destiniq-daily",
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
-    requireInteraction: false,
-    silent: false,
-  });
-  // Deep link: clicking the notification opens/focuses the app
-  notif.onclick = () => {
-    window.focus();
-    if(url) window.location.href = url;
-    notif.close();
-  };
-}
-
 function scheduleNotification(uid, name, timeStr, onFire) {
-  // Clear any existing timers for this user
   if(_notifTimers.has(uid)){
-    const timers = _notifTimers.get(uid);
-    if(Array.isArray(timers)) timers.forEach(t=>clearTimeout(t));
-    else clearTimeout(timers);
+    const t=_notifTimers.get(uid);
+    (Array.isArray(t)?t:[t]).forEach(x=>clearTimeout(x));
   }
-
   const [h,m]=timeStr.split(":").map(Number);
   const now=new Date(), next=new Date();
   next.setHours(h,m,0,0);
   if(next<=now) next.setDate(next.getDate()+1);
   const delay=next-now;
-
-  // Main daily notification
-  const tid1=setTimeout(()=>{
-    fireNotification("DestinIQ", pickRandom(NOTIF_MSGS_CHECKIN, name), "https://destiniq.vercel.app");
+  // Main daily nudge
+  const t1=setTimeout(()=>{
+    fireNotif(pickMsg(NOTIF_MSGS_MORNING,name));
     onFire&&onFire();
-    // Reschedule for the next day
     scheduleNotification(uid,name,timeStr,onFire);
   },delay);
-
-  // Random midday nudge (between 12:00–15:00, only if main notif is morning)
-  let tid2=null;
+  // Random midday nudge (12–3pm), only if main notif is morning
+  let t2=null;
   if(h<12){
-    const midday=new Date();
-    midday.setHours(12+Math.floor(Math.random()*3), Math.floor(Math.random()*59), 0, 0);
-    if(midday<=now) midday.setDate(midday.getDate()+1);
-    const middayDelay=midday-now;
-    tid2=setTimeout(()=>{
-      fireNotification("DestinIQ", pickRandom(NOTIF_MSGS_MIDDAY, name), "https://destiniq.vercel.app");
-    },middayDelay);
+    const md=new Date(); md.setHours(12+Math.floor(Math.random()*3),Math.floor(Math.random()*59),0,0);
+    if(md<=now) md.setDate(md.getDate()+1);
+    t2=setTimeout(()=>fireNotif(pickMsg(NOTIF_MSGS_MIDDAY,name)),md-now);
   }
-
-  // Random evening nudge (between 19:00–21:00, only if main notif is not evening)
-  let tid3=null;
+  // Random evening nudge (7–9pm), only if main notif is not evening
+  let t3=null;
   if(h<19){
-    const evening=new Date();
-    evening.setHours(19+Math.floor(Math.random()*2), Math.floor(Math.random()*59), 0, 0);
-    if(evening<=now) evening.setDate(evening.getDate()+1);
-    const eveningDelay=evening-now;
-    tid3=setTimeout(()=>{
-      fireNotification("DestinIQ", pickRandom(NOTIF_MSGS_EVENING, name), "https://destiniq.vercel.app");
-    },eveningDelay);
+    const ev=new Date(); ev.setHours(19+Math.floor(Math.random()*2),Math.floor(Math.random()*59),0,0);
+    if(ev<=now) ev.setDate(ev.getDate()+1);
+    t3=setTimeout(()=>fireNotif(pickMsg(NOTIF_MSGS_EVENING,name)),ev-now);
   }
-
-  _notifTimers.set(uid,[tid1,tid2,tid3].filter(Boolean));
+  _notifTimers.set(uid,[t1,t2,t3].filter(Boolean));
   return delay;
 }
 
@@ -1070,85 +1046,45 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
   "roadmap": [
     {
       "phase": "0–90 Days",
-      "title": "A short evocative title tied to THEIR EXACT goal — not generic. E.g. 'Validate Before You Leap' or 'Build the Income Bridge First'",
+      "title": "A title specific to THEIR goal — if they want Africa business, say something like 'Choose Your Country, Validate Your Idea'",
       "steps": [
-        "Step 1: Ultra-specific to their goal and country. Name the exact platform, website, organisation, or person type. Include a real number (cost, income, time). E.g. 'Register on Upwork this week — search your exact skill and filter to $25+/hr clients. Note the top 3 job categories hiring from your country right now. Your target is 2 proposals sent by Sunday.'",
-        "Step 2: The infrastructure step — what account, tool, or skill they need to set up. Real name, real link or search term, real time estimate.",
-        "Step 3: The relationship/network step — who to contact, where to find them, what to say. Specific community name, subreddit, LinkedIn group, or local body.",
-        "Step 4: The milestone that tells them this phase is DONE. A number, a contract, a conversation — something concrete they can check off."
+        "Step 1 written FOR THEIR SPECIFIC GOAL. Example: if they want Africa business, 'Research the 3 African countries that fit your skills and budget: Ghana (English, $500 company registration), Rwanda (easiest in Africa, $30 registration), Kenya (tech hub, $150 registration). This week: read the World Bank Doing Business reports for each.' NOT generic advice.",
+        "Step 2 with real example tied to their goal and skills.",
+        "Step 3 with a real platform, org, or contact type they can action this week.",
+        "Step 4 with a specific milestone that marks completion of this phase."
       ],
-      "desc": "3 sentences: (1) Why this phase matters for their SPECIFIC goal — not in general. (2) What shifts or becomes possible once they complete it. (3) One honest thing they need to accept going into this phase.",
-      "win": "The SINGLE most important action for THIS WEEK — so specific they could do it in the next 2 hours. No 'research' or 'think about'. An action with a real output.",
-      "support": "One sentence of genuine encouragement specific to this phase — acknowledge the difficulty, then the payoff. Not a quote. Something true about their situation."
+      "desc": "3 sentences on why this specific phase matters for their specific goal. What changes after they complete it.",
+      "win": "The one most important action for THIS WEEK — specific enough that they know exactly what to do."
     },
-    {
-      "phase": "3–12 Months",
-      "title": "",
-      "steps": ["Specific step with real example","Specific step with real platform or contact","Specific step with measurable milestone","Step showing how this phase builds on Phase 1"],
-      "desc": "3 sentences on what this phase actually looks like in their daily life, what gets harder, and what gets easier.",
-      "win": "The one action that unlocks this whole phase.",
-      "support": "One honest sentence acknowledging where they'll be emotionally at this point and what keeps people going."
-    },
-    {
-      "phase": "1–3 Years",
-      "title": "",
-      "steps": ["","",""],
-      "desc": "",
-      "win": "",
-      "support": ""
-    },
-    {
-      "phase": "3–5 Years",
-      "title": "",
-      "steps": ["",""],
-      "desc": "",
-      "win": "",
-      "support": ""
-    }
+    {"phase":"3–12 Months","title":"Specific to their goal","steps":["Specific step with real platform or org","Step with measurable milestone","Step building on phase 1 output","What 12 months in looks like if they execute"],"desc":"3 sentences: what this phase looks like in daily life, what gets harder, what gets easier.","win":"The one action that unlocks this whole phase — specific enough to do in a day.","support":"One honest sentence acknowledging where they'll be emotionally at this point."},
+    {"phase":"1–3 Years","title":"","steps":["","",""],"desc":"","win":"","support":""},
+    {"phase":"3–5 Years","title":"","steps":["",""],"desc":"","win":"","support":""}
   ],
   "mindset": {
-    "pattern": "Name the EXACT mental block — use their own words from their challenge field. Be specific enough that they feel seen, not diagnosed. E.g. 'You keep circling back to starting but find a reason to wait — the reason changes but the waiting doesn't.' NOT 'you have a fear of failure.'",
-    "reframe": "A reframe that ONLY works for their specific situation. Connect their stated goal to a new way of seeing the obstacle. Should feel like a quiet revelation, not a motivational quote. E.g. 'The instability you're trying to escape isn't a sign you're not ready — it's proof that what you have now is already costing you.'",
-    "practice": "One morning habit written as if you're coaching them in person. Name exact steps, exact duration, why it works for THEIR specific pattern. E.g. 'Before you open your phone tomorrow morning, write one sentence: the single thing you will move on today. Not a list. One thing. You spend energy planning because it feels like progress — this forces you to choose instead of plan.'",
-    "emotional": "4 sentences written TO them — not about them. Sentence 1: Name what it actually feels like to be carrying what they're carrying right now (use their goal and challenge). Sentence 2: Acknowledge the invisible cost of where they are. Sentence 3: Something true about their resilience that they're probably not giving themselves credit for. Sentence 4: One honest thing about what's possible from here that they may have stopped letting themselves believe.",
-    "encouragement": "2 sentences that are warm but not hollow. Acknowledge the specific difficulty of their path — their country, their situation, their goal — then remind them of something real they have going for them. No generic 'you've got this' — say something only they would recognise as true about themselves."
+    "pattern": "Name the EXACT mental block — use their own words from the challenge field. Specific enough that they feel seen. E.g. 'You keep circling back to starting but find a reason to wait — the reason changes but the waiting doesn't.' NOT generic like 'fear of failure'.",
+    "reframe": "A reframe that ONLY works for their specific situation and goal. Should feel like a quiet revelation. E.g. 'The instability you're trying to escape isn't a sign you're not ready — it's proof that what you have now is already costing you.' Not a motivational quote.",
+    "practice": "One morning habit written as if coaching them in person. Name exact steps, exact duration, why it works for THEIR specific pattern. Concrete enough to do tomorrow.",
+    "emotional": "4 sentences written directly TO them. (1) Name what it actually feels like to carry what they're carrying — use their goal and challenge. (2) Acknowledge the invisible cost of where they are. (3) Something true about their resilience they're probably not giving themselves credit for. (4) One honest thing about what's possible from here that they may have stopped letting themselves believe.",
+    "encouragement": "2 sentences — warm but not hollow. Acknowledge the specific difficulty of their path (their country, situation, goal), then name something real they have going for them. No generic 'you've got this'."
   },
   "career": [
     {
-      "title": "Specific career or business path — name the ROLE or BUSINESS TYPE, not a category. E.g. 'B2B SaaS Account Executive (Remote)' not 'Sales job'",
-      "why": "3 sentences: (1) Why this fits their specific skills from what they shared — name the skill. (2) Why this serves their stated goal specifically — connect it. (3) Realistic income potential with local AND international figures, and what it takes to reach the higher end.",
+      "title": "Specific role or business type — name it exactly. E.g. 'B2B SaaS Account Executive (Remote)' not 'Sales job'",
+      "why": "3 sentences: (1) Why this fits their specific skills — name the skill. (2) Why this serves their stated goal. (3) Realistic income at entry AND at 2 years with local + USD figures.",
       "how": [
-        "Step 1: The very first action — name the exact platform, company type, or person to contact. E.g. 'Search RemoteOK and We Work Remotely this week filtering to your role — bookmark 5 companies hiring from your country right now.'",
-        "Step 2: The skill or credential gap to close — if none, the portfolio or proof-of-work to build. Name what it should look like.",
-        "Step 3: How to get to first income or first interview — name the exact pitch, application, or outreach approach with a real example.",
+        "Step 1: Exact platform, company type, or person to contact — name it. E.g. 'Search RemoteOK and We Work Remotely filtering to your role this week.'",
+        "Step 2: The skill gap to close or portfolio to build — name what it should look like.",
+        "Step 3: How to get to first income — name the exact pitch or outreach approach.",
         "Step 4: What 6 months in looks like if they execute — income, lifestyle, next step."
       ],
       "effort": "low|medium|high",
       "timeline": "X–Y months to first income",
-      "income": "Entry: [local currency] / [USD] → Growth: [local currency] / [USD] at 2 years",
+      "income": "Entry: [local] / [USD] → 2 years: [local] / [USD]",
       "type": "job|business|freelance",
-      "reality_check": "One honest sentence about the biggest obstacle specific to their country or situation — and one sentence on how people actually get around it."
+      "reality_check": "One honest sentence about the biggest obstacle for their country — and one sentence on how people actually get around it."
     },
-    {
-      "title": "",
-      "why": "",
-      "how": ["","","",""],
-      "effort": "",
-      "timeline": "",
-      "income": "",
-      "type": "",
-      "reality_check": ""
-    },
-    {
-      "title": "",
-      "why": "",
-      "how": ["","","",""],
-      "effort": "",
-      "timeline": "",
-      "income": "",
-      "type": "",
-      "reality_check": ""
-    }
+    {"title":"","why":"","how":[],"effort":"","timeline":"","income":"","type":"","reality_check":""},
+    {"title":"","why":"","how":[],"effort":"","timeline":"","income":"","type":"","reality_check":""}
   ],
   "relocation": [
     {
@@ -2090,12 +2026,7 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
 // NOTIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function NotificationPanel({profile,userId,onClose}){
-  const [perm,  setPerm  ]=useState("default");
-  useEffect(()=>{
-    if(typeof window==="undefined") return;
-    if(!("Notification" in window)) setPerm("unsupported");
-    else setPerm(Notification.permission);
-  },[]);
+  const [perm,  setPerm  ]=useState(typeof Notification!=="undefined"?Notification.permission:"unsupported");
   const [time,  setTime  ]=useState("08:00");
   const [enabled,setEnabled]=useState(false);
   const [sched, setSched ]=useState(null);
@@ -2110,10 +2041,10 @@ function NotificationPanel({profile,userId,onClose}){
       setEnabled(true);
     }
   };
-  const disable=()=>{if(_notifTimers.has(userId)){const t=_notifTimers.get(userId);if(Array.isArray(t))t.forEach(x=>clearTimeout(x));else clearTimeout(t);_notifTimers.delete(userId);}setEnabled(false);setSched(null);};
+  const disable=()=>{if(_notifTimers.has(userId)){const t=_notifTimers.get(userId);(Array.isArray(t)?t:[t]).forEach(x=>clearTimeout(x));_notifTimers.delete(userId);}setEnabled(false);setSched(null);};
   const test=()=>{
     if(Notification.permission!=="granted") return;
-    fireNotification("DestinIQ",`Hey ${profile.name} — this is what your nudges will look like. Tap to open DestinIQ.`,"https://destiniq.vercel.app");
+    fireNotif(`Hey ${profile.name} — this is what your nudges look like. Tap to open DestinIQ.`);
     setTested(true);setTimeout(()=>setTested(false),3000);
   };
 
@@ -2133,41 +2064,24 @@ function NotificationPanel({profile,userId,onClose}){
           <>
             <div className="notif-panel">
               <div className="field">
-                <label className="fl">When should we send your main daily nudge?</label>
+                <label className="fl">What time should we remind you?</label>
                 <input type="time" className="notif-time" value={time} onChange={e=>setTime(e.target.value)}/>
-                <p className="small" style={{marginTop:6}}>Morning works best — we'll also send random check-ins during the day to keep you moving. Tapping any notification brings you straight back here.</p>
+                <p className="small" style={{marginTop:6}}>We'll send a daily nudge to log your momentum and check in. Morning works best for most people.</p>
               </div>
-              {enabled&&(
-                <div style={{marginTop:4,marginBottom:16,padding:"12px 14px",background:"rgba(46,168,126,0.06)",border:"1px solid rgba(46,168,126,0.2)",borderRadius:10}}>
-                  <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",color:"var(--emerald)",letterSpacing:".08em",marginBottom:6}}>SCHEDULED</div>
-                  {sched&&<p style={{fontSize:13,color:"var(--cream-60)"}}>Next nudge in <strong style={{color:"var(--emerald)"}}>{sched}</strong></p>}
-                  <p style={{fontSize:12,color:"var(--cream-30)",marginTop:4,lineHeight:1.6}}>You'll also get random midday and evening check-ins. Each one is different — tapping opens DestinIQ directly.</p>
-                </div>
-              )}
+              {sched&&<div className="insight emerald" style={{marginTop:4,marginBottom:16}}><p style={{fontSize:13,color:"var(--cream-60)"}}>✓ Scheduled — next notification in <strong style={{color:"var(--emerald)"}}>{sched}</strong></p></div>}
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                 {!enabled
-                  ?<button className="btn btn-gold" onClick={enable}>{perm==="granted"?"Schedule Notifications":"Enable & Schedule"}</button>
-                  :<><button className="btn btn-gold" onClick={enable}>↺ Reschedule</button><button className="btn btn-ghost" onClick={disable}>Turn off</button></>
+                  ?<button className="btn btn-gold" onClick={enable}>{perm==="granted"?"Schedule Notification":"Enable & Schedule"}</button>
+                  :<><button className="btn btn-gold" onClick={enable}>↺ Reschedule</button><button className="btn btn-ghost" onClick={disable}>Disable</button></>
                 }
                 {perm==="granted"&&<button className="btn btn-ghost" onClick={test} disabled={tested}>{tested?"Sent ✓":"Send Test"}</button>}
               </div>
             </div>
 
-            <div style={{marginTop:16,padding:"14px 16px",background:"var(--lift)",borderRadius:10,border:"1px solid var(--line)"}}>
-              <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",color:"var(--cream-30)",letterSpacing:".08em",marginBottom:8}}>WHAT YOU'LL RECEIVE</div>
-              {[
-                ["🌅","Morning nudge","At your chosen time — a different message every day"],
-                ["☀","Midday check-in","Random between 12–3pm — keeps you on track mid-day"],
-                ["🌙","Evening reflection","Random between 7–9pm — helps you close out the day"],
-              ].map(([icon,title,desc])=>(
-                <div key={title} style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10}}>
-                  <span style={{fontSize:14,flexShrink:0,marginTop:2}}>{icon}</span>
-                  <div>
-                    <div style={{fontSize:13,color:"var(--cream-60)",fontWeight:500}}>{title}</div>
-                    <div style={{fontSize:12,color:"var(--cream-30)",lineHeight:1.5}}>{desc}</div>
-                  </div>
-                </div>
-              ))}
+            <div className="insight" style={{marginTop:16,marginBottom:0}}>
+              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75}}>
+                <strong style={{color:"var(--gold)"}}>Production note:</strong> These are browser notifications — they fire while the tab is open or recently active. For true background delivery (app closed), add a service worker + Web Push API with VAPID keys to the Next.js build. That's a one-day implementation on top of this codebase.
+              </p>
             </div>
           </>
         )}
@@ -4004,37 +3918,30 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>Your path forward, step by step</div>
-                <p className="body" style={{marginBottom:28,color:"var(--cream-60)"}}>Not a template. Not generic advice. Built around your goal, your country, and what you actually told us.</p>
+                <p className="body" style={{marginBottom:28}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
                 {data.roadmap?.map((r,i)=>(
                   <div className="timeline-item" key={i}>
                     <div className="t-dot">{String(i+1).padStart(2,"0")}</div>
                     <div className="t-body">
                       <div className="t-phase">{r.phase}</div>
                       <div className="t-title">{r.title}</div>
-                      <p className="t-desc" style={{marginBottom:16}}>{r.desc}</p>
+                      <p className="t-desc" style={{marginBottom:12}}>{r.desc}</p>
                       {/* Numbered step-by-step list */}
                       {Array.isArray(r.steps)&&r.steps.length>0&&(
-                        <div style={{marginBottom:16}}>
+                        <div style={{marginBottom:12}}>
                           {r.steps.map((step,si)=>(
-                            <div key={si} style={{display:"flex",gap:12,marginBottom:10,padding:"12px 16px",background:"var(--lift)",borderRadius:10,border:"1px solid var(--line)"}}>
-                              <div style={{width:24,height:24,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--gold)"}}>{si+1}</div>
-                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,fontWeight:300,paddingTop:2}}>{step}</p>
+                            <div key={si} style={{display:"flex",gap:10,marginBottom:8,padding:"10px 14px",background:"var(--lift)",borderRadius:8,border:"1px solid var(--line)"}}>
+                              <div style={{width:22,height:22,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--gold)"}}>{si+1}</div>
+                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300}}>{step}</p>
                             </div>
                           ))}
                         </div>
                       )}
-                      {r.win&&(
-                        <div style={{background:"rgba(210,175,90,0.06)",border:"1px solid var(--line-gold)",borderRadius:10,padding:"14px 16px",marginBottom:r.support?12:0}}>
-                          <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",color:"var(--gold)",letterSpacing:".1em",marginBottom:6}}>DO THIS FIRST — THIS WEEK</div>
-                          <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,fontWeight:400}}>{r.win}</p>
-                        </div>
-                      )}
-                      {r.support&&(
-                        <div style={{display:"flex",gap:10,alignItems:"flex-start",padding:"12px 16px",background:"rgba(31,168,154,0.04)",borderRadius:10,border:"1px solid rgba(31,168,154,0.12)",marginTop:r.win?0:0}}>
-                          <span style={{color:"var(--teal)",fontSize:16,flexShrink:0,marginTop:1}}>✦</span>
-                          <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,fontStyle:"italic"}}>{r.support}</p>
-                        </div>
-                      )}
+                      {r.win&&<div className="t-win"><strong>Do this first:</strong> {r.win}</div>}
+                      {r.support&&<div style={{display:"flex",gap:8,alignItems:"flex-start",padding:"10px 14px",background:"rgba(31,168,154,0.04)",borderRadius:9,border:"1px solid rgba(31,168,154,0.12)",marginTop:10}}>
+                        <span style={{color:"var(--teal)",flexShrink:0}}>✦</span>
+                        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,fontStyle:"italic"}}>{r.support}</p>
+                      </div>}
                     </div>
                   </div>
                 ))}
@@ -4045,34 +3952,24 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           {mod==="mindset"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
-                <div className="d3" style={{marginBottom:8}}>What's really going on inside</div>
-                <p className="body" style={{marginBottom:28,color:"var(--cream-60)"}}>This isn't a personality test. It's built from what you actually told us — your challenge, your goal, your situation.</p>
+                <div className="d3" style={{marginBottom:20}}>What's really going on inside</div>
                 {[
-                  {icon:"◇",title:"The pattern holding you back",key:"pattern",accent:"rose",
-                   sub:"Named specifically for you — not a category"},
-                  {icon:"↺",title:"A different way to see it",key:"reframe",accent:"gold",
-                   sub:"A reframe that only applies to your situation"},
-                  {icon:"◎",title:"What it actually feels like right now",key:"emotional",accent:"violet",
-                   sub:"Written to you, not about you"},
-                  {icon:"◈",title:"One thing to try every morning",key:"practice",accent:"teal",
-                   sub:"A habit built for your exact pattern"},
+                  {icon:"◇",title:"What keeps tripping you up",key:"pattern",accent:"rose"},
+                  {icon:"↺",title:"A different way to see it",key:"reframe",accent:"gold"},
+                  {icon:"◎",title:"What's really happening emotionally",key:"emotional",accent:"violet"},
+                  {icon:"◈",title:"One thing to try every morning",key:"practice",accent:"teal"},
                 ].map(s=>(
-                  <div className="card" key={s.key} style={{marginBottom:16,borderLeft:`2px solid var(--${s.accent})`}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:14}}>
-                      <div style={{width:36,height:36,borderRadius:10,background:`rgba(var(--${s.accent}-rgb,100,100,100),0.1)`,border:`1px solid var(--${s.accent})`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{color:`var(--${s.accent})`,fontFamily:"var(--f-mono)",fontSize:16}}>{s.icon}</span>
-                      </div>
-                      <div>
-                        <div style={{fontFamily:"var(--f-display)",fontSize:17,fontWeight:500,marginBottom:2}}>{s.title}</div>
-                        <div style={{fontFamily:"var(--f-mono)",fontSize:"9px",color:"var(--cream-30)",letterSpacing:".06em"}}>{s.sub}</div>
-                      </div>
+                  <div className="card" key={s.key} style={{marginBottom:14,borderLeft:`2px solid var(--${s.accent})`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                      <span style={{color:`var(--${s.accent})`,fontFamily:"var(--f-mono)",fontSize:18}}>{s.icon}</span>
+                      <span style={{fontFamily:"var(--f-display)",fontSize:18,fontWeight:500}}>{s.title}</span>
                     </div>
-                    <p className="body" style={{lineHeight:1.8}}>{data.mindset?.[s.key]}</p>
+                    <p className="body">{data.mindset?.[s.key]}</p>
                   </div>
                 ))}
                 {data.mindset?.encouragement&&(
-                  <div style={{marginTop:8,padding:"20px 24px",background:"linear-gradient(135deg,rgba(210,175,90,0.06),rgba(31,168,154,0.04))",border:"1px solid var(--line-gold)",borderRadius:16,display:"flex",gap:14,alignItems:"flex-start"}}>
-                    <span style={{fontSize:22,flexShrink:0}}>✦</span>
+                  <div style={{marginTop:8,padding:"20px 24px",background:"rgba(210,175,90,0.06)",border:"1px solid var(--line-gold)",borderRadius:16,display:"flex",gap:14,alignItems:"flex-start"}}>
+                    <span style={{fontSize:20,flexShrink:0}}>✦</span>
                     <div>
                       <div style={{fontFamily:"var(--f-mono)",fontSize:"9px",color:"var(--gold)",letterSpacing:".1em",marginBottom:8}}>SOMETHING TRUE ABOUT YOU</div>
                       <p style={{fontSize:15,color:"var(--cream-60)",lineHeight:1.85,fontStyle:"italic"}}>{data.mindset.encouragement}</p>
@@ -4111,21 +4008,20 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                     {/* How to start — numbered steps */}
                     {o.how&&Array.isArray(o.how)&&o.how.length>0&&(
                       <div style={{marginBottom:o.reality_check?12:0}}>
-                        <div className="mono" style={{fontSize:"8px",marginBottom:10}}>How to start — step by step</div>
+                        <div className="mono" style={{fontSize:"8px",marginBottom:8}}>How to start — step by step</div>
                         {o.how.map((step,si)=>(
-                          <div key={si} style={{display:"flex",gap:12,marginBottom:8,padding:"11px 14px",background:"var(--lift)",borderRadius:9,border:"1px solid var(--line)"}}>
-                            <div style={{width:22,height:22,borderRadius:"50%",background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--teal)"}}>{si+1}</div>
-                            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,fontWeight:300,paddingTop:2}}>{step}</p>
+                          <div key={si} style={{display:"flex",gap:10,marginBottom:7,padding:"9px 12px",background:"var(--lift)",borderRadius:7,border:"1px solid var(--line)"}}>
+                            <div style={{width:20,height:20,borderRadius:"50%",background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--teal)"}}>{si+1}</div>
+                            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6,fontWeight:300}}>{step}</p>
                           </div>
                         ))}
                       </div>
                     )}
-                    {/* Reality check */}
                     {o.reality_check&&(
-                      <div style={{display:"flex",gap:10,alignItems:"flex-start",padding:"12px 14px",background:"rgba(196,100,90,0.04)",borderRadius:9,border:"1px solid rgba(196,100,90,0.15)"}}>
-                        <span style={{color:"var(--rose)",fontSize:14,flexShrink:0,marginTop:2}}>◎</span>
+                      <div style={{display:"flex",gap:10,alignItems:"flex-start",padding:"11px 14px",background:"rgba(196,100,90,0.04)",borderRadius:9,border:"1px solid rgba(196,100,90,0.15)"}}>
+                        <span style={{color:"var(--rose)",flexShrink:0,marginTop:2}}>◎</span>
                         <div>
-                          <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",color:"var(--rose)",letterSpacing:".08em",marginBottom:5}}>HONEST REALITY CHECK</div>
+                          <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",color:"var(--rose)",letterSpacing:".08em",marginBottom:4}}>HONEST REALITY CHECK</div>
                           <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7}}>{o.reality_check}</p>
                         </div>
                       </div>
@@ -4440,7 +4336,7 @@ Discover your own clarity score at destiniq.vercel.app`;
           <button onClick={copy} style={{flex:1,background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
             {copied?"✓ Copied!":"Copy to share"}
           </button>
-          {typeof window!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
+          {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
         </div>
       </div>
     </div>
@@ -4569,7 +4465,7 @@ function AdminDashboard({user,onBack}){
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:2}}>{t.name}</div>
                       <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>"{t.quote}"</div>
-                      <div style={{fontSize:10,color:"var(--cream-20)",marginTop:4,fontFamily:"var(--f-mono)"}} suppressHydrationWarning>{new Date(t.created_at).toLocaleDateString()}</div>
+                      <div style={{fontSize:10,color:"var(--cream-20)",marginTop:4,fontFamily:"var(--f-mono)"}}>{new Date(t.created_at).toLocaleDateString()}</div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
                       {!t.approved&&<button onClick={()=>approveTestimonial(t.id,true)} style={{background:"var(--teal)",border:"none",borderRadius:8,padding:"6px 12px",color:"#000",fontSize:11,fontWeight:700,cursor:"pointer"}}>Approve</button>}
@@ -4587,7 +4483,7 @@ function AdminDashboard({user,onBack}){
                 <div key={u.user_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid var(--line)"}}>
                   <div>
                     <div style={{fontSize:13,color:"var(--cream)"}}>{u.name||"Unknown"}</div>
-                    <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}} suppressHydrationWarning>{new Date(u.created_at).toLocaleDateString()} · 🔥{u.streak||0} streak</div>
+                    <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{new Date(u.created_at).toLocaleDateString()} · 🔥{u.streak||0} streak</div>
                   </div>
                   <div style={{display:"flex",gap:6}}>
                     {u.is_paid&&<span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",border:"1px solid var(--line-gold)",borderRadius:4,padding:"2px 6px"}}>PAID</span>}
@@ -4824,8 +4720,6 @@ function SubscriptionCard({isPaid,isPremium,userId,onManageSubscription}){
 }
 
 export default function DestinIQ(){
-  const [mounted,setMounted]=useState(false);
-  useEffect(()=>setMounted(true),[]);
   const [user, setUser]=useState(null);
   const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
   const [screen,    setScreen   ]=useState("landing");
@@ -5105,9 +4999,8 @@ or
     setMeta("twitter:image","https://destiniq.vercel.app/og-image.png");
   },[]);
 
-  if(!mounted) return null;
-
   return(
+    <ErrorBoundary>
     <>
       <style>{CSS}</style>
       <OfflineBanner/>
@@ -5213,6 +5106,6 @@ or
         </>}
       </div>
     </>
+    </ErrorBoundary>
   );
 }
-
