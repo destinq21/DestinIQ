@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -563,6 +563,12 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
   .results-grid{grid-template-columns:1fr!important;}
   .score-grid{grid-template-columns:1fr 1fr!important;}
+  .score-explain-grid{grid-template-columns:1fr 1fr!important;}
+  .pillar-score-ring{flex-direction:column!important;gap:16px!important;}
+  .pillar-score-ring>div:last-child{min-width:unset!important;grid-template-columns:1fr 1fr!important;}
+  .tabs{gap:4px;padding:4px;}
+  .tab{min-width:56px;font-size:10px;padding:7px 6px;flex-direction:column;gap:2px;}
+  .tab span{font-size:14px;}
 }
 @media(max-width:400px){
   .d1{font-size:28px!important;}
@@ -3889,45 +3895,211 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 // ═══════════════════════════════════════════════════════════════════════════════
 // AUDIO PLAYER — Text-to-speech using Web Speech API
 // ═══════════════════════════════════════════════════════════════════════════════
-function AudioPlayer({text,label="Listen to this"}){
-  const [playing,setPlaying]=useState(false);
-  const [supported]=useState(()=>typeof window!=="undefined"&&"speechSynthesis" in window);
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUDIO PLAYER — Voice selection, pause/resume, mini mode, reads everything
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared voice state so all players use the same selected voice
+const _voiceState = { selected: null, listeners: [] };
+function useSharedVoice() {
+  const [sel, setSel] = useState(_voiceState.selected);
+  useEffect(() => {
+    const cb = v => setSel(v);
+    _voiceState.listeners.push(cb);
+    return () => { _voiceState.listeners = _voiceState.listeners.filter(x=>x!==cb); };
+  }, []);
+  const setVoice = (v) => {
+    _voiceState.selected = v;
+    _voiceState.listeners.forEach(cb => cb(v));
+  };
+  return [sel, setVoice];
+}
 
-  const play=()=>{
-    if(!supported) return;
-    if(playing){
-      window.speechSynthesis.cancel();
-      setPlaying(false);
-      return;
-    }
-    const clean=(text||"").replace(/\*\*/g,"").replace(/[#*`]/g,"").replace(/\n+/g," ").trim();
-    if(!clean) return;
-    const utt=new SpeechSynthesisUtterance(clean);
-    utt.rate=0.92;
-    utt.pitch=1;
-    utt.volume=1;
-    const voices=window.speechSynthesis.getVoices();
-    const preferred=voices.find(v=>v.lang.startsWith("en")&&(v.name.includes("Google")||v.name.includes("Natural")||v.name.includes("Premium")));
-    if(preferred) utt.voice=preferred;
-    utt.onend=()=>setPlaying(false);
-    utt.onerror=()=>setPlaying(false);
-    window.speechSynthesis.speak(utt);
-    setPlaying(true);
+function VoiceSelector() {
+  const [voices, setVoices] = useState([]);
+  const [sel, setSel] = useSharedVoice();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const load = () => {
+      const all = window.speechSynthesis.getVoices();
+      const en = all.filter(v => v.lang.startsWith("en"));
+      setVoices(en);
+      if (!_voiceState.selected && en.length > 0) {
+        // Pick a nice default — prefer Google/Natural/Premium voices
+        const preferred = en.find(v => v.name.includes("Google") && v.name.includes("US")) ||
+          en.find(v => v.name.includes("Google")) ||
+          en.find(v => v.name.includes("Samantha") || v.name.includes("Daniel") || v.name.includes("Karen")) ||
+          en[0];
+        setSel(preferred);
+      }
+    };
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+  }, []);
+
+  if (voices.length === 0) return null;
+
+  // Group voices by accent/region
+  const ACCENT_MAP = [
+    { label: "🇺🇸 American", test: v => v.lang === "en-US" },
+    { label: "🇬🇧 British", test: v => v.lang === "en-GB" },
+    { label: "🇦🇺 Australian", test: v => v.lang === "en-AU" },
+    { label: "🇮🇳 Indian", test: v => v.lang === "en-IN" },
+    { label: "🌍 Other", test: () => true },
+  ];
+
+  const grouped = ACCENT_MAP.map(g => ({
+    label: g.label,
+    voices: voices.filter(v => g.test(v)),
+  })).filter(g => g.voices.length > 0);
+
+  // Remove duplicates — each voice only appears in first matching group
+  const seen = new Set();
+  grouped.forEach(g => {
+    g.voices = g.voices.filter(v => { if (seen.has(v.name)) return false; seen.add(v.name); return true; });
+  });
+
+  const selName = sel?.name || "Choose voice";
+
+  return (
+    <div style={{position:"relative",display:"inline-block"}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"5px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",letterSpacing:".04em",transition:"all .2s"}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--line-gold)";e.currentTarget.style.color="var(--gold)";}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-40)";}}>
+        🎙 {selName.length > 22 ? selName.slice(0,20)+"…" : selName} ▾
+      </button>
+      {open && (
+        <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,zIndex:999,background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:12,padding:"8px 0",minWidth:240,maxWidth:300,maxHeight:320,overflowY:"auto",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}}>
+          <div style={{padding:"6px 14px 8px",fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".1em"}}>SELECT VOICE & ACCENT</div>
+          {grouped.map(g=>(
+            <div key={g.label}>
+              <div style={{padding:"4px 14px",fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",background:"var(--midnight)",marginBottom:1}}>{g.label}</div>
+              {g.voices.slice(0,8).map(v=>(
+                <button key={v.name} onClick={()=>{setSel(v);setOpen(false);}}
+                  style={{display:"block",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.1)":"none",border:"none",padding:"8px 16px",color:sel?.name===v.name?"var(--gold)":"var(--cream-60)",fontSize:12,cursor:"pointer",fontFamily:"var(--f-body)"}}>
+                  {sel?.name===v.name?"✓ ":""}{v.name.replace(/\(.*?\)/g,"").trim()}
+                  {v.localService?<span style={{fontSize:9,color:"var(--cream-30)",marginLeft:6}}>local</span>:<span style={{fontSize:9,color:"var(--teal)",marginLeft:6}}>online</span>}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div style={{padding:"8px 14px 4px",borderTop:"1px solid var(--line)"}}>
+            <button onClick={()=>setOpen(false)} style={{fontSize:10,color:"var(--cream-30)",background:"none",border:"none",cursor:"pointer",fontFamily:"var(--f-mono)"}}>✕ Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AudioPlayer({text, label="Listen", mini=false}) {
+  const [state, setState] = useState("idle"); // idle | playing | paused
+  const [supported] = useState(() => typeof window !== "undefined" && "speechSynthesis" in window);
+  const [selVoice] = useSharedVoice();
+  const uttRef = useRef(null);
+
+  const cleanText = (t) => (t || "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`[^`]*`/g, "")
+    .replace(/[#►▶◎◈◇✦⬡↗⟶→←]/g, "")
+    .replace(/---+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  const stop = () => {
+    window.speechSynthesis.cancel();
+    setState("idle");
+    uttRef.current = null;
   };
 
-  useEffect(()=>()=>{ if(typeof window!=="undefined") window.speechSynthesis?.cancel(); },[]);
+  const play = () => {
+    if (!supported) return;
+    if (state === "paused" && uttRef.current) {
+      window.speechSynthesis.resume();
+      setState("playing");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const clean = cleanText(text);
+    if (!clean) return;
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.rate = 0.93;
+    utt.pitch = 1.0;
+    utt.volume = 1;
+    if (selVoice) utt.voice = selVoice;
+    utt.onstart = () => setState("playing");
+    utt.onend = () => { setState("idle"); uttRef.current = null; };
+    utt.onerror = () => { setState("idle"); uttRef.current = null; };
+    uttRef.current = utt;
+    window.speechSynthesis.speak(utt);
+  };
 
-  if(!supported) return null;
+  const pause = () => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      setState("paused");
+    }
+  };
 
-  return(
-    <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 14px",color:"var(--cream-50)",fontSize:12,cursor:"pointer",transition:"all .2s",marginTop:8}}
-      onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
-      onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-50)";}}>
-      {playing
-        ?<><span style={{fontSize:14}}>⏹</span> Stop audio</>
-        :<><span style={{fontSize:14}}>🔊</span> {label}</>
-      }
-    </button>
+  useEffect(() => () => { if (typeof window !== "undefined") window.speechSynthesis.cancel(); }, []);
+
+  if (!supported) return null;
+
+  // Mini mode — just a tiny speaker icon button (for inside score cards)
+  if (mini) {
+    return (
+      <button onClick={state === "playing" ? stop : state === "paused" ? play : play}
+        title={state === "playing" ? "Stop" : state === "paused" ? "Resume" : "Listen"}
+        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:"50%",background:state!=="idle"?"var(--gold-dim)":"none",border:`1px solid ${state!=="idle"?"var(--line-gold)":"var(--cream-15)"}`,cursor:"pointer",fontSize:11,marginTop:6,color:state!=="idle"?"var(--gold)":"var(--cream-30)",transition:"all .2s",flexShrink:0}}>
+        {state === "playing" ? "⏹" : state === "paused" ? "▶" : "🔊"}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:8,flexWrap:"wrap"}}>
+      {state === "idle" && (
+        <button onClick={play}
+          style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 14px",color:"var(--cream-50)",fontSize:12,cursor:"pointer",transition:"all .2s"}}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-50)";}}>
+          <span style={{fontSize:14}}>🔊</span>{label}
+        </button>
+      )}
+      {state === "playing" && (
+        <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
+          <button onClick={pause}
+            style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>
+            <span>⏸</span> Pause
+          </button>
+          <button onClick={stop}
+            style={{display:"inline-flex",alignItems:"center",background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>
+            ⏹
+          </button>
+          <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>
+            {[0,1,2].map(i=>(
+              <span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?14:9,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>
+            ))}
+          </span>
+        </div>
+      )}
+      {state === "paused" && (
+        <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
+          <button onClick={play}
+            style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--teal)",fontSize:12,cursor:"pointer"}}>
+            <span>▶</span> Resume
+          </button>
+          <button onClick={stop}
+            style={{display:"inline-flex",alignItems:"center",background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>
+            ⏹
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3937,7 +4109,10 @@ function LifeHacksModule({data,formData}){
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
-        <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--gold)"}}>LIFE HACKS FOR YOUR SITUATION</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
+          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>LIFE HACKS FOR YOUR SITUATION</div>
+          {hacks.length>0&&<AudioPlayer text={hacks.join(". ")} label="Listen to all hacks"/>}
+        </div>
         {hacks.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see personalised life hacks.</p>}
         {hacks.map((h,i)=>(
           <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid var(--line)":"none"}}>
@@ -3948,7 +4123,10 @@ function LifeHacksModule({data,formData}){
       </div>
       {emotional.length>0&&(
         <div className="card">
-          <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--teal)"}}>EMOTIONAL STRENGTH PRACTICES</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
+            <div className="mono" style={{fontSize:"9px",color:"var(--teal)"}}>EMOTIONAL STRENGTH PRACTICES</div>
+            <AudioPlayer text={emotional.join(". ")} label="Listen"/>
+          </div>
           {emotional.map((e,i)=>(
             <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid var(--line)":"none"}}>
               <span style={{fontSize:18,flexShrink:0}}>🧘</span>
@@ -3967,11 +4145,15 @@ function LifeHacksModule({data,formData}){
 function MoneyModule({data,formData}){
   const mp=(data?.money_protection&&typeof data.money_protection==="object")?data.money_protection:{};
   const re=(data?.real_estate_hack&&typeof data.real_estate_hack==="object")?data.real_estate_hack:{};
+  const mpText=[mp.rule,mp.savings_target&&`Save target: ${mp.savings_target}`,mp.avoid&&`Stop wasting on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
-        <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--gold)"}}>PROTECT YOUR MONEY</div>
-        {!mp.rule&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see your money protection plan.</p>}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
+          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>PROTECT YOUR MONEY</div>
+          {mpText&&<AudioPlayer text={mpText} label="Listen"/>}
+        </div>
+        {!mp.rule&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Money protection plan not yet generated. Click "↺ Regenerate" on your report to get this.</p>}
         {mp.rule&&(
           <>
             <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
@@ -4007,12 +4189,16 @@ function MoneyModule({data,formData}){
 // ═══════════════════════════════════════════════════════════════════════════════
 function OnlineIncomeModule({data,formData}){
   const online=Array.isArray(data?.online_income)?data.online_income:[];
+  const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""} Start today: ${o.first_step||""}`).join(". ");
   return(
     <div className="fu">
       <div className="card">
-        <div className="mono" style={{fontSize:"9px",marginBottom:4,color:"var(--gold)"}}>MAKE MONEY ONLINE</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
+          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>MAKE MONEY ONLINE</div>
+          {online.length>0&&<AudioPlayer text={audioText} label="Listen to all methods"/>}
+        </div>
         <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>Specific to {formData?.country||"your country"} and your skills</p>
-        {online.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see online income methods for your country.</p>}
+        {online.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Online income methods not yet generated. Click "↺ Regenerate" on your report to get this.</p>}
         {online.map((o,i)=>(
           <div key={i} style={{padding:"16px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid var(--line)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
@@ -4035,12 +4221,16 @@ function OnlineIncomeModule({data,formData}){
 function BusinessModule({data,formData}){
   const zb=(data?.zero_income_business&&typeof data.zero_income_business==="object")?data.zero_income_business:{};
   const pb=Array.isArray(data?.product_business)?data.product_business:[];
+  const zbText=[zb.idea,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
-        <div className="mono" style={{fontSize:"9px",marginBottom:4,color:"var(--gold)"}}>START A BUSINESS WITH ZERO MONEY</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
+          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>START A BUSINESS WITH ZERO MONEY</div>
+          {zbText&&<AudioPlayer text={zbText} label="Listen"/>}
+        </div>
         <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>You can start. Here is exactly how.</p>
-        {!zb.idea&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see your zero-capital business plan.</p>}
+        {!zb.idea&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Zero-capital business plan not yet generated. Click "↺ Regenerate" on your report to get this.</p>}
         {zb.idea&&(
           <>
             <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line-gold)"}}>
@@ -4153,7 +4343,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               {!showCheckin&&<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>}
             </div>
           </div>
-          <div className="fu3" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
+          <div className="fu3 pillar-score-ring" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
             <Ring score={data.overall||70} color="var(--gold)" size={106} label="Overall"/>
             <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:260}}>
               {PILLARS.map(p=>(
@@ -4166,17 +4356,21 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           </div>
           <div className="insight fu4">
             <p className="body">{data.headline}</p>
-            <AudioPlayer text={[data.headline,data.score_explanations?.life,data.score_explanations?.wealth].filter(Boolean).join(" ")} label="Listen to your report"/>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:8}}>
+              <AudioPlayer text={[data.headline, ...PILLARS.map(p=>data.score_explanations?.[p.id]).filter(Boolean)].join(" ")} label="Listen to your report"/>
+              <VoiceSelector/>
+            </div>
           </div>
 
           {/* Score explanations — why each pillar is the score it is */}
           {data.score_explanations&&(
-            <div className="fu4" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10}}>
+            <div className="fu4 score-explain-grid" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
               {PILLARS.map(p=>(
                 data.score_explanations[p.id]&&(
-                  <div key={p.id} style={{padding:"10px 13px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
+                  <div key={p.id} style={{padding:"12px 14px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
                     <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".12em",textTransform:"uppercase",color:p.color,marginBottom:5}}>{p.label}</div>
-                    <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300}}>{data.score_explanations[p.id]}</p>
+                    <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300,margin:0}}>{data.score_explanations[p.id]}</p>
+                    <AudioPlayer text={data.score_explanations[p.id]} label="" mini={true}/>
                   </div>
                 )
               ))}
@@ -4208,6 +4402,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                   </button>
                 </div>
                 <p className="body">{refreshingInsight?"Getting your fresh insight for today…":dailyInsight}</p>
+                <AudioPlayer text={dailyInsight} label="Listen to today's insight"/>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
                 <div className="card card-sm"><div className="mono" style={{marginBottom:10,fontSize:"9px"}}>What you bring to this</div>
@@ -4241,7 +4436,9 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>Your path forward, step by step</div>
-                <p className="body" style={{marginBottom:28}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
+                <p className="body" style={{marginBottom:12}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
+                <AudioPlayer text={data.roadmap?.map(r=>`${r.phase}: ${r.title}. ${r.desc}. ${r.win||""}`).join(" ")} label="Listen to your roadmap"/>
+                <div style={{marginBottom:16}}/>
                 {data.roadmap?.map((r,i)=>(
                   <div className="timeline-item" key={i}>
                     <div className="t-dot">{String(i+1).padStart(2,"0")}</div>
@@ -4271,7 +4468,9 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           {mod==="mindset"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
-                <div className="d3" style={{marginBottom:20}}>What's really going on inside</div>
+                <div className="d3" style={{marginBottom:12}}>What's really going on inside</div>
+                <AudioPlayer text={[data.mindset?.pattern,data.mindset?.reframe,data.mindset?.emotional,data.mindset?.practice].filter(Boolean).join(". ")} label="Listen to your mindset report"/>
+                <div style={{marginBottom:16}}/>
                 {[
                   {icon:"◇",title:"What keeps tripping you up",key:"pattern",accent:"rose"},
                   {icon:"↺",title:"A different way to see it",key:"reframe",accent:"gold"},
@@ -4294,7 +4493,9 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>What you could actually be doing</div>
-                <p className="body" style={{marginBottom:24}}>Real paths matched to your skills, your country, and where you are right now — with exact steps to start.</p>
+                <p className="body" style={{marginBottom:12}}>Real paths matched to your skills, your country, and where you are right now — with exact steps to start.</p>
+                <AudioPlayer text={data.career?.map(o=>`${o.title}. ${o.why||o.desc||""}`).filter(Boolean).join(". ")} label="Listen to your career paths"/>
+                <div style={{marginBottom:16}}/>
                 {data.career?.map((o,i)=>(
                   <div className="card" key={i} style={{marginBottom:16}}>
                     <div style={{display:"flex",gap:14,marginBottom:14}}>
