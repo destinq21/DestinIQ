@@ -4722,6 +4722,9 @@ export default function DestinIQ(){
   const [showPolicy,  setShowPolicy ]=useState(null); // "privacy"|"terms"|null
   const [showShare,   setShowShare  ]=useState(false);
   const [showReferral,setShowReferral]=useState(false);
+  const [navPhotoURL, setNavPhotoURL]=useState(null);
+  const [rateLimited, setRateLimited]=useState(false);
+  const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
 
   // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
