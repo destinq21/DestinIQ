@@ -251,7 +251,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
   basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
@@ -3638,8 +3638,9 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
       const prompt = buildSingleCountryRelocationPrompt(formData, country, isPremium);
       const raw = await callAPI({messages:[{role:"user",content:prompt}], system:sys, userId, isPremium});
       const clean = raw.replace(/```json|```/g,"").trim();
+      console.log("Relocation raw response:", clean.slice(0,200));
       const start = clean.indexOf("{"); const end = clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error("Invalid JSON response");
+      if(start===-1||end===-1) throw new Error(`Invalid JSON — got: ${clean.slice(0,100)}`);
       const parsed = JSON.parse(clean.slice(start, end+1));
       if(!parsed.country) parsed.country = country;
       setCustomReport(parsed);
@@ -4302,27 +4303,22 @@ function ShareCard({report,formData,onClose}){
   const [copied,setCopied]=useState(false);
 
   // Extract scores — handle both number scores and section-based reports
-  const getScore=(field,idx,def)=>{
-    if(typeof report?.[field]==="number") return report[field];
-    const s=report?.sections?.find(x=>x.title?.toLowerCase().includes(field.replace("relationship","relation")));
-    if(typeof s?.score==="number") return s.score;
-    if(typeof report?.sections?.[idx]?.score==="number") return report.sections[idx].score;
+  // Scores are stored under report.scores.X (same as dashboard PILLARS)
+  const sc = report?.scores || {};
+  const getScore=(field,def)=>{
+    const v = sc[field];
+    if(typeof v==="number") return v;
+    if(typeof v==="string"&&!isNaN(parseInt(v))) return parseInt(v);
     return def;
   };
   const scores=[
-    {label:"Life",     val:getScore("life",0,52)},
-    {label:"Wealth",   val:getScore("wealth",1,38)},
-    {label:"Mindset",  val:getScore("mindset",2,61)},
-    {label:"Relations",val:getScore("relationship",3,45)},
+    {label:"Life",     val:getScore("life",52)},
+    {label:"Wealth",   val:getScore("wealth",38)},
+    {label:"Mindset",  val:getScore("mindset",61)},
+    {label:"Relations",val:getScore("relations",45)},
   ];
-  // Parse overall — handle string "46" or number 46 or object with value
-  const parseOverall=(v)=>{
-    if(typeof v==="number") return v;
-    if(typeof v==="string"&&!isNaN(parseInt(v))) return parseInt(v);
-    if(v?.value) return parseInt(v.value);
-    return null;
-  };
-  const overall=parseOverall(report?.overall)||Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
+  const parseNum=(v)=>typeof v==="number"?v:parseInt(v)||0;
+  const overall=parseNum(report?.overall)||Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
 
   const shareText=`My DestinIQ Clarity Score: ${overall}/100
 
@@ -5121,7 +5117,8 @@ or
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
             {screen==="results"&&report&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setShowShare(true)}>Share 📤</button>}
             {screen!=="landing"&&screen!=="results"&&<button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>report?setScreen("results"):setScreen("landing")}>← Home</button>}
-            {screen==="landing"&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("intake")}>Begin →</button>}
+            {screen==="landing"&&!formData&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("intake")}>Begin →</button>}
+            {screen==="landing"&&formData&&report&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("results")}>My Dashboard →</button>}
           </div>
         </nav>
 
@@ -5162,7 +5159,8 @@ or
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
-        {screen==="landing"  &&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
+        {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
+        {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
