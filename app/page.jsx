@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -256,7 +256,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
   basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
@@ -489,7 +489,6 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .typing-dot span:nth-child(2){animation-delay:.2s;}
 .typing-dot span:nth-child(3){animation-delay:.4s;}
 @keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
-@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(196,100,90,0.4);}50%{box-shadow:0 0 0 6px rgba(196,100,90,0);}}
 .ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
 .ring-inner{position:absolute;text-align:center;}
 .ring-val{font-family:var(--f-display);font-size:24px;font-weight:500;line-height:1;display:block;}
@@ -518,12 +517,11 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .t-title{font-family:var(--f-display);font-size:18px;font-weight:500;margin-bottom:6px;}
 .t-desc{font-size:13px;color:var(--cream-60);line-height:1.75;font-weight:300;}
 .t-win{margin-top:10px;padding:10px 14px;background:var(--teal-dim);border-left:2px solid var(--teal);border-radius:0 8px 8px 0;font-size:12px;color:var(--teal);}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--base);border-radius:12px;padding:4px;gap:3px;}
+.tabs{display:flex;background:var(--base);border-radius:10px;padding:4px;gap:2px;overflow-x:auto;}
 .tabs::-webkit-scrollbar{display:none;}
-.tab{padding:8px 6px;border-radius:8px;border:none;cursor:pointer;font-family:var(--f-body);font-size:11px;font-weight:500;background:transparent;color:var(--cream-30);transition:all .25s;white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;}
-.tab span{font-size:15px;line-height:1;}
+.tab{flex:1;min-width:75px;padding:8px 10px;border-radius:7px;border:none;cursor:pointer;font-family:var(--f-body);font-size:11px;font-weight:500;background:transparent;color:var(--cream-30);transition:all .25s;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:4px;}
+.tab:hover{color:var(--cream-60);}
 .tab.on{background:var(--lift);color:var(--cream);border:1px solid var(--line-gold);}
-.tab:hover{color:var(--cream-60);background:var(--raised);}
 .mom-slider-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .mom-slider-label{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-30);width:72px;flex-shrink:0;}
 .mom-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;outline:none;cursor:pointer;}
@@ -565,10 +563,6 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
   .results-grid{grid-template-columns:1fr!important;}
   .score-grid{grid-template-columns:1fr 1fr!important;}
-  .tabs{grid-template-columns:repeat(3,1fr)!important;}
-  .score-cards-grid{grid-template-columns:1fr 1fr!important;}
-  .pillar-wrap{flex-direction:column!important;}
-  .pillar-wrap>div:last-child{min-width:unset!important;}
 }
 @media(max-width:400px){
   .d1{font-size:28px!important;}
@@ -613,6 +607,7 @@ const PILLARS=[
 const MODULES=[
   {id:"today",    icon:"◎", label:"My Report"},
   {id:"momentum", icon:"⚡", label:"Daily Check-in"},
+  {id:"wins",     icon:"🏆", label:"Win Tracker"},
   {id:"hacks",    icon:"💡", label:"Life Hacks"},
   {id:"money",    icon:"💰", label:"Money"},
   {id:"online",   icon:"🌐", label:"Earn Online"},
@@ -2043,7 +2038,7 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
 
         <div className="card" style={{marginBottom:24}}>
           <div className="mono" style={{marginBottom:12,fontSize:"9px"}}>What decision are you facing?</div>
-          <VoiceInput rows={3} maxLength={500}
+          <textarea className="ft" rows={3} maxLength={500}
             placeholder="e.g. Should I quit my job to go freelance? / Should I move to Dubai? / Should I take this business partnership?"
             value={question} onChange={e=>setQuestion(e.target.value)}/>
           <div style={{marginTop:12,display:"flex",gap:10,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
@@ -2074,7 +2069,6 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
                   <span className="tag tg" style={{flexShrink:0}}>{d.date}</span>
                 </div>
                 <div style={{fontSize:14,lineHeight:1.8,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap"}}>{d.framework}</div>
-                <AudioPlayer text={`Decision: ${d.question}. ${d.framework}`} label="Listen to this"/>
               </div>
             ))}
           </div>
@@ -2387,7 +2381,6 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
       </div>
       <div className="d3" style={{marginBottom:20}}>Something for today</div>
       <div style={{fontSize:15,lineHeight:1.85,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap"}}>{result}</div>
-      <AudioPlayer text={result} label="Listen to your reflection"/>
       <div style={{marginTop:24}}><button className="btn btn-ghost" onClick={onComplete}>← Back</button></div>
     </div>
   );
@@ -2409,12 +2402,8 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
           <span style={{fontFamily:"var(--f-display)",fontSize:24,color:"var(--gold)",minWidth:28}}>{score}</span>
         </div>
       </div>
-      <div className="field"><label className="fl">Most important thing you did today?</label>
-        <VoiceInput rows={2} placeholder="Doesn't have to be big. Even showing up counts." value={did} onChange={e=>setDid(e.target.value)}/>
-      </div>
-      <div className="field"><label className="fl">What did you keep putting off?</label>
-        <VoiceInput rows={2} placeholder="Be real — no one's watching. This is how you learn about yourself." value={avoided} onChange={e=>setAvoided(e.target.value)}/>
-      </div>
+      <div className="field"><label className="fl">Most important thing you did today?</label><textarea className="ft" rows={2} placeholder="Doesn't have to be big. Even showing up counts." value={did} onChange={e=>setDid(e.target.value)}/></div>
+      <div className="field"><label className="fl">What did you keep putting off?</label><textarea className="ft" rows={2} placeholder="Be real — no one's watching. This is how you learn about yourself." value={avoided} onChange={e=>setAvoided(e.target.value)}/></div>
       {error&&<div className="err-box">⚠ {error}</div>}
       <button className="btn btn-gold btn-full" onClick={submit} disabled={!feeling||!did.trim()||loading} style={{marginTop:8}}>{loading?"Reading what you shared…":"Get your reflection →"}</button>
     </div>
@@ -2424,27 +2413,6 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdvisorMicBtn({value,onTranscript}){
-  const [on,setOn]=useState(false);
-  const ref=useRef(null);
-  const sup=typeof window!=="undefined"&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window);
-  if(!sup) return null;
-  const toggle=()=>{
-    if(on){ref.current?.stop();setOn(false);return;}
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const r=new SR();r.lang="en-US";r.interimResults=false;r.continuous=false;
-    r.onresult=e=>onTranscript(e.results[0][0].transcript);
-    r.onend=()=>setOn(false);r.onerror=()=>setOn(false);
-    ref.current=r;r.start();setOn(true);
-  };
-  return(
-    <button type="button" onClick={toggle} title={on?"Stop speaking":"Tap to speak"}
-      style={{background:on?"rgba(196,100,90,0.2)":"none",border:"none",cursor:"pointer",fontSize:16,padding:"0 6px",color:on?"var(--rose)":"var(--cream-30)",transition:"all .2s",animation:on?"micpulse 1s infinite":"none",flexShrink:0}}>
-      {on?"⏹":"🎤"}
-    </button>
-  );
-}
-
 function AdvisorChat({profile,reportData,userId,isPremium}){
   const openingMessage = `Hey ${profile.name}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
@@ -2510,9 +2478,8 @@ function AdvisorChat({profile,reportData,userId,isPremium}){
           )}
         </div>
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
-        <div className="chat-in-row" style={{position:"relative"}}>
-          <input className="chat-in" placeholder="What's on your mind? Be honest… (or tap 🎤 to speak)" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
-          <AdvisorMicBtn value={input} onTranscript={t=>setInput(v=>v?v+" "+t:t)}/>
+        <div className="chat-in-row">
+          <input className="chat-in" placeholder="What's on your mind? Be honest…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
           <button className="chat-send" onClick={send} disabled={loading||!input.trim()}>→</button>
         </div>
       </div>
@@ -2617,59 +2584,6 @@ function TestimonialForm(){
 // ─── MARKDOWN RENDERER ───────────────────────────────────────────────────────
 // Clean plain rendering — no bold decorations, no colored circles.
 // Strips markdown syntax and displays content as readable plain text with spacing.
-// ═══════════════════════════════════════════════════════════════════════════════
-// VOICE INPUT — Type OR speak into any textarea
-// ═══════════════════════════════════════════════════════════════════════════════
-function VoiceInput({value,onChange,rows=3,placeholder="",maxLength,className="ft",style={}}){
-  const [listening,setListening]=useState(false);
-  const [supported]=useState(()=>typeof window!=="undefined"&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window));
-  const recRef=useRef(null);
-
-  const toggleVoice=()=>{
-    if(!supported) return;
-    if(listening){
-      recRef.current?.stop();
-      setListening(false);
-      return;
-    }
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const rec=new SR();
-    rec.continuous=true;
-    rec.interimResults=false;
-    rec.lang="en-US";
-    rec.onresult=(e)=>{
-      const t=Array.from(e.results).map(r=>r[0].transcript).join(" ");
-      onChange({target:{value:(value?value+" ":"")+t}});
-    };
-    rec.onend=()=>setListening(false);
-    rec.onerror=()=>setListening(false);
-    recRef.current=rec;
-    rec.start();
-    setListening(true);
-  };
-
-  return(
-    <div style={{position:"relative"}}>
-      <textarea
-        className={className}
-        rows={rows}
-        maxLength={maxLength}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        style={{...style,paddingRight:supported?44:undefined}}
-      />
-      {supported&&(
-        <button type="button" onClick={toggleVoice} title={listening?"Stop speaking":"Speak to type"}
-          style={{position:"absolute",right:10,bottom:10,width:30,height:30,borderRadius:"50%",border:`2px solid ${listening?"var(--rose)":"var(--cream-20)"}`,background:listening?"rgba(196,100,90,0.15)":"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,transition:"all .2s",color:listening?"var(--rose)":"var(--cream-30)",animation:listening?"micpulse 1.2s ease-in-out infinite":"none"}}>
-          {listening?"⏹":"🎤"}
-        </button>
-      )}
-      {listening&&<div style={{fontSize:10,color:"var(--rose)",fontFamily:"var(--f-mono)",marginTop:4,letterSpacing:".06em"}}>● Listening… speak now</div>}
-    </div>
-  );
-}
-
 function RenderMD({text,style={}}){
   if(!text) return null;
 
@@ -3260,7 +3174,7 @@ function Intake({onSubmit}){
               {(f.situation==="employed"||f.situation==="selfemployed"||f.situation==="business")&&(
                 <div style={{marginTop:14}}>
                   <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>BRIEFLY DESCRIBE YOUR WORK</label>
-                  <VoiceInput style={{background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12}} rows={2} maxLength={300} placeholder="e.g. Sales rep at a telecoms company, $600/month" value={f.career} onChange={e=>set("career",e.target.value)}/>
+                  <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none"}} rows={2} maxLength={300} placeholder="e.g. Sales rep at a telecoms company, $600/month" value={f.career} onChange={e=>set("career",e.target.value)}/>
                 </div>
               )}
             </div>
@@ -3293,12 +3207,12 @@ function Intake({onSubmit}){
               <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>This is the most important part. The more honest you are, the more powerful your report will be.</p>
               <div style={{marginBottom:18}}>
                 <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT DO YOU ACTUALLY WANT FROM LIFE?</label>
-                <VoiceInput style={{background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,lineHeight:1.6}} rows={3} maxLength={600} placeholder={`Don't filter yourself. Financial freedom, moving to ${f.country==="Ghana"?"Europe":"another country"}, a business, feeling less stuck — whatever it honestly is.`} value={f.goals} onChange={e=>set("goals",e.target.value)}/>
+                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder={`Don't filter yourself. Financial freedom, moving to ${f.country==="Ghana"?"Europe":"another country"}, a business, feeling less stuck — whatever it honestly is.`} value={f.goals} onChange={e=>set("goals",e.target.value)}/>
                 <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.goals.length}/600</div>
               </div>
               <div>
                 <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT'S ACTUALLY GETTING IN THE WAY?</label>
-                <VoiceInput style={{background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,lineHeight:1.6}} rows={3} maxLength={600} placeholder="What keeps coming back no matter what you try? Money, time, fear, family pressure, no connections — be real." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/>
+                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder="What keeps coming back no matter what you try? Money, time, fear, family pressure, no connections — be real." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/>
                 <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.challenge.length}/600</div>
               </div>
               <div style={{marginTop:16,padding:"14px 16px",background:"rgba(20,184,166,0.06)",border:"1px solid rgba(20,184,166,0.15)",borderRadius:12}}>
@@ -3768,42 +3682,23 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
   const generateReport = async(country, attempt=1)=>{
     setLoading(true); setCustomReport(null); setSelected(country); setView("custom");
     try{
-      const sys = "You are a relocation expert. You MUST return ONLY a valid JSON object. No markdown. No code fences. No explanation. No text before or after. Start your response with { and end with }.";
+      const sys = "You are a relocation expert. Return ONLY a valid JSON object. No markdown. No code fences. No explanation. Start with { and end with }. Keep each field under 200 characters to ensure the JSON fits completely.";
       const prompt = buildSingleCountryRelocationPrompt(formData, country, isPremium);
-      const raw = await callAPI({messages:[{role:"user",content:prompt}], system:sys, userId, isPremium});
+      const raw = await callAPI({messages:[{role:"user",content:prompt}], system:sys, userId, isPremium:true}); // always use premium tokens for relocation
       const clean = raw.replace(/```json|```/g,"").trim();
-      console.log("Relocation raw response:", clean.slice(0,200));
       const start = clean.indexOf("{"); const end = clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error(`Invalid JSON — got: ${clean.slice(0,100)}`);
+      if(start===-1||end===-1) throw new Error(`No JSON found`);
       const parsed = JSON.parse(clean.slice(start, end+1));
       if(!parsed.country) parsed.country = country;
       setCustomReport(parsed);
       setLoading(false);
     } catch(e){
-      console.warn(`Relocation report failed (attempt ${attempt}):`, e.message);
-      if(attempt < 2){
-        // Auto retry once — keep loading spinner active
-        setTimeout(()=>generateReport(country, attempt+1), 1500);
-        return; // don't setLoading(false) yet
+      console.warn(`Relocation attempt ${attempt} failed:`, e.message);
+      if(attempt < 3){
+        setTimeout(()=>generateReport(country, attempt+1), 1800);
+        return;
       }
-      // Both attempts failed — show retry button
-      setCustomReport({
-        country,
-        fit: 0,
-        tagline: "Couldn't load this report right now.",
-        overview: "",
-        pros: [],
-        cons: [],
-        business: "",
-        living: "",
-        visa_detail: "",
-        opportunity: 0,
-        cost: "",
-        visa: "",
-        timeline: "",
-        verdict: "",
-        error: true,
-      });
+      setCustomReport({country,fit:0,tagline:"Couldn't load right now.",overview:"",pros:[],cons:[],business:"",living:"",visa_detail:"",opportunity:0,cost:"",visa:"",timeline:"",verdict:"",error:true});
       setLoading(false);
     }
   };
@@ -3977,84 +3872,119 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 // AUDIO PLAYER — Text-to-speech using Web Speech API
 // ═══════════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUDIO — Shared voice state + VoiceSelector + AudioPlayer
+// VOICE SYSTEM — Global voice state + VoiceSelector + AudioPlayer
 // ═══════════════════════════════════════════════════════════════════════════════
-const _vs={v:null,cbs:[]};
+const _GV={voice:null,subs:[]};
 function useGlobalVoice(){
-  const [v,setV]=useState(_vs.v);
-  useEffect(()=>{_vs.cbs.push(setV);return()=>{_vs.cbs=_vs.cbs.filter(c=>c!==setV);};},[]);
-  const set=(voice)=>{_vs.v=voice;_vs.cbs.forEach(c=>c(voice));};
+  const [v,setV]=useState(_GV.voice);
+  useEffect(()=>{
+    _GV.subs.push(setV);
+    return()=>{_GV.subs=_GV.subs.filter(s=>s!==setV);};
+  },[]);
+  const set=v=>{_GV.voice=v;_GV.subs.forEach(s=>s(v));};
   return[v,set];
+}
+
+// Loads all voices — returns a promise that resolves when voices are ready
+function loadVoices(){
+  return new Promise(res=>{
+    if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
+    const attempt=()=>{
+      const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+      if(vs.length>0){res(vs);return;}
+      window.speechSynthesis.onvoiceschanged=()=>{
+        const vs2=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+        res(vs2);
+      };
+      // Fallback timeout
+      setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
+    };
+    attempt();
+  });
 }
 
 function VoiceSelector(){
   const [voices,setVoices]=useState([]);
   const [sel,setSel]=useGlobalVoice();
   const [open,setOpen]=useState(false);
-  const ref=useRef(null);
+  const btnRef=useRef(null);
+  const [pos,setPos]=useState({top:0,left:0});
 
   useEffect(()=>{
-    if(typeof window==="undefined"||!("speechSynthesis" in window)) return;
-    const load=()=>{
-      const all=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-      setVoices(all);
-      if(!_vs.v&&all.length){
-        const pick=all.find(v=>v.name.includes("Google")&&v.lang==="en-US")||all.find(v=>v.name.includes("Google"))||all.find(v=>/Samantha|Daniel|Karen|Moira|Rishi/.test(v.name))||all[0];
+    loadVoices().then(vs=>{
+      setVoices(vs);
+      if(!_GV.voice&&vs.length>0){
+        const pick=
+          vs.find(v=>v.name==="Google US English")||
+          vs.find(v=>v.name.includes("Google")&&v.lang==="en-US")||
+          vs.find(v=>v.name.includes("Samantha"))||
+          vs.find(v=>v.name.includes("Daniel"))||
+          vs.find(v=>v.lang==="en-US")||
+          vs[0];
         setSel(pick);
       }
-    };
-    load();
-    window.speechSynthesis.onvoiceschanged=load;
+    });
   },[]);
 
-  // Close on outside click
   useEffect(()=>{
     if(!open) return;
-    const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown",h);
-    return()=>document.removeEventListener("mousedown",h);
+    // Compute fixed position from button rect
+    if(btnRef.current){
+      const r=btnRef.current.getBoundingClientRect();
+      setPos({top:r.bottom+6,left:Math.min(r.left,window.innerWidth-260)});
+    }
+    const close=e=>{if(btnRef.current&&!btnRef.current.closest(".vs-wrap")?.contains(e.target))setOpen(false);};
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
   },[open]);
 
   if(!voices.length) return null;
 
   const GROUPS=[
-    {flag:"🇺🇸",label:"American",test:v=>v.lang==="en-US"},
-    {flag:"🇬🇧",label:"British", test:v=>v.lang==="en-GB"},
-    {flag:"🇦🇺",label:"Australian",test:v=>v.lang==="en-AU"},
-    {flag:"🇮🇳",label:"Indian",  test:v=>v.lang==="en-IN"},
-    {flag:"🌍", label:"Other",   test:()=>true},
+    {flag:"🇺🇸",key:"en-US",label:"American"},
+    {flag:"🇬🇧",key:"en-GB",label:"British"},
+    {flag:"🇦🇺",key:"en-AU",label:"Australian"},
+    {flag:"🇮🇳",key:"en-IN",label:"Indian"},
+    {flag:"🌍",key:"other",label:"Other English"},
   ];
   const seen=new Set();
   const grouped=GROUPS.map(g=>({
     ...g,
-    voices:voices.filter(v=>{ if(seen.has(v.name)||!g.test(v)) return false; seen.add(v.name); return true; }).slice(0,7),
-  })).filter(g=>g.voices.length);
+    voices:voices.filter(v=>{
+      if(seen.has(v.name)) return false;
+      const match=g.key==="other"?!["en-US","en-GB","en-AU","en-IN"].includes(v.lang):v.lang===g.key;
+      if(match){seen.add(v.name);return true;}
+      return false;
+    }).slice(0,6),
+  })).filter(g=>g.voices.length>0);
+
+  const shortName=v=>v.name.replace("Microsoft","").replace("Google","").replace(/\s*\(.*?\)/g,"").trim()||v.name;
 
   return(
-    <div ref={ref} style={{position:"relative",display:"inline-block"}}>
-      <button onClick={()=>setOpen(o=>!o)}
+    <div className="vs-wrap" style={{display:"inline-block",position:"relative"}}>
+      <button ref={btnRef} onClick={()=>setOpen(o=>!o)}
         style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"5px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",letterSpacing:".04em",transition:"all .2s",whiteSpace:"nowrap"}}
         onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--line-gold)";e.currentTarget.style.color="var(--gold)";}}
         onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-40)";}}>
-        🎙 {sel?(sel.name.replace(/\(.*?\)/g,"").trim().slice(0,18)||"Voice"):"Choose voice"} ▾
+        🎙 {sel?shortName(sel).slice(0,16):"Pick voice"} ▾
       </button>
       {open&&(
-        <div style={{position:"fixed",top:"auto",left:"auto",zIndex:99999,background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:14,padding:"6px 0 8px",minWidth:230,maxWidth:270,maxHeight:340,overflowY:"auto",boxShadow:"0 12px 48px rgba(0,0,0,0.85)",marginTop:6}}>
-          <div style={{padding:"5px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em"}}>VOICE & ACCENT</div>
+        <div style={{position:"fixed",top:pos.top,left:pos.left,zIndex:2147483647,background:"#1a1a2e",border:"1px solid rgba(210,175,90,0.4)",borderRadius:14,padding:"6px 0 8px",minWidth:230,maxWidth:260,maxHeight:360,overflowY:"auto",boxShadow:"0 16px 60px rgba(0,0,0,0.9)"}}>
+          <div style={{padding:"6px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:4}}>🎙 SELECT VOICE & ACCENT</div>
           {grouped.map(g=>(
-            <div key={g.label}>
-              <div style={{padding:"4px 14px 3px",fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",background:"var(--midnight)"}}>{g.flag} {g.label.toUpperCase()}</div>
+            <div key={g.key}>
+              <div style={{padding:"4px 14px 3px",fontSize:8,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",letterSpacing:".1em",textTransform:"uppercase"}}>{g.flag} {g.label}</div>
               {g.voices.map(v=>(
                 <button key={v.name} onClick={()=>{setSel(v);setOpen(false);}}
-                  style={{display:"block",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.12)":"none",border:"none",padding:"7px 16px",color:sel?.name===v.name?"var(--gold)":"var(--cream-60)",fontSize:12,cursor:"pointer",fontFamily:"var(--f-body)",lineHeight:1.4}}>
-                  {sel?.name===v.name?"✓ ":""}{v.name.replace(/\(.*?\)/g,"").replace("Microsoft","").replace("Google","").trim()}
-                  <span style={{fontSize:9,color:v.localService?"var(--cream-30)":"var(--teal)",marginLeft:5}}>{v.localService?"device":"online"}</span>
+                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.12)":"transparent",border:"none",padding:"8px 16px",color:sel?.name===v.name?"var(--gold)":"rgba(255,255,255,0.6)",fontSize:12,cursor:"pointer",gap:8,fontFamily:"inherit"}}>
+                  <span>{sel?.name===v.name?"✓ ":""}{shortName(v)}</span>
+                  <span style={{fontSize:9,color:v.localService?"rgba(255,255,255,0.2)":"var(--teal)",flexShrink:0}}>{v.localService?"device":"cloud"}</span>
                 </button>
               ))}
             </div>
           ))}
-          <div style={{borderTop:"1px solid var(--line)",padding:"6px 14px 0"}}>
-            <button onClick={()=>setOpen(false)} style={{fontSize:10,color:"var(--cream-30)",background:"none",border:"none",cursor:"pointer",fontFamily:"var(--f-mono)"}}>✕ close</button>
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",padding:"6px 14px 0",marginTop:4}}>
+            <button onClick={()=>setOpen(false)} style={{fontSize:10,color:"rgba(255,255,255,0.2)",background:"none",border:"none",cursor:"pointer"}}>✕ close</button>
           </div>
         </div>
       )}
@@ -4065,25 +3995,31 @@ function VoiceSelector(){
 function AudioPlayer({text,label="Listen",mini=false}){
   const [state,setState]=useState("idle");
   const [supported]=useState(()=>typeof window!=="undefined"&&"speechSynthesis" in window);
-  const [voice]=useGlobalVoice();
+  const [selVoice]=useGlobalVoice();
   const uttRef=useRef(null);
 
-  const clean=(t)=>(t||"")
+  const clean=t=>(t||"")
     .replace(/https?:\/\/\S+/g,"")
-    .replace(/\*\*(.*?)\*\*/g,"$1").replace(/\*(.*?)\*/g,"$1").replace(/`[^`]*`/g,"")
-    .replace(/[#◎◈◇✦⬡↗⟶→←►▶]/g,"").replace(/---+/g,". ")
-    .replace(/\s{2,}/g," ").trim();
+    .replace(/\*\*(.*?)\*\*/g,"$1").replace(/\*(.*?)\*/g,"$1")
+    .replace(/`[^`]*`/g,"").replace(/[#◎◈◇✦⬡↗⟶→←►▶]/g,"")
+    .replace(/---+/g,". ").replace(/\s{2,}/g," ").trim();
 
-  const stop=()=>{ window.speechSynthesis.cancel(); setState("idle"); uttRef.current=null; };
-  const pause=()=>{ if(window.speechSynthesis.speaking){window.speechSynthesis.pause();setState("paused");} };
+  const stop=()=>{window.speechSynthesis.cancel();setState("idle");uttRef.current=null;};
+  const pause=()=>{if(window.speechSynthesis.speaking){window.speechSynthesis.pause();setState("paused");}};
   const play=()=>{
     if(!supported) return;
     if(state==="paused"&&uttRef.current){window.speechSynthesis.resume();setState("playing");return;}
     window.speechSynthesis.cancel();
-    const t=clean(text); if(!t) return;
+    const t=clean(text);if(!t) return;
     const u=new SpeechSynthesisUtterance(t);
-    u.rate=0.93; u.pitch=1; u.volume=1;
-    if(voice) u.voice=voice;
+    u.rate=0.93;u.pitch=1;u.volume=1;
+    // Use selected voice — wait for it if not yet loaded
+    if(selVoice) u.voice=selVoice;
+    else {
+      const vs=window.speechSynthesis.getVoices();
+      const pick=vs.find(v=>v.lang==="en-US"&&v.name.includes("Google"))||vs.find(v=>v.lang.startsWith("en"))||vs[0];
+      if(pick) u.voice=pick;
+    }
     u.onstart=()=>setState("playing");
     u.onend=()=>{setState("idle");uttRef.current=null;};
     u.onerror=()=>{setState("idle");uttRef.current=null;};
@@ -4091,228 +4027,431 @@ function AudioPlayer({text,label="Listen",mini=false}){
     window.speechSynthesis.speak(u);
   };
   useEffect(()=>()=>{if(typeof window!=="undefined")window.speechSynthesis.cancel();},[]);
-
   if(!supported) return null;
 
   if(mini){
     return(
-      <button onClick={state==="playing"?stop:play} title={state==="playing"?"Stop":"Listen"}
-        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:"50%",background:state!=="idle"?"var(--gold-dim)":"none",border:`1px solid ${state!=="idle"?"var(--line-gold)":"var(--cream-15)"}`,cursor:"pointer",fontSize:10,marginTop:5,color:state!=="idle"?"var(--gold)":"var(--cream-30)",transition:"all .2s",flexShrink:0}}>
+      <button onClick={state==="playing"?stop:play}
+        title={state==="playing"?"Stop":"Listen"}
+        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:"50%",background:state!=="idle"?"rgba(210,175,90,0.12)":"none",border:`1.5px solid ${state!=="idle"?"rgba(210,175,90,0.5)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:11,marginTop:6,color:state!=="idle"?"var(--gold)":"rgba(255,255,255,0.25)",transition:"all .2s",flexShrink:0}}>
         {state==="playing"?"⏹":"🔊"}
       </button>
     );
   }
-
   return(
     <div style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:8,flexWrap:"wrap"}}>
       {state==="idle"&&(
-        <button onClick={play}
-          style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 14px",color:"var(--cream-50)",fontSize:12,cursor:"pointer",transition:"all .2s"}}
+        <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 14px",color:"rgba(255,255,255,0.45)",fontSize:12,cursor:"pointer",transition:"all .2s"}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-50)";}}>
-          <span style={{fontSize:14}}>🔊</span>{label}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.1)";e.currentTarget.style.color="rgba(255,255,255,0.45)";}}>
+          🔊 {label}
         </button>
       )}
       {state==="playing"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
-          <button onClick={pause} style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>⏸ Pause</button>
-          <button onClick={stop} style={{background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>⏹</button>
+          <button onClick={pause} style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>⏸ Pause</button>
+          <button onClick={stop} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 12px",color:"rgba(255,255,255,0.3)",fontSize:12,cursor:"pointer"}}>⏹</button>
           <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>{[0,1,2].map(i=><span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?13:8,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>)}</span>
         </div>
       )}
       {state==="paused"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
-          <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--teal)",fontSize:12,cursor:"pointer"}}>▶ Resume</button>
-          <button onClick={stop} style={{background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>⏹</button>
+          <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(20,184,154,0.08)",border:"1px solid rgba(20,184,154,0.35)",borderRadius:20,padding:"6px 14px",color:"var(--teal)",fontSize:12,cursor:"pointer"}}>▶ Resume</button>
+          <button onClick={stop} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 12px",color:"rgba(255,255,255,0.3)",fontSize:12,cursor:"pointer"}}>⏹</button>
         </div>
       )}
     </div>
   );
 }
 
-function LifeHacksModule({data,formData}){
-  const hacks=Array.isArray(data?.life_hacks)?data.life_hacks:[];
-  const emotional=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
-  const empty=hacks.length===0&&emotional.length===0;
+// ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
+async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
+  setLoading(true); setErr("");
+  const prompts={
+    life_hacks:`Give ${profile.name||"the user"} in ${profile.country||"their country"} 6 real, specific life hacks that will change how they operate. Skills: ${profile.skills||"general"}. Goal: ${profile.goals||""}. Income: ${profile.income||""}. Return ONLY a JSON array of 6 strings. No other text. Example: ["hack 1","hack 2"]`,
+    emotional_strength:`Give ${profile.name||"the user"} 4 emotional strength practices specific to their challenge: "${profile.challenge||""}". Return ONLY a JSON array of 4 strings. No other text.`,
+    money_protection:`Write a money protection plan for ${profile.name||"the user"} in ${profile.country||"their country"} earning ${profile.income||"under $500"}. Return ONLY JSON: {"rule":"...","savings_target":"...","avoid":"...","first_investment":"..."}`,
+    online_income:`Give ${profile.name||"the user"} in ${profile.country||"their country"} with skills "${profile.skills||""}" exactly 3 ways to make money online. Return ONLY a JSON array: [{"method":"...","why_it_works":"...","url":"exact website url","first_step":"..."},...]`,
+    zero_income_business:`How can ${profile.name||"the user"} in ${profile.country||"their country"} with skills "${profile.skills||""}" start a business with zero money? Return ONLY JSON: {"idea":"...","why_zero":"...","day_one":"...","first_revenue":"...","scale":"..."}`,
+    product_business:`Give 3 physical product business ideas for ${profile.country||"their country"}. Return ONLY a JSON array: [{"product":"...","why":"...","startup_cost":"...","profit_margin":"...","supplier_links":["alibaba.com","dhgate.com"]},...]`,
+    real_estate_hack:`How can someone with little money make money in real estate in ${profile.country||"their country"} right now? Return ONLY JSON: {"method":"...","how_it_works":"...","platform":"...","first_deal":"..."}`,
+  };
+  const sys="Return ONLY valid JSON. No markdown. No code fences. No explanation. Start directly with { or [.";
+  try{
+    const raw=await callAPI({messages:[{role:"user",content:prompts[key]}],system:sys,userId,isPremium:true});
+    const clean=raw.replace(/```json|```/g,"").trim();
+    const parsed=JSON.parse(clean);
+    setData(parsed);
+    setErr("");
+  }catch(e){
+    setErr("Couldn't generate right now. Tap retry.");
+  }
+  setLoading(false);
+}
+
+function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loading,err}){
+  return(
+    <div className="card" style={{marginBottom:20}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div className="mono" style={{fontSize:"9px",color}}>{title}</div>
+          {audioText&&<AudioPlayer text={audioText} label="" mini={true}/>}
+        </div>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          {audioText&&<AudioPlayer text={audioText} label="Listen"/>}
+          <button onClick={onRegen} disabled={loading}
+            style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.12)",background:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap"}}>
+            {loading?"…":"↺ Refresh"}
+          </button>
+        </div>
+      </div>
+      {err&&<div className="err-box" style={{marginBottom:10}}>⚠ {err} <button onClick={onRegen} style={{marginLeft:8,background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11}}>Retry</button></div>}
+      {loading&&<div style={{textAlign:"center",padding:"24px 0"}}><div style={{width:28,height:28,border:"2.5px solid rgba(255,255,255,0.08)",borderTop:"2.5px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 10px"}}/><p style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>Building your {title.toLowerCase()}…</p></div>}
+      {!loading&&children}
+    </div>
+  );
+}
+
+function LifeHacksModule({data,formData,userId,isPremium}){
+  const [hacks,setHacks]=useState(Array.isArray(data?.life_hacks)?data.life_hacks:[]);
+  const [emotional,setEmotional]=useState(Array.isArray(data?.emotional_strength)?data.emotional_strength:[]);
+  const [lLoading,setLLoading]=useState(false);[{},()=>{}];
+  const [eLoading,setELoading]=useState(false);
+  const [lErr,setLErr]=useState("");
+  const [eErr,setEErr]=useState("");
+  useEffect(()=>{setHacks(Array.isArray(data?.life_hacks)?data.life_hacks:[]);setEmotional(Array.isArray(data?.emotional_strength)?data.emotional_strength:[]);},[data]);
+
   return(
     <div className="fu">
-      <div className="card" style={{marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
-          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>LIFE HACKS FOR YOUR SITUATION</div>
-          {hacks.length>0&&<AudioPlayer text={hacks.map((h,i)=>`Hack ${i+1}: ${h}`).join(". ")} label="Listen to all hacks"/>}
-        </div>
-        {empty&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load your personalised life hacks.</p>}
+      <ModuleShell title="LIFE HACKS" color="var(--gold)" audioText={hacks.length?hacks.join(". "):""} onRegen={()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr)} loading={lLoading} err={lErr}>
+        {hacks.length===0&&!lLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your personalised life hacks.</p>}
         {hacks.map((h,i)=>(
-          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid var(--line)":"none",alignItems:"flex-start"}}>
-            <div style={{width:26,height:26,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
-            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0,flex:1}}>{h}</p>
+          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid rgba(255,255,255,0.05)":"none",alignItems:"flex-start"}}>
+            <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7,margin:0,flex:1}}>{h}</p>
             <AudioPlayer text={h} label="" mini={true}/>
           </div>
         ))}
-      </div>
-      {emotional.length>0&&(
-        <div className="card">
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
-            <div className="mono" style={{fontSize:"9px",color:"var(--teal)"}}>EMOTIONAL STRENGTH PRACTICES</div>
-            <AudioPlayer text={emotional.map((e,i)=>`Practice ${i+1}: ${e}`).join(". ")} label="Listen"/>
+      </ModuleShell>
+      <ModuleShell title="EMOTIONAL STRENGTH" color="var(--teal)" audioText={emotional.length?emotional.join(". "):""} onRegen={()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr)} loading={eLoading} err={eErr}>
+        {emotional.length===0&&!eLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate emotional strength practices.</p>}
+        {emotional.map((e,i)=>(
+          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid rgba(255,255,255,0.05)":"none",alignItems:"flex-start"}}>
+            <span style={{fontSize:18,flexShrink:0}}>🧘</span>
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7,margin:0,flex:1}}>{e}</p>
+            <AudioPlayer text={e} label="" mini={true}/>
           </div>
-          {emotional.map((e,i)=>(
-            <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid var(--line)":"none",alignItems:"flex-start"}}>
-              <span style={{fontSize:18,flexShrink:0}}>🧘</span>
-              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0,flex:1}}>{e}</p>
-              <AudioPlayer text={e} label="" mini={true}/>
-            </div>
-          ))}
-        </div>
-      )}
+        ))}
+      </ModuleShell>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MONEY MODULE
-// ═══════════════════════════════════════════════════════════════════════════════
-function MoneyModule({data,formData}){
-  const mp=(data?.money_protection&&typeof data.money_protection==="object")?data.money_protection:{};
-  const re=(data?.real_estate_hack&&typeof data.real_estate_hack==="object")?data.real_estate_hack:{};
-  const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Savings target: ${mp.savings_target}`,mp.avoid&&`Stop wasting on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
-  const reAudio=[re.method&&`Real estate method: ${re.method}`,re.how_it_works,re.platform&&`Platform: ${re.platform}`,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
+function MoneyModule({data,formData,userId,isPremium}){
+  const [mp,setMp]=useState(data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{});
+  const [re,setRe]=useState(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});
+  const [mpL,setMpL]=useState(false);const [reL,setReL]=useState(false);
+  const [mpE,setMpE]=useState("");const [reE,setReE]=useState("");
+  useEffect(()=>{setMp(data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{});setRe(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});},[data]);
+  const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Save: ${mp.savings_target}`,mp.avoid&&`Stop spending on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
+  const reAudio=[re.method&&`Method: ${re.method}`,re.how_it_works,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
-      <div className="card" style={{marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
-          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>PROTECT YOUR MONEY</div>
-          {mpAudio&&<AudioPlayer text={mpAudio} label="Listen"/>}
-        </div>
-        {!mp.rule&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load your money protection plan.</p>}
+      <ModuleShell title="PROTECT YOUR MONEY" color="var(--gold)" audioText={mpAudio} onRegen={()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE)} loading={mpL} err={mpE}>
+        {!mp.rule&&!mpL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your money protection plan.</p>}
         {mp.rule&&(
           <>
-            <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
-              <div style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:6}}>THE GOLDEN RULE</div>
+            <div style={{padding:"13px 16px",background:"rgba(210,175,90,0.05)",borderRadius:12,marginBottom:10,border:"1px solid rgba(210,175,90,0.2)"}}>
+              <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:5}}>GOLDEN RULE</div>
               <p style={{fontSize:14,fontWeight:600,color:"var(--cream)",margin:0,lineHeight:1.6}}>{mp.rule}</p>
             </div>
-            {[{label:"SAVINGS TARGET",val:mp.savings_target,c:"var(--teal)"},{label:"STOP WASTING ON",val:mp.avoid,c:"#F87171"},{label:"FIRST INVESTMENT",val:mp.first_investment,c:"var(--gold)"}].map(({label,val,c})=>val&&(
-              <div key={label} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
-                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{label}</div>
-                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{val}</p>
+            {[{l:"SAVINGS TARGET",v:mp.savings_target,c:"var(--teal)"},{l:"STOP WASTING ON",v:mp.avoid,c:"#F87171"},{l:"FIRST INVESTMENT",v:mp.first_investment,c:"var(--gold)"}].map(({l,v,c})=>v&&(
+              <div key={l} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
+                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{l}</div>
+                <p style={{fontSize:13,color:"rgba(255,255,255,0.6)",margin:0,lineHeight:1.6}}>{v}</p>
               </div>
             ))}
           </>
         )}
-      </div>
-      {re.method&&(
-        <div className="card">
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
-            <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>REAL ESTATE HACK</div>
-            {reAudio&&<AudioPlayer text={reAudio} label="Listen"/>}
-          </div>
-          <div style={{padding:"14px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
-            <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{re.method}</div>
-            <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{re.how_it_works}</p>
-          </div>
-          {re.platform&&<p style={{fontSize:13,color:"var(--cream-50)",marginBottom:8}}>Where to start: <span style={{color:"var(--gold)"}}>{re.platform}</span></p>}
-          {re.first_deal&&<div style={{padding:"10px 14px",background:"rgba(212,175,55,0.06)",borderRadius:10,fontSize:13,color:"var(--cream-60)",lineHeight:1.6,borderLeft:"2px solid var(--gold)"}}><b style={{color:"var(--cream)"}}>First deal: </b>{re.first_deal}</div>}
-        </div>
-      )}
+      </ModuleShell>
+      <ModuleShell title="REAL ESTATE HACK" color="var(--teal)" audioText={reAudio} onRegen={()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE)} loading={reL} err={reE}>
+        {!re.method&&!reL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate real estate income ideas for {formData?.country||"your country"}.</p>}
+        {re.method&&(
+          <>
+            <div style={{padding:"13px 16px",background:"rgba(20,184,154,0.05)",borderRadius:12,marginBottom:10,border:"1px solid rgba(20,184,154,0.2)"}}>
+              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{re.method}</div>
+              <p style={{fontSize:13,color:"rgba(255,255,255,0.6)",margin:0,lineHeight:1.6}}>{re.how_it_works}</p>
+            </div>
+            {re.platform&&<p style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginBottom:8}}>Platform: <span style={{color:"var(--teal)"}}>{re.platform}</span></p>}
+            {re.first_deal&&<div style={{padding:"10px 14px",background:"rgba(210,175,90,0.05)",borderRadius:10,fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.6,borderLeft:"2px solid var(--gold)"}}><b style={{color:"var(--cream)"}}>First deal: </b>{re.first_deal}</div>}
+          </>
+        )}
+      </ModuleShell>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ONLINE INCOME MODULE
-// ═══════════════════════════════════════════════════════════════════════════════
-function OnlineIncomeModule({data,formData}){
-  const online=Array.isArray(data?.online_income)?data.online_income:[];
+function OnlineIncomeModule({data,formData,userId,isPremium}){
+  const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState("");
+  useEffect(()=>{setOnline(Array.isArray(data?.online_income)?data.online_income:[]);},[data]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   return(
     <div className="fu">
-      <div className="card">
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
-          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>MAKE MONEY ONLINE</div>
-          {online.length>0&&<AudioPlayer text={audioText} label="Listen to all methods"/>}
-        </div>
-        <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>Specific to {formData?.country||"your country"} and your skills</p>
-        {online.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load online income methods for your country.</p>}
+      <ModuleShell title={`MAKE MONEY ONLINE IN ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err}>
+        {online.length===0&&!loading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>}
         {online.map((o,i)=>(
-          <div key={i} style={{padding:"16px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid var(--line)"}}>
+          <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
-              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)"}}>{o.method}</div>
-              <span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 8px",flexShrink:0}}>{i===0?"BEST FIT":i===1?"GOOD FIT":"HIGH CEILING"}</span>
+              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{o.method}</div>
+              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"rgba(210,175,90,0.1)",borderRadius:6,padding:"2px 8px",flexShrink:0,border:"1px solid rgba(210,175,90,0.25)"}}>{["BEST FIT","GOOD FIT","HIGH CEILING"][i]||"OPTION"}</span>
             </div>
-            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6,marginBottom:10}}>{o.why_it_works}</p>
-            {o.url&&<a href={o.url} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:8}}>🔗 {o.url}</a>}
-            {o.first_step&&<div style={{padding:"8px 12px",background:"rgba(20,184,154,0.06)",borderRadius:8,fontSize:12,color:"var(--cream-60)",borderLeft:"2px solid var(--teal)"}}><b style={{color:"var(--teal)"}}>Start today: </b>{o.first_step}</div>}
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.6,marginBottom:10}}>{o.why_it_works}</p>
+            {o.url&&<a href={o.url.startsWith("http")?o.url:`https://${o.url}`} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:8,wordBreak:"break-all"}}>🔗 {o.url}</a>}
+            {o.first_step&&<div style={{padding:"8px 12px",background:"rgba(20,184,154,0.05)",borderRadius:8,fontSize:12,color:"rgba(255,255,255,0.55)",borderLeft:"2px solid var(--teal)"}}><b style={{color:"var(--teal)"}}>Start today: </b>{o.first_step}</div>}
             <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
           </div>
         ))}
-      </div>
+      </ModuleShell>
+    </div>
+  );
+}
+
+function BusinessModule({data,formData,userId,isPremium}){
+  const [zb,setZb]=useState(data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{});
+  const [pb,setPb]=useState(Array.isArray(data?.product_business)?data.product_business:[]);
+  const [zbL,setZbL]=useState(false);const [pbL,setPbL]=useState(false);
+  const [zbE,setZbE]=useState("");const [pbE,setPbE]=useState("");
+  useEffect(()=>{setZb(data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{});setPb(Array.isArray(data?.product_business)?data.product_business:[]);},[data]);
+  const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
+  return(
+    <div className="fu">
+      <ModuleShell title="START WITH ZERO MONEY" color="var(--gold)" audioText={zbAudio} onRegen={()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE)} loading={zbL} err={zbE}>
+        {!zb.idea&&!zbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate a zero-capital business plan for {formData?.country||"your country"}.</p>}
+        {zb.idea&&(
+          <>
+            <div style={{padding:"14px",background:"rgba(210,175,90,0.05)",borderRadius:12,marginBottom:12,border:"1px solid rgba(210,175,90,0.2)"}}>
+              <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:5}}>THE IDEA</div>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{zb.idea}</div>
+              <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.6}}>{zb.why_zero}</p>
+            </div>
+            {[{l:"DAY ONE",v:zb.day_one,c:"var(--teal)"},{l:"FIRST REVENUE",v:zb.first_revenue,c:"var(--gold)"},{l:"HOW TO SCALE",v:zb.scale,c:"#9b72cf"}].map(({l,v,c})=>v&&(
+              <div key={l} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
+                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{l}</div>
+                <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.6}}>{v}</p>
+              </div>
+            ))}
+          </>
+        )}
+      </ModuleShell>
+      <ModuleShell title="SELL PHYSICAL PRODUCTS" color="var(--teal)" audioText={pb.length?pb.map(p=>`${p.product}: ${p.why||""}. Margin: ${p.profit_margin||""}`).join(". "):""} onRegen={()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE)} loading={pbL} err={pbE}>
+        {pb.length===0&&!pbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to get product business ideas with supplier links.</p>}
+        {pb.map((p,i)=>(
+          <div key={i} style={{padding:"13px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
+              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{p.product}</div>
+              {p.profit_margin&&<span style={{fontSize:9,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(20,184,154,0.08)",borderRadius:4,padding:"2px 6px",flexShrink:0,border:"1px solid rgba(20,184,154,0.2)"}}>{p.profit_margin} margin</span>}
+            </div>
+            <p style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:8,lineHeight:1.5}}>{p.why}</p>
+            {p.startup_cost&&<div style={{fontSize:12,color:"var(--gold)",marginBottom:10}}>Startup cost: {p.startup_cost}</div>}
+            {Array.isArray(p.supplier_links)&&p.supplier_links.length>0&&(
+              <div>
+                <div style={{fontSize:8,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",marginBottom:6}}>SUPPLIER LINKS</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {p.supplier_links.filter(l=>l).map((link,li)=>(
+                    <a key={li} href={link.startsWith("http")?link:`https://${link}`} target="_blank" rel="noopener noreferrer"
+                      style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.06)",borderRadius:6,padding:"3px 9px",textDecoration:"none",border:"1px solid rgba(20,184,154,0.2)"}}>
+                      {link.replace(/https?:\/\//,"").split("/")[0]}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            <AudioPlayer text={`${p.product}: ${p.why||""}. Cost: ${p.startup_cost||""}. Margin: ${p.profit_margin||""}`} label="" mini={true}/>
+          </div>
+        ))}
+      </ModuleShell>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BUSINESS MODULE
+// WIN TRACKER — Daily win logging with streak calendar + AI celebration
 // ═══════════════════════════════════════════════════════════════════════════════
-function BusinessModule({data,formData}){
-  const zb=(data?.zero_income_business&&typeof data.zero_income_business==="object")?data.zero_income_business:{};
-  const pb=Array.isArray(data?.product_business)?data.product_business:[];
-  const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero&&`Why you can start with zero: ${zb.why_zero}`,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`How to scale: ${zb.scale}`].filter(Boolean).join(". ");
+const WIN_STORE_KEY="destiniq_wins_v1";
+function loadWins(){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY)||"[]");}catch{return[];}}
+function saveWins(w){try{localStorage.setItem(WIN_STORE_KEY,JSON.stringify(w));}catch{}}
+
+function WinTracker({profile,userId,isPremium}){
+  const [wins,setWins]=useState(()=>loadWins());
+  const [input,setInput]=useState("");
+  const [mood,setMood]=useState(null);
+  const [celebrate,setCelebrate]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [tab,setTab]=useState("log"); // log | calendar | stats
+
+  const todayKey=new Date().toISOString().slice(0,10);
+  const todayWins=wins.filter(w=>w.date===todayKey);
+  const streakDays=[...new Set(wins.map(w=>w.date))].sort().reverse();
+  const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
+
+  const addWin=async()=>{
+    if(!input.trim()) return;
+    const win={id:Date.now(),text:input.trim(),date:todayKey,mood,ts:new Date().toISOString()};
+    const updated=[win,...wins];
+    setWins(updated);saveWins(updated);setInput("");setMood(null);
+    // AI celebration
+    setLoading(true);
+    try{
+      const txt=await callAPI({
+        messages:[{role:"user",content:`${profile?.name||"User"} just logged a win: "${win.text}". They're on a ${currentStreak+1}-day streak. Their goal is: "${profile?.goals||"success"}". Write ONE sentence (max 25 words) that celebrates this win in a real, warm way. Not generic. Reference their specific win.`}],
+        system:"You write short, warm, genuine celebration messages. One sentence only. No emojis. No AI-speak.",
+        userId,isPremium,
+      });
+      setCelebrate(txt.trim());
+    }catch{setCelebrate("That's a real step forward. Keep going.");}
+    setLoading(false);
+  };
+
+  const MOODS=[{e:"🔥",l:"Crushed it"},{e:"✅",l:"Good day"},{e:"😐",l:"Meh day"},{e:"💪",l:"Pushed through"},{e:"🌱",l:"Small step"}];
+
+  // Calendar — last 30 days
+  const last30=Array.from({length:30},(_, i)=>{const d=new Date();d.setDate(d.getDate()-29+i);const k=d.toISOString().slice(0,10);const dayWins=wins.filter(w=>w.date===k);return{key:k,count:dayWins.length,day:d.getDate(),isToday:k===todayKey};});
+
+  const totalWins=wins.length;
+  const avgPerDay=streakDays.length?Math.round(totalWins/Math.max(streakDays.length,1)*10)/10:0;
+
   return(
     <div className="fu">
-      <div className="card" style={{marginBottom:20}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
-          <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>START A BUSINESS WITH ZERO MONEY</div>
-          {zbAudio&&<AudioPlayer text={zbAudio} label="Listen"/>}
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div className="d3" style={{marginBottom:4}}>Win Tracker</div>
+          <p style={{fontSize:13,color:"rgba(255,255,255,0.4)"}}>Every small win builds the bigger one. Log what you did today.</p>
         </div>
-        <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>You can start. Here is exactly how.</p>
-        {!zb.idea&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load your zero-capital business plan.</p>}
-        {zb.idea&&(
-          <>
-            <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line-gold)"}}>
-              <div style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:6}}>THE IDEA</div>
-              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{zb.idea}</div>
-              <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{zb.why_zero}</p>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10}}>
+            <div style={{fontSize:22,fontWeight:700,color:"var(--gold)",lineHeight:1}}>{currentStreak}</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>DAY STREAK 🔥</div>
+          </div>
+          <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(20,184,154,0.06)",border:"1px solid rgba(20,184,154,0.2)",borderRadius:10}}>
+            <div style={{fontSize:22,fontWeight:700,color:"var(--teal)",lineHeight:1}}>{totalWins}</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>TOTAL WINS</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab pills */}
+      <div style={{display:"flex",gap:6,marginBottom:20}}>
+        {[{id:"log",l:"Log a Win"},{id:"calendar",l:"Calendar"},{id:"stats",l:"My Progress"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${tab===t.id?"rgba(210,175,90,0.4)":"rgba(255,255,255,0.1)"}`,background:tab===t.id?"rgba(210,175,90,0.08)":"none",color:tab===t.id?"var(--gold)":"rgba(255,255,255,0.4)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)"}}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+
+      {/* LOG TAB */}
+      {tab==="log"&&(
+        <>
+          {/* Mood selector */}
+          <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+            {MOODS.map(m=>(
+              <button key={m.l} onClick={()=>setMood(mood===m.l?null:m.l)}
+                style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:20,border:`1px solid ${mood===m.l?"rgba(210,175,90,0.4)":"rgba(255,255,255,0.08)"}`,background:mood===m.l?"rgba(210,175,90,0.08)":"none",cursor:"pointer",fontSize:12,color:mood===m.l?"var(--gold)":"rgba(255,255,255,0.4)"}}>
+                <span>{m.e}</span>{m.l}
+              </button>
+            ))}
+          </div>
+          <div style={{position:"relative",marginBottom:12}}>
+            <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addWin();}}}
+              placeholder="What did you accomplish today? Even tiny things count — showing up, making a call, finishing a task…"
+              style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:"13px 50px 13px 16px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6,fontFamily:"inherit"}} rows={3} maxLength={300}/>
+            <button onClick={addWin} disabled={!input.trim()||loading}
+              style={{position:"absolute",right:10,bottom:10,width:32,height:32,borderRadius:"50%",border:"none",background:input.trim()?"var(--gold)":"rgba(255,255,255,0.1)",color:input.trim()?"#000":"rgba(255,255,255,0.2)",cursor:input.trim()?"pointer":"default",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
+              {loading?"…":"→"}
+            </button>
+          </div>
+          {celebrate&&(
+            <div style={{padding:"12px 16px",background:"rgba(210,175,90,0.07)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10,marginBottom:16,fontSize:13,color:"var(--gold)",lineHeight:1.6,animation:"fadeUp 0.4s ease"}}>
+              ✨ {celebrate}
             </div>
-            {[{label:"DAY ONE ACTION",val:zb.day_one,c:"var(--teal)"},{label:"FIRST REVENUE",val:zb.first_revenue,c:"var(--gold)"},{label:"HOW TO SCALE",val:zb.scale,c:"#9b72cf"}].map(({label,val,c})=>val&&(
-              <div key={label} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
-                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{label}</div>
-                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{val}</p>
+          )}
+          {/* Today's wins */}
+          {todayWins.length>0&&(
+            <div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",marginBottom:10,letterSpacing:".1em"}}>TODAY'S WINS · {todayWins.length}</div>
+              {todayWins.map((w,i)=>(
+                <div key={w.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",borderBottom:i<todayWins.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>✅</span>
+                  <div style={{flex:1}}>
+                    <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",margin:0,lineHeight:1.6}}>{w.text}</p>
+                    {w.mood&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{w.mood}</span>}
+                  </div>
+                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {todayWins.length===0&&<p style={{fontSize:12,color:"rgba(255,255,255,0.25)",textAlign:"center",padding:"16px 0"}}>No wins logged yet today. What's one thing you'll do before the day ends?</p>}
+        </>
+      )}
+
+      {/* CALENDAR TAB */}
+      {tab==="calendar"&&(
+        <div>
+          <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"var(--f-mono)",marginBottom:14,letterSpacing:".1em"}}>LAST 30 DAYS</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5}}>
+            {last30.map(d=>(
+              <div key={d.key} title={`${d.key}: ${d.count} win${d.count!==1?"s":""}`}
+                style={{aspectRatio:"1",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,border:`1.5px solid ${d.isToday?"rgba(210,175,90,0.6)":d.count>0?"rgba(210,175,90,0.2)":"rgba(255,255,255,0.06)"}`,background:d.count>=3?"rgba(210,175,90,0.2)":d.count===2?"rgba(210,175,90,0.1)":d.count===1?"rgba(210,175,90,0.06)":"transparent",color:d.count>0?"var(--gold)":"rgba(255,255,255,0.2)"}}>
+                {d.count>0?d.count:d.day}
               </div>
             ))}
-          </>
-        )}
-      </div>
-      {pb.length>0&&(
-        <div className="card">
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
-            <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>SELL PHYSICAL PRODUCTS</div>
-            <AudioPlayer text={pb.map(p=>`${p.product}: ${p.why||""}. Startup cost: ${p.startup_cost||""}. Margin: ${p.profit_margin||""}`).join(". ")} label="Listen"/>
           </div>
-          <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>Things people buy every day — with supplier links</p>
-          {pb.map((p,i)=>(
-            <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
-                <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{p.product}</div>
-                {p.profit_margin&&<span style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(20,184,154,0.1)",borderRadius:4,padding:"2px 6px",flexShrink:0}}>{p.profit_margin} margin</span>}
+          <div style={{display:"flex",gap:12,marginTop:14,flexWrap:"wrap"}}>
+            {[{c:"rgba(210,175,90,0.2)",l:"3+ wins"},{c:"rgba(210,175,90,0.1)",l:"2 wins"},{c:"rgba(210,175,90,0.06)",l:"1 win"},{c:"transparent",l:"No log"}].map(x=>(
+              <div key={x.l} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"rgba(255,255,255,0.3)"}}>
+                <div style={{width:12,height:12,borderRadius:3,background:x.c,border:"1px solid rgba(210,175,90,0.2)"}}/>
+                {x.l}
               </div>
-              <p style={{fontSize:12,color:"var(--cream-50)",marginBottom:8,lineHeight:1.5}}>{p.why}</p>
-              {p.startup_cost&&<div style={{fontSize:12,color:"var(--gold)",marginBottom:10}}>Startup cost: {p.startup_cost}</div>}
-              {Array.isArray(p.supplier_links)&&p.supplier_links.length>0&&(
-                <div>
-                  <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:6}}>SUPPLIER LINKS</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                    {p.supplier_links.filter(l=>typeof l==="string"&&l).map((link,li)=>(
-                      <a key={li} href={link.startsWith("http")?link:`https://${link}`} target="_blank" rel="noopener noreferrer"
-                        style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.08)",borderRadius:6,padding:"3px 8px",textDecoration:"none",border:"1px solid rgba(20,184,154,0.2)"}}>
-                        {link.replace("https://","").replace("http://","").split("/")[0]}
-                      </a>
-                    ))}
-                  </div>
+            ))}
+          </div>
+          {wins.length>0&&(
+            <div style={{marginTop:20}}>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"var(--f-mono)",marginBottom:12,letterSpacing:".1em"}}>RECENT WINS</div>
+              {wins.slice(0,8).map(w=>(
+                <div key={w.id} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <span style={{fontSize:9,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)",flexShrink:0,paddingTop:3}}>{w.date}</span>
+                  <p style={{fontSize:12,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.5}}>{w.text}</p>
                 </div>
-              )}
-              <AudioPlayer text={`${p.product}: ${p.why||""}. Cost: ${p.startup_cost||""}. Margin: ${p.profit_margin||""}`} label="" mini={true}/>
+              ))}
             </div>
-          ))}
+          )}
+        </div>
+      )}
+
+      {/* STATS TAB */}
+      {tab==="stats"&&(
+        <div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+            {[
+              {label:"Current Streak",val:`${currentStreak} days`,icon:"🔥",c:"var(--gold)"},
+              {label:"Total Wins",val:totalWins,icon:"✅",c:"var(--teal)"},
+              {label:"Active Days",val:streakDays.length,icon:"📅",c:"#9b72cf"},
+              {label:"Avg per Day",val:avgPerDay,icon:"📈",c:"var(--gold)"},
+            ].map(s=>(
+              <div key={s.label} style={{padding:"14px",background:"rgba(255,255,255,0.03)",borderRadius:12,border:"1px solid rgba(255,255,255,0.07)"}}>
+                <div style={{fontSize:24,marginBottom:4}}>{s.icon}</div>
+                <div style={{fontSize:20,fontWeight:700,color:s.c,lineHeight:1}}>{s.val}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:4,fontFamily:"var(--f-mono)"}}>{s.label.toUpperCase()}</div>
+              </div>
+            ))}
+          </div>
+          {currentStreak>=7&&<div style={{padding:"14px 16px",background:"rgba(210,175,90,0.07)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,fontSize:13,color:"var(--gold)",lineHeight:1.6}}>🏆 You've maintained a {currentStreak}-day streak. Most people quit by day 3. You didn't.</div>}
+          {currentStreak===0&&totalWins>0&&<div style={{padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.6}}>You've logged {totalWins} wins total. Today is a new day — log one thing and restart your streak.</div>}
+          {totalWins===0&&<div style={{textAlign:"center",padding:"20px 0",color:"rgba(255,255,255,0.25)",fontSize:13}}>Start logging wins daily. Even small ones. After 7 days you'll see something change.</div>}
         </div>
       )}
     </div>
@@ -4382,8 +4521,12 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               {!showCheckin&&<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>}
             </div>
           </div>
-          <div className="fu3 pillar-wrap" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
-            <Ring score={data.overall||70} color="var(--gold)" size={106} label="Overall"/>
+          <div className="fu3" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
+            <Ring score={
+              data.scores
+                ? Math.round((data.scores.life||0)*0.25+(data.scores.wealth||0)*0.30+(data.scores.mindset||0)*0.25+(data.scores.relations||0)*0.20)
+                : data.overall||70
+            } color="var(--gold)" size={106} label="Overall"/>
             <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:260}}>
               {PILLARS.map(p=>(
                 <div className="pillar-bar-card" key={p.id}>
@@ -4396,14 +4539,14 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           <div className="insight fu4">
             <p className="body">{data.headline}</p>
             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:8}}>
-              <AudioPlayer text={[data.headline,...PILLARS.map(p=>data.score_explanations?.[p.id]).filter(Boolean)].join(". ")} label="Listen to your report"/>
+              <AudioPlayer text={[data.headline,...(PILLARS||[]).map(p=>data.score_explanations?.[p.id]).filter(Boolean)].join(". ")} label="Listen to full report"/>
               <VoiceSelector/>
             </div>
           </div>
 
-          {/* Score explanations */}
+          {/* Score explanation cards — 2-col on mobile, 4-col on desktop */}
           {data.score_explanations&&(
-            <div className="fu4" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+            <div className="fu4" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
               {PILLARS.map(p=>data.score_explanations[p.id]&&(
                 <div key={p.id} style={{padding:"12px 14px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
                   <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".12em",textTransform:"uppercase",color:p.color,marginBottom:5}}>{p.label}</div>
@@ -4461,10 +4604,11 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
 
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
-            {mod==="hacks"&&<LifeHacksModule data={data} formData={formData}/>}
-            {mod==="money"&&<MoneyModule data={data} formData={formData}/>}
-            {mod==="online"&&<OnlineIncomeModule data={data} formData={formData}/>}
-            {mod==="business"&&<BusinessModule data={data} formData={formData}/>}
+            {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
@@ -4472,11 +4616,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>Your path forward, step by step</div>
-                <p className="body" style={{marginBottom:12}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
-                {data.roadmap?.length>0&&(
-                  <AudioPlayer text={data.roadmap.map(r=>`${r.phase} — ${r.title}. ${r.desc}. ${Array.isArray(r.steps)?r.steps.join(". "):""}. ${r.win?`First step: ${r.win}`:""}`).join(" | ")} label="Listen to full roadmap"/>
-                )}
-                <div style={{marginBottom:20}}/>
+                <p className="body" style={{marginBottom:28}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
                 {data.roadmap?.map((r,i)=>(
                   <div className="timeline-item" key={i}>
                     <div className="t-dot">{String(i+1).padStart(2,"0")}</div>
@@ -4506,17 +4646,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           {mod==="mindset"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
-                <div className="d3" style={{marginBottom:12}}>What's really going on inside</div>
-                <AudioPlayer
-                  text={[
-                    data.mindset?.pattern&&`What keeps tripping you up: ${data.mindset.pattern}`,
-                    data.mindset?.reframe&&`A different way to see it: ${data.mindset.reframe}`,
-                    data.mindset?.emotional&&`What's really happening emotionally: ${data.mindset.emotional}`,
-                    data.mindset?.practice&&`One thing to try every morning: ${data.mindset.practice}`,
-                  ].filter(Boolean).join(". ")}
-                  label="Listen to mindset report"
-                />
-                <div style={{marginBottom:16}}/>
+                <div className="d3" style={{marginBottom:20}}>What's really going on inside</div>
                 {[
                   {icon:"◇",title:"What keeps tripping you up",key:"pattern",accent:"rose"},
                   {icon:"↺",title:"A different way to see it",key:"reframe",accent:"gold"},
@@ -4539,14 +4669,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>What you could actually be doing</div>
-                <p className="body" style={{marginBottom:12}}>Real paths matched to your skills, your country, and where you are right now — with exact steps to start.</p>
-                {data.career?.length>0&&(
-                  <AudioPlayer
-                    text={data.career.map(o=>`${o.title}: ${o.why||o.desc||""}. ${Array.isArray(o.how)?`How to start: ${o.how.join(". ")}`:""}. Income target: ${o.income||""}`).join(" | ")}
-                    label="Listen to all career paths"
-                  />
-                )}
-                <div style={{marginBottom:16}}/>
+                <p className="body" style={{marginBottom:24}}>Real paths matched to your skills, your country, and where you are right now — with exact steps to start.</p>
                 {data.career?.map((o,i)=>(
                   <div className="card" key={i} style={{marginBottom:16}}>
                     <div style={{display:"flex",gap:14,marginBottom:14}}>
@@ -5461,37 +5584,42 @@ export default function DestinIQ(){
       const parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
       pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
       setReport(parsed);
+      // Always compute overall from pillar scores so it stays consistent with what's shown
+      if(parsed.scores){
+        const {life=0,wealth=0,mindset=0,relations=0}=parsed.scores;
+        const computed=Math.round(life*0.25+wealth*0.30+mindset*0.25+relations*0.20);
+        parsed.overall=computed;
+      }
       setScreen("results");
       // Save profile + report to Supabase
       try{
         const reportToSave = {
-          overall: parsed.overall,
-          summary: parsed.summary,
-          life: parsed.life,
-          wealth: parsed.wealth,
-          mindset: parsed.mindset,
-          relationships: parsed.relationships,
-          sections: (parsed.sections||[]).map(s=>({title:s.title,content:(s.content||"").slice(0,600)})),
-          teaser: parsed.teaser,
-          headline: parsed.headline,
-          closing: parsed.closing,
-          strengths: parsed.strengths,
-          risks: parsed.risks,
-          scores: parsed.scores,
+          overall:       parsed.overall,
+          scores:        parsed.scores,
           score_explanations: parsed.score_explanations,
-          roadmap: parsed.roadmap,
-          career: parsed.career,
-          relocation: parsed.relocation,
-          suggestedCountries: (parsed.suggestedCountries||[]).slice(0,3),
-          // Module data — must be saved or tabs show "Regenerate"
-          life_hacks: parsed.life_hacks,
-          emotional_strength: parsed.emotional_strength,
-          money_protection: parsed.money_protection,
-          online_income: parsed.online_income,
-          zero_income_business: parsed.zero_income_business,
-          product_business: parsed.product_business,
-          real_estate_hack: parsed.real_estate_hack,
+          summary:       parsed.summary,
+          headline:      parsed.headline,
+          greeting:      parsed.greeting,
+          teaser:        parsed.teaser,
+          closing:       parsed.closing,
           daily_insight: parsed.daily_insight,
+          life:          parsed.life,
+          wealth:        parsed.wealth,
+          mindset:       parsed.mindset,
+          relationships: parsed.relationships,
+          sections:      (parsed.sections||[]).map(s=>({title:s.title,content:(s.content||"").slice(0,800)})),
+          roadmap:       parsed.roadmap,
+          career:        parsed.career,
+          relocation:    parsed.relocation,
+          suggestedCountries: (parsed.suggestedCountries||[]).slice(0,3),
+          // Module data — these MUST be saved or tabs show empty
+          life_hacks:          parsed.life_hacks,
+          emotional_strength:  parsed.emotional_strength,
+          money_protection:    parsed.money_protection,
+          online_income:       parsed.online_income,
+          zero_income_business:parsed.zero_income_business,
+          product_business:    parsed.product_business,
+          real_estate_hack:    parsed.real_estate_hack,
         };
         const {error:saveError} = await supabase.from("user_profiles").upsert({
           user_id: userId,
@@ -5513,7 +5641,18 @@ export default function DestinIQ(){
       setReport(fb);
       setScreen("results");
       try{
-        const fbToSave={overall:fb.overall,summary:fb.summary,life:fb.life,wealth:fb.wealth,mindset:fb.mindset,relationships:fb.relationships,sections:fb.sections?.map(s=>({title:s.title,content:s.content?.slice(0,800)})),teaser:fb.teaser};
+        const fbToSave={
+          overall:fb.overall, scores:fb.scores, score_explanations:fb.score_explanations,
+          summary:fb.summary, headline:fb.headline, teaser:fb.teaser,
+          life:fb.life, wealth:fb.wealth, mindset:fb.mindset, relationships:fb.relationships,
+          sections:fb.sections?.map(s=>({title:s.title,content:s.content?.slice(0,800)})),
+          roadmap:fb.roadmap, career:fb.career, relocation:fb.relocation,
+          suggestedCountries:(fb.suggestedCountries||[]).slice(0,3),
+          life_hacks:fb.life_hacks, emotional_strength:fb.emotional_strength,
+          money_protection:fb.money_protection, online_income:fb.online_income,
+          zero_income_business:fb.zero_income_business, product_business:fb.product_business,
+          real_estate_hack:fb.real_estate_hack,
+        };
         await saveUserProfile(userId,{form_data:f,report:fbToSave,is_paid:isPaid,is_premium:isPremium,streak});
       }catch(_){}
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
