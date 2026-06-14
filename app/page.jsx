@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -256,12 +256,12 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
-  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
-  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
+  basic:  { name:"Essential", amount:1,   label:"GHS1/month",  currency:"GHS" },
+  pro:    { name:"Premium",   amount:15,  label:"GHS15/month", currency:"GHS" },
+  annual: { name:"Annual Pro",amount:99,  label:"GHS99/year",  currency:"GHS" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
