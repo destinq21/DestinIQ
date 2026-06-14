@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -256,12 +256,12 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"GHS9/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:15,  label:"GHS15/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:99,  label:"GHS99/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
@@ -517,11 +517,23 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .t-title{font-family:var(--f-display);font-size:18px;font-weight:500;margin-bottom:6px;}
 .t-desc{font-size:13px;color:var(--cream-60);line-height:1.75;font-weight:300;}
 .t-win{margin-top:10px;padding:10px 14px;background:var(--teal-dim);border-left:2px solid var(--teal);border-radius:0 8px 8px 0;font-size:12px;color:var(--teal);}
-.tabs{display:flex;background:var(--base);border-radius:10px;padding:4px;gap:2px;overflow-x:auto;}
+.tabs{display:grid;grid-template-columns:repeat(7,1fr);background:var(--base);border-radius:10px;padding:4px;gap:3px;}
 .tabs::-webkit-scrollbar{display:none;}
-.tab{flex:1;min-width:75px;padding:8px 10px;border-radius:7px;border:none;cursor:pointer;font-family:var(--f-body);font-size:11px;font-weight:500;background:transparent;color:var(--cream-30);transition:all .25s;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:4px;}
+.tab{padding:9px 4px;border-radius:7px;border:none;cursor:pointer;font-family:var(--f-body);font-size:10.5px;font-weight:500;background:transparent;color:var(--cream-30);transition:all .25s;white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden;text-overflow:ellipsis;}
+.tab span:first-child{font-size:14px;}
 .tab:hover{color:var(--cream-60);}
 .tab.on{background:var(--lift);color:var(--cream);border:1px solid var(--line-gold);}
+@media(max-width:900px){
+  .tabs{grid-template-columns:repeat(5,1fr);}
+}
+@media(max-width:640px){
+  .tabs{grid-template-columns:repeat(4,1fr);}
+  .tab{font-size:9.5px;padding:8px 2px;}
+  .tab span:first-child{font-size:13px;}
+}
+@media(max-width:420px){
+  .tabs{grid-template-columns:repeat(3,1fr);}
+}
 .mom-slider-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .mom-slider-label{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-30);width:72px;flex-shrink:0;}
 .mom-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;outline:none;cursor:pointer;}
@@ -1014,7 +1026,6 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
   "greeting": "Start with something that makes them stop and re-read it. Mention their name and their specific goal. If we detected their city, name it. Sound like someone who has actually read what they wrote — not a welcome message.",
   "teaser": "One sentence naming a pattern or truth in their profile that they haven't said out loud yet. Something that makes them think 'how did they know that.'",
   "scores": {"life":<int>,"wealth":<int>,"mindset":<int>,"relations":<int>},
-  "overall": <weighted int>,
   "headline": "2 sentences that sound like truth, not a summary. Name their age, their country, and the exact tension between where they are and what they want. Use their own words back at them.",
   "daily_insight": "3 sentences for TODAY. Sentence 1: Name their specific challenge in their own words. Sentence 2: One concrete action for today with a real local/relevant example (platform name, real amount, specific step). Sentence 3: Something that makes them feel less alone in this.",
   "score_explanations": {
@@ -1087,7 +1098,7 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
       ],
       "effort": "low|medium|high",
       "timeline": "Realistic time to first income",
-      "income": "Use their actual local currency AND USD — e.g. GHS 3,500–8,000/month ($280–$650)",
+      "income": "Earnings in USD primarily (e.g. $280–$650/month), with local currency equivalent in parentheses using their actual currency",
       "type": "job|business|freelance"
     },
     {
@@ -1096,7 +1107,7 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
       "how": ["Step 1 specific to this path with real example","Step 2 with real platform or org","Step 3 showing path to first income"],
       "effort": "low|medium|high",
       "timeline": "X months to first income",
-      "income": "Local currency AND USD range",
+      "income": "USD range primarily, with local currency equivalent in parentheses",
       "type": "job|business|freelance"
     },
     {
@@ -1105,7 +1116,7 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
       "how": ["Step 1","Step 2","Step 3 showing the longer path to higher income"],
       "effort": "low|medium|high",
       "timeline": "X months",
-      "income": "Local currency AND USD — show the higher ceiling",
+      "income": "USD range showing the higher ceiling, with local currency equivalent in parentheses",
       "type": "job|business|freelance"
     }
   ],
@@ -1149,9 +1160,9 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
   ],
   "money_protection": {
     "rule": "The single most important money rule for their income level and country",
-    "savings_target": "What percentage to save and where to put it — specific account type or platform in their country",
+    "savings_target": "What percentage to save and where to put it — specific account type or platform in their country. Any amount must be in their LOCAL CURRENCY.",
     "avoid": "The 2-3 specific things people at their income level waste money on in their country",
-    "first_investment": "The smallest possible first investment they can make right now with almost no money — specific platform or method in their country"
+    "first_investment": "The smallest possible first investment they can make right now with almost no money — specific platform or method in their country. State the cost in their LOCAL CURRENCY."
   },
   "emotional_strength": [
     "Practice 1: specific to the challenge they described — exact instructions, when to do it, what it prevents",
@@ -1160,37 +1171,37 @@ Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
   ],
   "online_income": [
     {
-      "method": "Name of the method",
-      "why_it_works": "Why this works specifically in their country and for their skills",
-      "url": "https://actual-website.com",
-      "first_step": "What to do today to start"
+      "method": "Name of the method/platform — must be a real, well-known platform genuinely usable from their country",
+      "why_it_works": "Why this works specifically for someone in their country and for their skills — mention payment method compatibility if relevant. Earnings mentioned in USD.",
+      "url": "https://the-real-top-level-domain.com — must be the correct, real, working URL for this exact platform",
+      "first_step": "What to do today to start, in plain steps"
     },
     {
-      "method": "Second method",
-      "why_it_works": "Why this fits them",
-      "url": "https://actual-website.com",
+      "method": "Second method — different from the first",
+      "why_it_works": "Why this fits them and works in their country. Earnings in USD.",
+      "url": "https://the-real-top-level-domain.com",
       "first_step": "First action"
     },
     {
-      "method": "Third method",
-      "why_it_works": "Why this fits them",
-      "url": "https://actual-website.com",
+      "method": "Third method — different from the first two",
+      "why_it_works": "Why this fits them and works in their country. Earnings in USD.",
+      "url": "https://the-real-top-level-domain.com",
       "first_step": "First action"
     }
   ],
   "zero_income_business": {
-    "idea": "Specific business idea that matches their skills and requires zero capital",
+    "idea": "Specific business idea that matches their skills and requires zero capital, relevant to their country's market",
     "why_zero": "Why this can start with no money — the exact model",
     "day_one": "What to do on day one — specific action with no money needed",
-    "first_revenue": "How and when they get their first income — specific amount and method",
-    "scale": "How to grow it once they have their first GHS/NGN/KES 500 or equivalent"
+    "first_revenue": "How and when they get their first income — specific amount in LOCAL CURRENCY and method",
+    "scale": "How to grow it once they have their first small amount of LOCAL CURRENCY revenue"
   },
   "product_business": [
     {
       "product": "Product type — e.g. Phone accessories",
       "why": "Why this sells daily in their specific country/city",
       "supplier_links": ["https://alibaba.com/...", "https://dhgate.com/..."],
-      "startup_cost": "Estimated minimum startup in their local currency",
+      "startup_cost": "Estimated minimum startup cost stated in their LOCAL CURRENCY with correct currency symbol/code",
       "profit_margin": "Expected margin percentage"
     },
     {
@@ -4067,14 +4078,16 @@ function AudioPlayer({text,label="Listen",mini=false}){
 // ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
   setLoading(true); setErr("");
+  const country=profile.country||"their country";
+  const currencyNote=`Any startup cost, savings amount, or budget figure must be stated in the LOCAL CURRENCY of ${country} (correct currency code/symbol for that country). Any earnings/income figures should be in USD.`;
   const prompts={
-    life_hacks:`Give ${profile.name||"the user"} in ${profile.country||"their country"} 6 real, specific life hacks that will change how they operate. Skills: ${profile.skills||"general"}. Goal: ${profile.goals||""}. Income: ${profile.income||""}. Return ONLY a JSON array of 6 strings. No other text. Example: ["hack 1","hack 2"]`,
+    life_hacks:`Give ${profile.name||"the user"} in ${country} 6 real, specific life hacks that will change how they operate. Skills: ${profile.skills||"general"}. Goal: ${profile.goals||""}. Income: ${profile.income||""}. Return ONLY a JSON array of 6 strings. No other text. Example: ["hack 1","hack 2"]`,
     emotional_strength:`Give ${profile.name||"the user"} 4 emotional strength practices specific to their challenge: "${profile.challenge||""}". Return ONLY a JSON array of 4 strings. No other text.`,
-    money_protection:`Write a money protection plan for ${profile.name||"the user"} in ${profile.country||"their country"} earning ${profile.income||"under $500"}. Return ONLY JSON: {"rule":"...","savings_target":"...","avoid":"...","first_investment":"..."}`,
-    online_income:`Give ${profile.name||"the user"} in ${profile.country||"their country"} with skills "${profile.skills||""}" exactly 3 ways to make money online. Return ONLY a JSON array: [{"method":"...","why_it_works":"...","url":"exact website url","first_step":"..."},...]`,
-    zero_income_business:`How can ${profile.name||"the user"} in ${profile.country||"their country"} with skills "${profile.skills||""}" start a business with zero money? Return ONLY JSON: {"idea":"...","why_zero":"...","day_one":"...","first_revenue":"...","scale":"..."}`,
-    product_business:`Give 3 physical product business ideas for ${profile.country||"their country"}. Return ONLY a JSON array: [{"product":"...","why":"...","startup_cost":"...","profit_margin":"...","supplier_links":["alibaba.com","dhgate.com"]},...]`,
-    real_estate_hack:`How can someone with little money make money in real estate in ${profile.country||"their country"} right now? Return ONLY JSON: {"method":"...","how_it_works":"...","platform":"...","first_deal":"..."}`,
+    money_protection:`Write a money protection plan for ${profile.name||"the user"} in ${country} earning ${profile.income||"under $500"}. ${currencyNote} Return ONLY JSON: {"rule":"...","savings_target":"...","avoid":"...","first_investment":"..."}`,
+    online_income:`Give ${profile.name||"the user"} in ${country} with skills "${profile.skills||""}" exactly 3 ways to make money online that are genuinely ACCESSIBLE from ${country} (consider payment methods and platform availability — e.g. Upwork, Fiverr, Toptal, Remote.co, We Work Remotely, Appen, Braintrust, Deel, or strong local/regional alternatives). Give the exact, correct, real top-level domain URL for each platform (e.g. https://www.upwork.com). Earnings in USD. Return ONLY a JSON array: [{"method":"...","why_it_works":"...","url":"https://real-platform.com","first_step":"..."},...]`,
+    zero_income_business:`How can ${profile.name||"the user"} in ${country} with skills "${profile.skills||""}" start a business with zero money? ${currencyNote} Return ONLY JSON: {"idea":"...","why_zero":"...","day_one":"...","first_revenue":"...","scale":"..."}`,
+    product_business:`Give 3 physical product business ideas relevant to the market in ${country}. ${currencyNote} Return ONLY a JSON array: [{"product":"...","why":"...","startup_cost":"... (in local currency)","profit_margin":"...","supplier_links":["https://www.alibaba.com","https://www.dhgate.com"]},...]`,
+    real_estate_hack:`How can someone with little money make money in real estate in ${country} right now? Mention real platforms/marketplaces relevant to ${country} (e.g. Zillow/Craigslist for USA, OLX, Rightmove for UK, Jiji, etc — whichever is genuinely relevant). ${currencyNote} Return ONLY JSON: {"method":"...","how_it_works":"...","platform":"...","first_deal":"..."}`,
   };
   const sys="Return ONLY valid JSON. No markdown. No code fences. No explanation. Start directly with { or [.";
   try{
@@ -4459,10 +4472,18 @@ function WinTracker({profile,userId,isPremium}){
 }
 
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
-  const [mod,setMod]=useState("today");
+  const [mod,setMod]=useState(()=>{
+    if(typeof window==="undefined") return "today";
+    return localStorage.getItem("diq_active_tab")||"today";
+  });
+  useEffect(()=>{
+    try{ localStorage.setItem("diq_active_tab",mod); }catch{}
+  },[mod]);
   const [aScores,setAScores]=useState({life:0,wealth:0,mindset:0,relations:0});
   const [dailyInsight,setDailyInsight]=useState(data.daily_insight||"");
   const [refreshingInsight,setRefreshingInsight]=useState(false);
+  const [closingLine,setClosingLine]=useState(data.closing||"");
+  const [refreshingClosing,setRefreshingClosing]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
 
   // Auto-generate fresh insight if saved one is empty or generic
@@ -4480,21 +4501,55 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
     setRefreshingInsight(true);
     try{
       const today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-      const prompt=`Today is ${today}. Write a fresh, specific daily insight for ${sanitize(formData.name)} who lives in ${sanitize(formData.country)}, age ${formData.age}. Their challenge: "${sanitize(formData.challenge)}". Their goal: "${sanitize(formData.goals)}". Their skill: ${sanitize(formData.skills)||"general professional skills"}.
+      const challenge=sanitize(formData?.challenge)||"figuring out the next step toward their goal";
+      const goal=sanitize(formData?.goals)||"making real progress in life";
+      const name=sanitize(formData?.name)||"there";
+      const country=sanitize(formData?.country)||"their country";
+      const skill=sanitize(formData?.skills)||"general professional skills";
+
+      const prompt=`Today is ${today}. Write a fresh, specific daily insight for ${name} who lives in ${country}, age ${formData?.age||"adult"}. Their challenge: "${challenge}". Their goal: "${goal}". Their skill: ${skill}.
 
 Write exactly 3 sentences:
 1. Name their specific challenge using their own words.
-2. Give ONE concrete action they can do TODAY with a real local example — a specific platform, step, or person type that works in their country.
+2. Give ONE concrete action they can do TODAY with a real local example — a specific platform, step, or person type that works in ${country}.
 3. Close with something that makes them feel understood and capable.
 
-Do NOT use generic motivational language. Be specific, direct, and honest.`;
-      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You are a direct, honest daily advisor. Write exactly 3 sentences. No greetings, no headers, no lists, no bold. Just 3 powerful plain sentences.",userId,isPremium});
-      setDailyInsight(reply);
-      pushToMemory(userId,"assistant","Daily refresh: "+reply.slice(0,200));
+Do NOT use generic motivational language. Do NOT ask for more information — work with what's given, even if brief. Be specific, direct, and honest. Output ONLY the 3 sentences, nothing else.`;
+      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You are a direct, honest daily advisor. Write exactly 3 sentences. No greetings, no headers, no lists, no bold, no requests for more information — work with whatever details are given. Just 3 powerful plain sentences.",userId,isPremium,maxTokens:300});
+
+      // Guard against AI asking for more info despite instructions
+      const badPhrases=["i need more information","please tell me","i don't have enough","could you share","can you provide"];
+      const isBad = !reply || reply.length<30 || badPhrases.some(p=>reply.toLowerCase().includes(p));
+
+      if(isBad){
+        // Local fallback — always works, no AI needed
+        setDailyInsight(`${name}, the thing you've been putting off about "${challenge.slice(0,60)}" is the actual next step — not a detour from it. Today, give it 20 focused minutes: open one tab, search for the first concrete resource related to "${goal.slice(0,50)}" in ${country}, and write down what you find. Small honest steps compound faster than big plans that never start.`);
+      } else {
+        setDailyInsight(reply);
+        pushToMemory(userId,"assistant","Daily refresh: "+reply.slice(0,200));
+      }
     }catch(e){
-      setDailyInsight(data.daily_insight||"");
+      const name=sanitize(formData?.name)||"there";
+      setDailyInsight(`${name}, today is a good day to take one small, honest step toward what you said you want. Pick the smallest possible action related to your goal and do it before you check anything else. Momentum starts with motion, not motivation.`);
     }
     setRefreshingInsight(false);
+  };
+
+  const refreshClosing=async()=>{
+    if(refreshingClosing) return;
+    setRefreshingClosing(true);
+    try{
+      const name=sanitize(formData?.name)||"there";
+      const goal=sanitize(formData?.goals)||"their goal";
+      const challenge=sanitize(formData?.challenge)||"their challenge";
+      const prompt=`Person: ${name}, from ${sanitize(formData?.country)||"their country"}. Goal: "${goal}". Challenge: "${challenge}".
+
+Write ONE single sentence — something true and specific to them that they would screenshot and keep. Not motivational fluff. Something that sounds like it was written by someone who has been paying close attention to exactly what they wrote. Output ONLY that one sentence, nothing else, no quotes around it.`;
+      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You write one honest, specific sentence at a time. No quotes, no preamble, no explanation — just the sentence.",userId,isPremium,maxTokens:150});
+      const clean=(reply||"").trim().replace(/^["']|["']$/g,"");
+      if(clean&&clean.length>10) setClosingLine(clean);
+    }catch(e){ /* keep existing */ }
+    setRefreshingClosing(false);
   };
 
   return(
@@ -4523,9 +4578,9 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           </div>
           <div className="fu3" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
             <Ring score={
-              data.scores
-                ? Math.round((data.scores.life||0)*0.25+(data.scores.wealth||0)*0.30+(data.scores.mindset||0)*0.25+(data.scores.relations||0)*0.20)
-                : data.overall||70
+              (aScores.life||aScores.wealth||aScores.mindset||aScores.relations)
+                ? Math.round((aScores.life||0)*0.25+(aScores.wealth||0)*0.30+(aScores.mindset||0)*0.25+(aScores.relations||0)*0.20)
+                : 70
             } color="var(--gold)" size={106} label="Overall"/>
             <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:260}}>
               {PILLARS.map(p=>(
@@ -4568,7 +4623,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
       <div style={{padding:"36px 0"}}>
         <div className="cx-md">
           <div className="tabs" style={{marginBottom:32}}>
-            {MODULES.map(m=><button key={m.id} className={`tab ${mod===m.id?"on":""}`} onClick={()=>setMod(m.id)}><span>{m.icon}</span>{m.label}</button>)}
+            {MODULES.map(m=><button key={m.id} className={`tab ${mod===m.id?"on":""}`} onClick={()=>setMod(m.id)}><span>{m.icon}</span><span>{m.label}</span></button>)}
           </div>
 
           {mod==="today"&&(
@@ -4590,8 +4645,14 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                   {data.risks?.map((r,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--rose)",flexShrink:0}}>◇</span>{r}</div>)}</div>
               </div>
               <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
-                <div className="mono" style={{marginBottom:10,fontSize:"9px"}}>Something to carry with you</div>
-                <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>&ldquo;{data.closing}&rdquo;</p>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
+                  <div className="mono" style={{fontSize:"9px"}}>Something to carry with you</div>
+                  <button onClick={refreshClosing} disabled={refreshingClosing} title="Get a new one" style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"2px 10px",color:"var(--cream-40)",fontSize:10,cursor:refreshingClosing?"not-allowed":"pointer",fontFamily:"var(--f-mono)"}}>
+                    {refreshingClosing?"…":"↺"}
+                  </button>
+                </div>
+                <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>&ldquo;{refreshingClosing?"Thinking…":closingLine}&rdquo;</p>
+                <AudioPlayer text={closingLine} label="Listen"/>
               </div>
               {!isPaid&&(
                 <div style={{marginTop:24,padding:"20px 24px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(31,168,154,0.05))",border:"1px solid var(--line-gold)",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
@@ -4963,8 +5024,9 @@ function ShareCard({report,formData,onClose}){
     {label:"Mindset",  val:getScore("mindset",61)},
     {label:"Relations",val:getScore("relations",45)},
   ];
-  const parseNum=(v)=>typeof v==="number"?v:parseInt(v)||0;
-  const overall=parseNum(report?.overall)||Math.round(scores.reduce((s,x)=>s+x.val,0)/scores.length);
+  // Same weighted formula as the dashboard Ring — guarantees they always match
+  const life=getScore("life",52), wealth=getScore("wealth",38), mindset=getScore("mindset",61), relations=getScore("relations",45);
+  const overall=Math.round(life*0.25+wealth*0.30+mindset*0.25+relations*0.20);
 
   const shareText=`My DestinIQ Clarity Score: ${overall}/100
 
@@ -5576,13 +5638,13 @@ export default function DestinIQ(){
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
-        system:"You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person. Beyond the standard report sections, you MUST include these additional sections in your JSON response that will genuinely change how this person sees their options:\n\n- life_hacks: 5 specific, practical life hacks tailored to their goal and country. Real shortcuts. Real tips. Not generic advice.\n- money_protection: 3-4 specific rules for protecting whatever income they have — budgeting method, savings target, what NOT to spend on, and one investment they can start with almost nothing.\n- emotional_strength: 3 practices for not letting emotions derail their progress. Specific to what they said about their challenges.\n- online_income: 3 ways to make money online that work specifically in their country, with the exact website URLs they should go to (e.g. Upwork.com, Fiverr.com, Jumia.com etc). Be specific about which works best for their skills.\n- zero_income_business: How to start a business with zero money in their specific country. Real first step. Real business idea that matches their skills.\n- product_business: 3 physical product business ideas that sell daily (phones/accessories, perfumes, food, building materials etc) with real wholesale supplier links (e.g. Alibaba.com, DHgate.com, Made-in-China.com, local market names). Include estimated startup cost and profit margin.\n- real_estate_hack: How someone with little money can make money in real estate in their country right now — rental arbitrage, posting ads for commissions, connecting buyers and sellers. Include specific platforms or groups they can use.\n\nAll other rules still apply: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.",
+        system:"You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person, anywhere in the world — not just Africa. Tailor everything to their actual country, whether that is Ghana, the Philippines, Brazil, India, Poland, the USA, or anywhere else.\n\nCURRENCY RULE (applies to the entire report): any STARTUP COST, SAVINGS TARGET, BUDGET, or AMOUNT OF MONEY TO SPEND must be given in the person's own LOCAL CURRENCY (use the correct currency and symbol for their stated country — e.g. GHS for Ghana, NGN for Nigeria, PHP for Philippines, INR for India, BRL for Brazil, PLN for Poland, USD for USA). Any EARNINGS, INCOME, or REVENUE figures should be given primarily in USD (with local currency in parentheses if helpful), since online income is usually paid in USD regardless of the person's location.\n\nBeyond the standard report sections, you MUST include these additional sections in your JSON response:\n\n- life_hacks: 5 specific, practical life hacks tailored to their goal and country. Real shortcuts. Real tips. Not generic advice.\n- money_protection: 3-4 specific rules for protecting whatever income they have — budgeting method, savings target in LOCAL CURRENCY, what NOT to spend on, and one investment they can start with almost nothing (cost in local currency).\n- emotional_strength: 3 practices for not letting emotions derail their progress. Specific to what they said about their challenges.\n- online_income: 3 ways to make money online that are realistically ACCESSIBLE to someone in their specific country (consider payment methods, platform availability, and whether the platform accepts users from that country — e.g. Upwork, Fiverr, Toptal, Remote.co, We Work Remotely, Appen, Braintrust, Deel, local equivalents like OLX or Jumia for selling, or country-specific freelance platforms). Give the EXACT working URL for each (e.g. https://www.upwork.com, https://www.fiverr.com) — these must be real, correct, top-level domains a person can type directly. Earnings in USD. Be specific about which platform works best for their skills AND is genuinely usable from their country.\n- zero_income_business: How to start a business with zero money in their specific country. Real first step. Real business idea that matches their skills. Any cost mentioned must be in local currency.\n- product_business: 3 physical product business ideas that sell daily (phones/accessories, perfumes, food, building materials, clothing etc) relevant to their country's market, with real wholesale supplier links (e.g. https://www.alibaba.com, https://www.dhgate.com, https://www.made-in-china.com, or major local marketplaces relevant to their region). Startup cost in LOCAL CURRENCY. Profit margin as a percentage.\n- real_estate_hack: How someone with little money can make money in real estate in their country right now — rental arbitrage, posting ads for commissions, connecting buyers and sellers. Include specific platforms or groups relevant to their country (e.g. Zillow/Craigslist for USA, OLX for many countries, Rightmove for UK, Jiji for Nigeria/Ghana). Any investment figure in local currency.\n\nAll other rules still apply: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.",
         userId,isPremium
       });
       const cleaned=raw.replace(/```json|```/g,"").trim();
       const jStart=cleaned.indexOf("{"); const jEnd=cleaned.lastIndexOf("}");
       const parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
-      pushToMemory(userId,"assistant","Report generated: overall="+parsed.overall);
+      pushToMemory(userId,"assistant","Report generated: scores="+JSON.stringify(parsed.scores||{}));
       setReport(parsed);
       // Always compute overall from pillar scores so it stays consistent with what's shown
       if(parsed.scores){
