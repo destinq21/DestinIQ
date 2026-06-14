@@ -489,6 +489,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .typing-dot span:nth-child(2){animation-delay:.2s;}
 .typing-dot span:nth-child(3){animation-delay:.4s;}
 @keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
+@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(196,100,90,0.4);}50%{box-shadow:0 0 0 6px rgba(196,100,90,0);}}
 .ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
 .ring-inner{position:absolute;text-align:center;}
 .ring-val{font-family:var(--f-display);font-size:24px;font-weight:500;line-height:1;display:block;}
@@ -517,11 +518,12 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .t-title{font-family:var(--f-display);font-size:18px;font-weight:500;margin-bottom:6px;}
 .t-desc{font-size:13px;color:var(--cream-60);line-height:1.75;font-weight:300;}
 .t-win{margin-top:10px;padding:10px 14px;background:var(--teal-dim);border-left:2px solid var(--teal);border-radius:0 8px 8px 0;font-size:12px;color:var(--teal);}
-.tabs{display:flex;background:var(--base);border-radius:10px;padding:4px;gap:2px;overflow-x:auto;}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--base);border-radius:12px;padding:4px;gap:3px;}
 .tabs::-webkit-scrollbar{display:none;}
-.tab{flex:1;min-width:75px;padding:8px 10px;border-radius:7px;border:none;cursor:pointer;font-family:var(--f-body);font-size:11px;font-weight:500;background:transparent;color:var(--cream-30);transition:all .25s;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:4px;}
-.tab:hover{color:var(--cream-60);}
+.tab{padding:8px 6px;border-radius:8px;border:none;cursor:pointer;font-family:var(--f-body);font-size:11px;font-weight:500;background:transparent;color:var(--cream-30);transition:all .25s;white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;}
+.tab span{font-size:15px;line-height:1;}
 .tab.on{background:var(--lift);color:var(--cream);border:1px solid var(--line-gold);}
+.tab:hover{color:var(--cream-60);background:var(--raised);}
 .mom-slider-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .mom-slider-label{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-30);width:72px;flex-shrink:0;}
 .mom-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;outline:none;cursor:pointer;}
@@ -563,12 +565,10 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
   .results-grid{grid-template-columns:1fr!important;}
   .score-grid{grid-template-columns:1fr 1fr!important;}
-  .score-explain-grid{grid-template-columns:1fr 1fr!important;}
-  .pillar-score-ring{flex-direction:column!important;gap:16px!important;}
-  .pillar-score-ring>div:last-child{min-width:unset!important;grid-template-columns:1fr 1fr!important;}
-  .tabs{gap:4px;padding:4px;}
-  .tab{min-width:56px;font-size:10px;padding:7px 6px;flex-direction:column;gap:2px;}
-  .tab span{font-size:14px;}
+  .tabs{grid-template-columns:repeat(3,1fr)!important;}
+  .score-cards-grid{grid-template-columns:1fr 1fr!important;}
+  .pillar-wrap{flex-direction:column!important;}
+  .pillar-wrap>div:last-child{min-width:unset!important;}
 }
 @media(max-width:400px){
   .d1{font-size:28px!important;}
@@ -2043,7 +2043,7 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
 
         <div className="card" style={{marginBottom:24}}>
           <div className="mono" style={{marginBottom:12,fontSize:"9px"}}>What decision are you facing?</div>
-          <textarea className="ft" rows={3} maxLength={500}
+          <VoiceInput rows={3} maxLength={500}
             placeholder="e.g. Should I quit my job to go freelance? / Should I move to Dubai? / Should I take this business partnership?"
             value={question} onChange={e=>setQuestion(e.target.value)}/>
           <div style={{marginTop:12,display:"flex",gap:10,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
@@ -2074,6 +2074,7 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
                   <span className="tag tg" style={{flexShrink:0}}>{d.date}</span>
                 </div>
                 <div style={{fontSize:14,lineHeight:1.8,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap"}}>{d.framework}</div>
+                <AudioPlayer text={`Decision: ${d.question}. ${d.framework}`} label="Listen to this"/>
               </div>
             ))}
           </div>
@@ -2386,6 +2387,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
       </div>
       <div className="d3" style={{marginBottom:20}}>Something for today</div>
       <div style={{fontSize:15,lineHeight:1.85,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap"}}>{result}</div>
+      <AudioPlayer text={result} label="Listen to your reflection"/>
       <div style={{marginTop:24}}><button className="btn btn-ghost" onClick={onComplete}>← Back</button></div>
     </div>
   );
@@ -2407,8 +2409,12 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
           <span style={{fontFamily:"var(--f-display)",fontSize:24,color:"var(--gold)",minWidth:28}}>{score}</span>
         </div>
       </div>
-      <div className="field"><label className="fl">Most important thing you did today?</label><textarea className="ft" rows={2} placeholder="Doesn't have to be big. Even showing up counts." value={did} onChange={e=>setDid(e.target.value)}/></div>
-      <div className="field"><label className="fl">What did you keep putting off?</label><textarea className="ft" rows={2} placeholder="Be real — no one's watching. This is how you learn about yourself." value={avoided} onChange={e=>setAvoided(e.target.value)}/></div>
+      <div className="field"><label className="fl">Most important thing you did today?</label>
+        <VoiceInput rows={2} placeholder="Doesn't have to be big. Even showing up counts." value={did} onChange={e=>setDid(e.target.value)}/>
+      </div>
+      <div className="field"><label className="fl">What did you keep putting off?</label>
+        <VoiceInput rows={2} placeholder="Be real — no one's watching. This is how you learn about yourself." value={avoided} onChange={e=>setAvoided(e.target.value)}/>
+      </div>
       {error&&<div className="err-box">⚠ {error}</div>}
       <button className="btn btn-gold btn-full" onClick={submit} disabled={!feeling||!did.trim()||loading} style={{marginTop:8}}>{loading?"Reading what you shared…":"Get your reflection →"}</button>
     </div>
@@ -2418,6 +2424,27 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
+function AdvisorMicBtn({value,onTranscript}){
+  const [on,setOn]=useState(false);
+  const ref=useRef(null);
+  const sup=typeof window!=="undefined"&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window);
+  if(!sup) return null;
+  const toggle=()=>{
+    if(on){ref.current?.stop();setOn(false);return;}
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const r=new SR();r.lang="en-US";r.interimResults=false;r.continuous=false;
+    r.onresult=e=>onTranscript(e.results[0][0].transcript);
+    r.onend=()=>setOn(false);r.onerror=()=>setOn(false);
+    ref.current=r;r.start();setOn(true);
+  };
+  return(
+    <button type="button" onClick={toggle} title={on?"Stop speaking":"Tap to speak"}
+      style={{background:on?"rgba(196,100,90,0.2)":"none",border:"none",cursor:"pointer",fontSize:16,padding:"0 6px",color:on?"var(--rose)":"var(--cream-30)",transition:"all .2s",animation:on?"micpulse 1s infinite":"none",flexShrink:0}}>
+      {on?"⏹":"🎤"}
+    </button>
+  );
+}
+
 function AdvisorChat({profile,reportData,userId,isPremium}){
   const openingMessage = `Hey ${profile.name}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
@@ -2483,8 +2510,9 @@ function AdvisorChat({profile,reportData,userId,isPremium}){
           )}
         </div>
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
-        <div className="chat-in-row">
-          <input className="chat-in" placeholder="What's on your mind? Be honest…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
+        <div className="chat-in-row" style={{position:"relative"}}>
+          <input className="chat-in" placeholder="What's on your mind? Be honest… (or tap 🎤 to speak)" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
+          <AdvisorMicBtn value={input} onTranscript={t=>setInput(v=>v?v+" "+t:t)}/>
           <button className="chat-send" onClick={send} disabled={loading||!input.trim()}>→</button>
         </div>
       </div>
@@ -2589,6 +2617,59 @@ function TestimonialForm(){
 // ─── MARKDOWN RENDERER ───────────────────────────────────────────────────────
 // Clean plain rendering — no bold decorations, no colored circles.
 // Strips markdown syntax and displays content as readable plain text with spacing.
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOICE INPUT — Type OR speak into any textarea
+// ═══════════════════════════════════════════════════════════════════════════════
+function VoiceInput({value,onChange,rows=3,placeholder="",maxLength,className="ft",style={}}){
+  const [listening,setListening]=useState(false);
+  const [supported]=useState(()=>typeof window!=="undefined"&&("SpeechRecognition" in window||"webkitSpeechRecognition" in window));
+  const recRef=useRef(null);
+
+  const toggleVoice=()=>{
+    if(!supported) return;
+    if(listening){
+      recRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec=new SR();
+    rec.continuous=true;
+    rec.interimResults=false;
+    rec.lang="en-US";
+    rec.onresult=(e)=>{
+      const t=Array.from(e.results).map(r=>r[0].transcript).join(" ");
+      onChange({target:{value:(value?value+" ":"")+t}});
+    };
+    rec.onend=()=>setListening(false);
+    rec.onerror=()=>setListening(false);
+    recRef.current=rec;
+    rec.start();
+    setListening(true);
+  };
+
+  return(
+    <div style={{position:"relative"}}>
+      <textarea
+        className={className}
+        rows={rows}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        style={{...style,paddingRight:supported?44:undefined}}
+      />
+      {supported&&(
+        <button type="button" onClick={toggleVoice} title={listening?"Stop speaking":"Speak to type"}
+          style={{position:"absolute",right:10,bottom:10,width:30,height:30,borderRadius:"50%",border:`2px solid ${listening?"var(--rose)":"var(--cream-20)"}`,background:listening?"rgba(196,100,90,0.15)":"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,transition:"all .2s",color:listening?"var(--rose)":"var(--cream-30)",animation:listening?"micpulse 1.2s ease-in-out infinite":"none"}}>
+          {listening?"⏹":"🎤"}
+        </button>
+      )}
+      {listening&&<div style={{fontSize:10,color:"var(--rose)",fontFamily:"var(--f-mono)",marginTop:4,letterSpacing:".06em"}}>● Listening… speak now</div>}
+    </div>
+  );
+}
+
 function RenderMD({text,style={}}){
   if(!text) return null;
 
@@ -3179,7 +3260,7 @@ function Intake({onSubmit}){
               {(f.situation==="employed"||f.situation==="selfemployed"||f.situation==="business")&&(
                 <div style={{marginTop:14}}>
                   <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>BRIEFLY DESCRIBE YOUR WORK</label>
-                  <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none"}} rows={2} maxLength={300} placeholder="e.g. Sales rep at a telecoms company, $600/month" value={f.career} onChange={e=>set("career",e.target.value)}/>
+                  <VoiceInput style={{background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12}} rows={2} maxLength={300} placeholder="e.g. Sales rep at a telecoms company, $600/month" value={f.career} onChange={e=>set("career",e.target.value)}/>
                 </div>
               )}
             </div>
@@ -3212,12 +3293,12 @@ function Intake({onSubmit}){
               <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>This is the most important part. The more honest you are, the more powerful your report will be.</p>
               <div style={{marginBottom:18}}>
                 <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT DO YOU ACTUALLY WANT FROM LIFE?</label>
-                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder={`Don't filter yourself. Financial freedom, moving to ${f.country==="Ghana"?"Europe":"another country"}, a business, feeling less stuck — whatever it honestly is.`} value={f.goals} onChange={e=>set("goals",e.target.value)}/>
+                <VoiceInput style={{background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,lineHeight:1.6}} rows={3} maxLength={600} placeholder={`Don't filter yourself. Financial freedom, moving to ${f.country==="Ghana"?"Europe":"another country"}, a business, feeling less stuck — whatever it honestly is.`} value={f.goals} onChange={e=>set("goals",e.target.value)}/>
                 <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.goals.length}/600</div>
               </div>
               <div>
                 <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT'S ACTUALLY GETTING IN THE WAY?</label>
-                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder="What keeps coming back no matter what you try? Money, time, fear, family pressure, no connections — be real." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/>
+                <VoiceInput style={{background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,lineHeight:1.6}} rows={3} maxLength={600} placeholder="What keeps coming back no matter what you try? Money, time, fear, family pressure, no connections — be real." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/>
                 <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.challenge.length}/600</div>
               </div>
               <div style={{marginTop:16,padding:"14px 16px",background:"rgba(20,184,166,0.06)",border:"1px solid rgba(20,184,166,0.15)",borderRadius:12}}>
@@ -3896,97 +3977,84 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 // AUDIO PLAYER — Text-to-speech using Web Speech API
 // ═══════════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUDIO PLAYER — Voice selection, pause/resume, mini mode, reads everything
+// AUDIO — Shared voice state + VoiceSelector + AudioPlayer
 // ═══════════════════════════════════════════════════════════════════════════════
-// Shared voice state so all players use the same selected voice
-const _voiceState = { selected: null, listeners: [] };
-function useSharedVoice() {
-  const [sel, setSel] = useState(_voiceState.selected);
-  useEffect(() => {
-    const cb = v => setSel(v);
-    _voiceState.listeners.push(cb);
-    return () => { _voiceState.listeners = _voiceState.listeners.filter(x=>x!==cb); };
-  }, []);
-  const setVoice = (v) => {
-    _voiceState.selected = v;
-    _voiceState.listeners.forEach(cb => cb(v));
-  };
-  return [sel, setVoice];
+const _vs={v:null,cbs:[]};
+function useGlobalVoice(){
+  const [v,setV]=useState(_vs.v);
+  useEffect(()=>{_vs.cbs.push(setV);return()=>{_vs.cbs=_vs.cbs.filter(c=>c!==setV);};},[]);
+  const set=(voice)=>{_vs.v=voice;_vs.cbs.forEach(c=>c(voice));};
+  return[v,set];
 }
 
-function VoiceSelector() {
-  const [voices, setVoices] = useState([]);
-  const [sel, setSel] = useSharedVoice();
-  const [open, setOpen] = useState(false);
+function VoiceSelector(){
+  const [voices,setVoices]=useState([]);
+  const [sel,setSel]=useGlobalVoice();
+  const [open,setOpen]=useState(false);
+  const ref=useRef(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const load = () => {
-      const all = window.speechSynthesis.getVoices();
-      const en = all.filter(v => v.lang.startsWith("en"));
-      setVoices(en);
-      if (!_voiceState.selected && en.length > 0) {
-        // Pick a nice default — prefer Google/Natural/Premium voices
-        const preferred = en.find(v => v.name.includes("Google") && v.name.includes("US")) ||
-          en.find(v => v.name.includes("Google")) ||
-          en.find(v => v.name.includes("Samantha") || v.name.includes("Daniel") || v.name.includes("Karen")) ||
-          en[0];
-        setSel(preferred);
+  useEffect(()=>{
+    if(typeof window==="undefined"||!("speechSynthesis" in window)) return;
+    const load=()=>{
+      const all=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+      setVoices(all);
+      if(!_vs.v&&all.length){
+        const pick=all.find(v=>v.name.includes("Google")&&v.lang==="en-US")||all.find(v=>v.name.includes("Google"))||all.find(v=>/Samantha|Daniel|Karen|Moira|Rishi/.test(v.name))||all[0];
+        setSel(pick);
       }
     };
     load();
-    window.speechSynthesis.onvoiceschanged = load;
-  }, []);
+    window.speechSynthesis.onvoiceschanged=load;
+  },[]);
 
-  if (voices.length === 0) return null;
+  // Close on outside click
+  useEffect(()=>{
+    if(!open) return;
+    const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[open]);
 
-  // Group voices by accent/region
-  const ACCENT_MAP = [
-    { label: "🇺🇸 American", test: v => v.lang === "en-US" },
-    { label: "🇬🇧 British", test: v => v.lang === "en-GB" },
-    { label: "🇦🇺 Australian", test: v => v.lang === "en-AU" },
-    { label: "🇮🇳 Indian", test: v => v.lang === "en-IN" },
-    { label: "🌍 Other", test: () => true },
+  if(!voices.length) return null;
+
+  const GROUPS=[
+    {flag:"🇺🇸",label:"American",test:v=>v.lang==="en-US"},
+    {flag:"🇬🇧",label:"British", test:v=>v.lang==="en-GB"},
+    {flag:"🇦🇺",label:"Australian",test:v=>v.lang==="en-AU"},
+    {flag:"🇮🇳",label:"Indian",  test:v=>v.lang==="en-IN"},
+    {flag:"🌍", label:"Other",   test:()=>true},
   ];
+  const seen=new Set();
+  const grouped=GROUPS.map(g=>({
+    ...g,
+    voices:voices.filter(v=>{ if(seen.has(v.name)||!g.test(v)) return false; seen.add(v.name); return true; }).slice(0,7),
+  })).filter(g=>g.voices.length);
 
-  const grouped = ACCENT_MAP.map(g => ({
-    label: g.label,
-    voices: voices.filter(v => g.test(v)),
-  })).filter(g => g.voices.length > 0);
-
-  // Remove duplicates — each voice only appears in first matching group
-  const seen = new Set();
-  grouped.forEach(g => {
-    g.voices = g.voices.filter(v => { if (seen.has(v.name)) return false; seen.add(v.name); return true; });
-  });
-
-  const selName = sel?.name || "Choose voice";
-
-  return (
-    <div style={{position:"relative",display:"inline-block"}}>
+  return(
+    <div ref={ref} style={{position:"relative",display:"inline-block"}}>
       <button onClick={()=>setOpen(o=>!o)}
-        style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"5px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",letterSpacing:".04em",transition:"all .2s"}}
+        style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"5px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",letterSpacing:".04em",transition:"all .2s",whiteSpace:"nowrap"}}
         onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--line-gold)";e.currentTarget.style.color="var(--gold)";}}
         onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-40)";}}>
-        🎙 {selName.length > 22 ? selName.slice(0,20)+"…" : selName} ▾
+        🎙 {sel?(sel.name.replace(/\(.*?\)/g,"").trim().slice(0,18)||"Voice"):"Choose voice"} ▾
       </button>
-      {open && (
-        <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,zIndex:999,background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:12,padding:"8px 0",minWidth:240,maxWidth:300,maxHeight:320,overflowY:"auto",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}}>
-          <div style={{padding:"6px 14px 8px",fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".1em"}}>SELECT VOICE & ACCENT</div>
+      {open&&(
+        <div style={{position:"fixed",top:"auto",left:"auto",zIndex:99999,background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:14,padding:"6px 0 8px",minWidth:230,maxWidth:270,maxHeight:340,overflowY:"auto",boxShadow:"0 12px 48px rgba(0,0,0,0.85)",marginTop:6}}>
+          <div style={{padding:"5px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em"}}>VOICE & ACCENT</div>
           {grouped.map(g=>(
             <div key={g.label}>
-              <div style={{padding:"4px 14px",fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",background:"var(--midnight)",marginBottom:1}}>{g.label}</div>
-              {g.voices.slice(0,8).map(v=>(
+              <div style={{padding:"4px 14px 3px",fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",background:"var(--midnight)"}}>{g.flag} {g.label.toUpperCase()}</div>
+              {g.voices.map(v=>(
                 <button key={v.name} onClick={()=>{setSel(v);setOpen(false);}}
-                  style={{display:"block",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.1)":"none",border:"none",padding:"8px 16px",color:sel?.name===v.name?"var(--gold)":"var(--cream-60)",fontSize:12,cursor:"pointer",fontFamily:"var(--f-body)"}}>
-                  {sel?.name===v.name?"✓ ":""}{v.name.replace(/\(.*?\)/g,"").trim()}
-                  {v.localService?<span style={{fontSize:9,color:"var(--cream-30)",marginLeft:6}}>local</span>:<span style={{fontSize:9,color:"var(--teal)",marginLeft:6}}>online</span>}
+                  style={{display:"block",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.12)":"none",border:"none",padding:"7px 16px",color:sel?.name===v.name?"var(--gold)":"var(--cream-60)",fontSize:12,cursor:"pointer",fontFamily:"var(--f-body)",lineHeight:1.4}}>
+                  {sel?.name===v.name?"✓ ":""}{v.name.replace(/\(.*?\)/g,"").replace("Microsoft","").replace("Google","").trim()}
+                  <span style={{fontSize:9,color:v.localService?"var(--cream-30)":"var(--teal)",marginLeft:5}}>{v.localService?"device":"online"}</span>
                 </button>
               ))}
             </div>
           ))}
-          <div style={{padding:"8px 14px 4px",borderTop:"1px solid var(--line)"}}>
-            <button onClick={()=>setOpen(false)} style={{fontSize:10,color:"var(--cream-30)",background:"none",border:"none",cursor:"pointer",fontFamily:"var(--f-mono)"}}>✕ Close</button>
+          <div style={{borderTop:"1px solid var(--line)",padding:"6px 14px 0"}}>
+            <button onClick={()=>setOpen(false)} style={{fontSize:10,color:"var(--cream-30)",background:"none",border:"none",cursor:"pointer",fontFamily:"var(--f-mono)"}}>✕ close</button>
           </div>
         </div>
       )}
@@ -3994,75 +4062,50 @@ function VoiceSelector() {
   );
 }
 
-function AudioPlayer({text, label="Listen", mini=false}) {
-  const [state, setState] = useState("idle"); // idle | playing | paused
-  const [supported] = useState(() => typeof window !== "undefined" && "speechSynthesis" in window);
-  const [selVoice] = useSharedVoice();
-  const uttRef = useRef(null);
+function AudioPlayer({text,label="Listen",mini=false}){
+  const [state,setState]=useState("idle");
+  const [supported]=useState(()=>typeof window!=="undefined"&&"speechSynthesis" in window);
+  const [voice]=useGlobalVoice();
+  const uttRef=useRef(null);
 
-  const cleanText = (t) => (t || "")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/`[^`]*`/g, "")
-    .replace(/[#►▶◎◈◇✦⬡↗⟶→←]/g, "")
-    .replace(/---+/g, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  const clean=(t)=>(t||"")
+    .replace(/https?:\/\/\S+/g,"")
+    .replace(/\*\*(.*?)\*\*/g,"$1").replace(/\*(.*?)\*/g,"$1").replace(/`[^`]*`/g,"")
+    .replace(/[#◎◈◇✦⬡↗⟶→←►▶]/g,"").replace(/---+/g,". ")
+    .replace(/\s{2,}/g," ").trim();
 
-  const stop = () => {
+  const stop=()=>{ window.speechSynthesis.cancel(); setState("idle"); uttRef.current=null; };
+  const pause=()=>{ if(window.speechSynthesis.speaking){window.speechSynthesis.pause();setState("paused");} };
+  const play=()=>{
+    if(!supported) return;
+    if(state==="paused"&&uttRef.current){window.speechSynthesis.resume();setState("playing");return;}
     window.speechSynthesis.cancel();
-    setState("idle");
-    uttRef.current = null;
+    const t=clean(text); if(!t) return;
+    const u=new SpeechSynthesisUtterance(t);
+    u.rate=0.93; u.pitch=1; u.volume=1;
+    if(voice) u.voice=voice;
+    u.onstart=()=>setState("playing");
+    u.onend=()=>{setState("idle");uttRef.current=null;};
+    u.onerror=()=>{setState("idle");uttRef.current=null;};
+    uttRef.current=u;
+    window.speechSynthesis.speak(u);
   };
+  useEffect(()=>()=>{if(typeof window!=="undefined")window.speechSynthesis.cancel();},[]);
 
-  const play = () => {
-    if (!supported) return;
-    if (state === "paused" && uttRef.current) {
-      window.speechSynthesis.resume();
-      setState("playing");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const clean = cleanText(text);
-    if (!clean) return;
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.rate = 0.93;
-    utt.pitch = 1.0;
-    utt.volume = 1;
-    if (selVoice) utt.voice = selVoice;
-    utt.onstart = () => setState("playing");
-    utt.onend = () => { setState("idle"); uttRef.current = null; };
-    utt.onerror = () => { setState("idle"); uttRef.current = null; };
-    uttRef.current = utt;
-    window.speechSynthesis.speak(utt);
-  };
+  if(!supported) return null;
 
-  const pause = () => {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.pause();
-      setState("paused");
-    }
-  };
-
-  useEffect(() => () => { if (typeof window !== "undefined") window.speechSynthesis.cancel(); }, []);
-
-  if (!supported) return null;
-
-  // Mini mode — just a tiny speaker icon button (for inside score cards)
-  if (mini) {
-    return (
-      <button onClick={state === "playing" ? stop : state === "paused" ? play : play}
-        title={state === "playing" ? "Stop" : state === "paused" ? "Resume" : "Listen"}
-        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:"50%",background:state!=="idle"?"var(--gold-dim)":"none",border:`1px solid ${state!=="idle"?"var(--line-gold)":"var(--cream-15)"}`,cursor:"pointer",fontSize:11,marginTop:6,color:state!=="idle"?"var(--gold)":"var(--cream-30)",transition:"all .2s",flexShrink:0}}>
-        {state === "playing" ? "⏹" : state === "paused" ? "▶" : "🔊"}
+  if(mini){
+    return(
+      <button onClick={state==="playing"?stop:play} title={state==="playing"?"Stop":"Listen"}
+        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:22,height:22,borderRadius:"50%",background:state!=="idle"?"var(--gold-dim)":"none",border:`1px solid ${state!=="idle"?"var(--line-gold)":"var(--cream-15)"}`,cursor:"pointer",fontSize:10,marginTop:5,color:state!=="idle"?"var(--gold)":"var(--cream-30)",transition:"all .2s",flexShrink:0}}>
+        {state==="playing"?"⏹":"🔊"}
       </button>
     );
   }
 
-  return (
+  return(
     <div style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:8,flexWrap:"wrap"}}>
-      {state === "idle" && (
+      {state==="idle"&&(
         <button onClick={play}
           style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 14px",color:"var(--cream-50)",fontSize:12,cursor:"pointer",transition:"all .2s"}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
@@ -4070,33 +4113,17 @@ function AudioPlayer({text, label="Listen", mini=false}) {
           <span style={{fontSize:14}}>🔊</span>{label}
         </button>
       )}
-      {state === "playing" && (
+      {state==="playing"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
-          <button onClick={pause}
-            style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>
-            <span>⏸</span> Pause
-          </button>
-          <button onClick={stop}
-            style={{display:"inline-flex",alignItems:"center",background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>
-            ⏹
-          </button>
-          <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>
-            {[0,1,2].map(i=>(
-              <span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?14:9,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>
-            ))}
-          </span>
+          <button onClick={pause} style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>⏸ Pause</button>
+          <button onClick={stop} style={{background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>⏹</button>
+          <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>{[0,1,2].map(i=><span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?13:8,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>)}</span>
         </div>
       )}
-      {state === "paused" && (
+      {state==="paused"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
-          <button onClick={play}
-            style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--teal)",fontSize:12,cursor:"pointer"}}>
-            <span>▶</span> Resume
-          </button>
-          <button onClick={stop}
-            style={{display:"inline-flex",alignItems:"center",background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>
-            ⏹
-          </button>
+          <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:6,background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--teal)",fontSize:12,cursor:"pointer"}}>▶ Resume</button>
+          <button onClick={stop} style={{background:"none",border:"1px solid var(--line)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>⏹</button>
         </div>
       )}
     </div>
@@ -4106,18 +4133,20 @@ function AudioPlayer({text, label="Listen", mini=false}) {
 function LifeHacksModule({data,formData}){
   const hacks=Array.isArray(data?.life_hacks)?data.life_hacks:[];
   const emotional=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
+  const empty=hacks.length===0&&emotional.length===0;
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
           <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>LIFE HACKS FOR YOUR SITUATION</div>
-          {hacks.length>0&&<AudioPlayer text={hacks.join(". ")} label="Listen to all hacks"/>}
+          {hacks.length>0&&<AudioPlayer text={hacks.map((h,i)=>`Hack ${i+1}: ${h}`).join(". ")} label="Listen to all hacks"/>}
         </div>
-        {hacks.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerate your report to see personalised life hacks.</p>}
+        {empty&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load your personalised life hacks.</p>}
         {hacks.map((h,i)=>(
-          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid var(--line)":"none"}}>
+          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid var(--line)":"none",alignItems:"flex-start"}}>
             <div style={{width:26,height:26,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
-            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0}}>{h}</p>
+            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0,flex:1}}>{h}</p>
+            <AudioPlayer text={h} label="" mini={true}/>
           </div>
         ))}
       </div>
@@ -4125,12 +4154,13 @@ function LifeHacksModule({data,formData}){
         <div className="card">
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
             <div className="mono" style={{fontSize:"9px",color:"var(--teal)"}}>EMOTIONAL STRENGTH PRACTICES</div>
-            <AudioPlayer text={emotional.join(". ")} label="Listen"/>
+            <AudioPlayer text={emotional.map((e,i)=>`Practice ${i+1}: ${e}`).join(". ")} label="Listen"/>
           </div>
           {emotional.map((e,i)=>(
-            <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid var(--line)":"none"}}>
+            <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid var(--line)":"none",alignItems:"flex-start"}}>
               <span style={{fontSize:18,flexShrink:0}}>🧘</span>
-              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0}}>{e}</p>
+              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,margin:0,flex:1}}>{e}</p>
+              <AudioPlayer text={e} label="" mini={true}/>
             </div>
           ))}
         </div>
@@ -4145,15 +4175,16 @@ function LifeHacksModule({data,formData}){
 function MoneyModule({data,formData}){
   const mp=(data?.money_protection&&typeof data.money_protection==="object")?data.money_protection:{};
   const re=(data?.real_estate_hack&&typeof data.real_estate_hack==="object")?data.real_estate_hack:{};
-  const mpText=[mp.rule,mp.savings_target&&`Save target: ${mp.savings_target}`,mp.avoid&&`Stop wasting on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
+  const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Savings target: ${mp.savings_target}`,mp.avoid&&`Stop wasting on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
+  const reAudio=[re.method&&`Real estate method: ${re.method}`,re.how_it_works,re.platform&&`Platform: ${re.platform}`,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
           <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>PROTECT YOUR MONEY</div>
-          {mpText&&<AudioPlayer text={mpText} label="Listen"/>}
+          {mpAudio&&<AudioPlayer text={mpAudio} label="Listen"/>}
         </div>
-        {!mp.rule&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Money protection plan not yet generated. Click "↺ Regenerate" on your report to get this.</p>}
+        {!mp.rule&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load your money protection plan.</p>}
         {mp.rule&&(
           <>
             <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
@@ -4171,7 +4202,10 @@ function MoneyModule({data,formData}){
       </div>
       {re.method&&(
         <div className="card">
-          <div className="mono" style={{fontSize:"9px",marginBottom:16,color:"var(--gold)"}}>REAL ESTATE HACK</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:16}}>
+            <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>REAL ESTATE HACK</div>
+            {reAudio&&<AudioPlayer text={reAudio} label="Listen"/>}
+          </div>
           <div style={{padding:"14px",background:"var(--midnight)",borderRadius:12,marginBottom:10,border:"1px solid var(--line-gold)"}}>
             <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{re.method}</div>
             <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.6}}>{re.how_it_works}</p>
@@ -4189,7 +4223,7 @@ function MoneyModule({data,formData}){
 // ═══════════════════════════════════════════════════════════════════════════════
 function OnlineIncomeModule({data,formData}){
   const online=Array.isArray(data?.online_income)?data.online_income:[];
-  const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""} Start today: ${o.first_step||""}`).join(". ");
+  const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   return(
     <div className="fu">
       <div className="card">
@@ -4198,16 +4232,17 @@ function OnlineIncomeModule({data,formData}){
           {online.length>0&&<AudioPlayer text={audioText} label="Listen to all methods"/>}
         </div>
         <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>Specific to {formData?.country||"your country"} and your skills</p>
-        {online.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Online income methods not yet generated. Click "↺ Regenerate" on your report to get this.</p>}
+        {online.length===0&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load online income methods for your country.</p>}
         {online.map((o,i)=>(
           <div key={i} style={{padding:"16px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid var(--line)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
               <div style={{fontSize:15,fontWeight:700,color:"var(--cream)"}}>{o.method}</div>
-              <span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 8px"}}>{i===0?"BEST FIT":i===1?"GOOD FIT":"HIGH CEILING"}</span>
+              <span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 8px",flexShrink:0}}>{i===0?"BEST FIT":i===1?"GOOD FIT":"HIGH CEILING"}</span>
             </div>
             <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6,marginBottom:10}}>{o.why_it_works}</p>
             {o.url&&<a href={o.url} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:8}}>🔗 {o.url}</a>}
             {o.first_step&&<div style={{padding:"8px 12px",background:"rgba(20,184,154,0.06)",borderRadius:8,fontSize:12,color:"var(--cream-60)",borderLeft:"2px solid var(--teal)"}}><b style={{color:"var(--teal)"}}>Start today: </b>{o.first_step}</div>}
+            <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
           </div>
         ))}
       </div>
@@ -4221,16 +4256,16 @@ function OnlineIncomeModule({data,formData}){
 function BusinessModule({data,formData}){
   const zb=(data?.zero_income_business&&typeof data.zero_income_business==="object")?data.zero_income_business:{};
   const pb=Array.isArray(data?.product_business)?data.product_business:[];
-  const zbText=[zb.idea,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
+  const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero&&`Why you can start with zero: ${zb.why_zero}`,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`How to scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
       <div className="card" style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
           <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>START A BUSINESS WITH ZERO MONEY</div>
-          {zbText&&<AudioPlayer text={zbText} label="Listen"/>}
+          {zbAudio&&<AudioPlayer text={zbAudio} label="Listen"/>}
         </div>
         <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>You can start. Here is exactly how.</p>
-        {!zb.idea&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Zero-capital business plan not yet generated. Click "↺ Regenerate" on your report to get this.</p>}
+        {!zb.idea&&<p style={{fontSize:13,color:"var(--cream-40)"}}>Click <strong>↺ Regenerate</strong> on My Report to load your zero-capital business plan.</p>}
         {zb.idea&&(
           <>
             <div style={{padding:"14px 16px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line-gold)"}}>
@@ -4249,13 +4284,16 @@ function BusinessModule({data,formData}){
       </div>
       {pb.length>0&&(
         <div className="card">
-          <div className="mono" style={{fontSize:"9px",marginBottom:4,color:"var(--gold)"}}>SELL PHYSICAL PRODUCTS</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
+            <div className="mono" style={{fontSize:"9px",color:"var(--gold)"}}>SELL PHYSICAL PRODUCTS</div>
+            <AudioPlayer text={pb.map(p=>`${p.product}: ${p.why||""}. Startup cost: ${p.startup_cost||""}. Margin: ${p.profit_margin||""}`).join(". ")} label="Listen"/>
+          </div>
           <p style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>Things people buy every day — with supplier links</p>
           {pb.map((p,i)=>(
             <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid var(--line)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
                 <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{p.product}</div>
-                {p.profit_margin&&<span style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(20,184,154,0.1)",borderRadius:4,padding:"2px 6px"}}>{p.profit_margin} margin</span>}
+                {p.profit_margin&&<span style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(20,184,154,0.1)",borderRadius:4,padding:"2px 6px",flexShrink:0}}>{p.profit_margin} margin</span>}
               </div>
               <p style={{fontSize:12,color:"var(--cream-50)",marginBottom:8,lineHeight:1.5}}>{p.why}</p>
               {p.startup_cost&&<div style={{fontSize:12,color:"var(--gold)",marginBottom:10}}>Startup cost: {p.startup_cost}</div>}
@@ -4272,6 +4310,7 @@ function BusinessModule({data,formData}){
                   </div>
                 </div>
               )}
+              <AudioPlayer text={`${p.product}: ${p.why||""}. Cost: ${p.startup_cost||""}. Margin: ${p.profit_margin||""}`} label="" mini={true}/>
             </div>
           ))}
         </div>
@@ -4343,7 +4382,7 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               {!showCheckin&&<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>}
             </div>
           </div>
-          <div className="fu3 pillar-score-ring" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
+          <div className="fu3 pillar-wrap" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
             <Ring score={data.overall||70} color="var(--gold)" size={106} label="Overall"/>
             <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:260}}>
               {PILLARS.map(p=>(
@@ -4357,22 +4396,20 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
           <div className="insight fu4">
             <p className="body">{data.headline}</p>
             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:8}}>
-              <AudioPlayer text={[data.headline, ...PILLARS.map(p=>data.score_explanations?.[p.id]).filter(Boolean)].join(" ")} label="Listen to your report"/>
+              <AudioPlayer text={[data.headline,...PILLARS.map(p=>data.score_explanations?.[p.id]).filter(Boolean)].join(". ")} label="Listen to your report"/>
               <VoiceSelector/>
             </div>
           </div>
 
-          {/* Score explanations — why each pillar is the score it is */}
+          {/* Score explanations */}
           {data.score_explanations&&(
-            <div className="fu4 score-explain-grid" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
-              {PILLARS.map(p=>(
-                data.score_explanations[p.id]&&(
-                  <div key={p.id} style={{padding:"12px 14px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
-                    <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".12em",textTransform:"uppercase",color:p.color,marginBottom:5}}>{p.label}</div>
-                    <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300,margin:0}}>{data.score_explanations[p.id]}</p>
-                    <AudioPlayer text={data.score_explanations[p.id]} label="" mini={true}/>
-                  </div>
-                )
+            <div className="fu4" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+              {PILLARS.map(p=>data.score_explanations[p.id]&&(
+                <div key={p.id} style={{padding:"12px 14px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
+                  <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".12em",textTransform:"uppercase",color:p.color,marginBottom:5}}>{p.label}</div>
+                  <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300,margin:0}}>{data.score_explanations[p.id]}</p>
+                  <AudioPlayer text={`${p.label}: ${data.score_explanations[p.id]}`} label="" mini={true}/>
+                </div>
               ))}
             </div>
           )}
@@ -4402,7 +4439,6 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
                   </button>
                 </div>
                 <p className="body">{refreshingInsight?"Getting your fresh insight for today…":dailyInsight}</p>
-                <AudioPlayer text={dailyInsight} label="Listen to today's insight"/>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
                 <div className="card card-sm"><div className="mono" style={{marginBottom:10,fontSize:"9px"}}>What you bring to this</div>
@@ -4437,8 +4473,10 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>Your path forward, step by step</div>
                 <p className="body" style={{marginBottom:12}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
-                <AudioPlayer text={data.roadmap?.map(r=>`${r.phase}: ${r.title}. ${r.desc}. ${r.win||""}`).join(" ")} label="Listen to your roadmap"/>
-                <div style={{marginBottom:16}}/>
+                {data.roadmap?.length>0&&(
+                  <AudioPlayer text={data.roadmap.map(r=>`${r.phase} — ${r.title}. ${r.desc}. ${Array.isArray(r.steps)?r.steps.join(". "):""}. ${r.win?`First step: ${r.win}`:""}`).join(" | ")} label="Listen to full roadmap"/>
+                )}
+                <div style={{marginBottom:20}}/>
                 {data.roadmap?.map((r,i)=>(
                   <div className="timeline-item" key={i}>
                     <div className="t-dot">{String(i+1).padStart(2,"0")}</div>
@@ -4469,7 +4507,15 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
                 <div className="d3" style={{marginBottom:12}}>What's really going on inside</div>
-                <AudioPlayer text={[data.mindset?.pattern,data.mindset?.reframe,data.mindset?.emotional,data.mindset?.practice].filter(Boolean).join(". ")} label="Listen to your mindset report"/>
+                <AudioPlayer
+                  text={[
+                    data.mindset?.pattern&&`What keeps tripping you up: ${data.mindset.pattern}`,
+                    data.mindset?.reframe&&`A different way to see it: ${data.mindset.reframe}`,
+                    data.mindset?.emotional&&`What's really happening emotionally: ${data.mindset.emotional}`,
+                    data.mindset?.practice&&`One thing to try every morning: ${data.mindset.practice}`,
+                  ].filter(Boolean).join(". ")}
+                  label="Listen to mindset report"
+                />
                 <div style={{marginBottom:16}}/>
                 {[
                   {icon:"◇",title:"What keeps tripping you up",key:"pattern",accent:"rose"},
@@ -4494,7 +4540,12 @@ Do NOT use generic motivational language. Be specific, direct, and honest.`;
               <div className="fu">
                 <div className="d3" style={{marginBottom:6}}>What you could actually be doing</div>
                 <p className="body" style={{marginBottom:12}}>Real paths matched to your skills, your country, and where you are right now — with exact steps to start.</p>
-                <AudioPlayer text={data.career?.map(o=>`${o.title}. ${o.why||o.desc||""}`).filter(Boolean).join(". ")} label="Listen to your career paths"/>
+                {data.career?.length>0&&(
+                  <AudioPlayer
+                    text={data.career.map(o=>`${o.title}: ${o.why||o.desc||""}. ${Array.isArray(o.how)?`How to start: ${o.how.join(". ")}`:""}. Income target: ${o.income||""}`).join(" | ")}
+                    label="Listen to all career paths"
+                  />
+                )}
                 <div style={{marginBottom:16}}/>
                 {data.career?.map((o,i)=>(
                   <div className="card" key={i} style={{marginBottom:16}}>
@@ -5422,7 +5473,25 @@ export default function DestinIQ(){
           relationships: parsed.relationships,
           sections: (parsed.sections||[]).map(s=>({title:s.title,content:(s.content||"").slice(0,600)})),
           teaser: parsed.teaser,
+          headline: parsed.headline,
+          closing: parsed.closing,
+          strengths: parsed.strengths,
+          risks: parsed.risks,
+          scores: parsed.scores,
+          score_explanations: parsed.score_explanations,
+          roadmap: parsed.roadmap,
+          career: parsed.career,
+          relocation: parsed.relocation,
           suggestedCountries: (parsed.suggestedCountries||[]).slice(0,3),
+          // Module data — must be saved or tabs show "Regenerate"
+          life_hacks: parsed.life_hacks,
+          emotional_strength: parsed.emotional_strength,
+          money_protection: parsed.money_protection,
+          online_income: parsed.online_income,
+          zero_income_business: parsed.zero_income_business,
+          product_business: parsed.product_business,
+          real_estate_hack: parsed.real_estate_hack,
+          daily_insight: parsed.daily_insight,
         };
         const {error:saveError} = await supabase.from("user_profiles").upsert({
           user_id: userId,
