@@ -286,11 +286,43 @@ async function saveWeeklyReport(userId, report) {
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
 const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
+// All charges happen in USD via Paystack — international cards from anywhere
+// in the world are accepted and settle automatically. We just SHOW the price
+// converted to the user's local currency so it feels native to them.
 const PLANS = {
-  basic:  { name:"Essential", amount:1,   label:"¢1/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:15,  label:"¢15/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:99,  label:"¢99/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
+
+// Approximate USD exchange rates for display purposes only — actual charge
+// is always in USD. Update periodically; doesn't need to be perfectly live.
+const FX_RATES = {
+  USD:1, GHS:14.8, NGN:1550, KES:129, ZAR:18.4, GBP:0.79, EUR:0.92,
+  INR:85, PHP:58.5, BRL:5.7, CAD:1.37, AUD:1.52, MXN:18.2, EGP:49,
+  PKR:279, BDT:122, VND:25400, IDR:16200, NGS:1550, XOF:605, KWD:0.31,
+  AED:3.67, SAR:3.75, CNY:7.25, JPY:155, ZMW:27, UGX:3700, TZS:2650,
+};
+
+const CURRENCY_SYMBOLS = {
+  USD:"$", GHS:"GH₵", NGN:"₦", KES:"KSh", ZAR:"R", GBP:"£", EUR:"€",
+  INR:"₹", PHP:"₱", BRL:"R$", CAD:"C$", AUD:"A$", MXN:"MX$", EGP:"E£",
+  PKR:"₨", BDT:"৳", VND:"₫", IDR:"Rp", XOF:"CFA", KWD:"KD",
+  AED:"AED", SAR:"SAR", CNY:"¥", JPY:"¥", ZMW:"ZK", UGX:"USh", TZS:"TSh",
+};
+
+// Format a USD amount in the user's local currency for display.
+// Returns null if we don't have a rate for their currency (falls back to USD display).
+function formatLocalPrice(usdAmount, currencyCode){
+  if(!currencyCode||currencyCode==="USD") return null;
+  const rate=FX_RATES[currencyCode];
+  if(!rate) return null;
+  const converted=usdAmount*rate;
+  const symbol=CURRENCY_SYMBOLS[currencyCode]||currencyCode+" ";
+  // Round sensibly: whole numbers for currencies with big units, 2dp for small-unit ones
+  const rounded = converted>=100 ? Math.round(converted) : Math.round(converted*100)/100;
+  return `${symbol}${rounded.toLocaleString()}`;
+}
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
   const h=getHistory(uid); h.push({role,content:content.slice(0,800)});
@@ -2295,8 +2327,8 @@ function NotificationPanel({profile,userId,streak,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // PAYWALL
 // ═══════════════════════════════════════════════════════════════════════════════
-function Paywall({onUnlock,teaser,userEmail}){
-  const [sel,setSel]=useState("pro");
+function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
+  const [billing,setBilling]=useState("monthly"); // "monthly" | "annual"
   const [email,setEmail]=useState(userEmail||"");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
@@ -2314,17 +2346,17 @@ function Paywall({onUnlock,teaser,userEmail}){
     return()=>{};
   },[]);
 
-  const plans=[
-    {id:"basic", price:"$9", period:"/month",name:"Essential",  color:"var(--teal)",
-     features:["Full life analysis report","Daily momentum tracker","Check-in & daily insight","Roadmap access"]},
-    {id:"pro",   price:"$15",period:"/month",name:"Premium",    color:"var(--gold)",featured:true,
-     features:["Everything in Essential","Weekly Pulse AI report","Decisions (unlimited)","Live advisor conversations","Career & relocation intel","Streak tracking & history"]},
-    {id:"annual",price:"$99",period:"/year", name:"Annual Pro", color:"var(--violet)",
-     features:["Everything in Premium","Save $81 vs monthly","Downloadable PDF reports","Early access to new modules"]},
-  ];
+  // Detect the user's currency from their IP location for display purposes.
+  // Actual charge always happens in USD — Paystack settles international
+  // cards from anywhere in the world automatically.
+  const userCurrency=ipLocation?.currency||"USD";
+  const localPrice=(usd)=>formatLocalPrice(usd,userCurrency);
+
+  const planKey=billing==="annual"?"annual":"pro";
+  const plan=PLANS[planKey];
+  const monthlyEquivalent=billing==="annual"?Math.round((PLANS.annual.amount/12)*100)/100:PLANS.pro.amount;
 
   const handlePaystack=()=>{
-    // Validate email
     if(!email.trim()||!email.includes("@")){
       setError("Please enter a valid email address to continue.");
       return;
@@ -2341,46 +2373,39 @@ function Paywall({onUnlock,teaser,userEmail}){
     setLoading(true);
     setError("");
 
-    const plan=PLANS[sel]||PLANS.pro;
     const ref="diq_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
 
     try{
       const handler=window.PaystackPop.setup({
         key:      PAYSTACK_PUBLIC_KEY,
-        metadata: { userId: userId||"" },
         email:    email.trim(),
-        amount:   plan.amount * 100, // Paystack uses smallest unit (cents for USD)
-        currency: plan.currency,
+        amount:   plan.amount * 100, // smallest currency unit
+        currency: plan.currency,     // always USD — Paystack accepts intl cards
         ref:      ref,
         label:    "DestinIQ "+plan.name,
-        metadata: { plan:sel, custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}] },
+        metadata: { userId: userId||"", plan:planKey, custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}] },
         callback:async(response)=>{
-          // Payment verified by Paystack popup — write to DB immediately.
-          // The webhook at /api/paystack-webhook also does this server-side
-          // as a backup, so the user never loses their subscription on refresh.
           console.log("Payment successful:", response.reference);
           try{
-            // Write is_paid to Supabase right now from the client
             const{data:{session}}=await supabase.auth.getSession();
             if(session?.user){
               await supabase.from("user_profiles").upsert({
                 user_id:session.user.id,
                 is_paid:true,
+                is_premium:true,
                 paystack_ref:response.reference,
-                paid_plan:sel,
+                paid_plan:planKey,
                 paid_at:new Date().toISOString(),
                 updated_at:new Date().toISOString(),
               },{onConflict:"user_id"});
             }
           }catch(saveErr){
             console.warn("Could not save payment to DB:", saveErr.message);
-            // Still unlock — the webhook will catch it
           }
           setLoading(false);
           onUnlock(response.reference);
         },
         onClose:()=>{
-          // User closed the popup without paying
           setLoading(false);
         },
       });
@@ -2391,35 +2416,107 @@ function Paywall({onUnlock,teaser,userEmail}){
     }
   };
 
+  const FREE_FEATURES=[
+    "Full personalized clarity report",
+    "Life pillar scores & roadmap",
+    "Daily check-ins & win tracker",
+    "Life hacks & mindset insights",
+    "Career path suggestions",
+    "3 advisor messages per day",
+  ];
+
+  const PRO_FEATURES=[
+    "Everything in Free",
+    "Unlimited advisor conversations",
+    "Refresh money, business & online income ideas anytime",
+    "Full relocation reports for any country",
+    "Weekly Pulse — your week, analyzed",
+    "Big Decisions thinking partner",
+    "Priority response speed",
+  ];
+
   return(
     <div style={{padding:"60px 0"}}>
-      <div className="cx-sm" style={{textAlign:"center"}}>
+      <div className="cx-md" style={{textAlign:"center"}}>
         <div className="mono fu" style={{marginBottom:16}}>There's more we want to show you</div>
-        <h2 className="d2 fu1" style={{marginBottom:16}}>We've only shown you<br/>part of the picture</h2>
-        <div className="fu2" style={{margin:"0 auto 36px",maxWidth:480}}>
-          <div className="insight violet" style={{textAlign:"left"}}>
-            <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>Something we noticed about you</div>
-            <p style={{fontSize:15,color:"var(--cream-60)",fontStyle:"italic",lineHeight:1.75}}>"{teaser}"</p>
-            <p style={{fontSize:12,color:"var(--cream-30)",marginTop:8}}>This came up in your profile. The full report gets into it.</p>
+        <h2 className="d2 fu1" style={{marginBottom:16}}>Upgrade your plan</h2>
+        {teaser&&(
+          <div className="fu2" style={{margin:"0 auto 32px",maxWidth:480}}>
+            <div className="insight violet" style={{textAlign:"left"}}>
+              <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>Something we noticed about you</div>
+              <p style={{fontSize:14,color:"var(--cream-60)",fontStyle:"italic",lineHeight:1.75}}>"{teaser}"</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── BILLING TOGGLE (Claude-style) ────────────────────────────────── */}
+        <div className="fu3" style={{display:"inline-flex",alignItems:"center",gap:4,background:"var(--raised)",border:"1px solid var(--line)",borderRadius:999,padding:4,marginBottom:36}}>
+          <button onClick={()=>setBilling("monthly")}
+            style={{padding:"8px 22px",borderRadius:999,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,
+              background:billing==="monthly"?"var(--gold)":"transparent",
+              color:billing==="monthly"?"#000":"var(--cream-50)",transition:"all .2s"}}>
+            Monthly
+          </button>
+          <button onClick={()=>setBilling("annual")}
+            style={{padding:"8px 22px",borderRadius:999,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:8,
+              background:billing==="annual"?"var(--gold)":"transparent",
+              color:billing==="annual"?"#000":"var(--cream-50)",transition:"all .2s"}}>
+            Annual
+            <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:billing==="annual"?"rgba(0,0,0,0.15)":"var(--gold-dim)",color:billing==="annual"?"#000":"var(--gold)",fontWeight:700}}>
+              Save 45%
+            </span>
+          </button>
+        </div>
+
+        {/* ── TWO-CARD COMPARISON (Claude-style: Free vs Pro) ─────────────── */}
+        <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,marginBottom:36,maxWidth:680,marginLeft:"auto",marginRight:"auto",alignItems:"stretch"}}>
+
+          {/* FREE CARD — for context, not selectable */}
+          <div style={{border:"1px solid var(--line)",borderRadius:18,padding:"28px 24px",background:"var(--raised)",textAlign:"left",display:"flex",flexDirection:"column"}}>
+            <div className="mono" style={{color:"var(--cream-30)",marginBottom:10}}>CURRENT PLAN</div>
+            <div style={{fontFamily:"var(--f-display)",fontSize:34,marginBottom:2,color:"var(--cream)"}}>Free</div>
+            <div style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>You're already using this</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10,flex:1}}>
+              {FREE_FEATURES.map(f=>(
+                <div key={f} style={{display:"flex",gap:8,fontSize:13,color:"var(--cream-50)"}}>
+                  <span style={{color:"var(--cream-30)"}}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PREMIUM CARD — highlighted, selected plan */}
+          <div style={{border:"1px solid var(--line-gold)",borderRadius:18,padding:"28px 24px",background:"var(--gold-glow)",textAlign:"left",position:"relative",display:"flex",flexDirection:"column",boxShadow:"0 0 40px rgba(210,175,90,0.08)"}}>
+            <div style={{position:"absolute",top:-12,left:24,background:"var(--gold)",color:"#000",fontSize:10,fontWeight:700,padding:"4px 12px",borderRadius:20,fontFamily:"var(--f-mono)"}}>RECOMMENDED</div>
+            <div className="mono" style={{color:"var(--gold)",marginBottom:10}}>PREMIUM</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:2}}>
+              <div style={{fontFamily:"var(--f-display)",fontSize:34,color:"var(--cream)"}}>
+                ${billing==="annual"?monthlyEquivalent.toFixed(2):PLANS.pro.amount}
+              </div>
+              <div style={{fontSize:13,color:"var(--cream-40)"}}>/month</div>
+            </div>
+            {localPrice(billing==="annual"?monthlyEquivalent:PLANS.pro.amount)&&(
+              <div style={{fontSize:12,color:"var(--cream-40)",marginBottom:8}}>
+                ≈ {localPrice(billing==="annual"?monthlyEquivalent:PLANS.pro.amount)}/month in {userCurrency}
+              </div>
+            )}
+            <div style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>
+              {billing==="annual"
+                ?`Billed ${localPrice(PLANS.annual.amount)?`$${PLANS.annual.amount} (${localPrice(PLANS.annual.amount)})`:`$${PLANS.annual.amount}`} once per year`
+                :"Billed monthly — cancel anytime"}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:10,flex:1}}>
+              {PRO_FEATURES.map((f,i)=>(
+                <div key={f} style={{display:"flex",gap:8,fontSize:13,color:i===0?"var(--cream-40)":"var(--cream-60)",fontWeight:i===0?600:400}}>
+                  {i===0?"":<span style={{color:"var(--gold)"}}>✓</span>}{f}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* PLAN CARDS */}
-        <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:32}}>
-          {plans.map(p=>(
-            <div key={p.id} className={`plan-card ${p.featured?"featured":""}`} onClick={()=>setSel(p.id)}
-              style={{borderColor:sel===p.id?p.color:undefined,boxShadow:sel===p.id?`0 0 30px ${p.color}20`:undefined,opacity:sel===p.id?1:0.8}}>
-              {p.featured&&<div className="tag tg" style={{marginBottom:12,display:"inline-block"}}>MOST POPULAR</div>}
-              <div className="plan-price" style={{color:p.color}}>{p.price}</div>
-              <div className="plan-period">{p.period}</div>
-              <div className="plan-name">{p.name}</div>
-              {p.features.map(ft=><div className="plan-feature" key={ft}><span className="plan-check">✓</span>{ft}</div>)}
-            </div>
-          ))}
-        </div>
-
-        {/* EMAIL + PAY BUTTON */}
-        <div className="fu4" style={{maxWidth:400,margin:"0 auto"}}>
+        {/* ── EMAIL + PAY BUTTON ───────────────────────────────────────────── */}
+        <div className="fu4" style={{maxWidth:420,margin:"0 auto"}}>
           <div className="field" style={{marginBottom:12,textAlign:"left"}}>
             <label className="fl">Your email address</label>
             <input
@@ -2445,20 +2542,26 @@ function Paywall({onUnlock,teaser,userEmail}){
             disabled={loading||!scriptReady}
             style={{marginBottom:10}}
           >
-            {loading?"Opening payment…":!scriptReady?"Loading payment…":`Pay ${(PLANS[sel]||PLANS.pro).label} →`}
+            {loading
+              ?"Opening payment…"
+              :!scriptReady
+                ?"Loading payment…"
+                :billing==="annual"
+                  ?`Subscribe — $${PLANS.annual.amount}/year →`
+                  :`Subscribe — $${PLANS.pro.amount}/month →`}
           </button>
 
           {/* Security note */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:24}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:24,flexWrap:"wrap"}}>
             <span style={{fontSize:11,color:"var(--cream-30)"}}>🔒</span>
             <span style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
-              SECURED BY PAYSTACK · CANCEL ANYTIME
+              SECURED BY PAYSTACK · CANCEL ANYTIME · CHARGED IN USD
             </span>
           </div>
 
           {/* Payment methods accepted */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:32,flexWrap:"wrap"}}>
-            {["Visa","Mastercard","MTN Mobile Money","Vodafone Cash","Bank Transfer"].map(m=>(
+            {["Visa","Mastercard","Mobile Money","Bank Transfer","Apple Pay"].map(m=>(
               <div key={m} style={{padding:"4px 10px",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:6,fontSize:11,color:"var(--cream-30)"}}>
                 {m}
               </div>
@@ -6526,7 +6629,7 @@ export default function DestinIQ(){
         {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
-        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""}/>}
+        {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
