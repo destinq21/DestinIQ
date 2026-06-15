@@ -71,6 +71,12 @@
  * alter table testimonials enable row level security;
  * create policy "Anyone can submit" on testimonials for insert with check (true);
  * create policy "Anyone can read approved" on testimonials for select using (approved=true);
+ * -- Admin approve/revoke (replace the email below with your admin email)
+ * create policy "Admin can update testimonials" on testimonials for update
+ *   using (auth.jwt() ->> 'email' = 'destiniq21@gmail.com')
+ *   with check (auth.jwt() ->> 'email' = 'destiniq21@gmail.com');
+ * create policy "Admin can read all testimonials" on testimonials for select
+ *   using (auth.jwt() ->> 'email' = 'destiniq21@gmail.com');
  *
  * -- Cancellation requests (written by client; processed by webhook/admin)
  * create table if not exists cancellation_requests (
@@ -104,6 +110,13 @@
  * alter table user_profiles enable row level security;
  * create policy "Users manage own profile" on user_profiles
  *   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+ * -- Admin dashboard needs to read aggregate user data
+ * create policy "Admin can read all profiles" on user_profiles for select
+ *   using (auth.jwt() ->> 'email' = 'destiniq21@gmail.com');
+ * -- Allow referral lookup: any authenticated user can look up a user_id by prefix
+ * -- (needed so a new signup can find who referred them via ?ref=xxxxxxxx)
+ * create policy "Authenticated users can look up profiles for referrals" on user_profiles
+ *   for select using (auth.role() = 'authenticated');
  *
  * -- Referrals
  * create table if not exists referrals (
@@ -116,6 +129,21 @@
  * alter table referrals enable row level security;
  * create policy "Users see own referrals" on referrals
  *   for select using (auth.uid() = referrer_id);
+ * create policy "Authenticated users can record a referral" on referrals
+ *   for insert with check (auth.uid() = referred_id);
+ *
+ * -- Admin needs to see total referral counts
+ * create policy "Admin can read all referrals" on referrals for select
+ *   using (auth.jwt() ->> 'email' = 'destiniq21@gmail.com');
+ *
+ * -- Profile photo storage (avatars bucket — create it as a PUBLIC bucket in
+ * -- Storage settings, then run these policies on storage.objects)
+ * create policy "Users upload own avatar" on storage.objects for insert
+ *   with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+ * create policy "Users update own avatar" on storage.objects for update
+ *   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+ * create policy "Anyone can view avatars" on storage.objects for select
+ *   using (bucket_id = 'avatars');
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */
@@ -259,9 +287,9 @@ async function saveWeeklyReport(userId, report) {
 const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:1,   label:"GHS1/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:15,  label:"GHS15/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:99,  label:"GHS99/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
@@ -383,7 +411,8 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Outfit:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --void:#05060f;--deep:#08091a;--base:#0d0f1e;--raised:#121526;--lift:#181b2e;
+  --void:#05060f;--deep:#08091a;--base:#0d0f1e;--raised:#121526;--lift:#181b2e;--midnight:#0a0c1c;
+  --cream-80:rgba(237,232,216,0.8);--cream-70:rgba(237,232,216,0.7);--cream-50:rgba(237,232,216,0.5);--cream-40:rgba(237,232,216,0.4);--cream-20:rgba(237,232,216,0.2);--cream-15:rgba(237,232,216,0.12);
   --line:rgba(255,255,255,0.06);--line-gold:rgba(210,175,90,0.18);
   --gold:#d2af5a;--gold-bright:#e8cb7a;--gold-dim:rgba(210,175,90,0.12);--gold-glow:rgba(210,175,90,0.06);
   --teal:#1fa89a;--teal-dim:rgba(31,168,154,0.1);
@@ -651,12 +680,17 @@ function sanitize(s){
 // ═══════════════════════════════════════════════════════════════════════════════
 // API
 // ═══════════════════════════════════════════════════════════════════════════════
-async function callAPI({messages,system,userId,isPremium}){
+async function callAPI({messages,system,userId,isPremium,maxTokens}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
+  // Get the current session token so the server can verify this is a real logged-in user
+  const{data:{session}}=await supabase.auth.getSession();
   const res=await fetch("/api/analyze",{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({system,messages,max_tokens:isPremium?4000:1800}),
+    headers:{
+      "Content-Type":"application/json",
+      ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
+    },
+    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isPremium?4000:1800)}),
   });
   if(!res.ok){
     const e=await res.json().catch(()=>({}));
@@ -1675,16 +1709,6 @@ function Ring({score,color,size=96,label}){
   );
 }
 
-function PremiumToggle({isPremium,onToggle}){
-  return(
-    <div className={`prem-toggle ${isPremium?"":"off"}`} onClick={onToggle}
-      title={isPremium?"Premium: deeper responses":"Click to enable Premium"}>
-      <div className="prem-toggle-dot"/>
-      <span className="prem-toggle-label">{isPremium?"PREMIUM":"FREE"}</span>
-    </div>
-  );
-}
-
 function LockGate({children,isPaid,onUnlock}){
   if(isPaid) return children;
   return(
@@ -2424,16 +2448,32 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdvisorChat({profile,reportData,userId,isPremium}){
+function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
   const openingMessage = `Hey ${profile.name}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
+  // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
+  const FREE_DAILY_LIMIT=3;
+  const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
+  const [usedToday,setUsedToday]=useState(()=>{
+    if(typeof window==="undefined") return 0;
+    return parseInt(localStorage.getItem(limitKey)||"0");
+  });
+  const remaining=Math.max(0,FREE_DAILY_LIMIT-usedToday);
+  const limitReached=!isPaid&&remaining<=0;
+
   const send=async()=>{
     if(!input.trim()||loading) return;
+    if(limitReached){ onUnlock&&onUnlock(); return; }
     const msg=sanitize(input.trim());setInput("");setError("");
+    if(!isPaid){
+      const next=usedToday+1;
+      setUsedToday(next);
+      try{ localStorage.setItem(limitKey,String(next)); }catch{}
+    }
     const updated=[...msgs,{role:"user",content:msg}];setMsgs(updated);setLoading(true);
     pushToMemory(userId,"user",msg);
     try{
@@ -2464,7 +2504,7 @@ function AdvisorChat({profile,reportData,userId,isPremium}){
     <div className="fu">
       <div style={{marginBottom:20}}>
         <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPremium&&<span style={{color:"var(--gold)"}}>✦ You have unlimited access.</span>}</p>
+        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPaid&&<span style={{color:"var(--gold)"}}>✦ You have unlimited access.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> You have {remaining} of {FREE_DAILY_LIMIT} free messages left today.</span>}</p>
       </div>
       <div className="card">
         <div className="chat-scroll" ref={scrollRef}>
@@ -2489,10 +2529,17 @@ function AdvisorChat({profile,reportData,userId,isPremium}){
           )}
         </div>
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
-        <div className="chat-in-row">
-          <input className="chat-in" placeholder="What's on your mind? Be honest…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
-          <button className="chat-send" onClick={send} disabled={loading||!input.trim()}>→</button>
-        </div>
+        {limitReached?(
+          <div style={{textAlign:"center",padding:"16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,marginTop:10}}>
+            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>You've used your {FREE_DAILY_LIMIT} free messages for today. Upgrade for unlimited conversations with your advisor.</p>
+            <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:13,padding:"8px 20px"}}>Upgrade now</button>
+          </div>
+        ):(
+          <div className="chat-in-row">
+            <input className="chat-in" placeholder="What's on your mind? Be honest…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
+            <button className="chat-send" onClick={send} disabled={loading||!input.trim()}>→</button>
+          </div>
+        )}
       </div>
       <div style={{marginTop:12}}>
         <div className="mono" style={{marginBottom:8,fontSize:"9px"}}>Not sure what to ask? A few starting points:</div>
@@ -2563,7 +2610,8 @@ function TestimonialForm(){
   if(sent) return(
     <div style={{textAlign:"center",padding:"20px 0"}}>
       <div style={{fontSize:28,marginBottom:8}}>🙏</div>
-      <div style={{fontSize:14,color:"var(--cream-60)"}}>Thank you! Your story helps others believe it's possible.</div>
+      <div style={{fontSize:14,color:"var(--cream-60)",marginBottom:4}}>Thank you! Your story helps others believe it's possible.</div>
+      <div style={{fontSize:12,color:"var(--cream-30)"}}>It will appear here after a quick review.</div>
     </div>
   );
 
@@ -2759,8 +2807,8 @@ function SupportWidget(){
               <div style={{flex:1,overflowY:"auto",padding:"12px",display:"flex",flexDirection:"column",gap:8}}>
                 {msgs.map((m,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
-                    <div style={{maxWidth:"80%",padding:"9px 12px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:m.role==="user"?"var(--gold)":"var(--lift)",color:m.role==="user"?"#000":"var(--cream-60)",fontSize:12,lineHeight:1.6}}>
-                      {m.text}
+                    <div style={{maxWidth:"85%",padding:"9px 12px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:m.role==="user"?"var(--gold)":"var(--lift)",color:m.role==="user"?"#000":"var(--cream-60)",fontSize:12,lineHeight:1.6}}>
+                      {m.role==="user"?m.text:<RenderMD text={m.text}/>}
                     </div>
                   </div>
                 ))}
@@ -3896,6 +3944,18 @@ function useGlobalVoice(){
   return[v,set];
 }
 
+// Re-resolve a voice from a fresh getVoices() call by matching name+lang.
+// Voice object references can go stale across calls in many browsers (especially
+// mobile), so we always look up the live object right before speaking.
+function resolveLiveVoice(voiceRef){
+  if(typeof window==="undefined"||!window.speechSynthesis) return null;
+  const live=window.speechSynthesis.getVoices();
+  if(!voiceRef) return null;
+  return live.find(v=>v.voiceURI===voiceRef.voiceURI&&v.name===voiceRef.name)
+      || live.find(v=>v.name===voiceRef.name)
+      || null;
+}
+
 // Loads all voices — returns a promise that resolves when voices are ready
 function loadVoices(){
   return new Promise(res=>{
@@ -3925,11 +3985,16 @@ function VoiceSelector(){
     loadVoices().then(vs=>{
       setVoices(vs);
       if(!_GV.voice&&vs.length>0){
+        // Prefer natural-sounding, high-quality voices first (these tend to
+        // sound the least "robotic"). Falls back gracefully if not available.
         const pick=
+          vs.find(v=>v.name.includes("Natural"))||           // Edge/Windows "Natural" voices — very high quality
+          vs.find(v=>v.name.includes("Neural"))||            // Some platforms label neural voices this way
+          vs.find(v=>v.name==="Google UK English Female")||
           vs.find(v=>v.name==="Google US English")||
           vs.find(v=>v.name.includes("Google")&&v.lang==="en-US")||
-          vs.find(v=>v.name.includes("Samantha"))||
-          vs.find(v=>v.name.includes("Daniel"))||
+          vs.find(v=>v.name.includes("Samantha"))||          // macOS/iOS high quality
+          vs.find(v=>v.name.includes("Daniel"))||            // macOS/iOS high quality (British)
           vs.find(v=>v.lang==="en-US")||
           vs[0];
         setSel(pick);
@@ -3937,16 +4002,33 @@ function VoiceSelector(){
     });
   },[]);
 
+  // Recompute position whenever opened, and keep it pinned while scrolling/resizing
   useEffect(()=>{
     if(!open) return;
-    // Compute fixed position from button rect
-    if(btnRef.current){
+    const updatePos=()=>{
+      if(!btnRef.current) return;
       const r=btnRef.current.getBoundingClientRect();
-      setPos({top:r.bottom+6,left:Math.min(r.left,window.innerWidth-260)});
-    }
+      const dropdownW=260;
+      const dropdownMaxH=360;
+      let top=r.bottom+6;
+      let left=Math.min(r.left,window.innerWidth-dropdownW-8);
+      left=Math.max(8,left);
+      // If not enough room below, open upwards instead
+      if(top+dropdownMaxH>window.innerHeight&&r.top>dropdownMaxH){
+        top=r.top-dropdownMaxH-6;
+      }
+      setPos({top,left});
+    };
+    updatePos();
     const close=e=>{if(btnRef.current&&!btnRef.current.closest(".vs-wrap")?.contains(e.target))setOpen(false);};
     document.addEventListener("mousedown",close);
-    return()=>document.removeEventListener("mousedown",close);
+    window.addEventListener("scroll",updatePos,true);
+    window.addEventListener("resize",updatePos);
+    return()=>{
+      document.removeEventListener("mousedown",close);
+      window.removeEventListener("scroll",updatePos,true);
+      window.removeEventListener("resize",updatePos);
+    };
   },[open]);
 
   if(!voices.length) return null;
@@ -3980,7 +4062,7 @@ function VoiceSelector(){
         🎙 {sel?shortName(sel).slice(0,16):"Pick voice"} ▾
       </button>
       {open&&(
-        <div style={{position:"fixed",top:pos.top,left:pos.left,zIndex:2147483647,background:"#1a1a2e",border:"1px solid rgba(210,175,90,0.4)",borderRadius:14,padding:"6px 0 8px",minWidth:230,maxWidth:260,maxHeight:360,overflowY:"auto",boxShadow:"0 16px 60px rgba(0,0,0,0.9)"}}>
+        <div style={{position:"fixed",top:pos.top,left:pos.left,zIndex:2147483647,background:"#13131f",border:"1px solid rgba(210,175,90,0.4)",borderRadius:14,padding:"6px 0 8px",minWidth:230,maxWidth:260,maxHeight:"min(360px, 70vh)",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 16px 60px rgba(0,0,0,0.9)"}}>
           <div style={{padding:"6px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:4}}>🎙 SELECT VOICE & ACCENT</div>
           {grouped.map(g=>(
             <div key={g.key}>
@@ -4022,20 +4104,29 @@ function AudioPlayer({text,label="Listen",mini=false}){
     if(state==="paused"&&uttRef.current){window.speechSynthesis.resume();setState("playing");return;}
     window.speechSynthesis.cancel();
     const t=clean(text);if(!t) return;
-    const u=new SpeechSynthesisUtterance(t);
-    u.rate=0.93;u.pitch=1;u.volume=1;
-    // Use selected voice — wait for it if not yet loaded
-    if(selVoice) u.voice=selVoice;
-    else {
+
+    // Re-resolve the chosen voice fresh from the live voices list — stale
+    // voice object references silently fail to speak in many browsers.
+    let voiceToUse=resolveLiveVoice(selVoice);
+    if(!voiceToUse){
       const vs=window.speechSynthesis.getVoices();
-      const pick=vs.find(v=>v.lang==="en-US"&&v.name.includes("Google"))||vs.find(v=>v.lang.startsWith("en"))||vs[0];
-      if(pick) u.voice=pick;
+      voiceToUse=vs.find(v=>v.lang==="en-US"&&v.name.includes("Google"))||vs.find(v=>v.lang.startsWith("en"))||vs[0]||null;
     }
-    u.onstart=()=>setState("playing");
-    u.onend=()=>{setState("idle");uttRef.current=null;};
-    u.onerror=()=>{setState("idle");uttRef.current=null;};
-    uttRef.current=u;
-    window.speechSynthesis.speak(u);
+
+    const speakNow=()=>{
+      const u=new SpeechSynthesisUtterance(t);
+      u.rate=0.93;u.pitch=1;u.volume=1;
+      if(voiceToUse){ u.voice=voiceToUse; u.lang=voiceToUse.lang; }
+      u.onstart=()=>setState("playing");
+      u.onend=()=>{setState("idle");uttRef.current=null;};
+      u.onerror=()=>{setState("idle");uttRef.current=null;};
+      uttRef.current=u;
+      window.speechSynthesis.speak(u);
+    };
+
+    // Some browsers (esp. Chrome/Android) need a brief delay after cancel()
+    // before speak() will actually fire — otherwise it silently no-ops.
+    setTimeout(speakNow,60);
   };
   useEffect(()=>()=>{if(typeof window!=="undefined")window.speechSynthesis.cancel();},[]);
   if(!supported) return null;
@@ -4102,7 +4193,11 @@ async function regenerateModule(key, profile, userId, isPremium, setData, setLoa
   setLoading(false);
 }
 
-function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loading,err}){
+function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loading,err,isPaid,onUnlock}){
+  const handleRegen=()=>{
+    if(!isPaid){ onUnlock&&onUnlock(); return; }
+    onRegen&&onRegen();
+  };
   return(
     <div className="card" style={{marginBottom:20}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
@@ -4112,20 +4207,21 @@ function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loadi
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {audioText&&<AudioPlayer text={audioText} label="Listen"/>}
-          <button onClick={onRegen} disabled={loading}
-            style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.12)",background:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap"}}>
-            {loading?"…":"↺ Refresh"}
+          <button onClick={handleRegen} disabled={loading}
+            title={isPaid?"Get a new set":"Upgrade to refresh with new ideas"}
+            style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.12)",background:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4}}>
+            {loading?"…":isPaid?"↺ Refresh":<>🔒 Refresh</>}
           </button>
         </div>
       </div>
-      {err&&<div className="err-box" style={{marginBottom:10}}>⚠ {err} <button onClick={onRegen} style={{marginLeft:8,background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11}}>Retry</button></div>}
+      {err&&<div className="err-box" style={{marginBottom:10}}>⚠ {err} <button onClick={handleRegen} style={{marginLeft:8,background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11}}>Retry</button></div>}
       {loading&&<div style={{textAlign:"center",padding:"24px 0"}}><div style={{width:28,height:28,border:"2.5px solid rgba(255,255,255,0.08)",borderTop:"2.5px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 10px"}}/><p style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>Building your {title.toLowerCase()}…</p></div>}
       {!loading&&children}
     </div>
   );
 }
 
-function LifeHacksModule({data,formData,userId,isPremium}){
+function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [hacks,setHacks]=useState(Array.isArray(data?.life_hacks)?data.life_hacks:[]);
   const [emotional,setEmotional]=useState(Array.isArray(data?.emotional_strength)?data.emotional_strength:[]);
   const [lLoading,setLLoading]=useState(false);[{},()=>{}];
@@ -4136,7 +4232,7 @@ function LifeHacksModule({data,formData,userId,isPremium}){
 
   return(
     <div className="fu">
-      <ModuleShell title="LIFE HACKS" color="var(--gold)" audioText={hacks.length?hacks.join(". "):""} onRegen={()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr)} loading={lLoading} err={lErr}>
+      <ModuleShell title="LIFE HACKS" color="var(--gold)" audioText={hacks.length?hacks.join(". "):""} onRegen={()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr)} loading={lLoading} err={lErr} isPaid={isPaid} onUnlock={onUnlock}>
         {hacks.length===0&&!lLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your personalised life hacks.</p>}
         {hacks.map((h,i)=>(
           <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid rgba(255,255,255,0.05)":"none",alignItems:"flex-start"}}>
@@ -4146,7 +4242,7 @@ function LifeHacksModule({data,formData,userId,isPremium}){
           </div>
         ))}
       </ModuleShell>
-      <ModuleShell title="EMOTIONAL STRENGTH" color="var(--teal)" audioText={emotional.length?emotional.join(". "):""} onRegen={()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr)} loading={eLoading} err={eErr}>
+      <ModuleShell title="EMOTIONAL STRENGTH" color="var(--teal)" audioText={emotional.length?emotional.join(". "):""} onRegen={()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr)} loading={eLoading} err={eErr} isPaid={isPaid} onUnlock={onUnlock}>
         {emotional.length===0&&!eLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate emotional strength practices.</p>}
         {emotional.map((e,i)=>(
           <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid rgba(255,255,255,0.05)":"none",alignItems:"flex-start"}}>
@@ -4160,7 +4256,7 @@ function LifeHacksModule({data,formData,userId,isPremium}){
   );
 }
 
-function MoneyModule({data,formData,userId,isPremium}){
+function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [mp,setMp]=useState(data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{});
   const [re,setRe]=useState(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});
   const [mpL,setMpL]=useState(false);const [reL,setReL]=useState(false);
@@ -4170,7 +4266,7 @@ function MoneyModule({data,formData,userId,isPremium}){
   const reAudio=[re.method&&`Method: ${re.method}`,re.how_it_works,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
-      <ModuleShell title="PROTECT YOUR MONEY" color="var(--gold)" audioText={mpAudio} onRegen={()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE)} loading={mpL} err={mpE}>
+      <ModuleShell title="PROTECT YOUR MONEY" color="var(--gold)" audioText={mpAudio} onRegen={()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE)} loading={mpL} err={mpE} isPaid={isPaid} onUnlock={onUnlock}>
         {!mp.rule&&!mpL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your money protection plan.</p>}
         {mp.rule&&(
           <>
@@ -4187,7 +4283,7 @@ function MoneyModule({data,formData,userId,isPremium}){
           </>
         )}
       </ModuleShell>
-      <ModuleShell title="REAL ESTATE HACK" color="var(--teal)" audioText={reAudio} onRegen={()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE)} loading={reL} err={reE}>
+      <ModuleShell title="REAL ESTATE HACK" color="var(--teal)" audioText={reAudio} onRegen={()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE)} loading={reL} err={reE} isPaid={isPaid} onUnlock={onUnlock}>
         {!re.method&&!reL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate real estate income ideas for {formData?.country||"your country"}.</p>}
         {re.method&&(
           <>
@@ -4204,7 +4300,7 @@ function MoneyModule({data,formData,userId,isPremium}){
   );
 }
 
-function OnlineIncomeModule({data,formData,userId,isPremium}){
+function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
@@ -4212,7 +4308,7 @@ function OnlineIncomeModule({data,formData,userId,isPremium}){
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   return(
     <div className="fu">
-      <ModuleShell title={`MAKE MONEY ONLINE IN ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err}>
+      <ModuleShell title={`MAKE MONEY ONLINE IN ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={isPaid} onUnlock={onUnlock}>
         {online.length===0&&!loading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>}
         {online.map((o,i)=>(
           <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
@@ -4231,7 +4327,7 @@ function OnlineIncomeModule({data,formData,userId,isPremium}){
   );
 }
 
-function BusinessModule({data,formData,userId,isPremium}){
+function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [zb,setZb]=useState(data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{});
   const [pb,setPb]=useState(Array.isArray(data?.product_business)?data.product_business:[]);
   const [zbL,setZbL]=useState(false);const [pbL,setPbL]=useState(false);
@@ -4240,7 +4336,7 @@ function BusinessModule({data,formData,userId,isPremium}){
   const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
-      <ModuleShell title="START WITH ZERO MONEY" color="var(--gold)" audioText={zbAudio} onRegen={()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE)} loading={zbL} err={zbE}>
+      <ModuleShell title="START WITH ZERO MONEY" color="var(--gold)" audioText={zbAudio} onRegen={()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE)} loading={zbL} err={zbE} isPaid={isPaid} onUnlock={onUnlock}>
         {!zb.idea&&!zbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate a zero-capital business plan for {formData?.country||"your country"}.</p>}
         {zb.idea&&(
           <>
@@ -4258,7 +4354,7 @@ function BusinessModule({data,formData,userId,isPremium}){
           </>
         )}
       </ModuleShell>
-      <ModuleShell title="SELL PHYSICAL PRODUCTS" color="var(--teal)" audioText={pb.length?pb.map(p=>`${p.product}: ${p.why||""}. Margin: ${p.profit_margin||""}`).join(". "):""} onRegen={()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE)} loading={pbL} err={pbE}>
+      <ModuleShell title="SELL PHYSICAL PRODUCTS" color="var(--teal)" audioText={pb.length?pb.map(p=>`${p.product}: ${p.why||""}. Margin: ${p.profit_margin||""}`).join(". "):""} onRegen={()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE)} loading={pbL} err={pbE} isPaid={isPaid} onUnlock={onUnlock}>
         {pb.length===0&&!pbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to get product business ideas with supplier links.</p>}
         {pb.map((p,i)=>(
           <div key={i} style={{padding:"13px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
@@ -4666,10 +4762,10 @@ Write ONE single sentence — something true and specific to them that they woul
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium}/>}
-            {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
-            {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
-            {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
-            {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
@@ -4780,14 +4876,7 @@ Write ONE single sentence — something true and specific to them that they woul
             />
           )}
           {mod==="advisor"&&(
-            isPaid
-              ?<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium}/>
-              :<div className="fu" style={{textAlign:"center",padding:"40px 0"}}>
-                <div style={{fontSize:36,marginBottom:16}}>⬡</div>
-                <div className="d3" style={{marginBottom:12}}>A real conversation, any time</div>
-                <p className="body" style={{maxWidth:400,margin:"0 auto 24px"}}>Sometimes you just need someone who knows your situation to talk it through with. That's what this is. No scripts, no generic advice — just honest, specific conversation.</p>
-                <button className="btn btn-gold" onClick={onUnlock}>I want this</button>
-              </div>
+            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
           )}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
@@ -5090,8 +5179,7 @@ Discover your own clarity score at destiniq.vercel.app`;
 function ReferralWidget({user,isPaid}){
   const [copied,setCopied]=useState(false);
   const [referrals,setReferrals]=useState(0);
-  const refCode = user?.id?.slice(0,8)||"destiq";
-  const refLink = `https://destiniq.vercel.app?ref=${refCode}`;
+  const refLink = `https://destiniq.vercel.app?ref=${user?.id||""}`;
 
   useEffect(()=>{
     if(!user?.id) return;
@@ -5549,12 +5637,15 @@ export default function DestinIQ(){
         // Track referral if URL has ?ref=
         if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
           const ref=new URLSearchParams(window.location.search).get("ref");
-          if(ref){
-            // Find referrer by their id prefix
-            const{data:profiles}=await supabase.from("user_profiles").select("user_id").ilike("user_id",ref+"%").limit(1);
-            if(profiles?.[0]){
-              await supabase.from("referrals").insert({referrer_id:profiles[0].user_id,referred_id:session.user.id}).onConflict("referred_id").ignore();
-            }
+          // Basic UUID validation + don't let someone refer themselves
+          const isValidUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref||"");
+          if(isValidUUID&&ref!==session.user.id){
+            try{
+              // insert will silently fail if it violates the unique(referred_id) constraint — that's fine,
+              // it just means this user was already recorded as referred before
+              const{error:refErr}=await supabase.from("referrals").insert({referrer_id:ref,referred_id:session.user.id});
+              if(refErr) console.warn("Referral insert:",refErr.message);
+            }catch(_){ /* referral already recorded or insert failed — ignore */ }
             window.history.replaceState({},"",window.location.pathname);
           }
         }
@@ -5793,7 +5884,6 @@ export default function DestinIQ(){
             else setScreen("landing");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
-            {screen!=="landing"&&<PremiumToggle isPremium={isPremium} onToggle={()=>setIsPremium(p=>!p)}/>}
             {user&&<button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
                 ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
