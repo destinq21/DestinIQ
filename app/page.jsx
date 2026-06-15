@@ -4613,6 +4613,133 @@ function AudioPlayer({text,label="Listen",mini=false}){
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOICE INPUT — Textarea with microphone dictation (Web Speech API)
+// Falls back to a plain textarea if SpeechRecognition isn't supported.
+// ═══════════════════════════════════════════════════════════════════════════════
+function VoiceInput({value,onChange,rows=4,maxLength=600,placeholder=""}){
+  const [listening,setListening]=useState(false);
+  const [supported,setSupported]=useState(false);
+  const recogRef=useRef(null);
+  const baseTextRef=useRef(""); // text already in the box before this dictation session
+
+  useEffect(()=>{
+    const SR=typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition);
+    setSupported(!!SR);
+  },[]);
+
+  const stopListening=()=>{
+    if(recogRef.current){
+      try{ recogRef.current.stop(); }catch{}
+      recogRef.current=null;
+    }
+    setListening(false);
+  };
+
+  const startListening=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR) return;
+    if(listening){ stopListening(); return; }
+
+    const recog=new SR();
+    recog.lang="en-US";
+    recog.continuous=true;
+    recog.interimResults=true;
+
+    baseTextRef.current=value||"";
+
+    recog.onresult=(e)=>{
+      let finalTranscript="";
+      let interimTranscript="";
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const transcript=e.results[i][0].transcript;
+        if(e.results[i].isFinal) finalTranscript+=transcript;
+        else interimTranscript+=transcript;
+      }
+      const base=baseTextRef.current;
+      const sep=base&&!base.endsWith(" ")&&!base.endsWith("\n")?" ":"";
+      let combined=base+(finalTranscript?sep+finalTranscript:"")+(interimTranscript?(base||finalTranscript?" ":"")+interimTranscript:"");
+      if(finalTranscript) baseTextRef.current=base+sep+finalTranscript;
+      combined=combined.slice(0,maxLength);
+      onChange({target:{value:combined}});
+    };
+
+    recog.onerror=()=>stopListening();
+    recog.onend=()=>setListening(false);
+
+    recogRef.current=recog;
+    try{
+      recog.start();
+      setListening(true);
+    }catch{
+      setListening(false);
+    }
+  };
+
+  useEffect(()=>()=>{ if(recogRef.current){ try{recogRef.current.stop();}catch{} } },[]);
+
+  return(
+    <div style={{position:"relative"}}>
+      <textarea
+        value={value}
+        onChange={onChange}
+        rows={rows}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        style={{
+          width:"100%",
+          background:"var(--midnight)",
+          border:listening?"1px solid var(--gold)":"1px solid var(--cream-15)",
+          borderRadius:12,
+          padding:"14px 16px",
+          paddingRight:supported?48:16,
+          color:"var(--cream)",
+          fontSize:14,
+          lineHeight:1.6,
+          outline:"none",
+          resize:"vertical",
+          fontFamily:"var(--f-body)",
+          boxSizing:"border-box",
+          transition:"border-color .2s",
+        }}
+      />
+      {supported&&(
+        <button
+          type="button"
+          onClick={startListening}
+          title={listening?"Stop dictation":"Speak instead of typing"}
+          style={{
+            position:"absolute",
+            right:10,
+            bottom:10,
+            width:32,
+            height:32,
+            borderRadius:"50%",
+            border:listening?"1px solid var(--gold)":"1px solid var(--cream-15)",
+            background:listening?"var(--gold)":"var(--lift)",
+            color:listening?"#000":"var(--cream-50)",
+            fontSize:14,
+            cursor:"pointer",
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            transition:"all .2s",
+            animation:listening?"pulse 1.4s ease-in-out infinite":"none",
+          }}
+        >
+          🎤
+        </button>
+      )}
+      {listening&&(
+        <div style={{position:"absolute",right:48,bottom:14,fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".05em"}}>
+          Listening…
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
   setLoading(true); setErr("");
