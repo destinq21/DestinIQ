@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -284,12 +284,12 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
-  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
-  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
+  basic:  { name:"Essential", amount:1,   label:"¢1/month",  currency:"GHS" },
+  pro:    { name:"Premium",   amount:15,  label:"¢15/month", currency:"GHS" },
+  annual: { name:"Annual Pro",amount:99,  label:"¢99/year",  currency:"GHS" },
 };
 function getHistory(uid) { return _memoryStore.get(uid)||[]; }
 function pushToMemory(uid,role,content) {
@@ -369,38 +369,128 @@ function addDecision(uid,decision) {
 // Browser Notifications API. Works in deployed Next.js.
 // For true background push (app closed): add service worker + Web Push + VAPID keys.
 // ═══════════════════════════════════════════════════════════════════════════════
-const NOTIF_MSGS = [
-  (n)=>`Hey ${n} — how's today going? Take 30 seconds to check in with yourself.`,
-  (n)=>`${n}, you showed up yesterday. Show up again today. 30 seconds is all it takes.`,
-  (n)=>`Your streak is waiting, ${n}. Don't let today be the one you look back on.`,
-  ()=>`DestinIQ: One honest question. One honest answer. That's all today needs.`,
-  (n)=>`${n} — what moved today? Even something small counts. Log it now.`,
-];
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTIFICATION SYSTEM — Morning wake-up, afternoon, evening, streak protection
+// ═══════════════════════════════════════════════════════════════════════════════
+const NOTIF_MSGS = {
+  morning:[
+    (n,g)=>`${n}, it's morning. Your goal is "${g||"a better life"}". The people winning started their day already. Open DestinIQ.`,
+    (n)=>`Good morning ${n}. 5 minutes of planning now saves 3 hours of confusion later. Let's go.`,
+    (n)=>`${n} — while others are still in bed, you could already be moving. Get up. Start.`,
+    (n)=>`DestinIQ morning call for ${n}: Your roadmap has a next step waiting. Today is the day.`,
+    (n)=>`${n}, sleeping longer won't change anything. Moving will. Your daily check-in is ready.`,
+    (n)=>`Rise up ${n}. Every day you delay is a day someone else gets ahead. Your plan is ready.`,
+    (n)=>`${n}, the best time to start was yesterday. The second best time is right now. Open your plan.`,
+  ],
+  afternoon:[
+    (n)=>`${n}, half the day is gone. What actually happened? Log your check-in before tonight.`,
+    (n)=>`Afternoon check-in, ${n}. Did you do the thing you planned this morning?`,
+    (n)=>`${n} — afternoon is when most people lose focus. This is your reminder not to.`,
+    (n)=>`Your advisor is ready to help you think through whatever you're stuck on right now, ${n}.`,
+    ()=>`DestinIQ: Quick question — what's the one thing you'll finish before the day ends?`,
+  ],
+  evening:[
+    (n,s)=>`${n}, your ${s}-day streak ends at midnight if you don't check in. 2 minutes is all it takes.`,
+    (n)=>`Evening check-in time, ${n}. Not to judge the day — just to learn from it.`,
+    (n)=>`${n} — log one win from today. Even a small one. Streaks are built one honest answer at a time.`,
+    (n)=>`Before the day ends, ${n}: what did you actually move forward today? Log it now.`,
+    ()=>`DestinIQ: Your daily reflection is waiting. Takes 60 seconds. Worth every one.`,
+  ],
+  streak:[
+    (n,s)=>`⚠️ ${n}, your ${s}-day streak expires in 3 hours. Don't lose it tonight.`,
+    (n,s)=>`${s} days in a row, ${n}. Don't let tonight be the one you regret. Log your check-in.`,
+    (n,s)=>`Streak alert: You've shown up ${s} days straight, ${n}. Midnight will reset it. 90 seconds to keep it alive.`,
+  ],
+  weekly:[
+    (n)=>`New week, ${n}. Your roadmap has steps waiting. Which one are you committing to this week?`,
+    (n)=>`Monday, ${n}. This is when the gap between people who make it and people who don't gets decided.`,
+    (n)=>`${n}, last week is gone. This week starts now. Open your plan and pick one thing.`,
+  ],
+};
+
+const NOTIF_SCHED_KEY="destiniq_notif_v2";
 
 async function requestNotifPermission() {
-  if(!("Notification" in window)) return "unsupported";
+  if(typeof window==="undefined"||!("Notification" in window)) return "unsupported";
   if(Notification.permission==="granted") return "granted";
   if(Notification.permission==="denied") return "denied";
   return await Notification.requestPermission();
 }
 
-function scheduleNotification(uid, name, timeStr, onFire) {
-  if(_notifTimers.has(uid)) clearTimeout(_notifTimers.get(uid));
-  const [h,m]=timeStr.split(":").map(Number);
-  const now=new Date(), next=new Date();
-  next.setHours(h,m,0,0);
-  if(next<=now) next.setDate(next.getDate()+1);
-  const delay=next-now;
-  const tid=setTimeout(()=>{
-    const msg=NOTIF_MSGS[Math.floor(Math.random()*NOTIF_MSGS.length)](name);
-    if(Notification.permission==="granted") {
-      new Notification("DestinIQ",{body:msg,tag:"destiniq-daily"});
+function fireNotification(title, body, tag="destiniq"){
+  if(typeof window==="undefined"||Notification.permission!=="granted") return;
+  try{
+    const n=new Notification(title,{
+      body,tag,icon:"/icon-192.png",badge:"/icon-192.png",
+      requireInteraction:false,silent:false,
+    });
+    n.onclick=()=>{window.focus();n.close();};
+  }catch(_){}
+}
+
+function scheduleNotification(uid, name, goal, streak, times, onFire){
+  // times = { morning:"07:00", afternoon:"13:00", evening:"20:00" }
+  if(!uid||!times) return;
+
+  // Clear existing timers for this user
+  const existing=_notifTimers.get(uid)||[];
+  existing.forEach(t=>clearTimeout(t));
+  const newTimers=[];
+
+  const scheduleAt=(timeStr, msgFn, tag)=>{
+    if(!timeStr) return;
+    const [h,m]=timeStr.split(":").map(Number);
+    const now=new Date(), next=new Date();
+    next.setHours(h,m,0,0);
+    if(next<=now) next.setDate(next.getDate()+1);
+    const delay=next-now;
+    const tid=setTimeout(()=>{
+      const msg=msgFn();
+      fireNotification("DestinIQ",msg,tag);
+      onFire&&onFire(tag);
+      scheduleNotification(uid,name,goal,streak,times,onFire); // reschedule tomorrow
+    },delay);
+    newTimers.push(tid);
+  };
+
+  const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
+
+  scheduleAt(times.morning, ()=>pick(NOTIF_MSGS.morning)(name,goal), "morning");
+  scheduleAt(times.afternoon, ()=>pick(NOTIF_MSGS.afternoon)(name), "afternoon");
+  scheduleAt(times.evening, ()=>pick(NOTIF_MSGS.evening)(name,streak), "evening");
+
+  // Streak protection — fires 3 hours before midnight
+  const now=new Date();
+  const midnight=new Date(); midnight.setHours(21,0,0,0);
+  if(midnight>now){
+    const tid=setTimeout(()=>{
+      fireNotification("DestinIQ — Streak Alert",pick(NOTIF_MSGS.streak)(name,streak),"streak");
+    },midnight-now);
+    newTimers.push(tid);
+  }
+
+  // Monday morning motivation
+  const daysToMon=(1-now.getDay()+7)%7||7;
+  const nextMon=new Date(now); nextMon.setDate(now.getDate()+daysToMon); nextMon.setHours(8,0,0,0);
+  const monTid=setTimeout(()=>{
+    fireNotification("DestinIQ — New Week",pick(NOTIF_MSGS.weekly)(name),"weekly");
+  },nextMon-now);
+  newTimers.push(monTid);
+
+  _notifTimers.set(uid,newTimers);
+
+  // Persist so notifications survive page refresh
+  try{ localStorage.setItem(NOTIF_SCHED_KEY,JSON.stringify({uid,name,goal,streak,times,set:Date.now()})); }catch(_){}
+}
+
+// Restore notification schedule on page load
+if(typeof window!=="undefined"){
+  try{
+    const saved=JSON.parse(localStorage.getItem(NOTIF_SCHED_KEY)||"null");
+    if(saved&&Notification.permission==="granted"&&saved.uid){
+      scheduleNotification(saved.uid,saved.name,saved.goal,saved.streak,saved.times,null);
     }
-    onFire&&onFire();
-    scheduleNotification(uid,name,timeStr,onFire);
-  },delay);
-  _notifTimers.set(uid,tid);
-  return delay;
+  }catch(_){}
 }
 
 
@@ -654,6 +744,7 @@ const MODULES=[
   {id:"today",    icon:"◎", label:"My Report"},
   {id:"momentum", icon:"⚡", label:"Daily Check-in"},
   {id:"wins",     icon:"🏆", label:"Win Tracker"},
+  {id:"progress", icon:"📈", label:"My Progress"},
   {id:"hacks",    icon:"💡", label:"Life Hacks"},
   {id:"money",    icon:"💰", label:"Money"},
   {id:"online",   icon:"🌐", label:"Earn Online"},
@@ -2122,9 +2213,9 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function NotificationPanel({profile,userId,onClose}){
+function NotificationPanel({profile,userId,streak,onClose}){
   const [perm,  setPerm  ]=useState(typeof Notification!=="undefined"?Notification.permission:"unsupported");
-  const [time,  setTime  ]=useState("08:00");
+  const [times, setTimes ]=useState({morning:"07:00",afternoon:"13:00",evening:"20:00"});
   const [enabled,setEnabled]=useState(false);
   const [sched, setSched ]=useState(null);
   const [tested,setTested]=useState(false);
@@ -2132,16 +2223,21 @@ function NotificationPanel({profile,userId,onClose}){
   const enable=async()=>{
     const p=await requestNotifPermission();setPerm(p);
     if(p==="granted"){
-      const delay=scheduleNotification(userId,profile.name,time,()=>{});
-      const mins=Math.round(delay/60000);
-      setSched(mins>60?`${Math.round(mins/60)}h ${mins%60}m`:`${mins}m`);
+      scheduleNotification(userId,profile?.name||"",profile?.goals||"",streak||1,times,()=>{});
+      setSched("Morning, afternoon, evening + midnight streak guard all scheduled ✓");
       setEnabled(true);
     }
   };
-  const disable=()=>{if(_notifTimers.has(userId)){clearTimeout(_notifTimers.get(userId));_notifTimers.delete(userId);}setEnabled(false);setSched(null);};
+  const disable=()=>{
+    const timers=_notifTimers.get(userId)||[];
+    timers.forEach(t=>clearTimeout(t));
+    _notifTimers.delete(userId);
+    try{localStorage.removeItem("destiniq_notif_v2");}catch(_){}
+    setEnabled(false);setSched(null);
+  };
   const test=()=>{
     if(Notification.permission!=="granted") return;
-    new Notification("DestinIQ",{body:`Hey ${profile.name} — how's today going? Take 30 seconds to check in with yourself.`,tag:"destiniq-test"});
+    fireNotification("DestinIQ",`${profile?.name||"Hey"} — this is a test. Your daily notifications are working! 🎉`,"test");
     setTested(true);setTimeout(()=>setTested(false),3000);
   };
 
@@ -2160,15 +2256,24 @@ function NotificationPanel({profile,userId,onClose}){
         {perm!=="denied"&&perm!=="unsupported"&&(
           <>
             <div className="notif-panel">
-              <div className="field">
-                <label className="fl">What time should we remind you?</label>
-                <input type="time" className="notif-time" value={time} onChange={e=>setTime(e.target.value)}/>
-                <p className="small" style={{marginTop:6}}>We'll send a daily nudge to log your momentum and check in. Morning works best for most people.</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+                {[
+                  {key:"morning",label:"🌅 Wake-up",hint:"Best: 6–8 AM"},
+                  {key:"afternoon",label:"☀️ Afternoon",hint:"Best: 1–3 PM"},
+                  {key:"evening",label:"🌆 Evening",hint:"Best: 7–9 PM"},
+                ].map(slot=>(
+                  <div key={slot.key}>
+                    <label className="fl" style={{marginBottom:6}}>{slot.label}</label>
+                    <input type="time" className="notif-time" value={times[slot.key]} onChange={e=>setTimes(t=>({...t,[slot.key]:e.target.value}))}/>
+                    <p style={{fontSize:10,color:"rgba(255,255,255,0.25)",marginTop:4}}>{slot.hint}</p>
+                  </div>
+                ))}
               </div>
-              {sched&&<div className="insight emerald" style={{marginTop:4,marginBottom:16}}><p style={{fontSize:13,color:"var(--cream-60)"}}>✓ Scheduled — next notification in <strong style={{color:"var(--emerald)"}}>{sched}</strong></p></div>}
+              <p className="small" style={{marginBottom:12,lineHeight:1.6}}>Morning gets you out of bed and focused. Afternoon re-engages you after the lunch dip. Evening protects your streak and helps you reflect. Midnight streak alert fires automatically.</p>
+              {sched&&<div className="insight" style={{marginTop:4,marginBottom:16}}><p style={{fontSize:13,color:"var(--cream-60)"}}>✓ Scheduled — {sched}</p></div>}
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                 {!enabled
-                  ?<button className="btn btn-gold" onClick={enable}>{perm==="granted"?"Schedule Notification":"Enable & Schedule"}</button>
+                  ?<button className="btn btn-gold" onClick={enable}>{perm==="granted"?"Schedule Notifications":"Enable & Schedule"}</button>
                   :<><button className="btn btn-gold" onClick={enable}>↺ Reschedule</button><button className="btn btn-ghost" onClick={disable}>Disable</button></>
                 }
                 {perm==="granted"&&<button className="btn btn-ghost" onClick={test} disabled={tested}>{tested?"Sent ✓":"Send Test"}</button>}
@@ -2176,8 +2281,8 @@ function NotificationPanel({profile,userId,onClose}){
             </div>
 
             <div className="insight" style={{marginTop:16,marginBottom:0}}>
-              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75}}>
-                <strong style={{color:"var(--gold)"}}>Production note:</strong> These are browser notifications — they fire while the tab is open or recently active. For true background delivery (app closed), add a service worker + Web Push API with VAPID keys to the Next.js build. That's a one-day implementation on top of this codebase.
+              <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.75}}>
+                <strong style={{color:"var(--gold)"}}>Note:</strong> Browser notifications fire while the tab is open or recently active. For delivery when app is fully closed, a service worker + Web Push setup is needed (a separate one-day build).
               </p>
             </div>
           </>
@@ -2728,23 +2833,25 @@ function RenderMD({text,style={}}){
 // ─── SUPPORT WIDGET ───────────────────────────────────────────────────────────
 function SupportWidget(){
   const [open,setOpen]=useState(false);
-  const [tab,setTab]=useState("chat"); // chat | faq
+  const [tab,setTab]=useState("chat");
   const [msgs,setMsgs]=useState([{role:"assistant",text:"Hi! I'm the DestinIQ support assistant. Ask me anything about the app, your account, payments, or how features work."}]);
   const [input,setInput]=useState("");
   const [loading,setLoading]=useState(false);
   const msgEndRef=useRef(null);
 
   const FAQS=[
-    {q:"How does the momentum score work?",a:"Your score (0–100) is calculated from 5 signals: quality of your last 7 check-ins (40pts), your streak (25pts), whether you logged today (10pts), decisions made this week (10pts), and your 7-day consistency (15pts)."},
-    {q:"How do I upgrade to premium?",a:"Go to your dashboard and click 'Upgrade' in the top right corner. We accept card payments via Paystack."},
-    {q:"My report doesn't feel personalised — why?",a:"The report is built from what you shared during onboarding. The more honest and specific you are, the better it gets. You can regenerate by starting a new session."},
-    {q:"Can I change my onboarding answers?",a:"Yes — sign out and sign back in to go through onboarding again with updated information."},
-    {q:"Is my data private?",a:"Yes. Your data is stored securely in Supabase and is never shared with third parties. Only you can see your reports and logs."},
-    {q:"The payment went through but I'm still on free — what do I do?",a:"This sometimes takes a moment. Refresh the page. If it still shows free after 5 minutes, use the chat below to contact us with your email address."},
-    {q:"How do I delete my account?",a:"Send us a message in this support chat with your email and we'll delete your account and all data within 24 hours."},
+    {q:"How does the momentum score work?",a:"Your score (0-100) is calculated from 5 signals: quality of your last 7 check-ins (40pts), your streak (25pts), whether you logged today (10pts), decisions made this week (10pts), and your 7-day consistency (15pts)."},
+    {q:"How do I upgrade to premium?",a:"Go to your dashboard and click Upgrade in the top right corner. We accept card payments and mobile money via Paystack."},
+    {q:"My report doesn't feel personalised - why?",a:"The report is built from what you shared during onboarding. The more honest and specific you are, the better it gets. You can regenerate by starting a new session."},
+    {q:"Can I change my onboarding answers?",a:"Yes - sign out and sign back in to go through onboarding again with updated information."},
+    {q:"Is my data private?",a:"Yes. Your data is stored securely and is never shared with third parties. Only you can see your reports and logs."},
+    {q:"The payment went through but I'm still on free - what do I do?",a:"Refresh the page. If it still shows free after 5 minutes, send us a message in the chat with your email address."},
+    {q:"How do I delete my account?",a:"Send us a message in this support chat with your email and we will delete your account and all data within 24 hours."},
+    {q:"Why is my streak not going up?",a:"Your streak increases by 1 each time you complete a daily check-in on a new calendar day. Make sure you tap Submit on your check-in - just opening it does not count."},
+    {q:"How do I use voice to type?",a:"Anywhere you see a mic icon next to a text box, tap it and speak. It will type what you say automatically."},
   ];
 
-  useEffect(()=>{msgEndRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
+  useEffect(()=>{ if(open) setTimeout(()=>msgEndRef.current?.scrollIntoView({behavior:"smooth"}),80); },[msgs,open]);
 
   const send=async()=>{
     if(!input.trim()||loading) return;
@@ -2753,77 +2860,142 @@ function SupportWidget(){
     setMsgs(m=>[...m,{role:"user",text:userMsg}]);
     setLoading(true);
     try{
-      const history = msgs.concat({role:"user",content:userMsg})
+      const history=msgs.concat({role:"user",content:userMsg})
         .filter(m=>m.role!=="assistant"||m.text!==msgs[0]?.text)
         .map(m=>({role:m.role,content:m.text||m.content||""}));
       const reply=await callAPI({
         messages:history,
-        system:"You are DestinIQ's friendly support assistant. Be warm, clear, and concise. For steps use numbered lists (1. 2. 3.). For options use bullet points (- option). Use --- to separate sections. Do NOT use **bold** or # headers — plain clean text only. If issue needs human review, ask for their email. Never make up features.",
-        userId:null,
-        isPremium:false,
+        system:"You are DestinIQ support. Be warm, concise, and helpful. Use plain text only - no bold, no headers. Numbered lists for steps. If issue needs human review, ask for their email.",
+        userId:null,isPremium:false,
       });
       setMsgs(m=>[...m,{role:"assistant",text:reply}]);
     }catch(e){
-      setMsgs(m=>[...m,{role:"assistant",text:"Something went wrong. Please try again."}]);
+      setMsgs(m=>[...m,{role:"assistant",text:"Something went wrong. Please try again or email support@destiniq.app"}]);
     }
     setLoading(false);
   };
 
+  const isMobile=typeof window!=="undefined"&&window.innerWidth<640;
+
   return(
     <>
-      {/* Floating button */}
-      <div onClick={()=>setOpen(o=>!o)} style={{position:"fixed",bottom:24,right:24,width:52,height:52,borderRadius:"50%",background:open?"var(--night)":"var(--gold)",border:open?"1px solid var(--line-gold)":"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:9999,boxShadow:"0 4px 20px rgba(0,0,0,0.4)",transition:"all .2s",fontSize:22}}>
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{position:"fixed",bottom:24,right:16,width:52,height:52,borderRadius:"50%",
+          background:open?"#1a1a2e":"#d2af5a",
+          border:open?"1px solid rgba(210,175,90,0.4)":"none",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          cursor:"pointer",zIndex:10001,
+          boxShadow:"0 4px 24px rgba(0,0,0,0.7)",
+          transition:"all .25s",fontSize:22,
+          WebkitTapHighlightColor:"transparent"}}>
         {open?"✕":"💬"}
       </div>
 
-      {/* Widget */}
       {open&&(
-        <div style={{position:"fixed",bottom:88,right:24,width:360,height:500,background:"var(--midnight)",border:"1px solid var(--line-gold)",borderRadius:20,display:"flex",flexDirection:"column",zIndex:9997,boxShadow:"0 16px 60px rgba(0,0,0,0.95)",overflow:"hidden"}}>
-          {/* Header */}
-          <div style={{padding:"14px 16px",borderBottom:"1px solid var(--line)",background:"var(--midnight)",display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:32,height:32,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>⚡</div>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>DestinIQ Support</div>
-              <div style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)"}}>● Online · Usually replies instantly</div>
+        <div style={{
+          position:"fixed",
+          ...(isMobile
+            ?{top:0,left:0,right:0,bottom:0,width:"100%",height:"100%",borderRadius:0}
+            :{bottom:88,right:16,width:"min(380px,calc(100vw - 32px))",height:"min(540px,calc(100vh - 120px))",borderRadius:20}
+          ),
+          background:"#0b0c18",
+          border:isMobile?"none":"1px solid rgba(210,175,90,0.25)",
+          display:"flex",flexDirection:"column",
+          zIndex:10000,
+          boxShadow:"0 20px 80px rgba(0,0,0,1)",
+          overflow:"hidden",
+          isolation:"isolate",
+        }}>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)",background:"#0b0c18",display:"flex",alignItems:"center",gap:10,flexShrink:0,paddingTop:`max(14px, env(safe-area-inset-top, 14px))`}}>
+            <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>⚡</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#ede8d8"}}>DestinIQ Support</div>
+              <div style={{fontSize:10,color:"#1fa89a",fontFamily:"monospace",letterSpacing:".04em"}}>● Online</div>
             </div>
+            {isMobile&&<button onClick={()=>setOpen(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.5)",fontSize:22,cursor:"pointer",padding:"4px 8px",lineHeight:1,WebkitTapHighlightColor:"transparent"}}>✕</button>}
           </div>
 
-          {/* Tabs */}
-          <div style={{display:"flex",borderBottom:"1px solid var(--line)"}}>
-            {["chat","faq"].map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px",background:"none",border:"none",borderBottom:`2px solid ${tab===t?"var(--gold)":"transparent"}`,color:tab===t?"var(--gold)":"var(--cream-40)",fontSize:12,fontWeight:600,cursor:"pointer",transition:"all .2s",textTransform:"uppercase",letterSpacing:".05em"}}>
-                {t==="chat"?"💬 Chat":"❓ FAQ"}
+          <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.07)",background:"#0b0c18",flexShrink:0}}>
+            {[["chat","💬 Chat"],["faq","❓ FAQ"]].map(([t,label])=>(
+              <button key={t} onClick={()=>setTab(t)}
+                style={{flex:1,padding:"11px 8px",background:"none",border:"none",
+                  borderBottom:`2px solid ${tab===t?"#d2af5a":"transparent"}`,
+                  color:tab===t?"#d2af5a":"rgba(237,232,216,0.3)",
+                  fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s",
+                  WebkitTapHighlightColor:"transparent"}}>
+                {label}
               </button>
             ))}
           </div>
 
           {tab==="faq"?(
-            <div style={{flex:1,overflowY:"auto",padding:"12px"}}>
+            <div style={{flex:1,overflowY:"auto",padding:"12px 14px",background:"#0b0c18",WebkitOverflowScrolling:"touch"}}>
               {FAQS.map((f,i)=>(
-                <details key={i} style={{borderBottom:"1px solid var(--line)",paddingBottom:10,marginBottom:10}}>
-                  <summary style={{fontSize:12,color:"var(--cream)",fontWeight:600,cursor:"pointer",lineHeight:1.5,paddingTop:4}}>{f.q}</summary>
-                  <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,marginTop:8,marginBottom:0}}>{f.a}</p>
+                <details key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.06)",paddingBottom:10,marginBottom:10}}>
+                  <summary style={{fontSize:13,color:"rgba(237,232,216,0.8)",fontWeight:600,cursor:"pointer",lineHeight:1.5,paddingTop:4,WebkitTapHighlightColor:"transparent"}}>
+                    {f.q}
+                  </summary>
+                  <p style={{fontSize:12,color:"rgba(237,232,216,0.45)",lineHeight:1.75,marginTop:8,marginBottom:0}}>{f.a}</p>
                 </details>
               ))}
             </div>
           ):(
             <>
-              {/* Messages */}
-              <div style={{flex:1,overflowY:"auto",padding:"12px",display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10,background:"#0b0c18",WebkitOverflowScrolling:"touch"}}>
                 {msgs.map((m,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
-                    <div style={{maxWidth:"85%",padding:"9px 12px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:m.role==="user"?"var(--gold)":"var(--lift)",color:m.role==="user"?"#000":"var(--cream-60)",fontSize:12,lineHeight:1.6}}>
-                      {m.role==="user"?m.text:<RenderMD text={m.text}/>}
+                    <div style={{
+                      maxWidth:"82%",padding:"10px 13px",
+                      borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",
+                      background:m.role==="user"?"#d2af5a":"rgba(255,255,255,0.06)",
+                      color:m.role==="user"?"#000":"rgba(237,232,216,0.78)",
+                      fontSize:13,lineHeight:1.65,wordBreak:"break-word",
+                    }}>
+                      {m.text}
                     </div>
                   </div>
                 ))}
-                {loading&&<div style={{display:"flex",justifyContent:"flex-start"}}><div style={{padding:"9px 12px",borderRadius:"14px 14px 14px 4px",background:"var(--lift)",fontSize:12,color:"var(--cream-30)"}}>Typing…</div></div>}
+                {loading&&(
+                  <div style={{display:"flex",justifyContent:"flex-start"}}>
+                    <div style={{padding:"10px 14px",borderRadius:"16px 16px 16px 4px",background:"rgba(255,255,255,0.06)",display:"flex",gap:5,alignItems:"center"}}>
+                      {[0,1,2].map(i=><span key={i} style={{width:6,height:6,borderRadius:"50%",background:"rgba(210,175,90,0.5)",display:"inline-block",animation:`tdot 1.2s ease-in-out ${i*0.2}s infinite`}}/>)}
+                    </div>
+                  </div>
+                )}
                 <div ref={msgEndRef}/>
               </div>
-              {/* Input */}
-              <div style={{padding:"10px 12px",borderTop:"1px solid var(--line)",display:"flex",gap:8}}>
-                <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder="Ask anything…" style={{flex:1,background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"9px 12px",color:"var(--cream)",fontSize:12,outline:"none"}}/>
-                <button onClick={send} disabled={loading||!input.trim()} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"9px 14px",color:"#000",fontWeight:700,fontSize:12,cursor:loading||!input.trim()?"not-allowed":"pointer",opacity:!input.trim()?0.5:1}}>→</button>
+              <div style={{
+                padding:"10px 12px",
+                paddingBottom:"max(10px, env(safe-area-inset-bottom, 10px))",
+                borderTop:"1px solid rgba(255,255,255,0.07)",
+                display:"flex",gap:8,
+                background:"#0b0c18",
+                flexShrink:0,
+              }}>
+                <input
+                  value={input}
+                  onChange={e=>setInput(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()}
+                  placeholder="Ask anything..."
+                  style={{
+                    flex:1,background:"rgba(255,255,255,0.05)",
+                    border:"1px solid rgba(255,255,255,0.1)",
+                    borderRadius:12,padding:"11px 14px",
+                    color:"#ede8d8",fontSize:14,outline:"none",
+                    WebkitAppearance:"none",
+                    minHeight:44,boxSizing:"border-box",
+                  }}
+                />
+                <button onClick={send} disabled={loading||!input.trim()}
+                  style={{
+                    background:input.trim()?"#d2af5a":"rgba(255,255,255,0.06)",
+                    border:"none",borderRadius:12,
+                    padding:"0 18px",minHeight:44,minWidth:48,
+                    color:input.trim()?"#000":"rgba(255,255,255,0.2)",
+                    fontWeight:700,fontSize:18,cursor:!input.trim()?"not-allowed":"pointer",
+                    transition:"all .2s",flexShrink:0,
+                    WebkitTapHighlightColor:"transparent",
+                  }}>→</button>
               </div>
             </>
           )}
@@ -4256,28 +4428,49 @@ function AudioPlayer({text,label="Listen",mini=false}){
     window.speechSynthesis.cancel();
     const t=clean(text);if(!t) return;
 
-    // Re-resolve the chosen voice fresh from the live voices list — stale
-    // voice object references silently fail to speak in many browsers.
-    let voiceToUse=resolveLiveVoice(selVoice);
-    if(!voiceToUse){
-      const vs=window.speechSynthesis.getVoices();
-      voiceToUse=vs.find(v=>v.lang==="en-US"&&v.name.includes("Google"))||vs.find(v=>v.lang.startsWith("en"))||vs[0]||null;
-    }
-
     const speakNow=()=>{
+      // Always fetch voice fresh right before speaking — never use a stored reference
+      const liveVoices=window.speechSynthesis.getVoices();
+      let voiceToUse=null;
+      if(selVoice){
+        // Match by name — most reliable across all browsers including Android
+        voiceToUse=liveVoices.find(v=>v.name===selVoice.name)||null;
+      }
+      if(!voiceToUse){
+        // Fallback: best available English voice
+        voiceToUse=
+          liveVoices.find(v=>v.name.includes("Natural"))||
+          liveVoices.find(v=>v.name.includes("Google")&&v.lang==="en-US")||
+          liveVoices.find(v=>v.lang==="en-US")||
+          liveVoices.find(v=>v.lang.startsWith("en"))||
+          liveVoices[0]||null;
+      }
       const u=new SpeechSynthesisUtterance(t);
       u.rate=0.93;u.pitch=1;u.volume=1;
-      if(voiceToUse){ u.voice=voiceToUse; u.lang=voiceToUse.lang; }
+      if(voiceToUse){u.voice=voiceToUse;u.lang=voiceToUse.lang;}
       u.onstart=()=>setState("playing");
       u.onend=()=>{setState("idle");uttRef.current=null;};
-      u.onerror=()=>{setState("idle");uttRef.current=null;};
+      u.onerror=(e)=>{
+        // On Android, if utterance errors, retry once without a specific voice
+        if(e.error==="not-allowed"||e.error==="canceled") return;
+        if(voiceToUse){
+          // Retry with no voice set (browser default)
+          const u2=new SpeechSynthesisUtterance(t);
+          u2.rate=0.93;u2.pitch=1;u2.volume=1;
+          u2.onstart=()=>setState("playing");
+          u2.onend=()=>{setState("idle");uttRef.current=null;};
+          u2.onerror=()=>{setState("idle");uttRef.current=null;};
+          uttRef.current=u2;
+          window.speechSynthesis.speak(u2);
+        } else {setState("idle");uttRef.current=null;}
+      };
       uttRef.current=u;
       window.speechSynthesis.speak(u);
     };
 
-    // Some browsers (esp. Chrome/Android) need a brief delay after cancel()
-    // before speak() will actually fire — otherwise it silently no-ops.
-    setTimeout(speakNow,60);
+    // Chrome Android needs 120ms after cancel() before speak() fires reliably
+    const isMobile=/Android|iPhone|iPad/i.test(typeof navigator!=="undefined"?navigator.userAgent:"");
+    setTimeout(speakNow, isMobile?150:60);
   };
   useEffect(()=>()=>{if(typeof window!=="undefined")window.speechSynthesis.cancel();},[]);
   if(!supported) return null;
@@ -4718,6 +4911,183 @@ function WinTracker({profile,userId,isPremium}){
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROGRESS FEED — User reports back on steps, AI coaches based on full history
+// ═══════════════════════════════════════════════════════════════════════════════
+const PROGRESS_KEY="destiniq_progress_v1";
+function loadProgress(){try{return JSON.parse(localStorage.getItem(PROGRESS_KEY)||"[]");}catch{return[];}}
+function saveProgress(p){try{localStorage.setItem(PROGRESS_KEY,JSON.stringify(p.slice(0,100)));}catch{}}
+
+const PROGRESS_TAGS=[
+  {id:"roadmap",label:"Roadmap",color:"var(--gold)"},
+  {id:"money",label:"Money",color:"var(--teal)"},
+  {id:"career",label:"Career",color:"#9b72cf"},
+  {id:"business",label:"Business",color:"#e8963a"},
+  {id:"mindset",label:"Mindset",color:"var(--rose)"},
+  {id:"personal",label:"Personal",color:"var(--cream-40)"},
+];
+
+function ProgressFeed({profile,reportData,userId,isPremium}){
+  const [entries,setEntries]=useState(()=>loadProgress());
+  const [input,setInput]=useState("");
+  const [tag,setTag]=useState("roadmap");
+  const [loading,setLoading]=useState(false);
+  const [expandedId,setExpandedId]=useState(null);
+  const [filter,setFilter]=useState("all");
+
+  const submit=async()=>{
+    if(!input.trim()||loading) return;
+    const entry={
+      id:Date.now(),
+      text:input.trim(),
+      tag,
+      date:new Date().toISOString(),
+      reply:null,
+      loading:true,
+    };
+    const updated=[entry,...entries];
+    setEntries(updated);
+    saveProgress(updated);
+    setInput("");
+    setLoading(true);
+    setExpandedId(entry.id);
+
+    try{
+      // Build context from report + roadmap + past 5 entries
+      const pastContext=entries.slice(0,5).map(e=>`[${new Date(e.date).toLocaleDateString()}] ${e.text}${e.reply?` → Coach replied: ${e.reply.slice(0,120)}`:""}`).join("\n");
+      const prompt=`${profile?.name||"The user"} is updating their progress. Their goal: "${profile?.goals||""}". Country: ${profile?.country||""}. Income: ${profile?.income||""}.
+
+Their report summary: "${reportData?.headline||""}".
+Their roadmap phase 1: "${reportData?.roadmap?.[0]?.title||""}".
+
+Past progress entries:
+${pastContext||"(none yet — this is their first update)"}
+
+TODAY'S UPDATE (tagged as "${tag}"): "${entry.text}"
+
+Respond as their personal coach who knows their full story. Be direct, warm, specific. Reference exactly what they said. Give ONE concrete next step. Max 4 sentences. No generic advice.`;
+
+      const reply=await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:"You are a personal life coach who knows this person's full story. Speak directly to them. Reference their specific situation. Never be generic. 3-4 sentences max. No bullet points.",
+        userId,isPremium,
+      });
+
+      const withReply=updated.map(e=>e.id===entry.id?{...e,reply,loading:false}:e);
+      setEntries(withReply);
+      saveProgress(withReply);
+    }catch{
+      const withErr=updated.map(e=>e.id===entry.id?{...e,reply:"Couldn't load a response right now. Your update is saved — try refreshing.",loading:false}:e);
+      setEntries(withErr);
+      saveProgress(withErr);
+    }
+    setLoading(false);
+  };
+
+  const filtered=filter==="all"?entries:entries.filter(e=>e.tag===filter);
+  const tagMeta=(id)=>PROGRESS_TAGS.find(t=>t.id===id)||PROGRESS_TAGS[0];
+
+  return(
+    <div className="fu">
+      <div style={{marginBottom:24}}>
+        <div className="d3" style={{marginBottom:6}}>My Progress</div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.6}}>Tell your coach what you tried, what happened, and what's not working. They'll respond based on everything they know about you.</p>
+      </div>
+
+      {/* Input card */}
+      <div className="card" style={{marginBottom:24}}>
+        {/* Tag selector */}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+          {PROGRESS_TAGS.map(t=>(
+            <button key={t.id} onClick={()=>setTag(t.id)}
+              style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${tag===t.id?t.color:"rgba(255,255,255,0.1)"}`,background:tag===t.id?`${t.color}18`:"none",color:tag===t.id?t.color:"rgba(255,255,255,0.4)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",transition:"all .2s"}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{position:"relative",marginBottom:12}}>
+          <VoiceInput
+            value={input}
+            onChange={e=>setInput(e.target.value)}
+            rows={4}
+            maxLength={600}
+            placeholder={`What did you try? What happened? What's working and what's not? Be honest — your coach needs the real picture to help you...`}
+          />
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+          <span style={{fontSize:11,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)"}}>{input.length}/600</span>
+          <button onClick={submit} disabled={!input.trim()||loading} className="btn btn-gold" style={{fontSize:13}}>
+            {loading?"Getting your coaching…":"Send update →"}
+          </button>
+        </div>
+      </div>
+
+      {/* Filter */}
+      {entries.length>0&&(
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+          <button onClick={()=>setFilter("all")} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filter==="all"?"var(--gold)":"rgba(255,255,255,0.1)"}`,background:filter==="all"?"rgba(210,175,90,0.08)":"none",color:filter==="all"?"var(--gold)":"rgba(255,255,255,0.35)",fontSize:11,cursor:"pointer"}}>
+            All ({entries.length})
+          </button>
+          {PROGRESS_TAGS.filter(t=>entries.some(e=>e.tag===t.id)).map(t=>(
+            <button key={t.id} onClick={()=>setFilter(t.id)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filter===t.id?t.color:"rgba(255,255,255,0.1)"}`,background:filter===t.id?`${t.color}18`:"none",color:filter===t.id?t.color:"rgba(255,255,255,0.35)",fontSize:11,cursor:"pointer"}}>
+              {t.label} ({entries.filter(e=>e.tag===t.id).length})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Feed */}
+      {filtered.length===0&&(
+        <div style={{textAlign:"center",padding:"32px 0"}}>
+          <div style={{fontSize:40,marginBottom:12}}>📈</div>
+          <div className="d3" style={{marginBottom:8}}>Your progress story starts here</div>
+          <p style={{fontSize:13,color:"rgba(255,255,255,0.35)",maxWidth:380,margin:"0 auto",lineHeight:1.7}}>
+            Every time you try something from your roadmap, career path, or business plan — come back and tell your coach what happened. They'll help you adjust and keep moving.
+          </p>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {filtered.map(entry=>{
+          const meta=tagMeta(entry.tag);
+          const isExpanded=expandedId===entry.id;
+          const dateStr=new Date(entry.date).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+          return(
+            <div key={entry.id} style={{background:"var(--lift)",borderRadius:14,border:"1px solid rgba(255,255,255,0.06)",overflow:"hidden"}}>
+              {/* User update */}
+              <div style={{padding:"14px 16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:8,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:9,color:meta.color,fontFamily:"var(--f-mono)",background:`${meta.color}18`,border:`1px solid ${meta.color}40`,borderRadius:4,padding:"2px 8px"}}>{meta.label.toUpperCase()}</span>
+                    <span style={{fontSize:10,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)"}}>{dateStr}</span>
+                  </div>
+                  <button onClick={()=>setEntries(entries.filter(e=>e.id!==entry.id))||saveProgress(entries.filter(e=>e.id!==entry.id))} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12}}>✕</button>
+                </div>
+                <p style={{fontSize:13,color:"rgba(255,255,255,0.75)",lineHeight:1.7,margin:0}}>{entry.text}</p>
+              </div>
+
+              {/* Coach reply */}
+              {entry.loading?(
+                <div style={{padding:"12px 16px",borderTop:"1px solid rgba(255,255,255,0.06)",background:"rgba(210,175,90,0.03)",display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:20,height:20,border:"2px solid rgba(210,175,90,0.2)",borderTop:"2px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",flexShrink:0}}/>
+                  <span style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>Your coach is reading your update…</span>
+                </div>
+              ):entry.reply?(
+                <div style={{padding:"14px 16px",borderTop:"1px solid rgba(255,255,255,0.06)",background:"rgba(210,175,90,0.04)"}}>
+                  <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:8,letterSpacing:".08em"}}>⬡ YOUR COACH</div>
+                  <p style={{fontSize:13,color:"rgba(237,232,216,0.7)",lineHeight:1.75,margin:0}}>{entry.reply}</p>
+                  <AudioPlayer text={entry.reply} label="Listen" mini={false}/>
+                </div>
+              ):null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -4935,6 +5305,7 @@ Write ONE single sentence — something true and specific to them that they woul
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium}/>}
             {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -5797,11 +6168,20 @@ export default function DestinIQ(){
         }
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
-        // Only go to results if BOTH formData and report exist
+        // Restore exactly where they left off
         if (profile.form_data && profile.report) {
           setScreen("results");
+        } else if (profile.form_data && !profile.report) {
+          // Has profile but no report yet — go to landing, not intake
+          setScreen("landing");
         }
-        // Otherwise stay on landing — user will see the home page and can click Begin
+        // Always restore notification preference
+        if (profile.notif_time && userId) {
+          const savedTime = profile.notif_time;
+          requestNotifPermission().then(perm=>{
+            if(perm==="granted") scheduleNotification(userId, profile.form_data?.name||"", savedTime, ()=>{});
+          });
+        }
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
@@ -6161,7 +6541,7 @@ export default function DestinIQ(){
         )}
 
         {showNotif&&formData&&(
-          <NotificationPanel profile={formData} userId={userId} onClose={()=>setShowNotif(false)}/>
+          <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
         )}
         </>}
 
