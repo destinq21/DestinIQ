@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -284,7 +284,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 const PLANS = {
   basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
@@ -608,6 +608,11 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 @media(max-width:400px){
   .d1{font-size:28px!important;}
   .nav-logo{font-size:16px!important;}
+}
+@media(max-width:840px){
+  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
+  .hero-grid>div:first-child{order:1;}
+  .hero-grid>div:last-child{order:2;}
 }
 .fu{animation:fadeUp .5s ease both;}
 .fu1{opacity:0;animation:fadeUp .5s .08s ease both;}
@@ -2874,7 +2879,7 @@ function Landing({onStart,ipLocation}){
   return(
     <div style={{paddingTop:60}}>
       <section style={{minHeight:"92vh",display:"flex",alignItems:"center",borderBottom:"1px solid var(--line)",padding:"80px 0"}}>
-        <div className="cx" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:60,alignItems:"center"}}>
+        <div className="cx hero-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:60,alignItems:"center"}}>
           <div>
             <div className="fu" style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -2971,6 +2976,99 @@ function Landing({onStart,ipLocation}){
         </div>
       </section>
 
+      {/* HOW IT WORKS — 3 steps */}
+      <section style={{padding:"56px 0",borderBottom:"1px solid var(--line)"}}>
+        <div className="cx" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:24}}>
+          {[
+            {n:"01",icon:"✍️",title:"Tell us what's really going on",desc:"60 seconds. Your situation, your goals, what's been holding you back. No judgement — just honesty."},
+            {n:"02",icon:"🧠",title:"Get a report built only for you",desc:"Not generic advice. A full breakdown of your life, money, mindset, and relationships — with a roadmap that fits your exact situation."},
+            {n:"03",icon:"📈",title:"Show up daily, watch it click",desc:"Check in, log wins, ask your advisor anything. Every day you show up, your picture gets clearer and your plan gets sharper."},
+          ].map(s=>(
+            <div key={s.n} className="fu" style={{textAlign:"left"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div className="mono" style={{color:"var(--gold)",fontSize:18}}>{s.n}</div>
+                <div style={{fontSize:24}}>{s.icon}</div>
+              </div>
+              <div style={{fontWeight:600,fontSize:15,marginBottom:6,color:"var(--cream)"}}>{s.title}</div>
+              <p className="small" style={{lineHeight:1.7}}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* WHAT'S INSIDE — module showcase */}
+      <section style={{padding:"80px 0",borderBottom:"1px solid var(--line)"}}>
+        <div className="cx" style={{textAlign:"center"}}>
+          <div className="mono fu" style={{marginBottom:16}}>Everything In One Place</div>
+          <h2 className="d2 fu1" style={{marginBottom:16}}>Your whole life,<br/><span className="em">finally organized</span></h2>
+          <p className="body-lg fu2" style={{maxWidth:540,margin:"0 auto 48px"}}>No more switching between five apps and a dozen tabs. Your report, your money plan, your career options, your roadmap — all in one place, all built around YOU.</p>
+
+          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,maxWidth:900,margin:"0 auto"}}>
+            {[
+              {icon:"◎",label:"Your Report",desc:"A full picture of where you stand right now"},
+              {icon:"⚡",label:"Daily Check-in",desc:"30 seconds to track your momentum"},
+              {icon:"🏆",label:"Win Tracker",desc:"Celebrate small wins that add up"},
+              {icon:"💡",label:"Life Hacks",desc:"Shortcuts tailored to your situation",premium:true},
+              {icon:"💰",label:"Money Plan",desc:"Protect and grow what you have",premium:true},
+              {icon:"🌐",label:"Earn Online",desc:"Real platforms, real first steps",premium:true},
+              {icon:"🏗️",label:"Start a Business",desc:"Even with zero capital",premium:true},
+              {icon:"◈",label:"Big Decisions",desc:"Think through what's next, clearly",premium:true},
+              {icon:"↗",label:"Weekly Pulse",desc:"Patterns in your week, explained",premium:true},
+              {icon:"⟶",label:"Your Roadmap",desc:"0-90 days to 3-5 years, mapped out"},
+              {icon:"◇",label:"Mindset",desc:"What's really holding you back"},
+              {icon:"◈",label:"Career Path",desc:"3 paths matched to your skills"},
+              {icon:"✦",label:"Relocate",desc:"Explore countries that fit you",premium:true},
+              {icon:"⬡",label:"Your Advisor",desc:"Talk it through, any time"},
+            ].map(m=>(
+              <div key={m.label} style={{position:"relative",padding:"18px 14px",background:"var(--night)",border:"1px solid var(--line)",borderRadius:14,textAlign:"left",transition:"border-color .25s"}}>
+                {m.premium&&<div style={{position:"absolute",top:10,right:10,fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 6px"}}>PRO</div>}
+                <div style={{fontSize:22,marginBottom:8}}>{m.icon}</div>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:4,color:"var(--cream)"}}>{m.label}</div>
+                <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.5}}>{m.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section style={{padding:"80px 0",borderBottom:"1px solid var(--line)",background:"rgba(210,175,90,0.02)"}}>
+        <div className="cx-md" style={{textAlign:"center"}}>
+          <div className="mono fu" style={{marginBottom:16}}>Simple Pricing</div>
+          <h2 className="d2 fu1" style={{marginBottom:16}}>Start free.<br/><span className="em">Go deeper when you're ready.</span></h2>
+          <p className="body-lg fu2" style={{maxWidth:480,margin:"0 auto 48px"}}>Your full report, momentum tracking, and roadmap are free — forever. Upgrade when you want unlimited advisor conversations, deeper money and business plans, and full relocation reports.</p>
+
+          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:20,maxWidth:760,margin:"0 auto"}}>
+            {/* Free plan */}
+            <div className="card" style={{textAlign:"left"}}>
+              <div className="mono" style={{color:"var(--cream-30)",marginBottom:8}}>FREE</div>
+              <div style={{fontFamily:"var(--f-display)",fontSize:32,marginBottom:4}}>$0</div>
+              <div className="small" style={{marginBottom:20}}>Forever</div>
+              <ul style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:10}}>
+                {["Full personalized report","Life pillar scores & roadmap","Daily check-ins & win tracker","Life hacks & mindset insights","Career path suggestions","3 advisor messages per day"].map(f=>(
+                  <li key={f} style={{display:"flex",gap:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--teal)"}}>✓</span>{f}</li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Premium plan */}
+            <div className="card" style={{textAlign:"left",borderColor:"var(--line-gold)",position:"relative",background:"var(--gold-glow)"}}>
+              <div style={{position:"absolute",top:-12,right:20,background:"var(--gold)",color:"#000",fontSize:10,fontWeight:700,padding:"4px 12px",borderRadius:20,fontFamily:"var(--f-mono)"}}>MOST POPULAR</div>
+              <div className="mono" style={{color:"var(--gold)",marginBottom:8}}>PREMIUM</div>
+              <div style={{fontFamily:"var(--f-display)",fontSize:32,marginBottom:4}}>$15<span style={{fontSize:14,color:"var(--cream-40)"}}>/month</span></div>
+              <div className="small" style={{marginBottom:20}}>or $99/year — save 45%</div>
+              <ul style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:10}}>
+                {["Everything in Free, plus:","Unlimited advisor conversations","Refresh money, business & online income ideas anytime","Full relocation reports for any country","Weekly Pulse pattern analysis","Big Decisions thinking partner","Priority response speed"].map((f,i)=>(
+                  <li key={f} style={{display:"flex",gap:8,fontSize:13,color:i===0?"var(--cream-40)":"var(--cream-60)",fontWeight:i===0?600:400}}>{i===0?"":<span style={{color:"var(--gold)"}}>✓</span>}{f}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <button className="btn btn-gold btn-lg fu4" onClick={onStart} style={{marginTop:32}}>Start free — upgrade anytime</button>
+        </div>
+      </section>
+
       {/* LIVE SLIDING TESTIMONIALS + SUBMIT FORM */}
       <section style={{padding:"64px 0",borderBottom:"1px solid var(--line)",overflow:"hidden"}}>
         <div className="cx">
@@ -3020,9 +3118,14 @@ function Landing({onStart,ipLocation}){
       <section style={{padding:"80px 0",textAlign:"center"}}>
         <div className="cx-sm">
           <div className="mono fu" style={{marginBottom:16}}>Free to start · No card needed</div>
-          <h2 className="d2 fu1" style={{marginBottom:20}}>One minute.<br/>Infinite clarity.</h2>
+          <h2 className="d2 fu1" style={{marginBottom:20}}>What would change<br/>if you finally <span className="em">had a plan?</span></h2>
           <p className="body fu2" style={{marginBottom:32,color:"var(--cream-60)"}}>Answer honestly. We do the rest. You deserve to finally understand what's actually going on in your life — and what to do next.</p>
-          <button className="btn btn-gold btn-lg fu3" onClick={onStart}>Start for free</button>
+          <button className="btn btn-gold btn-lg fu3" onClick={onStart}>Get my free report →</button>
+          <div className="fu4" style={{display:"flex",gap:24,justifyContent:"center",marginTop:24,flexWrap:"wrap"}}>
+            {["🔒 Your data stays private","⚡ Takes about 60 seconds","💳 No card required to start"].map(t=>(
+              <span key={t} className="small" style={{color:"var(--cream-30)"}}>{t}</span>
+            ))}
+          </div>
         </div>
       </section>
       <div className="disc">DestinIQ is a personal clarity and life strategy platform. Everything here is meant to help you think — not to replace a doctor, lawyer, or financial advisor. Use it as a trusted friend who's done their homework.</div>
@@ -3464,7 +3567,13 @@ function AuthScreen({onAuth}){
     setLoading(true);setError("");
     const{error:err}=await supabase.auth.signInWithOAuth({
       provider:"google",
-      options:{redirectTo:window.location.origin},
+      options:{
+        redirectTo:window.location.origin,
+        // Force Google's account picker every time — without this, Google
+        // silently re-authenticates with whatever account is already active
+        // in the browser, so "sign in with a different account" never works.
+        queryParams:{prompt:"select_account"},
+      },
     });
     if(err){setError(err.message);setLoading(false);}
     // On success the page redirects; onAuthStateChange in the root picks up the session.
@@ -3944,15 +4053,16 @@ function useGlobalVoice(){
   return[v,set];
 }
 
-// Re-resolve a voice from a fresh getVoices() call by matching name+lang.
-// Voice object references can go stale across calls in many browsers (especially
-// mobile), so we always look up the live object right before speaking.
+// Re-resolve a voice from fresh getVoices() right before speaking.
+// Voice object references go STALE in many browsers (Chrome Android especially).
+// Match by name only — voiceURI is often undefined on mobile browsers.
 function resolveLiveVoice(voiceRef){
-  if(typeof window==="undefined"||!window.speechSynthesis) return null;
+  if(typeof window==="undefined"||!window.speechSynthesis||!voiceRef) return null;
   const live=window.speechSynthesis.getVoices();
-  if(!voiceRef) return null;
-  return live.find(v=>v.voiceURI===voiceRef.voiceURI&&v.name===voiceRef.name)
-      || live.find(v=>v.name===voiceRef.name)
+  // Match by name (most reliable cross-browser identifier)
+  return live.find(v=>v.name===voiceRef.name)
+      || live.find(v=>v.lang===voiceRef.lang&&!v.localService===!voiceRef.localService)
+      || live.find(v=>v.lang===voiceRef.lang)
       || null;
 }
 
@@ -3979,22 +4089,21 @@ function VoiceSelector(){
   const [sel,setSel]=useGlobalVoice();
   const [open,setOpen]=useState(false);
   const btnRef=useRef(null);
+  const dropRef=useRef(null);
   const [pos,setPos]=useState({top:0,left:0});
 
   useEffect(()=>{
     loadVoices().then(vs=>{
       setVoices(vs);
       if(!_GV.voice&&vs.length>0){
-        // Prefer natural-sounding, high-quality voices first (these tend to
-        // sound the least "robotic"). Falls back gracefully if not available.
         const pick=
-          vs.find(v=>v.name.includes("Natural"))||           // Edge/Windows "Natural" voices — very high quality
-          vs.find(v=>v.name.includes("Neural"))||            // Some platforms label neural voices this way
+          vs.find(v=>v.name.includes("Natural"))||
+          vs.find(v=>v.name.includes("Neural"))||
           vs.find(v=>v.name==="Google UK English Female")||
           vs.find(v=>v.name==="Google US English")||
           vs.find(v=>v.name.includes("Google")&&v.lang==="en-US")||
-          vs.find(v=>v.name.includes("Samantha"))||          // macOS/iOS high quality
-          vs.find(v=>v.name.includes("Daniel"))||            // macOS/iOS high quality (British)
+          vs.find(v=>v.name.includes("Samantha"))||
+          vs.find(v=>v.name.includes("Daniel"))||
           vs.find(v=>v.lang==="en-US")||
           vs[0];
         setSel(pick);
@@ -4002,30 +4111,33 @@ function VoiceSelector(){
     });
   },[]);
 
-  // Recompute position whenever opened, and keep it pinned while scrolling/resizing
   useEffect(()=>{
     if(!open) return;
     const updatePos=()=>{
       if(!btnRef.current) return;
       const r=btnRef.current.getBoundingClientRect();
-      const dropdownW=260;
-      const dropdownMaxH=360;
+      const dropdownW=270;
+      const dropdownMaxH=380;
       let top=r.bottom+6;
       let left=Math.min(r.left,window.innerWidth-dropdownW-8);
       left=Math.max(8,left);
-      // If not enough room below, open upwards instead
-      if(top+dropdownMaxH>window.innerHeight&&r.top>dropdownMaxH){
-        top=r.top-dropdownMaxH-6;
-      }
+      if(top+dropdownMaxH>window.innerHeight&&r.top>dropdownMaxH) top=r.top-dropdownMaxH-6;
       setPos({top,left});
     };
     updatePos();
-    const close=e=>{if(btnRef.current&&!btnRef.current.closest(".vs-wrap")?.contains(e.target))setOpen(false);};
+    // KEY FIX: check BOTH btnRef AND dropRef — the fixed dropdown is NOT inside btnRef DOM
+    const close=(e)=>{
+      if(!btnRef.current?.contains(e.target)&&!dropRef.current?.contains(e.target)){
+        setOpen(false);
+      }
+    };
     document.addEventListener("mousedown",close);
+    document.addEventListener("touchstart",close,{passive:true});
     window.addEventListener("scroll",updatePos,true);
     window.addEventListener("resize",updatePos);
     return()=>{
       document.removeEventListener("mousedown",close);
+      document.removeEventListener("touchstart",close);
       window.removeEventListener("scroll",updatePos,true);
       window.removeEventListener("resize",updatePos);
     };
@@ -4054,30 +4166,69 @@ function VoiceSelector(){
   const shortName=v=>v.name.replace("Microsoft","").replace("Google","").replace(/\s*\(.*?\)/g,"").trim()||v.name;
 
   return(
-    <div className="vs-wrap" style={{display:"inline-block",position:"relative"}}>
-      <button ref={btnRef} onClick={()=>setOpen(o=>!o)}
+    <div style={{display:"inline-block"}}>
+      <button ref={btnRef} onClick={(e)=>{e.stopPropagation();setOpen(o=>!o);}}
         style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"5px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",letterSpacing:".04em",transition:"all .2s",whiteSpace:"nowrap"}}
         onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--line-gold)";e.currentTarget.style.color="var(--gold)";}}
         onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-40)";}}>
         🎙 {sel?shortName(sel).slice(0,16):"Pick voice"} ▾
       </button>
       {open&&(
-        <div style={{position:"fixed",top:pos.top,left:pos.left,zIndex:2147483647,background:"#13131f",border:"1px solid rgba(210,175,90,0.4)",borderRadius:14,padding:"6px 0 8px",minWidth:230,maxWidth:260,maxHeight:"min(360px, 70vh)",overflowY:"auto",WebkitOverflowScrolling:"touch",boxShadow:"0 16px 60px rgba(0,0,0,0.9)"}}>
-          <div style={{padding:"6px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:4}}>🎙 SELECT VOICE & ACCENT</div>
+        <div
+          ref={dropRef}
+          style={{
+            position:"fixed",
+            top:pos.top,
+            left:pos.left,
+            zIndex:2147483647,
+            background:"#0f1018",
+            border:"1px solid rgba(210,175,90,0.45)",
+            borderRadius:14,
+            padding:"0 0 8px",
+            minWidth:240,
+            maxWidth:270,
+            maxHeight:"min(380px,72vh)",
+            overflowY:"auto",
+            WebkitOverflowScrolling:"touch",
+            overscrollBehavior:"contain",
+            boxShadow:"0 24px 80px rgba(0,0,0,0.99)",
+            isolation:"isolate",
+            willChange:"transform",
+          }}
+          onScroll={e=>e.stopPropagation()}
+          onClick={e=>e.stopPropagation()}
+        >
+          <div style={{padding:"10px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:4,position:"sticky",top:0,background:"#0f1018",zIndex:1}}>🎙 SELECT VOICE & ACCENT</div>
           {grouped.map(g=>(
             <div key={g.key}>
-              <div style={{padding:"4px 14px 3px",fontSize:8,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",letterSpacing:".1em",textTransform:"uppercase"}}>{g.flag} {g.label}</div>
+              <div style={{padding:"5px 14px 3px",fontSize:8,color:"rgba(255,255,255,0.22)",fontFamily:"var(--f-mono)",letterSpacing:".1em",textTransform:"uppercase",background:"rgba(255,255,255,0.02)"}}>{g.flag} {g.label}</div>
               {g.voices.map(v=>(
-                <button key={v.name} onClick={()=>{setSel(v);setOpen(false);}}
-                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.12)":"transparent",border:"none",padding:"8px 16px",color:sel?.name===v.name?"var(--gold)":"rgba(255,255,255,0.6)",fontSize:12,cursor:"pointer",gap:8,fontFamily:"inherit"}}>
-                  <span>{sel?.name===v.name?"✓ ":""}{shortName(v)}</span>
-                  <span style={{fontSize:9,color:v.localService?"rgba(255,255,255,0.2)":"var(--teal)",flexShrink:0}}>{v.localService?"device":"cloud"}</span>
+                <button key={v.name}
+                  onMouseDown={(e)=>{
+                    // Use onMouseDown (fires BEFORE the document mousedown close handler)
+                    // so the selection always registers before the dropdown closes
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSel(v);
+                    setOpen(false);
+                  }}
+                  onTouchEnd={(e)=>{
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSel(v);
+                    setOpen(false);
+                  }}
+                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.1)":"transparent",border:"none",padding:"10px 16px",color:sel?.name===v.name?"var(--gold)":"rgba(255,255,255,0.65)",fontSize:13,cursor:"pointer",gap:8,fontFamily:"inherit",transition:"background .1s"}}>
+                  <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {sel?.name===v.name&&<span style={{marginRight:5}}>✓</span>}{shortName(v)}
+                  </span>
+                  <span style={{fontSize:9,color:v.localService?"rgba(255,255,255,0.18)":"var(--teal)",flexShrink:0,padding:"1px 6px",borderRadius:4,background:v.localService?"transparent":"rgba(20,184,154,0.07)"}}>{v.localService?"device":"cloud"}</span>
                 </button>
               ))}
             </div>
           ))}
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",padding:"6px 14px 0",marginTop:4}}>
-            <button onClick={()=>setOpen(false)} style={{fontSize:10,color:"rgba(255,255,255,0.2)",background:"none",border:"none",cursor:"pointer"}}>✕ close</button>
+          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",padding:"8px 14px 0",marginTop:4}}>
+            <button onMouseDown={(e)=>{e.preventDefault();setOpen(false);}} style={{fontSize:10,color:"rgba(255,255,255,0.2)",background:"none",border:"none",cursor:"pointer",fontFamily:"var(--f-mono)"}}>✕ close</button>
           </div>
         </div>
       )}
@@ -4712,7 +4863,29 @@ Write ONE single sentence — something true and specific to them that they woul
 
       {showCheckin&&(
         <div style={{padding:"32px 0",borderBottom:"1px solid var(--line)",background:"rgba(31,168,154,0.03)"}}>
-          <div className="cx-md"><CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setShowCheckin(false)} userId={userId} isPremium={isPremium}/></div>
+          <div className="cx-md"><CheckIn profile={formData} reportData={data} streak={streak} onComplete={async()=>{
+            // Increment streak only once per calendar day
+            const today=new Date().toISOString().slice(0,10);
+            const lastKey=`destiniq_checkin_${userId}`;
+            const last=localStorage.getItem(lastKey)||"";
+            if(last!==today){
+              localStorage.setItem(lastKey,today);
+              const newStreak=streak+1;
+              setStreak(newStreak);
+              // Persist to Supabase
+              if(userId){
+                try{
+                  await supabase.from("user_profiles").upsert({
+                    user_id:userId,
+                    streak:newStreak,
+                    last_checkin_date:today,
+                    updated_at:new Date().toISOString(),
+                  },{onConflict:"user_id"});
+                }catch(e){console.warn("Streak save failed:",e.message);}
+              }
+            }
+            setShowCheckin(false);
+          }} userId={userId} isPremium={isPremium}/></div>
         </div>
       )}
 
@@ -5605,7 +5778,23 @@ export default function DestinIQ(){
       if (profile) {
         if (profile.is_paid)    setIsPaid(true);
         if (profile.is_premium) setIsPremium(true);
-        if (profile.streak)     setStreak(profile.streak);
+        if (profile.streak){
+          // Check if streak is still valid — reset if last check-in was >1 day ago
+          const today=new Date().toISOString().slice(0,10);
+          const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+          const lastCheckin=profile.last_checkin_date||"";
+          const localLast=localStorage.getItem(`destiniq_checkin_${session.user.id}`)||"";
+          const effectiveLast=[lastCheckin,localLast].filter(Boolean).sort().pop()||"";
+          if(effectiveLast===today||effectiveLast===yesterday){
+            setStreak(profile.streak||1);
+          } else if(effectiveLast){
+            // Streak broken — reset to 1 but keep showing current day as start
+            setStreak(1);
+            supabase.from("user_profiles").upsert({user_id:session.user.id,streak:1,updated_at:new Date().toISOString()},{onConflict:"user_id"}).catch(()=>{});
+          } else {
+            setStreak(profile.streak||1);
+          }
+        }
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
         // Only go to results if BOTH formData and report exist
@@ -5932,7 +6121,18 @@ export default function DestinIQ(){
         {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} streak={streak}
           onPhotoUpdate={(url)=>setNavPhotoURL(url)}
           onBack={()=>setShowProfile(false)}
-          onSignOut={async()=>{await supabase.auth.signOut();setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);setShowProfile(false);}}
+          onSignOut={async()=>{
+            await supabase.auth.signOut();
+            setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
+            setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
+            setShowProfile(false);
+            // Clear any per-account localStorage so the next sign-in starts fresh
+            try{
+              Object.keys(localStorage).forEach(k=>{
+                if(k.startsWith("diq_")) localStorage.removeItem(k);
+              });
+            }catch{}
+          }}
           onManageSubscription={()=>{setShowProfile(false);handleUnlock();}}/>}
 
         {/* Admin dashboard */}
