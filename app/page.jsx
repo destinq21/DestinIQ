@@ -6384,14 +6384,14 @@ export default function DestinIQ(){
           const today=new Date().toISOString().slice(0,10);
           const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
           const lastCheckin=profile.last_checkin_date||"";
-          const localLast=localStorage.getItem(`destiniq_checkin_${session.user.id}`)||"";
+          const localLast=localStorage.getItem(`destiniq_checkin_${u.id}`)||"";
           const effectiveLast=[lastCheckin,localLast].filter(Boolean).sort().pop()||"";
           if(effectiveLast===today||effectiveLast===yesterday){
             setStreak(profile.streak||1);
           } else if(effectiveLast){
             // Streak broken — reset to 1 but keep showing current day as start
             setStreak(1);
-            supabase.from("user_profiles").upsert({user_id:session.user.id,streak:1,updated_at:new Date().toISOString()},{onConflict:"user_id"}).catch(()=>{});
+            supabase.from("user_profiles").upsert({user_id:u.id,streak:1,updated_at:new Date().toISOString()},{onConflict:"user_id"}).catch(()=>{});
           } else {
             setStreak(profile.streak||1);
           }
@@ -6507,6 +6507,42 @@ export default function DestinIQ(){
     window.addEventListener("showPolicy",handler);
     return()=>window.removeEventListener("showPolicy",handler);
   },[]);
+
+  // ── BROWSER BACK BUTTON ──────────────────────────────────────────────
+  // Push a marker entry on mount so the first "back" press is caught by
+  // our popstate listener below instead of immediately leaving/reloading
+  // the app (which is what was wiping formData/report and sending people
+  // back to the "what's your name" intake screen).
+  useEffect(()=>{
+    try{ window.history.replaceState({diqApp:true},"",window.location.href); }catch(_){}
+  },[]);
+
+  useEffect(()=>{
+    const onPopState=()=>{
+      // If a panel/overlay is open, close it and stay right where we are.
+      if(showProfile||showAdmin||showShare||showNotif||showPolicy){
+        setShowProfile(false);setShowAdmin(false);setShowShare(false);setShowNotif(false);setShowPolicy(null);
+        try{ window.history.pushState({diqApp:true},"",window.location.href); }catch(_){}
+        return;
+      }
+      // From the subscription/paywall page, go back to the dashboard —
+      // never re-show the intake form for someone who already has a report.
+      if(screen==="paywall"){
+        setScreen(formData&&report?"results":"landing");
+        try{ window.history.pushState({diqApp:true},"",window.location.href); }catch(_){}
+        return;
+      }
+      // If a saved report exists, "back" should never land on the intake form.
+      if(screen==="intake"&&formData&&report){
+        setScreen("results");
+        try{ window.history.pushState({diqApp:true},"",window.location.href); }catch(_){}
+        return;
+      }
+      // Otherwise, let the back navigation proceed normally.
+    };
+    window.addEventListener("popstate",onPopState);
+    return()=>window.removeEventListener("popstate",onPopState);
+  },[showProfile,showAdmin,showShare,showNotif,showPolicy,screen,formData,report]);
 
   const handleSubmit=useCallback(async(f)=>{
     try{
@@ -6754,7 +6790,8 @@ export default function DestinIQ(){
         {!showPolicy&&!showProfile&&!showAdmin&&<>
         {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
         {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
-        {screen==="intake"   &&<Intake onSubmit={handleSubmit}/>}
+        {screen==="intake"   &&formData&&report&&(setScreen("results"),null)}
+        {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
