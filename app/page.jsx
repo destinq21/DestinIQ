@@ -546,7 +546,7 @@ const CSS = `
   --f-display:'Playfair Display',serif;--f-body:'Outfit',sans-serif;--f-mono:'JetBrains Mono',monospace;
 }
 html{scroll-behavior:smooth;}
-body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
 .bg-mesh{background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(31,168,154,0.07) 0%,transparent 55%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(210,175,90,0.08) 0%,transparent 55%),radial-gradient(ellipse 50% 40% at 80% 20%,rgba(124,92,191,0.05) 0%,transparent 50%),var(--void);}
 .bg-noise{opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:128px;}
@@ -568,7 +568,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .prem-toggle-label{font-family:var(--f-mono);font-size:9px;letter-spacing:.14em;color:var(--gold);}
 .prem-toggle.off .prem-toggle-label{color:var(--cream-30);}
 .prem-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08));border:1px solid var(--line-gold);border-radius:20px;font-family:var(--f-mono);font-size:9px;letter-spacing:.1em;color:var(--gold-bright);}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 24px;border-radius:8px;border:none;cursor:pointer;font-family:var(--f-body);font-size:13px;font-weight:500;transition:all .25s;white-space:nowrap;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 24px;border-radius:8px;border:none;cursor:pointer;font-family:var(--f-body);font-size:13px;font-weight:500;transition:all .25s;white-space:nowrap;min-height:44px;min-height:44px;}
 .btn-gold{background:var(--gold);color:#0a0800;box-shadow:0 4px 20px rgba(210,175,90,0.2);}
 .btn-gold:hover{background:var(--gold-bright);transform:translateY(-1px);box-shadow:0 8px 28px rgba(210,175,90,0.3);}
 .btn-gold:disabled{opacity:.4;cursor:not-allowed;transform:none;}
@@ -594,7 +594,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .small{font-size:13px;line-height:1.65;color:var(--cream-30);}
 .field{margin-bottom:16px;}
 .fl{display:block;margin-bottom:6px;font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);}
-.fi,.fs,.ft{width:100%;padding:12px 16px;background:var(--lift);border:1px solid var(--line);border-radius:8px;color:var(--cream);font-family:var(--f-body);font-size:14px;font-weight:300;outline:none;transition:all .25s;-webkit-appearance:none;}
+.fi,.fs,.ft{width:100%;padding:12px 16px;background:var(--lift);border:1px solid var(--line);border-radius:8px;color:var(--cream);font-family:var(--f-body);font-size:16px;font-weight:300;outline:none;transition:all .25s;-webkit-appearance:none;}/* 16px prevents iOS Safari zoom on focus */
 .fi:focus,.fs:focus,.ft:focus{border-color:var(--line-gold);background:var(--gold-glow);box-shadow:0 0 0 3px rgba(210,175,90,0.06);}
 .fi::placeholder,.ft::placeholder{color:rgba(237,232,216,0.2);font-style:italic;}
 .fs option{background:var(--base);color:var(--cream);}
@@ -681,9 +681,60 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .tabs{grid-template-columns:repeat(4,1fr);}
   .tab{font-size:9.5px;padding:8px 2px;}
   .tab span:first-child{font-size:13px;}
+  .cx,.cx-sm,.cx-md{padding:0 16px!important;}
+  .d1{font-size:clamp(28px,9vw,52px)!important;}
+  .d2{font-size:clamp(20px,6vw,36px)!important;}
+  .d3{font-size:clamp(17px,5vw,26px)!important;}
+  .card{padding:16px!important;}
+  .nav{padding:0 14px!important;}
+  .fu{padding:0 16px 40px!important;}
+  .results-grid{grid-template-columns:1fr!important;}
+  .score-grid{grid-template-columns:1fr 1fr!important;}
+  .score-explain-grid{grid-template-columns:1fr 1fr!important;}
+  .pillar-wrap{flex-direction:column!important;align-items:stretch!important;}
+  .pillar-wrap>div:last-child{min-width:unset!important;}
+  .nav-r{gap:6px!important;}
+  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
+  .pbar-wrap{width:100%!important;max-width:100%!important;}
+  .mom-stat-grid{grid-template-columns:repeat(3,1fr)!important;}
+  .reloc-grid{grid-template-columns:1fr!important;}
+  .reloc-stats{grid-template-columns:repeat(3,1fr)!important;}
+  .plan-cards-grid{grid-template-columns:1fr!important;}
+  .paywall-faq{grid-template-columns:1fr!important;}
+  .notif-3col{grid-template-columns:1fr!important;}
+  .decision-card{padding:14px!important;}
+  .timeline-item{padding-left:44px!important;}
+  .t-dot{width:30px!important;height:30px!important;font-size:9px!important;}
+  .score-cards-row{flex-direction:column!important;}
+  .intake-center{padding:0 8px!important;}
+  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
 }
 @media(max-width:420px){
   .tabs{grid-template-columns:repeat(3,1fr);}
+  .d1{font-size:26px!important;}
+  .nav-logo{font-size:15px!important;}
+  .card{padding:12px!important;}
+  .plan-cards-grid{grid-template-columns:1fr!important;}
+}
+@media(min-width:641px)and(max-width:900px){
+  .cx{padding:0 28px;}
+  .cx-md{padding:0 28px;}
+  .plan-cards-grid{grid-template-columns:1fr 1fr!important;}
+  .score-explain-grid{grid-template-columns:1fr 1fr!important;}
+  .notif-3col{grid-template-columns:1fr 1fr!important;}
+}
+@media(max-width:840px){
+  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
+  .hero-grid>div:first-child{order:1;}
+  .hero-grid>div:last-child{order:2;}
+}
+@media(max-width:600px){
+  .nav{padding:0 16px;}
+  .card{padding:18px;}
+  .cx,.cx-sm,.cx-md{padding:0 16px;}
+  .reloc-grid{grid-template-columns:1fr;}
+  .reloc-stats{grid-template-columns:repeat(3,1fr);}
 }
 .mom-slider-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
 .mom-slider-label{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-30);width:72px;flex-shrink:0;}
@@ -1821,7 +1872,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
       </div>
 
       {log.length>0&&(
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
+        <div className="mom-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
           {[["7-Day Avg",allAvg,col(allAvg)],["Today",todayEntry?avgOf(todayEntry):"—",col(todayEntry?avgOf(todayEntry):5)],["Trend",trend===0?"→":trend>0?`↑ +${trend}`:`↓ ${trend}`,trend>0?"var(--teal)":trend<0?"var(--rose)":"var(--cream-30)"]].map(([l,v,c])=>(
             <div className="card card-sm" key={l} style={{textAlign:"center"}}>
               <div style={{fontFamily:"var(--f-display)",fontSize:26,color:c,marginBottom:4}}>{v}</div>
@@ -2128,7 +2179,7 @@ function NotificationPanel({profile,userId,streak,onClose}){
         {perm!=="denied"&&perm!=="unsupported"&&(
           <>
             <div className="notif-panel">
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+              <div className="notif-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
                 {[
                   {key:"morning",label:"🌅 Wake-up",hint:"Best: 6–8 AM"},
                   {key:"afternoon",label:"☀️ Afternoon",hint:"Best: 1–3 PM"},
@@ -2223,6 +2274,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
         currency: plan.currency,     // always USD — Paystack accepts intl cards
         ref:      ref,
         label:    "DestinIQ "+plan.name,
+        channels:["card","bank","ussd","qr","mobile_money","bank_transfer"],
         metadata: { userId: userId||"", plan:planKey, custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}] },
         callback:async(response)=>{
           console.log("Payment successful:", response.reference);
@@ -2312,7 +2364,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
         </div>
 
         {/* ── TWO-CARD COMPARISON (Claude-style: Free vs Pro) ─────────────── */}
-        <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,marginBottom:36,maxWidth:680,marginLeft:"auto",marginRight:"auto",alignItems:"stretch"}}>
+        <div className="fu3 plan-cards-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,marginBottom:36,maxWidth:680,marginLeft:"auto",marginRight:"auto",alignItems:"stretch"}}>
 
           {/* FREE CARD — for context, not selectable */}
           <div style={{border:"1px solid var(--line)",borderRadius:18,padding:"28px 24px",background:"var(--raised)",textAlign:"left",display:"flex",flexDirection:"column"}}>
@@ -2653,7 +2705,7 @@ function TestimonialForm(){
       await supabase.from("testimonials").insert({
         name:`${name.trim()}${location.trim()?` · ${location.trim()}`:""}`,
         quote:quote.trim(),
-        approved:false, // shown after manual approval or auto-approve
+        approved:true, // auto-approved — admin can hide from admin panel if needed
       });
       setSent(true);
     }catch(e){
@@ -2996,7 +3048,7 @@ function Landing({onStart,ipLocation}){
 
   return(
     <div style={{paddingTop:60}}>
-      <section style={{minHeight:"92vh",display:"flex",alignItems:"center",borderBottom:"1px solid var(--line)",padding:"80px 0"}}>
+      <section style={{minHeight:"92vh",display:"flex",alignItems:"center",borderBottom:"1px solid var(--line)",padding:"clamp(48px,10vw,80px) 0"}}>
         <div className="cx hero-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:60,alignItems:"center"}}>
           <div>
             <div className="fu" style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
@@ -3205,7 +3257,7 @@ function Landing({onStart,ipLocation}){
             }}>
               {[...ALL_TESTIMONIALS,...ALL_TESTIMONIALS].map((t,i)=>(
                 <div key={i} style={{
-                  width:280,flexShrink:0,
+                  width:"min(280px,calc(85vw - 16px))",flexShrink:0,
                   background:"var(--night)",border:`1px solid ${i%3===1?"var(--line-gold)":"var(--line)"}`,
                   borderRadius:16,padding:"20px 18px",
                 }}>
@@ -3356,7 +3408,7 @@ function Intake({onSubmit, savedFormData}){
   const greeting=greetings[f.name.length%greetings.length]||"Hey";
 
   return(
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"80px 20px 40px"}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"clamp(20px,5vw,80px) 20px 40px"}}>
       <div style={{width:"100%",maxWidth:560}}>
 
         {/* Progress bar */}
@@ -3576,7 +3628,7 @@ function Loading(){
       <div className="mono fu" style={{marginBottom:24}}>We're reading your story carefully</div>
       <div className="d3 fu1" style={{marginBottom:12,fontWeight:300}}>Putting it all together for you</div>
       <p className="small fu2" style={{marginBottom:48}}>This takes a moment because it's actually thinking — not just filling in a template.</p>
-      <div style={{width:280,marginBottom:36}}>
+      <div className="pbar-wrap" style={{width:"min(280px,100%)",marginBottom:36}}>
         <div className="pbar"><div className="pfill" style={{width:`${pct}%`}}/></div>
         <div style={{marginTop:10,fontFamily:"var(--f-mono)",fontSize:9,letterSpacing:".12em",color:"var(--cream-30)"}}>{Math.round(pct)}% · {LOADING_PHRASES[s]}</div>
       </div>
@@ -4338,31 +4390,12 @@ function VoiceSelector(){
                     e.stopPropagation();
                     setSel(v);
                     setOpen(false);
-                    // Immediately play a short preview so the user can hear the voice
-                    try{
-                      window.speechSynthesis.cancel();
-                      const preview=new SpeechSynthesisUtterance("This is how I sound. I'm ready.");
-                      const live=window.speechSynthesis.getVoices();
-                      const lv=live.find(lv=>lv.name===v.name)||null;
-                      if(lv){preview.voice=lv;preview.lang=lv.lang;}
-                      preview.rate=0.93;preview.pitch=1.0;preview.volume=1;
-                      setTimeout(()=>window.speechSynthesis.speak(preview),60);
-                    }catch(_){}
                   }}
                   onTouchEnd={(e)=>{
                     e.preventDefault();
                     e.stopPropagation();
                     setSel(v);
                     setOpen(false);
-                    try{
-                      window.speechSynthesis.cancel();
-                      const preview=new SpeechSynthesisUtterance("This is how I sound.");
-                      const live=window.speechSynthesis.getVoices();
-                      const lv=live.find(lv=>lv.name===v.name)||null;
-                      if(lv){preview.voice=lv;preview.lang=lv.lang;}
-                      preview.rate=0.93;preview.pitch=1.0;preview.volume=1;
-                      setTimeout(()=>window.speechSynthesis.speak(preview),100);
-                    }catch(_){}
                   }}
                   style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.1)":"transparent",border:"none",padding:"10px 16px",color:sel?.name===v.name?"var(--gold)":"rgba(255,255,255,0.65)",fontSize:13,cursor:"pointer",gap:8,fontFamily:"inherit",transition:"background .1s"}}>
                   <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -4673,9 +4706,7 @@ async function regenerateModule(key, profile, userId, isPremium, setData, setLoa
   const name=profile?.name||"the user";
   const income=profile?.income||"Under $500";
   const challenge=profile?.challenge||"getting started";
-  // Use the explicit currency helper so the prompt always has the EXACT symbol
-  const {code:currCode, symbol:currSymbol}=getCountryCurrency(country);
-  const currencyNote=`MANDATORY CURRENCY RULE: This person is in ${country}. ALL local costs, prices, savings targets, and budgets MUST be in ${currSymbol} (${currCode}). DO NOT use $, USD, INR, or any other currency for local amounts. If you use the wrong currency symbol this response fails. Online income earnings go in USD with ${currSymbol} equivalent in parentheses.`;
+  const currencyNote=`MANDATORY: All local costs and amounts MUST use ${country}'s local currency with correct symbol (GH₵ Ghana, ₦ Nigeria, KSh Kenya, R South Africa, £ UK, $ USA etc). Online income in USD with local equivalent in parentheses.`;
   const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
   const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
   const todayPlatforms=platformSets[dayIndex];
@@ -4811,36 +4842,19 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
 }
 
 function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
-  const initOnline=Array.isArray(data?.online_income)&&data.online_income.length>0?data.online_income:[];
-  const [online,setOnline]=useState(initOnline);
-  const [loading,setLoading]=useState(()=>{
-    // Auto-load on first mount if report has no online_income data yet
-    return false;
-  });
+  const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
+  const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
-  // Sync when parent data changes (e.g. after report reload)
-  useEffect(()=>{
-    if(Array.isArray(data?.online_income)&&data.online_income.length>0){
-      setOnline(data.online_income);
-    }
-  },[data]);
+  useEffect(()=>{setOnline(Array.isArray(data?.online_income)?data.online_income:[]);},[data]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
   return(
     <div className="fu">
       <ModuleShell title={`MAKE MONEY ONLINE — ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={isPaid} onUnlock={onUnlock}>
         {online.length===0&&!loading&&(
-          <div style={{textAlign:"center",padding:"24px 0"}}>
-            {isPaid
-              ? <>
-                  <p style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:14}}>Click <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods tailored to {formData?.country||"your country"} and your skills.</p>
-                  <p style={{fontSize:11,color:"rgba(255,255,255,0.2)"}}>Fresh ideas every refresh — platforms rotate daily.</p>
-                </>
-              : <>
-                  <p style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:14}}>Online income ideas are a <b style={{color:"var(--gold)"}}>Premium</b> feature.</p>
-                  <button onClick={onUnlock} style={{padding:"10px 24px",borderRadius:10,border:"none",background:"var(--gold)",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>Upgrade to unlock →</button>
-                </>
-            }
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:16}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>
+            <p style={{fontSize:11,color:"rgba(255,255,255,0.2)"}}>Fresh ideas every refresh — we rotate platforms daily so you always get new options.</p>
           </div>
         )}
         {online.map((o,i)=>(
@@ -5406,13 +5420,13 @@ Write ONE single sentence — something true and specific to them that they woul
               {!showCheckin&&<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>}
             </div>
           </div>
-          <div className="fu3" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
+          <div className="fu3 pillar-wrap" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
             <Ring score={
               (aScores.life||aScores.wealth||aScores.mindset||aScores.relations)
                 ? Math.round((aScores.life||0)*0.25+(aScores.wealth||0)*0.30+(aScores.mindset||0)*0.25+(aScores.relations||0)*0.20)
                 : 70
             } color="var(--gold)" size={106} label="Overall"/>
-            <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:260}}>
+            <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:"min(260px,100%)"}}>
               {PILLARS.map(p=>(
                 <div className="pillar-bar-card" key={p.id}>
                   <div className="pb-row"><span className="pb-name">{p.label}</span><span className="pb-val" style={{color:p.color}}>{aScores[p.id]||0}</span></div>
@@ -5431,7 +5445,7 @@ Write ONE single sentence — something true and specific to them that they woul
 
           {/* Score explanation cards — 2-col on mobile, 4-col on desktop */}
           {data.score_explanations&&(
-            <div className="fu4" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+            <div className="fu4 score-explain-grid" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
               {PILLARS.map(p=>data.score_explanations[p.id]&&(
                 <div key={p.id} style={{padding:"12px 14px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
                   <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".12em",textTransform:"uppercase",color:p.color,marginBottom:5}}>{p.label}</div>
@@ -6413,10 +6427,6 @@ export default function DestinIQ(){
 
     // Listen for sign-in / sign-out events (including OAuth callback)
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,session)=>{
-      // INITIAL_SESSION fires on every page load — getSession() above already handles
-      // it with await, so we skip it here to prevent a second unawaited call to
-      // restoreUserSession that races and resets the screen back to landing.
-      if(_event==="INITIAL_SESSION") return;
       if(session?.user){
         restoreUserSession(session.user);
         // Track referral if URL has ?ref=
@@ -6769,6 +6779,10 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             else setScreen("landing");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
+            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}else{setIsPremium(p=>!p);}}} title={isPaid?(isPremium?"Premium mode on":"Switch to Premium"):"Upgrade to Premium"}>
+              <div className="prem-toggle-dot"/>
+              <span className="prem-toggle-label">{isPaid&&isPremium?"PREMIUM":"UPGRADE"}</span>
+            </div>
             <button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
                 ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
