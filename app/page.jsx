@@ -1837,16 +1837,20 @@ function Ring({score,color,size=96,label}){
   );
 }
 
-function LockGate({children,isPaid,onUnlock}){
+function LockGate({children,isPaid,onUnlock,teaser=""}){
   if(isPaid) return children;
+  // Free users see a meaningful teaser, not a total blackout
   return(
     <div className="lock-wrap">
-      <div className="lock-blur">{children}</div>
+      {/* Show top portion blurred so users know what they're missing */}
+      <div className="lock-blur" style={{maxHeight:220,overflow:"hidden"}}>{children}</div>
       <div className="lock-gate">
-        <div style={{fontSize:28,marginBottom:12}}>⬡</div>
-        <div className="d3" style={{marginBottom:8,fontSize:"1.1em"}}>This is for you</div>
-        <p className="body" style={{maxWidth:320,marginBottom:20}}>This part of your picture is waiting. We've kept it for members — people who are serious about actually changing things.</p>
-        <button className="btn btn-gold" onClick={onUnlock}>I'm ready to see it</button>
+        <div style={{fontSize:28,marginBottom:10}}>🔒</div>
+        <div className="d3" style={{marginBottom:6,fontSize:"1em"}}>This insight is for members</div>
+        {teaser&&<p style={{fontSize:13,color:"var(--cream-50)",maxWidth:300,marginBottom:16,lineHeight:1.6,textAlign:"center"}}>{teaser}</p>}
+        {!teaser&&<p className="body" style={{maxWidth:300,marginBottom:16,textAlign:"center"}}>Upgrade to unlock this section and every other premium module — roadmap, decisions, weekly pulse, and your full life advisor.</p>}
+        <button className="btn btn-gold" onClick={onUnlock}>Unlock full access</button>
+        <p style={{fontSize:11,color:"var(--cream-30)",marginTop:10}}>From $9/month · Cancel anytime</p>
       </div>
     </div>
   );
@@ -3411,16 +3415,18 @@ function Landing({onStart,ipLocation}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTAKE
 // ═══════════════════════════════════════════════════════════════════════════════
-function Intake({onSubmit}){
+function Intake({onSubmit, savedFormData}){
   const TOTAL=6;
   const [step,setStep]=useState(1);
   const [animating,setAnimating]=useState(false);
   const [direction,setDirection]=useState("forward");
-  const [f,setF]=useState({
+  const [f,setF]=useState(()=>({
     name:"",age:"",gender:"",country:"",relationship:"",income:"",
     education:"",career:"",skills:"",habits:"",goals:"",challenge:"",
-    situation:"",bigGoal:"",wantFrom:""
-  });
+    situation:"",bigGoal:"",wantFrom:"",
+    // Pre-fill from saved data if it exists — so refresh never loses the form
+    ...(savedFormData||{}),
+  }));
   const [err,setErr]=useState("");
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
@@ -3757,7 +3763,7 @@ function Loading(){
 // ═══════════════════════════════════════════════════════════════════════════════
 // AUTH SCREEN — Premium redesign
 // ═══════════════════════════════════════════════════════════════════════════════
-function AuthScreen({onAuth}){
+function AuthScreen({onAuth, onBack}){
   const [mode,setMode]=useState("login"); // login | signup | forgot | forgot_sent | reset
   const [tab,setTab]=useState("email");   // email | phone
   const [email,setEmail]=useState("");
@@ -3983,13 +3989,20 @@ function AuthScreen({onAuth}){
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
       <div style={{width:"100%",maxWidth:420}}>
 
+        {/* Back to landing */}
+        {onBack&&(
+          <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:16,display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}>
+            ← Back to home
+          </button>
+        )}
+
         {/* Logo */}
         <div style={{textAlign:"center",marginBottom:32}}>
           <div style={{fontSize:28,fontWeight:800,letterSpacing:"-0.5px",color:"var(--cream)",marginBottom:8}}>
             Destin<b style={{color:"var(--gold)"}}>IQ</b>
           </div>
           <div style={{fontSize:15,color:"var(--cream-60)"}}>
-            {mode==="signup"?"Create your account":"Welcome back"}
+            {mode==="signup"?"Create your free account":"Welcome back"}
           </div>
         </div>
 
@@ -4523,6 +4536,22 @@ function AudioPlayer({text,label="Listen",mini=false}){
     .replace(/`[^`]*`/g,"").replace(/[#◎◈◇✦⬡↗⟶→←►▶]/g,"")
     .replace(/---+/g,". ").replace(/\s{2,}/g," ").trim();
 
+  // Get accent-appropriate rate/pitch so voices actually sound different
+  const getVoiceParams=(v)=>{
+    if(!v) return {rate:0.93,pitch:1.0};
+    const lang=(v.lang||"").toLowerCase();
+    const name=(v.name||"").toLowerCase();
+    if(lang.startsWith("en-gb")||name.includes("british")||name.includes("daniel")||name.includes("kate"))
+      return {rate:0.90, pitch:0.95}; // British: slightly slower, lower pitch
+    if(lang.startsWith("en-au")||name.includes("australia")||name.includes("karen"))
+      return {rate:0.95, pitch:1.05}; // Australian: slightly faster, higher
+    if(lang.startsWith("en-in")||name.includes("india")||name.includes("ravi")||name.includes("heera"))
+      return {rate:0.88, pitch:1.10}; // Indian: slower, higher pitch
+    if(name.includes("natural")||name.includes("neural"))
+      return {rate:0.96, pitch:1.0}; // Neural voices: slightly faster
+    return {rate:0.93, pitch:1.0}; // Default American
+  };
+
   const stop=()=>{window.speechSynthesis.cancel();setState("idle");uttRef.current=null;};
   const pause=()=>{if(window.speechSynthesis.speaking){window.speechSynthesis.pause();setState("paused");}};
   const play=()=>{
@@ -4549,7 +4578,8 @@ function AudioPlayer({text,label="Listen",mini=false}){
           liveVoices[0]||null;
       }
       const u=new SpeechSynthesisUtterance(t);
-      u.rate=0.93;u.pitch=1;u.volume=1;
+      const {rate,pitch}=getVoiceParams(voiceToUse);
+      u.rate=rate;u.pitch=pitch;u.volume=1;
       if(voiceToUse){u.voice=voiceToUse;u.lang=voiceToUse.lang;}
       u.onstart=()=>setState("playing");
       u.onend=()=>{setState("idle");uttRef.current=null;};
@@ -4559,7 +4589,8 @@ function AudioPlayer({text,label="Listen",mini=false}){
         if(voiceToUse){
           // Retry with no voice set (browser default)
           const u2=new SpeechSynthesisUtterance(t);
-          u2.rate=0.93;u2.pitch=1;u2.volume=1;
+          const {rate:r2,pitch:p2}=getVoiceParams(null);
+          u2.rate=r2;u2.pitch=p2;u2.volume=1;
           u2.onstart=()=>setState("playing");
           u2.onend=()=>{setState("idle");uttRef.current=null;};
           u2.onerror=()=>{setState("idle");uttRef.current=null;};
@@ -4741,10 +4772,47 @@ function VoiceInput({value,onChange,rows=4,maxLength=600,placeholder=""}){
 
 
 // ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
+// Detects the correct local currency from the user's country name.
+function getLocalCurrency(country){
+  if(!country) return {code:"USD",symbol:"$"};
+  const c=(country||"").toLowerCase();
+  if(c.includes("ghana"))        return {code:"GHS",symbol:"GH₵"};
+  if(c.includes("nigeria"))      return {code:"NGN",symbol:"₦"};
+  if(c.includes("kenya"))        return {code:"KES",symbol:"KSh"};
+  if(c.includes("south africa")) return {code:"ZAR",symbol:"R"};
+  if(c.includes("rwanda"))       return {code:"RWF",symbol:"RWF"};
+  if(c.includes("uganda"))       return {code:"UGX",symbol:"USh"};
+  if(c.includes("tanzania"))     return {code:"TZS",symbol:"TSh"};
+  if(c.includes("zambia"))       return {code:"ZMW",symbol:"ZK"};
+  if(c.includes("ethiopia"))     return {code:"ETB",symbol:"Birr"};
+  if(c.includes("egypt"))        return {code:"EGP",symbol:"E£"};
+  if(c.includes("morocco"))      return {code:"MAD",symbol:"MAD"};
+  if(c.includes("senegal")||c.includes("côte")||c.includes("mali")||c.includes("burkina")||c.includes("togo")||c.includes("benin")) return {code:"XOF",symbol:"CFA"};
+  if(c.includes("united kingdom")||c.includes("uk")) return {code:"GBP",symbol:"£"};
+  if(c.includes("europe")||c.includes("france")||c.includes("germany")||c.includes("spain")||c.includes("italy")||c.includes("netherlands")||c.includes("portugal")||c.includes("belgium")) return {code:"EUR",symbol:"€"};
+  if(c.includes("india"))        return {code:"INR",symbol:"₹"};
+  if(c.includes("pakistan"))     return {code:"PKR",symbol:"₨"};
+  if(c.includes("bangladesh"))   return {code:"BDT",symbol:"৳"};
+  if(c.includes("philippines"))  return {code:"PHP",symbol:"₱"};
+  if(c.includes("indonesia"))    return {code:"IDR",symbol:"Rp"};
+  if(c.includes("vietnam"))      return {code:"VND",symbol:"₫"};
+  if(c.includes("brazil"))       return {code:"BRL",symbol:"R$"};
+  if(c.includes("mexico"))       return {code:"MXN",symbol:"MX$"};
+  if(c.includes("canada"))       return {code:"CAD",symbol:"C$"};
+  if(c.includes("australia"))    return {code:"AUD",symbol:"A$"};
+  if(c.includes("japan"))        return {code:"JPY",symbol:"¥"};
+  if(c.includes("china"))        return {code:"CNY",symbol:"¥"};
+  if(c.includes("uae")||c.includes("dubai")||c.includes("emirates")) return {code:"AED",symbol:"AED"};
+  if(c.includes("saudi"))        return {code:"SAR",symbol:"SAR"};
+  return {code:"USD",symbol:"$"}; // default
+}
+
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
   setLoading(true); setErr("");
   const country=profile.country||"their country";
-  const currencyNote=`Any startup cost, savings amount, or budget figure must be stated in the LOCAL CURRENCY of ${country} (correct currency code/symbol for that country). Any earnings/income figures should be in USD.`;
+  // Determine the correct local currency — NEVER guess or default to USD/INR for non-US/Indian users
+  const {code:currCode, symbol:currSym} = getLocalCurrency(country);
+  const currencyNote=`CURRENCY RULE: Any startup cost, savings amount, investment, or budget figure MUST be in ${country}'s local currency — ${currCode} (${currSym}). Do NOT use USD or any other currency for costs/budgets. Earnings/income from online work can be in USD.`;
   const prompts={
     life_hacks:`Give ${profile.name||"the user"} in ${country} 6 real, specific life hacks that will change how they operate. Skills: ${profile.skills||"general"}. Goal: ${profile.goals||""}. Income: ${profile.income||""}. Return ONLY a JSON array of 6 strings. No other text. Example: ["hack 1","hack 2"]`,
     emotional_strength:`Give ${profile.name||"the user"} 4 emotional strength practices specific to their challenge: "${profile.challenge||""}". Return ONLY a JSON array of 4 strings. No other text.`,
@@ -4878,12 +4946,34 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
-  useEffect(()=>{setOnline(Array.isArray(data?.online_income)?data.online_income:[]);},[data]);
+  // Auto-load if data exists from report but state is empty
+  useEffect(()=>{
+    const d=data?.online_income;
+    if(Array.isArray(d)&&d.length>0) setOnline(d);
+    // If no data at all, auto-generate for everyone (free + paid)
+    else if(!loading&&userId&&formData) {
+      setLoading(true);setErr("");
+      const country=formData.country||"their country";
+      const {code:currCode}=getLocalCurrency(country);
+      const prompt=`Give ${formData.name||"the user"} in ${country} with skills "${formData.skills||formData.career||"general"}" exactly 3 ways to make money online that are genuinely ACCESSIBLE from ${country}. Earnings in USD. Return ONLY a JSON array: [{"method":"...","why_it_works":"...","url":"https://real-platform.com","first_step":"..."},...]`;
+      callAPI({messages:[{role:"user",content:prompt}],system:"Return ONLY valid JSON. No markdown. No code fences. Start directly with [.",userId,isPremium:isPremium||false})
+        .then(raw=>{
+          const clean=raw.replace(/```json|```/g,"").trim();
+          const parsed=JSON.parse(clean);
+          if(Array.isArray(parsed)) setOnline(parsed);
+          setErr("");
+        })
+        .catch(()=>setErr("Tap 'Refresh' to load income methods for your country."))
+        .finally(()=>setLoading(false));
+    }
+  // eslint-disable-next-line
+  },[data,userId]);
+
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   return(
     <div className="fu">
-      <ModuleShell title={`MAKE MONEY ONLINE IN ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={isPaid} onUnlock={onUnlock}>
-        {online.length===0&&!loading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>}
+      <ModuleShell title={`MAKE MONEY ONLINE IN ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={true} onUnlock={onUnlock}>
+        {online.length===0&&!loading&&!err&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Loading income methods for {formData?.country||"your country"}…</p>}
         {online.map((o,i)=>(
           <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
@@ -4896,6 +4986,13 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
             <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
           </div>
         ))}
+        {/* Upgrade CTA for free users — show after content, not as a blocker */}
+        {!isPaid&&online.length>0&&(
+          <div style={{marginTop:8,padding:"12px 16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>🔒 Upgrade to refresh with new ideas tailored to your skills</p>
+            <button onClick={onUnlock} style={{background:"var(--gold)",border:"none",borderRadius:8,padding:"7px 16px",color:"#000",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Upgrade</button>
+          </div>
+        )}
       </ModuleShell>
     </div>
   );
@@ -6398,20 +6495,17 @@ export default function DestinIQ(){
         }
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
-        // Restore exactly where they left off
+        // ── CRITICAL: Always restore exactly where they left off ──
+        // Refresh must NEVER send a user back to onboarding or landing.
         if (profile.form_data && profile.report) {
+          // Has both — go straight to the dashboard
           setScreen("results");
         } else if (profile.form_data && !profile.report) {
-          // Has profile but no report yet — go to landing, not intake
+          // Has onboarding data but report generation was interrupted
+          // Stay on landing so they can regenerate — don't re-show intake
           setScreen("landing");
         }
-        // Always restore notification preference
-        if (profile.notif_time && userId) {
-          const savedTime = profile.notif_time;
-          requestNotifPermission().then(perm=>{
-            if(perm==="granted") scheduleNotification(userId, profile.form_data?.name||"", savedTime, ()=>{});
-          });
-        }
+        // If no form_data at all, stay on landing (will prompt Begin)
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
@@ -6421,10 +6515,12 @@ export default function DestinIQ(){
   };
 
   useEffect(()=>{
-    // Check for an existing session on mount (handles OAuth redirects too)
-    supabase.auth.getSession().then(({data:{session}})=>{
+    // Check for an existing session on mount (handles OAuth redirects too).
+    // IMPORTANT: we await restoreUserSession before clearing authLoading so the
+    // app never flashes the landing page before we know the user is logged in.
+    supabase.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
-        restoreUserSession(session.user);
+        await restoreUserSession(session.user);
       }
       setAuthLoading(false);
     });
@@ -6564,7 +6660,28 @@ export default function DestinIQ(){
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
-        system:"You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person, anywhere in the world — not just Africa. Tailor everything to their actual country, whether that is Ghana, the Philippines, Brazil, India, Poland, the USA, or anywhere else.\n\nCURRENCY RULE (applies to the entire report): any STARTUP COST, SAVINGS TARGET, BUDGET, or AMOUNT OF MONEY TO SPEND must be given in the person's own LOCAL CURRENCY (use the correct currency and symbol for their stated country — e.g. GHS for Ghana, NGN for Nigeria, PHP for Philippines, INR for India, BRL for Brazil, PLN for Poland, USD for USA). Any EARNINGS, INCOME, or REVENUE figures should be given primarily in USD (with local currency in parentheses if helpful), since online income is usually paid in USD regardless of the person's location.\n\nBeyond the standard report sections, you MUST include these additional sections in your JSON response:\n\n- life_hacks: 5 specific, practical life hacks tailored to their goal and country. Real shortcuts. Real tips. Not generic advice.\n- money_protection: 3-4 specific rules for protecting whatever income they have — budgeting method, savings target in LOCAL CURRENCY, what NOT to spend on, and one investment they can start with almost nothing (cost in local currency).\n- emotional_strength: 3 practices for not letting emotions derail their progress. Specific to what they said about their challenges.\n- online_income: 3 ways to make money online that are realistically ACCESSIBLE to someone in their specific country (consider payment methods, platform availability, and whether the platform accepts users from that country — e.g. Upwork, Fiverr, Toptal, Remote.co, We Work Remotely, Appen, Braintrust, Deel, local equivalents like OLX or Jumia for selling, or country-specific freelance platforms). Give the EXACT working URL for each (e.g. https://www.upwork.com, https://www.fiverr.com) — these must be real, correct, top-level domains a person can type directly. Earnings in USD. Be specific about which platform works best for their skills AND is genuinely usable from their country.\n- zero_income_business: How to start a business with zero money in their specific country. Real first step. Real business idea that matches their skills. Any cost mentioned must be in local currency.\n- product_business: 3 physical product business ideas that sell daily (phones/accessories, perfumes, food, building materials, clothing etc) relevant to their country's market, with real wholesale supplier links (e.g. https://www.alibaba.com, https://www.dhgate.com, https://www.made-in-china.com, or major local marketplaces relevant to their region). Startup cost in LOCAL CURRENCY. Profit margin as a percentage.\n- real_estate_hack: How someone with little money can make money in real estate in their country right now — rental arbitrage, posting ads for commissions, connecting buyers and sellers. Include specific platforms or groups relevant to their country (e.g. Zillow/Craigslist for USA, OLX for many countries, Rightmove for UK, Jiji for Nigeria/Ghana). Any investment figure in local currency.\n\nAll other rules still apply: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.",
+        system:`You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person, anywhere in the world — not just Africa. Tailor everything to their actual country, whether that is Ghana, the Philippines, Brazil, India, Poland, the USA, or anywhere else.
+
+CURRENCY RULE — THIS IS MANDATORY AND NON-NEGOTIABLE:
+- Detect the person's country from their profile.
+- EVERY startup cost, savings target, budget, or amount of money to SPEND must be in that country's LOCAL currency with the correct symbol.
+- Ghana → GH₵ (Ghana Cedis / GHS). NEVER use $ or ₹ for a Ghanaian user.
+- Nigeria → ₦ (NGN). Kenya → KSh (KES). South Africa → R (ZAR). Rwanda → RWF. Uganda → USh (UGX).
+- UK → £ (GBP). Eurozone → € (EUR). India → ₹ (INR). Philippines → ₱ (PHP).
+- USA / no detected country → $ (USD).
+- EARNINGS and ONLINE INCOME figures should be in USD (since online income is usually paid in USD), with local currency equivalent in parentheses.
+- DO NOT mix currencies. DO NOT use INR for anyone outside India. DO NOT use USD for Ghanaian cost-of-living figures.
+
+Beyond the standard report sections, you MUST include these additional sections in your JSON response:
+- life_hacks: 5 specific, practical life hacks tailored to their goal and country.
+- money_protection: 3-4 specific rules for protecting income — budgeting method, savings target in LOCAL CURRENCY, what NOT to spend on, and one investment they can start with almost nothing.
+- emotional_strength: 3 practices for not letting emotions derail progress.
+- online_income: 3 ways to make money online accessible from their country. Give EXACT working URLs. Earnings in USD.
+- zero_income_business: How to start a business with zero money. Costs in local currency.
+- product_business: 3 physical product ideas with supplier links. Startup cost in LOCAL CURRENCY.
+- real_estate_hack: Real estate income method for their country with local platforms. Amounts in local currency.
+
+All other rules: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.`,
         userId,isPremium
       });
       const cleaned=raw.replace(/```json|```/g,"").trim();
@@ -6705,27 +6822,70 @@ export default function DestinIQ(){
       <div className="bg bg-grid"/>
       <div className="root" suppressHydrationWarning>
 
-        {/* AUTH GATE — show login if not authenticated */}
-        {authLoading&&<div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div></div>}{!authLoading&&!user&&<AuthScreen onAuth={async(u)=>{if(u.isNew)triggerWelcomeEmail(u);await restoreUserSession({id:u.id,email:u.email,phone:u.phone,user_metadata:{name:u.name,full_name:u.name},app_metadata:{provider:u.provider}});}}/>}
+        {/* ── LOADING STATE — wait for Supabase session check ─────────────── */}
+        {authLoading&&(
+          <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Loading…</div>
+          </div>
+        )}
+
+        {/* ── NOT LOGGED IN — show landing page first, not auth screen ──────
+            Correct flow:
+              New visitor      → Landing → clicks "Begin" → AuthScreen → Dashboard
+              Returning logged-out → Landing → clicks "Sign in" → AuthScreen → Dashboard
+            The auth screen should never appear before the landing page.
+        ──────────────────────────────────────────────────────────────────── */}
+        {!authLoading&&!user&&(
+          <>
+            {/* Show auth screen only when user explicitly clicked to begin/sign in */}
+            {screen==="auth"
+              ? <AuthScreen onAuth={async(u)=>{
+                    if(u.isNew) triggerWelcomeEmail(u);
+                    await restoreUserSession({
+                      id:u.id,email:u.email,phone:u.phone,
+                      user_metadata:{name:u.name,full_name:u.name},
+                      app_metadata:{provider:u.provider},
+                    });
+                  }}
+                  onBack={()=>setScreen("landing")}
+                />
+              : <>
+                  {/* Public nav for unauthenticated state */}
+                  <nav className="nav">
+                    <div className="logo" onClick={()=>setScreen("landing")}>Destin<b>IQ</b></div>
+                    <div className="nav-r">
+                      <button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("auth")}>Sign in</button>
+                      <button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("auth")}>Get started free →</button>
+                    </div>
+                  </nav>
+                  {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
+                  {!showPolicy&&<Landing onStart={()=>setScreen("auth")} ipLocation={ipLocation}/>}
+                </>
+            }
+          </>
+        )}
+
+        {/* ── LOGGED IN ─────────────────────────────────────────────────────── */}
+        {!authLoading&&user&&(
+          <>
         {/* Show skeleton while loading saved profile from DB */}
-        {user&&profileLoading&&<LoadingSkeleton/>}
-        {user&&!profileLoading&&<>
+        {profileLoading&&<LoadingSkeleton/>}
+        {!profileLoading&&<>
 
         <SupportWidget/>
         <nav className="nav">
           <div className="logo" onClick={()=>{
             if(report) setScreen("results");
-            else if(user) setScreen("landing");
             else setScreen("landing");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
-            {user&&<button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
+            <button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
                 ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                 :(user.name||user.email||"U")[0].toUpperCase()
               }
-            </button>}
-            {user&&ADMIN_EMAILS.includes(user.email)&&<button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}} onClick={()=>setShowAdmin(true)}>Admin</button>}
+            </button>
+            {ADMIN_EMAILS.includes(user.email)&&<button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}} onClick={()=>setShowAdmin(true)}>Admin</button>}
             {screen==="results"&&(
               <button className="btn btn-ghost" style={{fontSize:12,padding:"6px 12px"}} onClick={()=>setShowNotif(true)} title="Set daily notification">
                 🔔
@@ -6772,10 +6932,9 @@ export default function DestinIQ(){
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
             setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
-            // Clear any per-account localStorage so the next sign-in starts fresh
             try{
               Object.keys(localStorage).forEach(k=>{
-                if(k.startsWith("diq_")) localStorage.removeItem(k);
+                if(k.startsWith("diq_")||k.startsWith("destiniq_")) localStorage.removeItem(k);
               });
             }catch{}
           }}
@@ -6788,10 +6947,12 @@ export default function DestinIQ(){
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
+        {/* Redirect landing→results if user already has a full report */}
         {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
         {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
+        {/* Redirect intake→results if report already exists (prevent re-onboarding) */}
         {screen==="intake"   &&formData&&report&&(setScreen("results"),null)}
-        {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit}/>}
+        {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
@@ -6806,6 +6967,8 @@ export default function DestinIQ(){
             </div>
           </div>
         )}
+        {/* If somehow on results with no formData, send to landing */}
+        {screen==="results"  &&!formData&&(setScreen("landing"),null)}
 
         {showNotif&&formData&&(
           <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
@@ -6813,6 +6976,8 @@ export default function DestinIQ(){
         </>}
 
         </>}
+          </>
+        )}
       </div>
     </>
     </ErrorBoundary>
