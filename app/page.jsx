@@ -6396,19 +6396,25 @@ export default function DestinIQ(){
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
         // ── CRITICAL: Always restore exactly where they left off ──
-        // Refresh must NEVER send a user back to onboarding or landing.
+        // Signed-in users must NEVER see the marketing landing page — only
+        // brand-new users (no saved onboarding data) see the welcome/intake form.
         if (profile.form_data && profile.report) {
           // Has both — go straight to the dashboard
           setScreen("results");
-        } else if (profile.form_data && !profile.report) {
-          // Has onboarding data but report generation was interrupted
-          // Stay on landing so they can regenerate — don't re-show intake
-          setScreen("landing");
+        } else {
+          // Either no onboarding data yet, or it exists but report generation
+          // was interrupted — either way, send to intake (it pre-fills from
+          // savedFormData, so nothing is lost) instead of the landing page.
+          setScreen("intake");
         }
-        // If no form_data at all, stay on landing (will prompt Begin)
+      } else {
+        // No profile row yet at all — brand-new user, show the welcome/intake form.
+        setScreen("intake");
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
+      // Even on error, never fall back to showing the landing page to a signed-in user.
+      setScreen("intake");
     }finally{
       setProfileLoading(false);
     }
@@ -6524,7 +6530,7 @@ export default function DestinIQ(){
       // From the subscription/paywall page, go back to the dashboard —
       // never re-show the intake form for someone who already has a report.
       if(screen==="paywall"){
-        setScreen(formData&&report?"results":"landing");
+        setScreen(formData&&report?"results":"intake");
         try{ window.history.pushState({diqApp:true},"",window.location.href); }catch(_){}
         return;
       }
@@ -6670,7 +6676,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
     }
   },[userId,isPremium,ipLocation]);
 
-  const restart=()=>{setScreen("landing");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
+  const restart=()=>{setScreen("intake");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
   const handleUnlock=()=>{setScreen("paywall");};
   // handlePay: called after Paystack confirms payment in the Paywall component.
   // We write is_paid:true to Supabase immediately so it survives any refresh.
@@ -6776,7 +6782,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         <nav className="nav">
           <div className="logo" onClick={()=>{
             if(report) setScreen("results");
-            else setScreen("landing");
+            else setScreen("intake");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
             <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}else{setIsPremium(p=>!p);}}} title={isPaid?(isPremium?"Premium mode on":"Switch to Premium"):"Upgrade to Premium"}>
@@ -6798,9 +6804,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             {screen==="results"&&!isPaid&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={handleUnlock}>Upgrade</button>}
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
             {screen==="results"&&report&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setShowShare(true)}>Share 📤</button>}
-            {screen!=="landing"&&screen!=="results"&&<button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>report?setScreen("results"):setScreen("landing")}>← Home</button>}
-            {screen==="landing"&&!formData&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("intake")}>Begin →</button>}
-            {screen==="landing"&&formData&&report&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("results")}>My Dashboard →</button>}
+            {screen!=="intake"&&screen!=="results"&&<button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>report?setScreen("results"):setScreen("intake")}>← Home</button>}
           </div>
         </nav>
 
@@ -6851,9 +6855,9 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
-        {/* Redirect landing→results if user already has a full report */}
+        {/* Signed-in users never see the marketing landing page — redirect straight to intake or results */}
         {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
-        {screen==="landing"  &&!(formData&&report)&&<Landing onStart={()=>setScreen("intake")} ipLocation={ipLocation}/>}
+        {screen==="landing"  &&!(formData&&report)&&(setScreen("intake"),null)}
         {/* Redirect intake→results if report already exists (prevent re-onboarding) */}
         {screen==="intake"   &&formData&&report&&(setScreen("results"),null)}
         {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
@@ -6871,8 +6875,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             </div>
           </div>
         )}
-        {/* If somehow on results with no formData, send to landing */}
-        {screen==="results"  &&!formData&&(setScreen("landing"),null)}
+        {/* If somehow on results with no formData, send to intake (never landing for a signed-in user) */}
+        {screen==="results"  &&!formData&&(setScreen("intake"),null)}
 
         {showNotif&&formData&&(
           <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
