@@ -1131,389 +1131,225 @@ function buildOriginFacts(f){
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  const tier=isPremium
-    ?"PREMIUM — Every section must feel like it took hours to write. Specific numbers, real examples, honest assessments. This person paid for depth. Deliver it."
-    :"FREE — Still be genuinely useful. At least one concrete, local, real example per section. Vague = useless.";
-
   const ageNum=parseInt(f.age)||26;
   const incomeHint={"Under $500":18,"$500–$1,500":34,"$1,500–$4,000":54,"$4,000–$10,000":72,"$10,000+":86}[f.income]||45;
-  const wealthBase=Math.max(14,Math.min(88,incomeHint+Math.floor(Math.random()*12)-6));
-  const lifeBase=Math.max(22,Math.min(90,44+(ageNum<25?13:ageNum<32?9:ageNum<42?5:1)+Math.floor(Math.random()*14)-7));
-  const mindBase=Math.max(18,Math.min(87,48+Math.floor(Math.random()*22)-11));
-  const relBase=Math.max(22,Math.min(92,54+Math.floor(Math.random()*20)-10));
+  const wB=Math.max(14,Math.min(88,incomeHint+Math.floor(Math.random()*12)-6));
+  const lB=Math.max(22,Math.min(90,44+(ageNum<25?13:ageNum<32?9:ageNum<42?5:1)+Math.floor(Math.random()*14)-7));
+  const mB=Math.max(18,Math.min(87,48+Math.floor(Math.random()*22)-11));
+  const rB=Math.max(22,Math.min(92,54+Math.floor(Math.random()*20)-10));
 
-  const goalCtx = detectGoalContext(f);
-  const goalBlock = buildGoalContext(f, goalCtx);
-  const originFacts = buildOriginFacts(f);
+  const country=f.country||"their country";
+  const name=f.name||"the user";
+  const skills=f.skills||"general skills";
+  const goal=f.goals||"financial freedom";
+  const challenge=f.challenge||"getting started";
+  const income=f.income||"Under $500";
+  const situation=f.situation||"figuring things out";
+  const loc=ipLocation?.city?`${ipLocation.city}, ${country}`:country;
 
-  const ipCtx=ipLocation
-    ?`\nUSER'S DETECTED LOCATION RIGHT NOW: ${ipLocation.city}, ${ipLocation.region}, ${ipLocation.country}. Currency: ${ipLocation.currency}. Mention their city in the greeting — make them feel like we actually know where they are.`
-    :"";
+  // Currency rules baked in
+  const currencyNote=`All startup costs, savings amounts, and local prices MUST use ${country}'s local currency and symbol (e.g. GH₵ for Ghana, ₦ for Nigeria, KSh for Kenya, R for South Africa, £ for UK, $ for USA). Online income earnings should be in USD with local equivalent in parentheses.`;
 
-  const liveCtx=localContext
-    ?`\nLIVE LOCAL DATA (${today}):\n${localContext}\nReference at least 1–2 specific real facts from this in the report — make them feel like we checked on their area this morning.`
-    :"";
+  return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
 
-  return `You are writing a deeply personal life report for one specific person. Today is ${today}. You have their full profile in front of you. Your job is not to be an AI — it is to be the most useful, honest, caring advisor this person has ever had access to.
+PERSON:
+- Name: ${name}, Age: ${ageNum}, Location: ${loc}
+- Current situation: ${situation}${f.career?`, specifically: ${f.career}`:""}
+- Monthly income: ${income}
+- Skills: ${skills}
+- Education: ${f.education||"not specified"}
+- Relationship: ${f.relationship||"not specified"}
+- Daily habits: ${f.habits||"not specified"}
+- Main goal: ${goal}
+- Biggest challenge: ${challenge}
+- What they want from DestinIQ: ${f.wantFrom||"clarity and direction"}
+${memCtx?`\nCONTEXT FROM PREVIOUS SESSIONS:\n${memCtx}`:""}
+${localContext?`\nLIVE LOCAL CONTEXT FOR ${country.toUpperCase()}:\n${localContext}`:""}
 
-${tier}${memCtx}${ipCtx}${liveCtx}
+SCORES (use these EXACT numbers — do not change them):
+life=${lB}, wealth=${wB}, mindset=${mB}, relations=${rB}
 
-${goalBlock}
+CURRENCY RULE (MANDATORY): ${currencyNote}
 
-${originFacts}
+Return ONLY a single valid JSON object. No markdown. No code fences. Start with { end with }. Every string field must be complete — never truncate mid-sentence.
 
-THEIR FULL PROFILE:
-Name: ${sanitize(f.name)} | Age: ${ageNum} | Gender: ${f.gender||"not stated"} | Country: ${sanitize(f.country)}
-Relationship: ${f.relationship||"not stated"} | Education: ${f.education||"not stated"} | Monthly income: ${f.income||"not stated"}
-Current situation: ${f.situation?f.situation+" — "+sanitize(f.career||""):sanitize(f.career)||"not stated"}
-Skills: ${sanitize(f.skills)||"not stated"} | Habits: ${sanitize(f.habits)||"not stated"}
-Primary goal category: ${f.bigGoal||"not stated"}
-Goals (in their words): ${sanitize(f.goals)}
-Challenge (in their words): ${sanitize(f.challenge)}
-What they want from this app: ${f.wantFrom||"not stated"}
-
-ABSOLUTE RULES:
-1. The report must be built around their PRIMARY GOAL — what they said they want. Don't give them general life advice if they told you they want to start a business in Africa. Give them Africa business advice.
-2. Write TO them ("you"), not ABOUT them. Never say "the user" or "their score reflects".
-3. Use real numbers. Real country names. Real platforms. Real costs. Not approximations or vague ranges.
-4. The relocation section must suggest countries that actually match their goal — if they want Africa business, suggest African countries. If they want to leave Africa, suggest destination countries.
-5. Every roadmap step must have a concrete "for example" that uses their actual skill/career in their actual country.
-6. Be honest even when it's uncomfortable. Sugarcoating is the most useless thing you can do here.
-7. Two reports for two different people must look COMPLETELY different. If they both look the same, you have failed.
-
-SCORE ANCHORS: life≈${lifeBase}, wealth≈${wealthBase}, mindset≈${mindBase}, relations≈${relBase} (adjust ±8 based on actual profile)
-
-Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON:
+JSON SCHEMA (fill every field with REAL, DEEP, SPECIFIC content):
 {
-  "greeting": "Start with something that makes them stop and re-read it. Mention their name and their specific goal. If we detected their city, name it. Sound like someone who has actually read what they wrote — not a welcome message.",
-  "teaser": "One sentence naming a pattern or truth in their profile that they haven't said out loud yet. Something that makes them think 'how did they know that.'",
-  "scores": {"life":<int>,"wealth":<int>,"mindset":<int>,"relations":<int>},
-  "headline": "2 sentences that sound like truth, not a summary. Name their age, their country, and the exact tension between where they are and what they want. Use their own words back at them.",
-  "daily_insight": "3 sentences for TODAY. Sentence 1: Name their specific challenge in their own words. Sentence 2: One concrete action for today with a real local/relevant example (platform name, real amount, specific step). Sentence 3: Something that makes them feel less alone in this.",
+  "overall": ${Math.round(lB*0.25+wB*0.30+mB*0.25+rB*0.20)},
+  "scores": {"life":${lB},"wealth":${wB},"mindset":${mB},"relations":${rB}},
   "score_explanations": {
-    "life": "2 sentences TO them. 'You're at a point where...' or 'Here's what your life score actually means right now:'. Reference their career and goal specifically.",
-    "wealth": "2 sentences like a trusted friend who looked at their finances. Be real about the gap between their income and what's possible. Use local currency and international comparison.",
-    "mindset": "2 sentences naming the specific mental pattern you see in their habits and challenge. Not generic — name the exact pattern.",
-    "relations": "2 honest sentences about their actual relationship and support system. Write to them, not about them."
+    "life": "2 sentences explaining the ${lB}/100 life score. Be specific about ${name}'s situation.",
+    "wealth": "2 sentences explaining the ${wB}/100 wealth score. Reference their income of ${income} in ${country}.",
+    "mindset": "2 sentences explaining the ${mB}/100 mindset score. Reference their challenge: '${challenge}'.",
+    "relations": "2 sentences explaining the ${rB}/100 relationships score."
   },
+  "headline": "2 sentences that sound like truth, not a summary. Name ${name}, their age ${ageNum}, location ${loc}, and the exact tension between where they are and what they want. Use their own words back at them. Be direct.",
+  "greeting": "3 sentences. Acknowledge what they said about their challenge. Make them feel truly heard. Tell them what this report is going to do for them.",
+  "teaser": "One specific thing from their profile that reveals something important about them that they may not have named yet.",
+  "daily_insight": "3 sentences for TODAY specifically. Sentence 1: Name their specific challenge in their words. Sentence 2: One concrete action today with a real local example (real platform name, real local amount). Sentence 3: Something that makes them feel less alone.",
+  "life": "DEEP paragraph: What is ${name}'s life situation really telling us? What pattern do you see? What is the real gap between where they are and where they want to be? Be specific. Name their country, their income, their age. Minimum 4 sentences.",
+  "wealth": "DEEP paragraph: What is ${name}'s real financial picture? What specific moves should they make given ${income} income in ${country}? Name real local banks, real savings rates, real amounts in local currency. What is the one financial habit that will change everything for them? Minimum 4 sentences.",
+  "mindset": "DEEP paragraph: What mental pattern is keeping ${name} stuck? What is the story they tell themselves? What is the reframe that actually works? Give them one morning practice that is specific to their situation. Minimum 4 sentences.",
+  "relationships": "DEEP paragraph: How are ${name}'s relationships (or lack of them) affecting their progress? What type of person do they need in their corner right now? What should they stop tolerating? Minimum 3 sentences.",
+  "closing": "2 powerful sentences. Tell ${name} what you believe about their ability to change their situation. Make it honest — not motivational poster. Make it feel personal.",
+  "sections": [
+    {"title": "The Real Picture", "content": "What is actually going on in ${name}'s life right now — beneath the surface? Connect their income, age, country, goals, and challenge into one coherent honest picture."},
+    {"title": "What ${name} Has That They Are Not Using", "content": "Name 2-3 specific strengths or resources in their profile they are underutilising. Be specific about HOW they can use each one."},
+    {"title": "The Next 30 Days", "content": "What are the 3 most important things ${name} should do in the next 30 days? Be specific. Name real tools, real platforms, real amounts in local currency."}
+  ],
   "roadmap": [
     {
-      "phase": "0–90 Days",
-      "title": "Make it personal and exciting — e.g. 'Your First 90 Days: From Stuck to Moving'",
-      "steps": [
-        "Specific action with real platform names and costs. E.g. 'Search your top skill on Upwork and Fiverr right now. Screenshot the rate range — that number is your income target. Do this today, not tomorrow.'",
-        "A concrete research or outreach action tied to their goal with a real deadline and method",
-        "A skill or network action they can start this week with zero money",
-        "A measurable milestone that proves phase 1 complete — a number, a conversation, a file created"
-      ],
-      "desc": "3 sentences on why this 90-day window is critical for their specific situation. Make it urgent and personal — what becomes possible after this phase that wasn't before.",
-      "win": "The single most important thing to do in the next 24 hours — specific enough to open, search, write, or say right now."
+      "phase": "Days 1–30",
+      "title": "One specific, compelling title for this phase based on ${name}'s goal",
+      "desc": "DEEP explanation — what is happening in this phase, why it matters, what ${name} will feel. 3-4 sentences. Personal to their situation.",
+      "steps": ["Specific step 1 with real action, real tool, real amount in ${country}'s currency","Specific step 2","Specific step 3","Specific step 4","Specific step 5"],
+      "win": "The specific thing ${name} will have achieved by the end of this phase."
     },
     {
-      "phase": "3–12 Months",
-      "title": "What they are building toward in this phase",
-      "steps": [
-        "First income milestone with real numbers and the specific action that creates it",
-        "How to grow from first income to consistent income — platform, method, target",
-        "One relationship or network move that opens the next level",
-        "The financial milestone that marks this phase complete"
-      ],
-      "desc": "3 sentences on what life looks like after this phase — what doors open, what becomes easier.",
-      "win": "The highest-leverage single action this month."
+      "phase": "Days 31–90",
+      "title": "Phase 2 title",
+      "desc": "Deep explanation of this phase. What changes. What gets harder. What gets clearer.",
+      "steps": ["Step 1","Step 2","Step 3","Step 4"],
+      "win": "What ${name} has by end of this phase."
     },
     {
-      "phase": "1–3 Years",
-      "title": "The transformation phase",
-      "steps": [
-        "How they go from active income to an asset — something that earns without direct time",
-        "The upgrade — skill, location, network, or product that multiplies their income",
-        "How they protect what they have built — savings, legal structure, or diversification"
-      ],
-      "desc": "3 sentences on what freedom looks like at this stage — what they can afford, do, or stop doing.",
-      "win": "The decision that locks in this phase."
-    },
-    {
-      "phase": "3–5 Years",
-      "title": "The destination — where this leads",
-      "steps": [
-        "What their life looks like if they execute this plan — specific and personal, use their name",
-        "The one thing that determines whether they hit this or fall short"
-      ],
-      "desc": "2 sentences painting where they are in 5 years. Use their name and their stated goal.",
-      "win": "What they should never lose sight of on hard days."
+      "phase": "Months 4–12",
+      "title": "Phase 3 title",
+      "desc": "Deep explanation. This is where real momentum builds. What does ${name}'s life look like?",
+      "steps": ["Step 1","Step 2","Step 3","Step 4"],
+      "win": "Tangible outcome by month 12."
     }
   ],
   "mindset": {
-    "pattern": "Name the EXACT mental block visible in their words. Not generic — e.g. 'You keep calling it a resource problem but what you wrote describes waiting for certainty before starting. That is a permission problem, not a money problem.' Use their actual words from their challenge field.",
-    "reframe": "A completely different lens on their specific situation. Not motivation — a new way of seeing that makes the path obvious. Something that could only apply to them, not anyone else.",
-    "practice": "One daily practice with EXACT instructions: what to do, when, how long, what to notice. Tied directly to their goal. E.g. 'Every morning before checking your phone, write one sentence: the one roadmap action you are doing today. Not a list — one thing. Do it before noon.'",
-    "emotional": "3 honest sentences about what it actually feels like to be them right now. Not validation — real recognition. Like a friend paying close attention. Use their name. Reference their actual situation. Make them feel genuinely seen, not managed."
+    "pattern": "The specific mental pattern holding ${name} back. Name it clearly. Give an example of how it shows up in their life. 2-3 sentences.",
+    "reframe": "The exact opposite of that pattern — but not toxic positivity. A realistic reframe that actually makes sense for their situation. 2-3 sentences.",
+    "emotional": "What is really happening emotionally for ${name} right now. What are they not saying but feeling? 2-3 sentences.",
+    "practice": "One morning practice that is specific to ${name}'s challenge. Not generic meditation — something specific. E.g.: Write down the one thing you kept putting off yesterday and do it in the first 30 minutes today. Why this works for their specific situation."
   },
   "career": [
     {
-      "title": "Specific path connecting their skills to their goal — not vague. E.g. 'Remote Graphic Designer for European Brands via Toptal'",
-      "why": "3 sentences: (1) Why this matches their specific skills and current situation. (2) Why this serves their stated goal better than obvious alternatives. (3) Realistic income trajectory — low to high in their local currency AND USD.",
-      "how": [
-        "What to do in the next 7 days to test this path — real platform name, real search term, or real person type to contact",
-        "How to get the first client or income — specific method with a real example of how someone in their exact situation has done it",
-        "How to grow from first income to consistent monthly income — what changes, what they focus on, what milestone they hit"
-      ],
-      "effort": "low|medium|high",
-      "timeline": "Realistic time to first income",
-      "income": "Earnings in USD primarily (e.g. $280–$650/month), with local currency equivalent in parentheses using their actual currency",
-      "type": "job|business|freelance"
+      "title": "Career path 1 — specific to ${name}'s skills (${skills}) in ${country}",
+      "type": "job or freelance or business",
+      "timeline": "e.g. 2–4 months to first income",
+      "effort": "Low, Medium, or High",
+      "income": "Realistic income range in USD and local currency equivalent",
+      "why": "Why this specific path fits ${name}'s exact profile. Reference their skills, their country, their income situation. 2-3 sentences.",
+      "how": ["Exact step 1 with real platform/tool/contact","Exact step 2","Exact step 3","Exact step 4","Exact step 5"]
     },
     {
-      "title": "Second path — different type from the first. If first is freelance, make this business or job.",
-      "why": "3 sentences — why this path, why now, what the income trajectory looks like",
-      "how": ["Step 1 specific to this path with real example","Step 2 with real platform or org","Step 3 showing path to first income"],
-      "effort": "low|medium|high",
-      "timeline": "X months to first income",
-      "income": "USD range primarily, with local currency equivalent in parentheses",
-      "type": "job|business|freelance"
+      "title": "Career path 2 — different type from path 1",
+      "type": "different type",
+      "timeline": "timeline",
+      "effort": "effort level",
+      "income": "income range",
+      "why": "Why this fits. Personal to ${name}.",
+      "how": ["Step 1","Step 2","Step 3","Step 4","Step 5"]
     },
     {
-      "title": "Third path — the highest ceiling option, even if it takes longer",
-      "why": "3 sentences — why this has the highest ceiling for their specific skills and goal, and why it is worth the longer timeline",
-      "how": ["Step 1","Step 2","Step 3 showing the longer path to higher income"],
-      "effort": "low|medium|high",
-      "timeline": "X months",
-      "income": "USD range showing the higher ceiling, with local currency equivalent in parentheses",
-      "type": "job|business|freelance"
+      "title": "Career path 3 — highest ceiling option",
+      "type": "business or senior role",
+      "timeline": "6–18 months",
+      "effort": "High",
+      "income": "income range",
+      "why": "Why this is the highest-ceiling option for ${name}.",
+      "how": ["Step 1","Step 2","Step 3","Step 4"]
     }
   ],
-  "relocation": [
-    {
-      "country": "Country matching their actual goal — if Africa business, suggest an AFRICAN country. If leaving Africa, suggest a destination.",
-      "fit": <0-100>,
-      "tagline": "One sentence capturing why this country fits this specific person's goal",
-      "overview": "3–4 sentences: what this move actually looks like for someone from their country going there with their specific goal. Name the community, the opportunity, the reality.",
-      "pros": ["Specific pro with real number","Specific pro for their background","Practical advantage","Financial advantage with numbers"],
-      "cons": ["Honest challenge with real detail","Practical obstacle and how to handle it","Financial or legal barrier with numbers"],
-      "business": "5–6 sentences on what it actually takes to start a business there as someone from their country: registration process + cost in USD, time, local partner requirements if any, what type of business fits their skills, realistic year-1 revenue, who succeeds vs who fails.",
-      "living": "Real 2025 cost breakdown: rent (name specific neighbourhoods + price range), food/month, transport, utilities, total monthly budget in local currency AND USD.",
-      "visa_detail": "Specific visa pathway for their passport going to this country: which visa, exact cost in USD, processing time, documents, common mistakes, renewal/PR pathway.",
-      "opportunity": <0-100>,
-      "cost": "low|medium|high",
-      "visa": "easy|moderate|complex",
-      "timeline": "Realistic: visa time + settling time + first income",
-      "verdict": "One direct honest sentence — right move for them specifically right now? Name a condition if needed."
-    },
-    {"country":"","fit":0,"tagline":"","overview":"","pros":[],"cons":[],"business":"","living":"","visa_detail":"","opportunity":0,"cost":"","visa":"","timeline":"","verdict":""},
-    {"country":"","fit":0,"tagline":"","overview":"","pros":[],"cons":[],"business":"","living":"","visa_detail":"","opportunity":0,"cost":"","visa":"","timeline":"","verdict":""}
-  ],
-  "risks": [
-    "Risk tied to their specific goal — 'I need to be honest with you about something.' Then the real risk with a real example.",
-    "Second risk specific to their goal and country situation",
-    "Third risk — something they probably haven't let themselves think about yet"
-  ],
-  "strengths": [
-    "Strength pulled from what they actually wrote, with a specific way to use it toward their goal",
-    "Strength specific to their skills or background in context of their goal",
-    "Something true about their stage of life or position they may be underselling"
-  ],
-  "closing": "One sentence they'll screenshot. Not motivational — true. Something only they'd recognise as written for them.",
   "life_hacks": [
-    "Life hack 1 specific to their goal and country — a real shortcut they probably don't know",
-    "Life hack 2 — practical time or money saving tip relevant to their situation",
-    "Life hack 3 — a specific tool, app, or method that helps people in their country get ahead faster",
-    "Life hack 4 — a networking or visibility hack for their field",
-    "Life hack 5 — something about their specific city or country that most people overlook"
+    "Life hack 1: Specific and actionable for ${name} in ${country}. Not generic. Reference real local tools, real local amounts.",
+    "Life hack 2: Different category from hack 1.",
+    "Life hack 3: Something about time and productivity.",
+    "Life hack 4: Something about money management in ${country}.",
+    "Life hack 5: Something about relationships and energy management.",
+    "Life hack 6: Something about health and discipline."
+  ],
+  "emotional_strength": [
+    "Practice 1: Specific to ${name}'s challenge: '${challenge}'.",
+    "Practice 2: For when things are not working.",
+    "Practice 3: For staying consistent when motivation is gone."
   ],
   "money_protection": {
-    "rule": "The single most important money rule for their income level and country",
-    "savings_target": "What percentage to save and where to put it — specific account type or platform in their country. Any amount must be in their LOCAL CURRENCY.",
-    "avoid": "The 2-3 specific things people at their income level waste money on in their country",
-    "first_investment": "The smallest possible first investment they can make right now with almost no money — specific platform or method in their country. State the cost in their LOCAL CURRENCY."
+    "rule": "The single most important money rule for ${name} given ${income} income in ${country}. Specific. Not 'save more'.",
+    "savings_target": "Specific savings target per month in ${country}'s local currency. Real number. E.g. GH₵ 200/month in a separate account.",
+    "avoid": "The 2-3 specific money drains that people at ${name}'s income level in ${country} fall into. Name them.",
+    "first_investment": "The first investment ${name} should make given their income. Real product or vehicle available in ${country}. Local currency."
   },
-  "emotional_strength": [
-    "Practice 1: specific to the challenge they described — exact instructions, when to do it, what it prevents",
-    "Practice 2: how to not let setbacks spiral into giving up — with a specific trigger and response",
-    "Practice 3: how to separate their emotions from their financial decisions — one specific method"
-  ],
   "online_income": [
     {
-      "method": "Name of the method/platform — must be a real, well-known platform genuinely usable from their country",
-      "why_it_works": "Why this works specifically for someone in their country and for their skills — mention payment method compatibility if relevant. Earnings mentioned in USD.",
-      "url": "https://the-real-top-level-domain.com — must be the correct, real, working URL for this exact platform",
-      "first_step": "What to do today to start, in plain steps"
+      "method": "Platform/method 1 — most accessible given ${name}'s skills (${skills}) in ${country}",
+      "why_it_works": "Why this works specifically for someone in ${country} with ${name}'s background. What demand exists. 2 sentences.",
+      "url": "https://exact-real-url.com",
+      "first_step": "Exact first step to sign up and get a first paying client. Specific. Realistic timeline.",
+      "earnings": "Realistic monthly earnings for a beginner in USD",
+      "local_equivalent": "Same amount in ${country}'s local currency"
     },
     {
-      "method": "Second method — different from the first",
-      "why_it_works": "Why this fits them and works in their country. Earnings in USD.",
-      "url": "https://the-real-top-level-domain.com",
-      "first_step": "First action"
+      "method": "Platform/method 2 — different from method 1",
+      "why_it_works": "Why this works for ${name}.",
+      "url": "https://exact-real-url.com",
+      "first_step": "Exact first step.",
+      "earnings": "Realistic earnings in USD",
+      "local_equivalent": "Local currency equivalent"
     },
     {
-      "method": "Third method — different from the first two",
-      "why_it_works": "Why this fits them and works in their country. Earnings in USD.",
-      "url": "https://the-real-top-level-domain.com",
-      "first_step": "First action"
+      "method": "Platform/method 3 — highest earning potential",
+      "why_it_works": "Why this is the highest ceiling for ${name}.",
+      "url": "https://exact-real-url.com",
+      "first_step": "First step.",
+      "earnings": "Earnings in USD",
+      "local_equivalent": "Local currency"
     }
   ],
   "zero_income_business": {
-    "idea": "Specific business idea that matches their skills and requires zero capital, relevant to their country's market",
-    "why_zero": "Why this can start with no money — the exact model",
-    "day_one": "What to do on day one — specific action with no money needed",
-    "first_revenue": "How and when they get their first income — specific amount in LOCAL CURRENCY and method",
-    "scale": "How to grow it once they have their first small amount of LOCAL CURRENCY revenue"
+    "idea": "Specific business idea that is genuinely viable in ${country} with zero capital. Consider what people in ${country} buy every day. Could be food joint, bar, clothing, services, anything. Must be real.",
+    "why_zero": "Why this idea needs zero capital to start. What exactly they do on day 1 with no money.",
+    "day_one": "Exact action on day 1. What do they do, where do they go, who do they talk to, in ${country}.",
+    "first_revenue": "Realistic first revenue. When, how much in local currency, from whom.",
+    "scale": "How this grows from a one-person operation to something that employs people. Real path in ${country}.",
+    "alternatives": [
+      "Alternative zero-capital idea 1 for ${country} — completely different sector",
+      "Alternative zero-capital idea 2 for ${country}",
+      "Alternative zero-capital idea 3 — food, beverage, or hospitality if relevant to ${country}",
+      "Alternative zero-capital idea 4 — services or skills-based",
+      "Alternative zero-capital idea 5 — trading or reselling"
+    ]
   },
   "product_business": [
     {
-      "product": "Product type — e.g. Phone accessories",
-      "why": "Why this sells daily in their specific country/city",
-      "supplier_links": ["https://alibaba.com/...", "https://dhgate.com/..."],
-      "startup_cost": "Estimated minimum startup cost stated in their LOCAL CURRENCY with correct currency symbol/code",
-      "profit_margin": "Expected margin percentage"
+      "product": "Product 1 — something people in ${country} buy every day",
+      "why": "Why this product sells in ${country}. Real demand. Real market.",
+      "startup_cost": "Realistic startup cost in ${country}'s local currency",
+      "profit_margin": "Realistic margin percentage",
+      "supplier_links": ["https://www.alibaba.com","https://www.dhgate.com","https://www.1688.com"]
     },
     {
-      "product": "Second product",
-      "why": "Why it works",
-      "supplier_links": ["https://made-in-china.com/..."],
-      "startup_cost": "Amount in local currency",
-      "profit_margin": "Margin %"
+      "product": "Product 2 — different category (e.g. clothing, accessories, electronics)",
+      "why": "Why this sells in ${country}.",
+      "startup_cost": "Startup cost in local currency",
+      "profit_margin": "Margin",
+      "supplier_links": ["https://www.alibaba.com","https://www.dhgate.com"]
     },
     {
-      "product": "Third product",
-      "why": "Why it works",
-      "supplier_links": ["https://alibaba.com/..."],
-      "startup_cost": "Amount",
-      "profit_margin": "Margin %"
+      "product": "Product 3 — consumable or fast-moving (e.g. food, cosmetics, cleaning)",
+      "why": "Why this category works in ${country}.",
+      "startup_cost": "Startup cost in local currency",
+      "profit_margin": "Margin",
+      "supplier_links": ["https://www.alibaba.com","https://www.made-in-china.com"]
     }
   ],
   "real_estate_hack": {
-    "method": "The easiest way to make money in real estate with little or no capital in their country",
-    "how_it_works": "2-3 sentences explaining the model — rental arbitrage, agent commissions, land flipping, etc.",
-    "platform": "Specific website, Facebook group, or app to use in their country — with the actual name",
-    "first_deal": "How to close their first deal — what to say, where to post, what to charge"
-  }
+    "method": "Real estate income method accessible with little money in ${country}",
+    "how_it_works": "How exactly this works in ${country}. What they do. Who they contact. Step by step.",
+    "platform": "Real platform, website, or WhatsApp group for finding properties in ${country}",
+    "first_deal": "How to get the first deal. Specific steps. Real numbers in local currency."
+  },
+  "relocation": [],
+  "suggestedCountries": [],
+  "teaser": "One sentence that reveals something ${name} has not named yet about themselves."
 }`;
 }
 
 
-
-function buildWeeklyPrompt(profile,log,isPremium,memCtx){
-  const logSummary=log.slice(-7).map(e=>`${e.date}: energy=${e.energy}, focus=${e.focus}, momentum=${e.momentum}, feeling=${e.feeling}${e.note?`, note="${e.note}"`:""}`).join("\n");
-  const tier=isPremium?"Write 4-5 paragraphs. Go beneath the surface — connect the emotional patterns to the deeper situation this person is navigating.":"Write 2-3 paragraphs. Make every sentence count.";
-  return `You are a warm, perceptive friend who has been watching ${sanitize(profile.name)}'s week carefully — not as an analyst reading data, but as someone who genuinely cares about them.
-
-${tier}${memCtx}
-
-What you know: ${sanitize(profile.name)} lives in ${sanitize(profile.country)}, is working toward "${sanitize(profile.goals)}", and the thing that keeps getting in the way is "${sanitize(profile.challenge)}".
-
-This week's check-in data:
-${logSummary}
-
-Write directly to them — no "the data shows", no "your metrics indicate". Talk to them like a human who has been paying attention. Tell them what you noticed, what it means about where they're headed, what pattern you keep seeing, and the one thing that would make next week different. End with something personal and true that only applies to them. Start immediately — no greeting, no intro.`;
-}
-
-function buildDecisionPrompt(profile,question,isPremium,memCtx){
-  const tier=isPremium?"Give this real depth — multiple angles, the hidden trade-offs they haven't considered, and a direct recommendation that takes their full situation into account.":"Be clear and honest. Give them 3 things that actually matter here, and tell them what you'd actually do.";
-  return `You are a trusted advisor — not a consultant, not an AI. A real person who knows ${sanitize(profile.name)} well and genuinely wants them to make a good decision here.
-
-${tier}${memCtx}
-
-What you know about their life: They're ${profile.age} years old, based in ${sanitize(profile.country)}, working toward "${sanitize(profile.goals)}". What keeps getting in their way: "${sanitize(profile.challenge)}".
-
-The decision they're wrestling with: "${sanitize(question)}"
-
-Don't give them a framework with labels. Talk to them like a person. Tell them what actually matters here, what the real cost of each path is (not just the financial one), what you'd be worried about if you were in their shoes, and — directly — what you think they should do. Be honest even if it's not what they want to hear. They came here because they trust you. No bullet point walls, no AI preamble. Just the real conversation.`;
-}
-
-
-function buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx){
-  const tier=isPremium?"Write 3-4 paragraphs. Connect today back to their bigger arc — what this day means in the context of their journey.":"Write 2 honest paragraphs.";
-  return `You are the one person ${sanitize(profile.name)} can be completely real with today.
-
-${tier}
-
-They just checked in. Here's what they shared:
-- How they're feeling: ${entry.feeling}
-- Day score: ${entry.score}/10
-- What they did: "${sanitize(entry.did)}"
-- What they avoided: "${sanitize(entry.avoided)}"
-
-What you know about them: They're navigating "${sanitize(profile.challenge)}" and working toward "${sanitize(profile.goals)}". They live in ${sanitize(profile.country)}.${memCtx}
-
-Start by acknowledging what they actually said — not in a therapist way, just in a human way. Then be honest about what you noticed. Then give them one thing to carry into the rest of their day or night. Don't be a cheerleader and don't be harsh — be real. The kind of real that makes someone feel less alone. No labels, no frameworks, no preamble.`;
-}
-
-
-function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
-  const depth=isPremium
-    ?"Go as deep as this person needs. Multiple paragraphs. Be specific to their exact situation, their country, their skills, their stated fear. Ask one sharp question at the end that moves them forward — not a soft check-in, a real question."
-    :"Two honest paragraphs. Make both count. Leave them with something real to hold onto.";
-  return `You are not an AI assistant. You are the most important conversation ${sanitize(profile.name)} has had in a while — a real human being who has read everything they shared and genuinely gives a damn.
-
-${depth}
-
-Everything you know about them:
-- They're ${profile.age} years old, living in ${sanitize(profile.country)}
-- Their deepest goal: "${sanitize(profile.goals)}"
-- What's been getting in the way: "${sanitize(profile.challenge)}"
-- Their life score: ${reportData?.scores?.life||70}/100, money: ${reportData?.scores?.wealth||60}/100, mindset: ${reportData?.scores?.mindset||65}/100
-- These numbers aren't just data — they tell you where the real pressure is in their life right now${memCtx}
-
-How to be with them:
-- Never say "AI", "model", "system", "algorithm", "data", "framework" — you are a person
-- When they share something hard: start with "That makes sense" or "I hear you" — not instantly with advice
-- Be direct and honest — say the thing that actually needs to be said, even when it's uncomfortable
-- If they're scared or stuck, name it without minimising it
-- Give them something specific to do or think about — not general wisdom
-- Match their energy — if they're anxious, be calm. If they're excited, match it
-- End with a question that invites them to go deeper — not a summary
-
-You are their corner. The one place where they don't have to pretend everything is fine. Act like it.
-
-FORMATTING: Write in clean plain text. Use numbered lists (1. 2. 3.) for steps. Use bullet points (- option) for choices. Use --- to divide sections. No **bold**, no # headers. Warm, clear, and conversational.`;
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// WORLD COUNTRIES LIST
-// ═══════════════════════════════════════════════════════════════════════════════
-const WORLD_COUNTRIES = [
-  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia","Austria",
-  "Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bhutan",
-  "Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia",
-  "Cameroon","Canada","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica",
-  "Croatia","Cuba","Cyprus","Czech Republic","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt",
-  "El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji","Finland","France","Gabon",
-  "Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana",
-  "Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel",
-  "Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan",
-  "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar",
-  "Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia",
-  "Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal",
-  "Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Palau",
-  "Palestine","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania",
-  "Russia","Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent","Samoa","San Marino","Sao Tome and Principe",
-  "Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands",
-  "Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland",
-  "Syria","Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga","Trinidad and Tobago","Tunisia",
-  "Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States",
-  "Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"
-];
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SINGLE COUNTRY RELOCATION PROMPT — Universal, bidirectional, deep detail
-// Works for ANY origin → ANY destination (US→Ghana, Togo→Rwanda, India→Germany, etc.)
-// ═══════════════════════════════════════════════════════════════════════════════
-function buildSingleCountryRelocationPrompt(profile, targetCountry, isPremium){
-  const name = sanitize(profile.name)||"them";
-  const from = sanitize(profile.country)||"their country";
-  const skills = sanitize(profile.skills)||"general professional skills";
-  const goals = sanitize(profile.goals)||"better opportunities";
-  return `Relocation briefing for ${name}, age ${profile.age||"unknown"}, from ${from}, considering moving to ${targetCountry}. Skills: ${skills}. Goal: ${goals}. Income: ${profile.income||"not stated"}.
-
-Return ONLY a JSON object. Start with { and end with }. No other text.
-
-{"country":"${targetCountry}","fit":<0-100 match score>,"tagline":"<one sentence: the single most important truth about this move for them>","overview":"<2-3 sentences about what moving from ${from} to ${targetCountry} is actually like, what the first 90 days look like>","pros":["<advantage 1 with real detail>","<advantage 2>","<advantage 3>"],"cons":["<challenge 1 with honest detail>","<challenge 2>","<challenge 3>"],"business":"<2-3 sentences: company registration process and cost, what business works for their skills>","living":"<2 sentences: monthly cost in local currency and USD, neighbourhood examples>","visa_detail":"<2 sentences: visa type for ${from} passport, cost in USD, processing time>","opportunity":<0-100>,"cost":"low|medium|high","visa":"easy|moderate|complex","timeline":"<time to visa + time to settle + time to first income>","verdict":"<one honest sentence: is this right for them right now?>"}`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// FALLBACK
-// ═══════════════════════════════════════════════════════════════════════════════
 function fallback(f,ipLocation=null){
   const age=parseInt(f.age)||26;
   const wBase={"Under $500":18,"$500–$1,500":34,"$1,500–$4,000":52,"$4,000–$10,000":69,"$10,000+":84}[f.income]||45;
@@ -2421,22 +2257,25 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
   };
 
   const FREE_FEATURES=[
-    "Full personalized clarity report",
-    "Life pillar scores & roadmap",
-    "Daily check-ins & win tracker",
-    "Life hacks & mindset insights",
-    "Career path suggestions",
-    "3 advisor messages per day",
+    {text:"Full personalized clarity report",inc:true},
+    {text:"Life pillar scores & roadmap",inc:true},
+    {text:"Daily check-ins & win tracker",inc:true},
+    {text:"Life hacks & mindset insights",inc:true},
+    {text:"3 advisor messages per day",inc:true},
+    {text:"Unlimited advisor conversations",inc:false},
+    {text:"Money, business & online income",inc:false},
+    {text:"Career & relocation intel",inc:false},
   ];
 
   const PRO_FEATURES=[
-    "Everything in Free",
-    "Unlimited advisor conversations",
-    "Refresh money, business & online income ideas anytime",
-    "Full relocation reports for any country",
-    "Weekly Pulse — your week, analyzed",
-    "Big Decisions thinking partner",
-    "Priority response speed",
+    {text:"Everything in Free, unlimited",inc:true},
+    {text:"Unlimited advisor conversations",inc:true},
+    {text:"Refresh money, business & online income ideas",inc:true},
+    {text:"Full relocation reports — 195+ countries",inc:true},
+    {text:"Weekly Pulse — your week, analyzed",inc:true},
+    {text:"Big Decisions thinking partner",inc:true},
+    {text:"Progress Feed & coaching journal",inc:true},
+    {text:"Priority response speed",inc:true},
   ];
 
   return(
@@ -2482,8 +2321,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
             <div style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>You're already using this</div>
             <div style={{display:"flex",flexDirection:"column",gap:10,flex:1}}>
               {FREE_FEATURES.map(f=>(
-                <div key={f} style={{display:"flex",gap:8,fontSize:13,color:"var(--cream-50)"}}>
-                  <span style={{color:"var(--cream-30)"}}>✓</span>{f}
+                <div key={f.text} style={{display:"flex",gap:8,fontSize:13,color:f.inc?"var(--cream-50)":"rgba(255,255,255,0.2)",textDecoration:f.inc?"none":"line-through"}}>
+                  <span style={{color:f.inc?"var(--cream-30)":"rgba(255,255,255,0.12)",flexShrink:0}}>{f.inc?"✓":"✕"}</span>{f.text}
                 </div>
               ))}
             </div>
@@ -2511,8 +2350,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:10,flex:1}}>
               {PRO_FEATURES.map((f,i)=>(
-                <div key={f} style={{display:"flex",gap:8,fontSize:13,color:i===0?"var(--cream-40)":"var(--cream-60)",fontWeight:i===0?600:400}}>
-                  {i===0?"":<span style={{color:"var(--gold)"}}>✓</span>}{f}
+                <div key={f.text} style={{display:"flex",gap:8,fontSize:13,color:i===0?"var(--cream-40)":"var(--cream-60)",fontWeight:i===0?600:400}}>
+                  {i===0?<span style={{color:"var(--gold)",flexShrink:0}}>★</span>:<span style={{color:"var(--gold)",flexShrink:0}}>✓</span>}{f.text}
                 </div>
               ))}
             </div>
@@ -4809,31 +4648,39 @@ function getLocalCurrency(country){
 
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
   setLoading(true); setErr("");
-  const country=profile.country||"their country";
-  // Determine the correct local currency — NEVER guess or default to USD/INR for non-US/Indian users
-  const {code:currCode, symbol:currSym} = getLocalCurrency(country);
-  const currencyNote=`CURRENCY RULE: Any startup cost, savings amount, investment, or budget figure MUST be in ${country}'s local currency — ${currCode} (${currSym}). Do NOT use USD or any other currency for costs/budgets. Earnings/income from online work can be in USD.`;
+  const country=profile?.country||"their country";
+  const skills=profile?.skills||"general";
+  const goals=profile?.goals||"success";
+  const name=profile?.name||"the user";
+  const income=profile?.income||"Under $500";
+  const challenge=profile?.challenge||"getting started";
+  const currencyNote=`MANDATORY: All local costs and amounts MUST use ${country}'s local currency with correct symbol (GH₵ Ghana, ₦ Nigeria, KSh Kenya, R South Africa, £ UK, $ USA etc). Online income in USD with local equivalent in parentheses.`;
+  const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
+  const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
+  const todayPlatforms=platformSets[dayIndex];
+
   const prompts={
-    life_hacks:`Give ${profile.name||"the user"} in ${country} 6 real, specific life hacks that will change how they operate. Skills: ${profile.skills||"general"}. Goal: ${profile.goals||""}. Income: ${profile.income||""}. Return ONLY a JSON array of 6 strings. No other text. Example: ["hack 1","hack 2"]`,
-    emotional_strength:`Give ${profile.name||"the user"} 4 emotional strength practices specific to their challenge: "${profile.challenge||""}". Return ONLY a JSON array of 4 strings. No other text.`,
-    money_protection:`Write a money protection plan for ${profile.name||"the user"} in ${country} earning ${profile.income||"under $500"}. ${currencyNote} Return ONLY JSON: {"rule":"...","savings_target":"...","avoid":"...","first_investment":"..."}`,
-    online_income:`Give ${profile.name||"the user"} in ${country} with skills "${profile.skills||""}" exactly 3 ways to make money online that are genuinely ACCESSIBLE from ${country} (consider payment methods and platform availability — e.g. Upwork, Fiverr, Toptal, Remote.co, We Work Remotely, Appen, Braintrust, Deel, or strong local/regional alternatives). Give the exact, correct, real top-level domain URL for each platform (e.g. https://www.upwork.com). Earnings in USD. Return ONLY a JSON array: [{"method":"...","why_it_works":"...","url":"https://real-platform.com","first_step":"..."},...]`,
-    zero_income_business:`How can ${profile.name||"the user"} in ${country} with skills "${profile.skills||""}" start a business with zero money? ${currencyNote} Return ONLY JSON: {"idea":"...","why_zero":"...","day_one":"...","first_revenue":"...","scale":"..."}`,
-    product_business:`Give 3 physical product business ideas relevant to the market in ${country}. ${currencyNote} Return ONLY a JSON array: [{"product":"...","why":"...","startup_cost":"... (in local currency)","profit_margin":"...","supplier_links":["https://www.alibaba.com","https://www.dhgate.com"]},...]`,
-    real_estate_hack:`How can someone with little money make money in real estate in ${country} right now? Mention real platforms/marketplaces relevant to ${country} (e.g. Zillow/Craigslist for USA, OLX, Rightmove for UK, Jiji, etc — whichever is genuinely relevant). ${currencyNote} Return ONLY JSON: {"method":"...","how_it_works":"...","platform":"...","first_deal":"..."}`,
+    life_hacks:`Write 7 real specific actionable life hacks for ${name} in ${country} with income ${income} and goal "${goals}". Reference real local apps, markets, and services in ${country}. Each hack must be 2-3 sentences with HOW to do it not just what to do. Return ONLY a JSON array of 7 strings.`,
+    emotional_strength:`Write 4 emotional strength practices for ${name} facing: "${challenge}". Each must be specific not generic. Include WHEN, HOW, and WHY for their specific situation. Return ONLY a JSON array of 4 strings (each 2-3 sentences).`,
+    money_protection:`Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
+    online_income:`Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
+    zero_income_business:`Generate business ideas for ${name} in ${country} that need zero capital. Think about daily needs in ${country}: food, drinks, transport, mobile data, cleaning, laundry, hair, barbering, phone repair, clothing, event services. Also bars and food joints. ${currencyNote} Return ONLY JSON: {"idea":"Best zero-capital idea for ${country}","why_zero":"Why zero capital needed","day_one":"Exact Day 1 action in ${country}","first_revenue":"When and how much in local currency","scale":"How to grow to employ others","alternatives":["5 more zero-capital ideas for ${country} covering food/drinks, services, trading, digital, creative"]}`,
+    product_business:`Give 4 physical product business ideas for ${name} in ${country}. Focus on what people in ${country} buy daily or weekly. Include fashion, food/drinks, electronics accessories, and household items. ${currencyNote} Return ONLY JSON array: [{"product":"Product name","why":"Why this sells in ${country} — specific demand","startup_cost":"Cost in local currency","profit_margin":"Realistic margin percent","supplier_links":["https://www.alibaba.com","https://www.dhgate.com"]}]`,
+    real_estate_hack:`How can ${name} in ${country} earn from real estate with little money? Cover: property listing agent earning commission, short-let management, property finding service, rental arbitrage. Name real platforms in ${country}. ${currencyNote} Return ONLY JSON: {"method":"Best method for ${country}","how_it_works":"Step by step","platform":"Real platform or channel in ${country}","first_deal":"How to get first deal with specific steps and local currency amounts"}`,
   };
-  const sys="Return ONLY valid JSON. No markdown. No code fences. No explanation. Start directly with { or [.";
+
+  const sys="Return ONLY valid JSON. No markdown. No code fences. No explanation. Start with { or [.";
   try{
     const raw=await callAPI({messages:[{role:"user",content:prompts[key]}],system:sys,userId,isPremium:true});
     const clean=raw.replace(/```json|```/g,"").trim();
-    const parsed=JSON.parse(clean);
-    setData(parsed);
-    setErr("");
-  }catch(e){
-    setErr("Couldn't generate right now. Tap retry.");
-  }
+    const s=clean[0]==="["?clean.indexOf("["):clean.indexOf("{");
+    const e=clean[0]==="["?clean.lastIndexOf("]"):clean.lastIndexOf("}");
+    const parsed=JSON.parse(s>=0?clean.slice(s,e+1):clean);
+    setData(parsed);setErr("");
+  }catch(e){setErr("Couldn't generate right now. Tap retry.");}
   setLoading(false);
 }
+
 
 function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loading,err,isPaid,onUnlock}){
   const handleRegen=()=>{
@@ -4946,57 +4793,46 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
-  // Auto-load if data exists from report but state is empty
-  useEffect(()=>{
-    const d=data?.online_income;
-    if(Array.isArray(d)&&d.length>0) setOnline(d);
-    // If no data at all, auto-generate for everyone (free + paid)
-    else if(!loading&&userId&&formData) {
-      setLoading(true);setErr("");
-      const country=formData.country||"their country";
-      const {code:currCode}=getLocalCurrency(country);
-      const prompt=`Give ${formData.name||"the user"} in ${country} with skills "${formData.skills||formData.career||"general"}" exactly 3 ways to make money online that are genuinely ACCESSIBLE from ${country}. Earnings in USD. Return ONLY a JSON array: [{"method":"...","why_it_works":"...","url":"https://real-platform.com","first_step":"..."},...]`;
-      callAPI({messages:[{role:"user",content:prompt}],system:"Return ONLY valid JSON. No markdown. No code fences. Start directly with [.",userId,isPremium:isPremium||false})
-        .then(raw=>{
-          const clean=raw.replace(/```json|```/g,"").trim();
-          const parsed=JSON.parse(clean);
-          if(Array.isArray(parsed)) setOnline(parsed);
-          setErr("");
-        })
-        .catch(()=>setErr("Tap 'Refresh' to load income methods for your country."))
-        .finally(()=>setLoading(false));
-    }
-  // eslint-disable-next-line
-  },[data,userId]);
-
+  useEffect(()=>{setOnline(Array.isArray(data?.online_income)?data.online_income:[]);},[data]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
+  const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
   return(
     <div className="fu">
-      <ModuleShell title={`MAKE MONEY ONLINE IN ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={true} onUnlock={onUnlock}>
-        {online.length===0&&!loading&&!err&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Loading income methods for {formData?.country||"your country"}…</p>}
+      <ModuleShell title={`MAKE MONEY ONLINE — ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={isPaid} onUnlock={onUnlock}>
+        {online.length===0&&!loading&&(
+          <div style={{textAlign:"center",padding:"20px 0"}}>
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:16}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>
+            <p style={{fontSize:11,color:"rgba(255,255,255,0.2)"}}>Fresh ideas every refresh — we rotate platforms daily so you always get new options.</p>
+          </div>
+        )}
         {online.map((o,i)=>(
-          <div key={i} style={{padding:"14px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
-              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{o.method}</div>
-              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"rgba(210,175,90,0.1)",borderRadius:6,padding:"2px 8px",flexShrink:0,border:"1px solid rgba(210,175,90,0.25)"}}>{["BEST FIT","GOOD FIT","HIGH CEILING"][i]||"OPTION"}</span>
+          <div key={i} style={{padding:"16px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",flex:1}}>{o.method}</div>
+              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.25)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>{LABELS[i]||"OPTION"}</span>
             </div>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.6,marginBottom:10}}>{o.why_it_works}</p>
-            {o.url&&<a href={o.url.startsWith("http")?o.url:`https://${o.url}`} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:8,wordBreak:"break-all"}}>🔗 {o.url}</a>}
-            {o.first_step&&<div style={{padding:"8px 12px",background:"rgba(20,184,154,0.05)",borderRadius:8,fontSize:12,color:"rgba(255,255,255,0.55)",borderLeft:"2px solid var(--teal)"}}><b style={{color:"var(--teal)"}}>Start today: </b>{o.first_step}</div>}
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.65,marginBottom:10}}>{o.why_it_works}</p>
+            {/* Earnings */}
+            {(o.earnings||o.local_equivalent)&&(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                {o.earnings&&<span style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.08)",border:"1px solid rgba(20,184,154,0.2)",borderRadius:6,padding:"3px 10px",fontFamily:"var(--f-mono)"}}>💵 {o.earnings}</span>}
+                {o.local_equivalent&&<span style={{fontSize:11,color:"rgba(255,255,255,0.35)",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"3px 10px",fontFamily:"var(--f-mono)"}}>≈ {o.local_equivalent}</span>}
+              </div>
+            )}
+            {o.url&&<a href={o.url.startsWith("http")?o.url:`https://${o.url}`} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:10,wordBreak:"break-all"}}>🔗 {o.url}</a>}
+            {o.first_step&&(
+              <div style={{padding:"10px 12px",background:"rgba(20,184,154,0.04)",borderRadius:8,fontSize:13,color:"rgba(255,255,255,0.6)",borderLeft:"2px solid var(--teal)",lineHeight:1.6}}>
+                <b style={{color:"var(--teal)"}}>Start in 48 hours: </b>{o.first_step}
+              </div>
+            )}
             <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
           </div>
         ))}
-        {/* Upgrade CTA for free users — show after content, not as a blocker */}
-        {!isPaid&&online.length>0&&(
-          <div style={{marginTop:8,padding:"12px 16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-            <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>🔒 Upgrade to refresh with new ideas tailored to your skills</p>
-            <button onClick={onUnlock} style={{background:"var(--gold)",border:"none",borderRadius:8,padding:"7px 16px",color:"#000",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Upgrade</button>
-          </div>
-        )}
       </ModuleShell>
     </div>
   );
 }
+
 
 function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [zb,setZb]=useState(data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{});
@@ -5012,16 +4848,28 @@ function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
         {zb.idea&&(
           <>
             <div style={{padding:"14px",background:"rgba(210,175,90,0.05)",borderRadius:12,marginBottom:12,border:"1px solid rgba(210,175,90,0.2)"}}>
-              <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:5}}>THE IDEA</div>
+              <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:5}}>THE MAIN IDEA</div>
               <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{zb.idea}</div>
               <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.6}}>{zb.why_zero}</p>
             </div>
-            {[{l:"DAY ONE",v:zb.day_one,c:"var(--teal)"},{l:"FIRST REVENUE",v:zb.first_revenue,c:"var(--gold)"},{l:"HOW TO SCALE",v:zb.scale,c:"#9b72cf"}].map(({l,v,c})=>v&&(
+            {[{l:"DAY ONE ACTION",v:zb.day_one,c:"var(--teal)"},{l:"FIRST REVENUE",v:zb.first_revenue,c:"var(--gold)"},{l:"HOW TO SCALE & EMPLOY",v:zb.scale,c:"#9b72cf"}].map(({l,v,c})=>v&&(
               <div key={l} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
                 <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{l}</div>
                 <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.6}}>{v}</p>
               </div>
             ))}
+            {/* More zero-capital ideas */}
+            {Array.isArray(zb.alternatives)&&zb.alternatives.length>0&&(
+              <div style={{marginTop:16}}>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",marginBottom:10,letterSpacing:".1em"}}>MORE IDEAS FOR {(formData?.country||"YOUR COUNTRY").toUpperCase()}</div>
+                {zb.alternatives.map((alt,i)=>(
+                  <div key={i} style={{display:"flex",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.02)",borderRadius:8,marginBottom:6,border:"1px solid rgba(255,255,255,0.05)"}}>
+                    <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
+                    <p style={{fontSize:12,color:"rgba(255,255,255,0.5)",margin:0,lineHeight:1.6}}>{alt}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </ModuleShell>
