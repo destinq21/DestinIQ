@@ -4338,12 +4338,31 @@ function VoiceSelector(){
                     e.stopPropagation();
                     setSel(v);
                     setOpen(false);
+                    // Immediately play a short preview so the user can hear the voice
+                    try{
+                      window.speechSynthesis.cancel();
+                      const preview=new SpeechSynthesisUtterance("This is how I sound. I'm ready.");
+                      const live=window.speechSynthesis.getVoices();
+                      const lv=live.find(lv=>lv.name===v.name)||null;
+                      if(lv){preview.voice=lv;preview.lang=lv.lang;}
+                      preview.rate=0.93;preview.pitch=1.0;preview.volume=1;
+                      setTimeout(()=>window.speechSynthesis.speak(preview),60);
+                    }catch(_){}
                   }}
                   onTouchEnd={(e)=>{
                     e.preventDefault();
                     e.stopPropagation();
                     setSel(v);
                     setOpen(false);
+                    try{
+                      window.speechSynthesis.cancel();
+                      const preview=new SpeechSynthesisUtterance("This is how I sound.");
+                      const live=window.speechSynthesis.getVoices();
+                      const lv=live.find(lv=>lv.name===v.name)||null;
+                      if(lv){preview.voice=lv;preview.lang=lv.lang;}
+                      preview.rate=0.93;preview.pitch=1.0;preview.volume=1;
+                      setTimeout(()=>window.speechSynthesis.speak(preview),100);
+                    }catch(_){}
                   }}
                   style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.1)":"transparent",border:"none",padding:"10px 16px",color:sel?.name===v.name?"var(--gold)":"rgba(255,255,255,0.65)",fontSize:13,cursor:"pointer",gap:8,fontFamily:"inherit",transition:"background .1s"}}>
                   <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -4654,7 +4673,9 @@ async function regenerateModule(key, profile, userId, isPremium, setData, setLoa
   const name=profile?.name||"the user";
   const income=profile?.income||"Under $500";
   const challenge=profile?.challenge||"getting started";
-  const currencyNote=`MANDATORY: All local costs and amounts MUST use ${country}'s local currency with correct symbol (GH₵ Ghana, ₦ Nigeria, KSh Kenya, R South Africa, £ UK, $ USA etc). Online income in USD with local equivalent in parentheses.`;
+  // Use the explicit currency helper so the prompt always has the EXACT symbol
+  const {code:currCode, symbol:currSymbol}=getCountryCurrency(country);
+  const currencyNote=`MANDATORY CURRENCY RULE: This person is in ${country}. ALL local costs, prices, savings targets, and budgets MUST be in ${currSymbol} (${currCode}). DO NOT use $, USD, INR, or any other currency for local amounts. If you use the wrong currency symbol this response fails. Online income earnings go in USD with ${currSymbol} equivalent in parentheses.`;
   const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
   const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
   const todayPlatforms=platformSets[dayIndex];
@@ -4790,19 +4811,36 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
 }
 
 function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
-  const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
-  const [loading,setLoading]=useState(false);
+  const initOnline=Array.isArray(data?.online_income)&&data.online_income.length>0?data.online_income:[];
+  const [online,setOnline]=useState(initOnline);
+  const [loading,setLoading]=useState(()=>{
+    // Auto-load on first mount if report has no online_income data yet
+    return false;
+  });
   const [err,setErr]=useState("");
-  useEffect(()=>{setOnline(Array.isArray(data?.online_income)?data.online_income:[]);},[data]);
+  // Sync when parent data changes (e.g. after report reload)
+  useEffect(()=>{
+    if(Array.isArray(data?.online_income)&&data.online_income.length>0){
+      setOnline(data.online_income);
+    }
+  },[data]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
   return(
     <div className="fu">
       <ModuleShell title={`MAKE MONEY ONLINE — ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={isPaid} onUnlock={onUnlock}>
         {online.length===0&&!loading&&(
-          <div style={{textAlign:"center",padding:"20px 0"}}>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:16}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>
-            <p style={{fontSize:11,color:"rgba(255,255,255,0.2)"}}>Fresh ideas every refresh — we rotate platforms daily so you always get new options.</p>
+          <div style={{textAlign:"center",padding:"24px 0"}}>
+            {isPaid
+              ? <>
+                  <p style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:14}}>Click <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods tailored to {formData?.country||"your country"} and your skills.</p>
+                  <p style={{fontSize:11,color:"rgba(255,255,255,0.2)"}}>Fresh ideas every refresh — platforms rotate daily.</p>
+                </>
+              : <>
+                  <p style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:14}}>Online income ideas are a <b style={{color:"var(--gold)"}}>Premium</b> feature.</p>
+                  <button onClick={onUnlock} style={{padding:"10px 24px",borderRadius:10,border:"none",background:"var(--gold)",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>Upgrade to unlock →</button>
+                </>
+            }
           </div>
         )}
         {online.map((o,i)=>(
@@ -6375,6 +6413,10 @@ export default function DestinIQ(){
 
     // Listen for sign-in / sign-out events (including OAuth callback)
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,session)=>{
+      // INITIAL_SESSION fires on every page load — getSession() above already handles
+      // it with await, so we skip it here to prevent a second unawaited call to
+      // restoreUserSession that races and resets the screen back to landing.
+      if(_event==="INITIAL_SESSION") return;
       if(session?.user){
         restoreUserSession(session.user);
         // Track referral if URL has ?ref=
