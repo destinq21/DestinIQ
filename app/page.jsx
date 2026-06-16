@@ -186,7 +186,18 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
+  {
+    // Explicit session handling so a hard refresh NEVER loses the user's session.
+    // These are the library defaults, pinned here so a future default change can't
+    // silently break persistence. storageKey is intentionally left at the default
+    // (sb-<ref>-auth-token) so existing logged-in sessions keep working.
+    auth: {
+      persistSession: true,     // keep the JWT in localStorage across refreshes
+      autoRefreshToken: true,   // silently refresh the token before it expires
+      detectSessionInUrl: true, // pick up the session after an OAuth / password-reset redirect
+    },
+  }
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -265,12 +276,39 @@ async function saveUserProfile(userId, data) {
   if (error) throw new Error(error.message);
 }
 
-/** Load user profile from Supabase. Returns null if not found. */
+/**
+ * Load user profile from Supabase, distinguishing the three outcomes that the
+ * routing logic MUST treat differently:
+ *   { status:"ok",  profile }  — a saved profile row exists
+ *   { status:"new" }           — definitively NO row (a genuine brand-new user)
+ *   { status:"error", error }  — the read failed (network / RLS / transient)
+ *
+ * The old version collapsed "new" and "error" into `null`, which is why a
+ * transient read failure was sending fully-onboarded users back to onboarding.
+ * `.maybeSingle()` returns `data:null, error:null` for zero rows, so a real
+ * error is now unambiguous.
+ */
 async function loadUserProfile(userId) {
   try {
-    const { data } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single();
-    return data || null;
-  } catch (e) { return null; }
+    const { data, error } = await supabase
+      .from("user_profiles").select("*").eq("user_id", userId).maybeSingle();
+    if (error) return { status: "error", error };
+    if (!data)  return { status: "new" };
+    return { status: "ok", profile: data };
+  } catch (e) {
+    return { status: "error", error: e };
+  }
+}
+
+/** Load the profile, retrying a few times on transient errors before giving up. */
+async function loadUserProfileWithRetry(userId, attempts = 3) {
+  let last = { status: "error", error: new Error("no attempt made") };
+  for (let i = 0; i < attempts; i++) {
+    last = await loadUserProfile(userId);
+    if (last.status !== "error") return last;        // "ok" or "new" are final answers
+    await new Promise(r => setTimeout(r, 500 * (i + 1))); // back off, then retry
+  }
+  return last;
 }
 
 /** Upsert a weekly report. */
@@ -6344,6 +6382,11 @@ export default function DestinIQ(){
   const [rateLimited, setRateLimited]=useState(false);
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
+  // Tracks which user id we've already fully restored. Auth events (SIGNED_IN,
+  // TOKEN_REFRESHED, INITIAL_SESSION) fire repeatedly for the SAME user — notably
+  // every time the tab regains focus — so we use this to restore (and touch the
+  // `screen`) exactly once per user and ignore the redundant re-fires.
+  const restoredUidRef = useRef(null);
 
   // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
   const restoreUserSession = async (supaUser) => {
@@ -6372,8 +6415,20 @@ export default function DestinIQ(){
 
     // Load saved profile (onboarding answers + subscription)
     try{
-      const profile = await loadUserProfile(u.id);
-      if (profile) {
+      const result = await loadUserProfileWithRetry(u.id);
+
+      if (result.status === "error") {
+        // ── CRITICAL: a failed READ must NEVER be mistaken for a new user. ──
+        // Sending an onboarded user to "intake" here was the bug that made
+        // onboarding re-appear after a refresh / tab-refocus. Show a retry
+        // screen instead; their saved data is untouched.
+        console.warn("restoreUserSession profile read failed:", result.error?.message||result.error);
+        setScreen("loaderror");
+        return;
+      }
+
+      if (result.status === "ok") {
+        const profile = result.profile;
         if (profile.is_paid)    setIsPaid(true);
         if (profile.is_premium) setIsPremium(true);
         if (profile.streak){
@@ -6395,73 +6450,119 @@ export default function DestinIQ(){
         }
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
-        // ── CRITICAL: Always restore exactly where they left off ──
-        // Signed-in users must NEVER see the marketing landing page — only
-        // brand-new users (no saved onboarding data) see the welcome/intake form.
+        // ── Restore exactly where they left off ──
+        // Onboarding (intake) is shown ONLY when onboarding is genuinely
+        // incomplete — i.e. there is no saved report yet. A returning user with
+        // a completed report always goes straight to the dashboard, and a
+        // signed-in user never sees the marketing landing page.
         if (profile.form_data && profile.report) {
-          // Has both — go straight to the dashboard
           setScreen("results");
         } else {
-          // Either no onboarding data yet, or it exists but report generation
-          // was interrupted — either way, send to intake (it pre-fills from
-          // savedFormData, so nothing is lost) instead of the landing page.
+          // Row exists but onboarding wasn't finished (e.g. report generation
+          // was interrupted). Intake pre-fills from savedFormData, so nothing
+          // is lost.
           setScreen("intake");
         }
       } else {
-        // No profile row yet at all — brand-new user, show the welcome/intake form.
+        // status === "new": definitively no profile row → genuine new user.
         setScreen("intake");
       }
     }catch(e){
-      console.warn("restoreUserSession profile load error:",e.message);
-      // Even on error, never fall back to showing the landing page to a signed-in user.
-      setScreen("intake");
+      // Unexpected throw — treat as a read failure, not a new user.
+      console.warn("restoreUserSession unexpected error:",e.message);
+      setScreen("loaderror");
     }finally{
       setProfileLoading(false);
     }
   };
 
   useEffect(()=>{
-    // Check for an existing session on mount (handles OAuth redirects too).
-    // IMPORTANT: we await restoreUserSession before clearing authLoading so the
-    // app never flashes the landing page before we know the user is logged in.
-    supabase.auth.getSession().then(async({data:{session}})=>{
-      if(session?.user){
-        await restoreUserSession(session.user);
-      }
-      setAuthLoading(false);
-    });
+    let active = true;
 
-    // Listen for sign-in / sign-out events (including OAuth callback)
-    const{data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,session)=>{
+    // Single source of truth for routing on auth changes. Called by both the
+    // initial getSession() and every onAuthStateChange event, but it restores
+    // (and changes `screen`) ONLY when the signed-in user actually changes.
+    const handleSession = async (session, event) => {
+      if(!active) return;
+
       if(session?.user){
-        restoreUserSession(session.user);
-        // Track referral if URL has ?ref=
-        if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
+        const uid = session.user.id;
+
+        // Restore once per user. Re-fires of SIGNED_IN / TOKEN_REFRESHED /
+        // INITIAL_SESSION for the SAME user (e.g. on tab refocus or a silent
+        // token refresh) are ignored here, so they can no longer reset `screen`
+        // and bounce the user back to onboarding/landing.
+        if(restoredUidRef.current !== uid){
+          restoredUidRef.current = uid;
+          await restoreUserSession(session.user);
+        }
+
+        // Referral tracking only on a genuine interactive sign-in.
+        if(event==="SIGNED_IN"&&typeof window!=="undefined"){
           const ref=new URLSearchParams(window.location.search).get("ref");
-          // Basic UUID validation + don't let someone refer themselves
           const isValidUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref||"");
-          if(isValidUUID&&ref!==session.user.id){
+          if(isValidUUID&&ref!==uid){
             try{
-              // insert will silently fail if it violates the unique(referred_id) constraint — that's fine,
-              // it just means this user was already recorded as referred before
-              const{error:refErr}=await supabase.from("referrals").insert({referrer_id:ref,referred_id:session.user.id});
+              const{error:refErr}=await supabase.from("referrals").insert({referrer_id:ref,referred_id:uid});
               if(refErr) console.warn("Referral insert:",refErr.message);
             }catch(_){ /* referral already recorded or insert failed — ignore */ }
             window.history.replaceState({},"",window.location.pathname);
           }
         }
       } else {
-        setUser(null);
-        setUserId(null);
-        setFormData(null);
-        setReport(null);
-        setIsPaid(false);
-        setIsPremium(false);
-        setScreen("landing");
+        // No session. Only tear down + route to landing on a GENUINE sign-out
+        // (we previously had a user). On a first load with no session we must
+        // NOT clobber a screen the user navigated to (e.g. they clicked "auth").
+        const wasSignedIn = restoredUidRef.current !== null;
+        restoredUidRef.current = null;
+        if(wasSignedIn){
+          setUser(null);
+          setUserId(null);
+          setFormData(null);
+          setReport(null);
+          setIsPaid(false);
+          setIsPremium(false);
+          setScreen("landing");
+        }
       }
+      setAuthLoading(false);
+    };
+
+    // onAuthStateChange emits INITIAL_SESSION with the stored session right after
+    // construction, so this also handles the "already signed in, just refreshed"
+    // and OAuth-redirect cases.
+    const{data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
+      handleSession(session, event);
     });
-    return()=>subscription.unsubscribe();
+
+    // Fallback in case INITIAL_SESSION is slow to fire — the uid guard above
+    // guarantees this can't cause a duplicate restore.
+    supabase.auth.getSession().then(({data:{session}})=>{
+      handleSession(session, "INITIAL_SESSION");
+    });
+
+    return()=>{ active=false; subscription.unsubscribe(); };
   },[]);
+
+  // ── SCREEN NORMALIZER ───────────────────────────────────────────────────
+  // Keeps the signed-in user on a valid screen for their data, WITHOUT calling
+  // setScreen() during render. Runs only once auth + profile are settled.
+  //  • A signed-in user must never sit on the marketing landing page.
+  //  • A user with a completed report must never be shown the onboarding form
+  //    (this is the "onboarding only once" guarantee).
+  //  • `loaderror` is left alone — it has its own Retry flow and must not be
+  //    silently downgraded to onboarding.
+  useEffect(()=>{
+    if(authLoading||profileLoading||!user||screen==="loaderror") return;
+    if(screen==="landing"){
+      setScreen(formData&&report?"results":"intake");
+    } else if(screen==="intake"&&formData&&report){
+      setScreen("results");
+    } else if(screen==="results"&&!formData){
+      // results needs data; only a genuinely data-less user falls back to intake
+      setScreen("intake");
+    }
+  },[authLoading,profileLoading,user,screen,formData,report]);
 
   // Silently fetch IP location as soon as app loads
   useEffect(()=>{
@@ -6747,11 +6848,16 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             {screen==="auth"
               ? <AuthScreen onAuth={async(u)=>{
                     if(u.isNew) triggerWelcomeEmail(u);
+                    // Claim this uid before restoring so the SIGNED_IN event that
+                    // signInWithPassword/signUp/verifyOtp also fires won't trigger
+                    // a second, racing restore.
+                    restoredUidRef.current = u.id;
                     await restoreUserSession({
                       id:u.id,email:u.email,phone:u.phone,
                       user_metadata:{name:u.name,full_name:u.name},
                       app_metadata:{provider:u.provider},
                     });
+                    setAuthLoading(false);
                   }}
                   onBack={()=>setScreen("landing")}
                 />
@@ -6837,6 +6943,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           onBack={()=>setShowProfile(false)}
           onSignOut={async()=>{
             await supabase.auth.signOut();
+            restoredUidRef.current=null;
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
             setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
@@ -6855,14 +6962,26 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
-        {/* Signed-in users never see the marketing landing page — redirect straight to intake or results */}
-        {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
-        {screen==="landing"  &&!(formData&&report)&&(setScreen("intake"),null)}
-        {/* Redirect intake→results if report already exists (prevent re-onboarding) */}
-        {screen==="intake"   &&formData&&report&&(setScreen("results"),null)}
-        {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
+        {/* Routing is decided in restoreUserSession + the screenNormalizer effect
+            below — NOT with setScreen() calls during render (that anti-pattern
+            fought the auth listener and caused redirect oscillation). Here we
+            only render the screen the state already resolved to. */}
+        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
+        {screen==="loaderror"&&(
+          <div style={{minHeight:"70vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,textAlign:"center",padding:24}}>
+            <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Couldn't load your account</div>
+            <p style={{fontSize:14,color:"var(--cream-60)",maxWidth:340,lineHeight:1.6}}>We couldn't reach your saved profile right now. Your data is safe — this is just a connection issue.</p>
+            <button className="btn btn-gold" onClick={()=>{
+              restoredUidRef.current=null;
+              setScreen("landing"); // neutral placeholder; the retry re-resolves it
+              supabase.auth.getSession().then(({data:{session}})=>{
+                if(session?.user){ restoredUidRef.current=session.user.id; restoreUserSession(session.user); }
+              });
+            }}>Retry</button>
+          </div>
+        )}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
@@ -6875,8 +6994,6 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             </div>
           </div>
         )}
-        {/* If somehow on results with no formData, send to intake (never landing for a signed-in user) */}
-        {screen==="results"  &&!formData&&(setScreen("intake"),null)}
 
         {showNotif&&formData&&(
           <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
