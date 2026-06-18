@@ -186,18 +186,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
-  {
-    // Explicit session handling so a hard refresh NEVER loses the user's session.
-    // These are the library defaults, pinned here so a future default change can't
-    // silently break persistence. storageKey is intentionally left at the default
-    // (sb-<ref>-auth-token) so existing logged-in sessions keep working.
-    auth: {
-      persistSession: true,     // keep the JWT in localStorage across refreshes
-      autoRefreshToken: true,   // silently refresh the token before it expires
-      detectSessionInUrl: true, // pick up the session after an OAuth / password-reset redirect
-    },
-  }
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA"
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -276,39 +265,12 @@ async function saveUserProfile(userId, data) {
   if (error) throw new Error(error.message);
 }
 
-/**
- * Load user profile from Supabase, distinguishing the three outcomes that the
- * routing logic MUST treat differently:
- *   { status:"ok",  profile }  — a saved profile row exists
- *   { status:"new" }           — definitively NO row (a genuine brand-new user)
- *   { status:"error", error }  — the read failed (network / RLS / transient)
- *
- * The old version collapsed "new" and "error" into `null`, which is why a
- * transient read failure was sending fully-onboarded users back to onboarding.
- * `.maybeSingle()` returns `data:null, error:null` for zero rows, so a real
- * error is now unambiguous.
- */
+/** Load user profile from Supabase. Returns null if not found. */
 async function loadUserProfile(userId) {
   try {
-    const { data, error } = await supabase
-      .from("user_profiles").select("*").eq("user_id", userId).maybeSingle();
-    if (error) return { status: "error", error };
-    if (!data)  return { status: "new" };
-    return { status: "ok", profile: data };
-  } catch (e) {
-    return { status: "error", error: e };
-  }
-}
-
-/** Load the profile, retrying a few times on transient errors before giving up. */
-async function loadUserProfileWithRetry(userId, attempts = 3) {
-  let last = { status: "error", error: new Error("no attempt made") };
-  for (let i = 0; i < attempts; i++) {
-    last = await loadUserProfile(userId);
-    if (last.status !== "error") return last;        // "ok" or "new" are final answers
-    await new Promise(r => setTimeout(r, 500 * (i + 1))); // back off, then retry
-  }
-  return last;
+    const { data } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single();
+    return data || null;
+  } catch (e) { return null; }
 }
 
 /** Upsert a weekly report. */
@@ -322,7 +284,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -861,23 +823,54 @@ const PILLARS=[
   {id:"mindset",   label:"Mindset",        color:"#9b72cf"},
   {id:"relations", label:"Relationships",  color:"#c4645a"},
 ];
-const MODULES=[
-  {id:"today",    icon:"◎", label:"My Report"},
-  {id:"momentum", icon:"⚡", label:"Daily Check-in"},
-  {id:"wins",     icon:"🏆", label:"Win Tracker"},
-  {id:"progress", icon:"📈", label:"My Progress"},
-  {id:"hacks",    icon:"💡", label:"Life Hacks"},
-  {id:"money",    icon:"💰", label:"Money"},
-  {id:"online",   icon:"🌐", label:"Earn Online"},
-  {id:"business", icon:"🏗️", label:"Start Business"},
-  {id:"decisions",icon:"◈", label:"Big Decisions"},
-  {id:"weekly",   icon:"↗", label:"Weekly Pulse"},
-  {id:"roadmap",  icon:"⟶", label:"My Roadmap"},
-  {id:"mindset",  icon:"◇", label:"Mindset"},
-  {id:"career",   icon:"◈", label:"Career Path"},
-  {id:"relocate", icon:"✦", label:"Relocate"},
-  {id:"advisor",  icon:"⬡", label:"My Advisor"},
+// Tabs grouped by category — rendered as a single scrollable row
+// but with a thin category label above each group for orientation
+const MODULE_GROUPS=[
+  {
+    group:"Your Dashboard",
+    color:"var(--gold)",
+    items:[
+      {id:"today",    icon:"◎", label:"My Report"},
+      {id:"momentum", icon:"⚡", label:"Check-in"},
+      {id:"wins",     icon:"🏆", label:"Wins"},
+      {id:"progress", icon:"📈", label:"Progress"},
+      {id:"weekly",   icon:"↗", label:"Weekly Pulse"},
+    ],
+  },
+  {
+    group:"Make Money",
+    color:"var(--teal)",
+    items:[
+      {id:"money",    icon:"💰", label:"Money"},
+      {id:"online",   icon:"🌐", label:"Earn Online"},
+      {id:"business", icon:"🏗️", label:"Business"},
+      {id:"hacks",    icon:"💡", label:"Life Hacks"},
+    ],
+  },
+  {
+    group:"Level Up",
+    color:"#9b72cf",
+    items:[
+      {id:"invest",    icon:"📊", label:"Invest in You"},
+      {id:"success",   icon:"🔥", label:"Get Successful"},
+      {id:"mindset10x",icon:"🧠", label:"10x Mindset"},
+      {id:"mindset",   icon:"◇", label:"Inner Mindset"},
+      {id:"career",    icon:"◈", label:"Career Path"},
+    ],
+  },
+  {
+    group:"Plan & Decide",
+    color:"var(--rose)",
+    items:[
+      {id:"roadmap",  icon:"⟶", label:"My Roadmap"},
+      {id:"decisions",icon:"◈", label:"Decisions"},
+      {id:"relocate", icon:"✦", label:"Relocate"},
+      {id:"advisor",  icon:"⬡", label:"My Advisor"},
+    ],
+  },
 ];
+// Flat list kept for backward compatibility (tab persistence, etc.)
+const MODULES = MODULE_GROUPS.flatMap(g=>g.items);
 const LOADING_PHRASES=["Reading what you shared…","Thinking about your situation…","Writing your roadmap…","Looking at what's really possible for you…","Almost there…","One moment more…"];
 
 function urlBase64ToUint8Array(base64String){
@@ -5353,6 +5346,514 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVEST IN YOURSELF MODULE
+// Investments for your 20s–30s — because your 20s decide your 40s.
+// ═══════════════════════════════════════════════════════════════════════════════
+const INVEST_SECTIONS=[
+  {
+    id:"study",
+    icon:"📚",
+    color:"var(--gold)",
+    title:"Study Obsession",
+    subtitle:"Your 20s decide your 40s — what you pour in now compounds for decades.",
+    body:"Read biographies of the greats — Steve Jobs, Elon Musk, Rockefeller, Oprah, Howard Schultz. Not to worship them. To study their patterns. Success leaves clues. You learn what actually worked in real life — their morning routines, how they handled rejection, the decisions they made at 25 that changed everything. You start to see that most legendary careers weren't lucky accidents. They were the result of compounding small, obsessive inputs over years.",
+    habits:[
+      "Read 1 biography or autobiography per month — not self-help, actual life stories of people who built something.",
+      "Keep a pattern journal: write down 1 pattern you noticed in what you read each week.",
+      "Study failures as hard as successes — what did they do at the moment it nearly fell apart?",
+      "Pick one mentor dead or alive and study them deeply for 90 days before moving to the next.",
+    ],
+    why:"Why it works: you compress decades of experience into weeks. You stop making beginner mistakes that people before you already made and documented.",
+  },
+  {
+    id:"body",
+    icon:"⚡",
+    color:"var(--teal)",
+    title:"Obsess Over Energy",
+    subtitle:"Your body is your highest-return investment. Protect it like your most valuable asset.",
+    body:"Everything — discipline, creativity, focus, emotional control — runs on energy. Sleep 7–8 hours like your career depends on it, because it does. Exercise 4–5 times a week, not for aesthetics but for cognitive performance. What you eat determines how clearly you think at 3pm. Most people negotiate their energy away for short-term comfort and then wonder why they can't execute on their goals.",
+    habits:[
+      "Sleep before midnight. Non-negotiable. Your prefrontal cortex — the part that makes decisions — degrades fast on poor sleep.",
+      "Exercise in the morning, before the world asks things of you. Even 30 minutes changes your entire day.",
+      "Cut one thing from your diet that you know is draining you. Not everything — just one thing this month.",
+      "Track your energy hourly for one week. You will immediately see the patterns that are costing you hours of output.",
+    ],
+    why:"Why it works: high-energy people outperform high-talent people. You can outwork smarter people if you protect your engine.",
+  },
+  {
+    id:"skills",
+    icon:"🛠️",
+    color:"#9b72cf",
+    title:"Stack High-Income Skills",
+    subtitle:"One skill makes you employable. A stack of 2–3 rare skills makes you irreplaceable.",
+    body:"Pick skills that compound and are hard to outsource: sales, persuasion, writing, coding, design, leadership, public speaking, negotiation. Then layer them. A programmer who can also sell is 10x more valuable than a programmer who only codes. A designer who can write copy commands double the rates. Your 20s are the lowest-cost time to acquire these skills — you have time, low obligations, and the brain plasticity to absorb new things fast.",
+    habits:[
+      "Spend 1 hour daily learning a skill that will be worth more in 5 years than it is today.",
+      "Teach what you learn immediately — tutoring, content, or just explaining to a friend. Teaching is the fastest form of retention.",
+      "Take on projects that scare you slightly — just beyond your current ability is where growth happens fastest.",
+      "Build a portfolio, not just a CV. Evidence of work beats claims about work every time.",
+    ],
+    why:"Why it works: skills are the only asset that can't be taken from you, and the compounding is silent but violent.",
+  },
+  {
+    id:"network",
+    icon:"🔗",
+    color:"var(--rose)",
+    title:"Network Mathematics",
+    subtitle:"You are the average of the 5 people you spend most time with. Choose them like your life depends on it.",
+    body:"Your network is not just who you know — it is what you believe is possible. Spend time with people who are building, who read, who have real standards for themselves, and your own standards quietly rise. Spend time with people who complain, who settle, who see ambition as arrogance — and your ceiling drops without you noticing. The math is ruthless: one right introduction can do what 10 years of solo effort cannot.",
+    habits:[
+      "Every month, reach out to one person you admire who is 5–10 years ahead of where you want to be. Not to ask for anything. Just to connect.",
+      "Give before you take — show up with value, a resource, an observation, something useful. Transactions come much later.",
+      "Audit your 5 closest people every 6 months. Not to cut people harshly, but to be honest about who is pulling you forward.",
+      "Go to one event, conference, or gathering in your field every quarter. Most of your best opportunities will come from a room.",
+    ],
+    why:"Why it works: talent and hardwork get you to a certain level. Network gets you the rest of the way.",
+  },
+  {
+    id:"money",
+    icon:"💸",
+    color:"var(--gold)",
+    title:"Make Your Money Move Before You Do",
+    subtitle:"Spending is easy. Building wealth is a skill. Start in your 20s or pay in your 40s.",
+    body:"The single biggest financial mistake of the 20s: treating savings as what's left after spending, instead of what comes out first. Pay yourself first — 20% off the top before you touch a single cedi, naira, dollar, or pound. Then make that money work: index funds, a skill that generates income, a small side business. Compound interest is not a metaphor. It is a machine that runs 24 hours a day — but only if you start it early.",
+    habits:[
+      "Save at least 20% of every single income — no matter how small. Make it automatic so it's not a decision.",
+      "Learn one investment vehicle this year — index funds, real estate basics, or a simple business model. One. Deeply.",
+      "Avoid lifestyle inflation aggressively in your 20s. The car, the apartment upgrade, the clothing — that money invested now is worth 10x at 40.",
+      "Track every major expense for 30 days. You will find at least 2–3 things you're paying for that give you zero real return.",
+    ],
+    why:"Why it works: starting at 22 vs 32 in compound growth is not a 10-year difference — it is a 300–500% difference in outcome.",
+  },
+  {
+    id:"create",
+    icon:"✏️",
+    color:"var(--teal)",
+    title:"Create, Don't Just Consume",
+    subtitle:"Consumers pay. Creators get paid. Your 20s are your cheapest time to become a creator.",
+    body:"Every hour you spend scrolling, watching, and consuming, someone else is building the thing you wish you had built. Creation — writing, building, making, teaching, designing — is how you turn what you know into leverage. You do not need to be perfect to start. You need to start to get good. The creator who ships imperfect work consistently crushes the person who is perfecting something in private.",
+    habits:[
+      "Create something every single day — a post, a paragraph, a prototype, a line of code, a sketch. Something.",
+      "Ship before you feel ready. Waiting for perfect is waiting forever. Version 1 always beats Version Never.",
+      "Build in public — share your process, your learning, your failures. People trust builders who show their work.",
+      "Pick one medium to master this year: writing, video, audio, or code. One. Go deep before going wide.",
+    ],
+    why:"Why it works: creation compounds. Your 100th post teaches you things your 1st post never could. The reps are the lesson.",
+  },
+  {
+    id:"routine",
+    icon:"⏰",
+    color:"var(--gold)",
+    title:"Ruthless Routine",
+    subtitle:"Motivation gets you started. Routine keeps you going when motivation disappears — and it will.",
+    body:"Discipline is not a personality trait. It is a system. Successful people do not rely on feeling motivated — they build environments and routines that make good behavior the default. Your morning decides your day. Your week structure decides your month. Your habits, repeated 300 times, decide your year. The goal is to make your best version the path of least resistance, not the heroic effort.",
+    habits:[
+      "Design your morning before you sleep — know exactly what you will do first when you wake up. Remove the decision.",
+      "Block time for your most important work first, before email, before social media, before anything reactive.",
+      "End every day with a 5-minute review: what did I do, what moved forward, what needs to move tomorrow.",
+      "Protect your routine like a meeting you cannot miss — because it is the most important meeting of your day.",
+    ],
+    why:"Why it works: willpower depletes. Systems don't. A person with a strong routine at 60% motivation outperforms a person relying on inspiration at 100%.",
+  },
+];
+
+function InvestInYourselfModule({formData}){
+  const [open,setOpen]=useState(null);
+  const toggleAccordion=(id)=>setOpen(o=>o===id?null:id);
+  return(
+    <div className="fu">
+      <div style={{marginBottom:28}}>
+        <div className="d3" style={{marginBottom:8}}>Invest In Yourself{formData?.name?`, ${formData.name}`:""} — Your 20s Decide Your 40s</div>
+        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.75,maxWidth:620}}>
+          The highest-return investments you can make are not in stocks or real estate — they're in yourself.
+          What you build{formData?.age&&parseInt(formData.age)<=35?" in the next few years":" starting now"} is the foundation everything else sits on.
+          {formData?.country?` In ${formData.country}, the people who compound these habits fastest are the ones who start before they feel ready.`:` These are the inputs that compound.`}
+        </p>
+        {formData?.goals&&(
+          <div style={{marginTop:14,padding:"12px 16px",background:"rgba(210,175,90,0.06)",border:"1px solid var(--line-gold)",borderRadius:10,display:"flex",gap:10,alignItems:"flex-start"}}>
+            <span style={{color:"var(--gold)",flexShrink:0,marginTop:2}}>◎</span>
+            <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.65}}>
+              Your goal: <em style={{color:"var(--cream-70)"}}>&ldquo;{formData.goals}&rdquo;</em> — every section below feeds directly into that.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {INVEST_SECTIONS.map(s=>{
+          const isOpen=open===s.id;
+          return(
+            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+              {/* Header */}
+              <button onClick={()=>toggleAccordion(s.id)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+                <div style={{width:42,height:42,borderRadius:12,background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{s.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{s.title}</div>
+                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.subtitle}</div>
+                </div>
+                <div style={{color:s.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+              </button>
+
+              {/* Expanded content */}
+              {isOpen&&(
+                <div style={{padding:"0 20px 20px"}}>
+                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{s.body}</p>
+
+                  {/* Daily habits */}
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>WHAT TO ACTUALLY DO</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {s.habits.map((h,i)=>(
+                        <div key={i} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+                          <div style={{width:22,height:22,borderRadius:"50%",background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:s.color,fontWeight:700}}>{i+1}</div>
+                          <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{h}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Why it works */}
+                  <div style={{padding:"12px 16px",background:`${s.color}08`,borderLeft:`2px solid ${s.color}`,borderRadius:"0 10px 10px 0"}}>
+                    <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.7,fontStyle:"italic"}}>{s.why}</p>
+                  </div>
+
+                  <AudioPlayer text={`${s.title}. ${s.body} ${s.habits.join(". ")}`} label="Listen" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom quote */}
+      <div style={{marginTop:32,padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
+        <p style={{fontFamily:"var(--f-display)",fontSize:18,fontStyle:"italic",color:"var(--gold)",lineHeight:1.6,margin:0}}>
+          &ldquo;The best time to plant a tree was 20 years ago. The second best time is today.&rdquo;
+        </p>
+        <p style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginTop:8}}>Your compound interest starts the moment you start.</p>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISGUSTINGLY SUCCESSFUL MODULE
+// Not lucky. Not gifted. Just following the right rules.
+// ═══════════════════════════════════════════════════════════════════════════════
+const SUCCESS_RULES=[
+  {
+    number:"01",
+    color:"var(--gold)",
+    title:"Study Obsession",
+    hook:"Read biographies of the greats. Not to worship them. To steal their patterns.",
+    detail:"Steve Jobs. Elon Musk. Rockefeller. Oprah. Howard Schultz. Katherine Johnson. These people were not just talented — they were patterned. They made specific choices, at specific moments, that changed everything. When you read their actual stories, not the highlight reels, you see the patterns: they worked when others rested, they obsessed when others kept things balanced, they were willing to look stupid before they looked brilliant. Success leaves clues. You can steal from people who already figured it out.",
+    actions:[
+      "Read 1 real biography per month — not summaries, the full book.",
+      "After each one, write 3 patterns you noticed. What did they all do that most people don't?",
+      "Pick 1 mistake they made and figure out if you are currently making the same one.",
+    ],
+  },
+  {
+    number:"02",
+    color:"var(--teal)",
+    title:"Ruthless Routine",
+    hook:"Motivation is a visitor. Discipline is a resident. Build the system that runs when you don't feel like it.",
+    detail:"Every high performer you study has a morning routine, an output quota, a non-negotiable block of deep work. They are not more motivated than you. They designed environments and systems that make their best work the default behavior. Your feelings are unreliable. Your calendar is not. Structure your day so that your most important work happens first, before the world gets its hands on your attention.",
+    actions:[
+      "Design your ideal morning and run it for 21 days straight — no modification, just execute.",
+      "Block 2–3 hours of uninterrupted deep work daily — guard it like a meeting with your largest client.",
+      "End each day with a 5-minute review: did today move you forward or just keep you busy?",
+    ],
+  },
+  {
+    number:"03",
+    color:"#9b72cf",
+    title:"Network Mathematics",
+    hook:"One right introduction beats 10 years of solo effort. The math is real.",
+    detail:"Your network is not who you know. It is what you believe is possible. The people around you define your ceiling, whether you notice it or not. The ambitious person who surrounds themselves with builders starts to believe bigger without trying. The talented person who stays in a circle of complainers slowly loses the ambition they started with. Upgrade your environment, and your results follow automatically — even before you do any more work.",
+    actions:[
+      "Reach out to one person you admire every month — no ask, just genuine connection.",
+      "Attend one event or gathering in your field every quarter. Your next opportunity will come from a room.",
+      "Give before you take — show up with value, ideas, connections. Transactions come much later.",
+    ],
+  },
+  {
+    number:"04",
+    color:"var(--rose)",
+    title:"Create, Don't Consume",
+    hook:"Consumers pay. Creators get paid. Stop feeding algorithms and start building things.",
+    detail:"Every hour you spend consuming, someone else is building the thing you wish you had created. Writing, building, designing, teaching, making — this is how you convert what you know into leverage. Creation is also the fastest path to clarity. You don't know what you think until you write it. You don't know if an idea works until you build it. The creator who ships imperfect work consistently beats the perfectionist who never finishes.",
+    actions:[
+      "Create something every day — a post, a paragraph, a prototype, a line of code. Even if nobody sees it.",
+      "Ship before you are ready. Done is the engine of more. Perfect is the enemy of real.",
+      "Pick one medium to master this year: writing, video, audio, or code. One. Go very deep.",
+    ],
+  },
+  {
+    number:"05",
+    color:"var(--gold)",
+    title:"Obsess Over Energy",
+    hook:"You cannot build an empire running on empty. Your body is not a cost — it is your infrastructure.",
+    detail:"Sleep, movement, nutrition, and mental recovery are not indulgences — they are performance inputs. A well-rested, physically active person with average talent will outperform a brilliant, depleted person almost every time. You cannot think clearly, make good decisions, or sustain long-term effort on 5 hours of sleep and zero movement. This is not wellness advice. It is performance strategy.",
+    actions:[
+      "Protect 7–8 hours of sleep — especially during your most important work phases.",
+      "Move your body for at least 30 minutes daily. The cognitive benefits alone are worth it.",
+      "Audit your energy for 7 days: rate yourself every 3 hours. Find the patterns that are costing you output.",
+    ],
+  },
+];
+
+const SUCCESS_TRUTH={
+  title:"The Final Truth",
+  lines:[
+    "Disgusting success is built daily. Not emotionally. Not randomly. Systematically.",
+    "The person who shows up without motivation and executes their system beats the inspired person who acts only when they feel like it.",
+    "You don't need luck. You need a repeatable process, applied with obsessive consistency, for longer than most people are willing to go.",
+    "The rules are not a secret. Everyone has access to them. The difference is who actually follows them.",
+  ],
+};
+
+function DisgustinglySuccessfulModule({formData}){
+  const [open,setOpen]=useState(null);
+  return(
+    <div className="fu">
+      {/* Hero */}
+      <div style={{marginBottom:32,padding:"28px 24px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(20,184,154,0.04))",border:"1px solid var(--line-gold)",borderRadius:18,textAlign:"center"}}>
+        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:10}}>THE REAL PLAYBOOK</div>
+        <div className="d2" style={{marginBottom:12,fontSize:"clamp(22px,4vw,32px)"}}>
+          How to Become Disgustingly Successful{formData?.name?`, ${formData.name}`:""}
+        </div>
+        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.75,maxWidth:520,margin:"0 auto"}}>
+          Not lucky. Not gifted. Just following the right rules — and following them when no one is watching,
+          when it's not working yet, and when it would be much easier to stop.
+          {formData?.challenge?` You said your challenge is "${formData.challenge.slice(0,80)}${formData.challenge.length>80?"…":""}". Every rule below is a direct answer to that.`:""}
+        </p>
+      </div>
+
+      {/* Rules */}
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32}}>
+        {SUCCESS_RULES.map(r=>{
+          const isOpen=open===r.number;
+          return(
+            <div key={r.number} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?r.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+              <button onClick={()=>setOpen(o=>o===r.number?null:r.number)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+                <div style={{width:42,height:42,borderRadius:12,background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--f-mono)",fontSize:13,fontWeight:700,color:r.color,flexShrink:0}}>{r.number}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{r.title}</div>
+                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5,fontStyle:"italic"}}>"{r.hook}"</div>
+                </div>
+                <div style={{color:r.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+              </button>
+              {isOpen&&(
+                <div style={{padding:"0 20px 20px"}}>
+                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{r.detail}</p>
+                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:r.color,letterSpacing:".12em",marginBottom:10}}>EXECUTE THIS WEEK</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {r.actions.map((a,i)=>(
+                      <div key={i} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+                        <div style={{width:22,height:22,borderRadius:"50%",background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:r.color,fontWeight:700}}>{i+1}</div>
+                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{a}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <AudioPlayer text={`Rule ${r.number}: ${r.title}. ${r.detail}`} label="Listen" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Final Truth */}
+      <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:18}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:14}}>THE FINAL TRUTH</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {SUCCESS_TRUTH.lines.map((l,i)=>(
+            <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+              <span style={{color:"var(--gold)",fontSize:10,marginTop:4,flexShrink:0}}>◎</span>
+              <p style={{fontSize:14,color:i===0?"var(--cream)":"var(--cream-60)",fontWeight:i===0?600:400,lineHeight:1.75,margin:0}}>{l}</p>
+            </div>
+          ))}
+        </div>
+        <AudioPlayer text={SUCCESS_TRUTH.lines.join(" ")} label="Listen to the full truth" mini={false}/>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 10X MINDSET MODULE
+// Strong mindset principles + 10x performance principles
+// ═══════════════════════════════════════════════════════════════════════════════
+const MINDSET_PRINCIPLES=[
+  {icon:"⏳",color:"var(--gold)",title:"Be Patient",body:"Most worthwhile things take longer than you expect. Impatience is what causes people to quit at the exact moment they are about to break through. Build a 3-year frame for your goals and a daily frame for your actions. The daily actions are yours to control. The 3-year result is the compound of those actions. Patience is not passive waiting — it is aggressive consistency without demanding an immediate reward."},
+  {icon:"⚡",color:"var(--teal)",title:"Be Proactive",body:"Reactive people manage problems. Proactive people prevent them. Every week, ask yourself: what is the one thing that, if I handle it now, removes 10 problems in the future? Proactivity is a thinking habit first — you have to train yourself to look ahead before looking around. Start each morning asking: what do I want to happen today, and what can I do in the next hour to make it more likely?"},
+  {icon:"🔄",color:"#9b72cf",title:"Be Open to Change",body:"The person who updates their beliefs when they get new evidence moves faster than the person who defends what they already decided. Change is not weakness — refusing to change when the evidence demands it is. Every 6 months, audit your top 3 beliefs about yourself, your work, and your goals. Ask honestly: is this still true, or am I holding this belief because I've held it for a long time?"},
+  {icon:"🍃",color:"var(--rose)",title:"Learn to Let Go",body:"Some people are carrying losses from 3 years ago like they happened this morning. Every unit of energy spent resisting something that has already happened is energy that cannot go into what comes next. Letting go is not forgetting — it is refusing to let the past allocate your present resources. Process it, extract the lesson, then physically move your focus to the next thing."},
+  {icon:"☀️",color:"var(--gold)",title:"Stay Hopeful",body:"Hope is not naive optimism — it is the rational belief that your actions can influence your outcomes. People without hope stop trying. People with realistic hope keep adjusting and moving. Protect your hope aggressively: limit time with people who drain it, regularly review evidence of your own progress, and zoom out when the present moment feels impossible."},
+  {icon:"🧠",color:"var(--teal)",title:"Check Your Thoughts",body:"Your internal monologue is either your best coach or your worst saboteur. Most people never audit it. When you catch a thought like 'I can't do this' or 'this always happens to me,' pause and ask: is this actually true, or is this a habit my brain has? You do not have to believe every thought you have. You have to notice it, question it, and replace it with one that is both true and useful."},
+  {icon:"💙",color:"#9b72cf",title:"It's Okay Not to Be Okay",body:"Pretending to be fine when you're not costs enormous energy and cuts you off from the help available to you. Acknowledging difficulty is not weakness — it is the first accurate assessment of your situation. You cannot navigate from a position you're lying about. Name what's hard, allow it to be hard, then ask: what is the smallest thing I can do from here that moves me slightly forward?"},
+  {icon:"🏁",color:"var(--rose)",title:"Don't Give Up",body:"Giving up too early is the single most common reason for failure — not incompetence, not bad luck, not the wrong idea. Most people quit right before the compounding would have kicked in. Before you quit anything, ask: am I quitting because this genuinely isn't working, or am I quitting because it's hard right now and harder than I expected? Those are two very different situations requiring two very different responses."},
+];
+
+const TENX_PRINCIPLES=[
+  {
+    title:"Consistency Beats Intensity",
+    icon:"📅",
+    color:"var(--gold)",
+    body:"The person who shows up every day at 70% outperforms the person who shows up at 100% three times a week. Consistency is not glamorous. It does not make good Instagram content. But it is what separates the person who makes it from the person who almost made it. Design your work so that your worst day is still enough to move forward.",
+  },
+  {
+    title:"Focus on Process, Not Outcome",
+    icon:"🔬",
+    color:"var(--teal)",
+    body:"Outcomes are the result of a thousand process decisions you made when no one was watching. Obsessing over results without controlling inputs is anxiety, not strategy. Define the exact behaviors that produce your goal, then measure those behaviors daily. The outcome becomes the inevitable consequence of a well-executed process, not something you achieve by wanting it harder.",
+  },
+  {
+    title:"Remove Friction from Good Habits",
+    icon:"✂️",
+    color:"#9b72cf",
+    body:"You do not rise to the level of your motivation — you fall to the level of your environment. If good habits require willpower every time, they will fail eventually. Make them the default: gym clothes by the bed, healthy food at the front of the fridge, phone in another room during deep work, book on your pillow. Every point of friction you remove is 5 years of sustained behavior you gain.",
+  },
+  {
+    title:"Get Feedback Fast",
+    icon:"⚡",
+    color:"var(--rose)",
+    body:"Slow feedback loops are expensive. The faster you can test an idea and learn from reality, the faster you improve. Ship small, learn fast, adjust early. Every week of building without feedback is a week of potentially going in the wrong direction. Build a feedback mechanism into everything you do: test your ideas with real people, show your work before it's ready, and value honest criticism over comfortable silence.",
+  },
+  {
+    title:"Learn from People Ahead of You",
+    icon:"🔭",
+    color:"var(--gold)",
+    body:"You can compress 10 years of someone's experience into 3 hours of honest conversation. Stop learning exclusively from peers who are at the same level as you — you will all discover the same things at the same time. Find people who are 5–10 years ahead on the specific path you're on, and learn what they know about the phase you're currently in. This is not networking for status — it is intelligence gathering for your own journey.",
+  },
+  {
+    title:"Eliminate Distractions — Shape Your Environment",
+    icon:"🎯",
+    color:"var(--teal)",
+    body:"Focus is less about willpower and more about environment. You cannot out-discipline a phone that is designed by a team of engineers to be more addictive than your goals. Stop trying to resist your phone and start designing a life where it has less access to you. Remove apps that steal time. Turn off all non-essential notifications. Put the phone in another room during your most important 2 hours of the day. What you don't see, you don't reach for.",
+    callout:{
+      label:"Try This Starting Today",
+      items:[
+        "Delete any app that you open out of boredom rather than intention — not forever, just for 30 days.",
+        "Turn off all notifications except calls and messages from specific people. Every other notification is someone else's agenda interrupting yours.",
+        "Set your phone to grayscale. Color is an attention tool. Grayscale removes 40% of the addictive pull.",
+        "Create a physical 'phone-free zone' in your home — your desk during work hours, your dinner table, your bed.",
+      ],
+    },
+  },
+];
+
+function MindsetTenXModule({formData}){
+  const [openPrinciple,setOpenPrinciple]=useState(null);
+  const [openTenX,setOpenTenX]=useState(null);
+  const [tab,setTab]=useState("mindset"); // "mindset" | "tenx"
+  return(
+    <div className="fu">
+      {/* Hero */}
+      <div style={{marginBottom:24,padding:"22px 24px",background:"linear-gradient(135deg,rgba(155,114,207,0.08),rgba(31,168,154,0.04))",border:"1px solid rgba(155,114,207,0.2)",borderRadius:16,textAlign:"center"}}>
+        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".15em",marginBottom:8}}>MENTAL OPERATING SYSTEM</div>
+        <div className="d3" style={{marginBottom:8}}>
+          Build a Mind That Doesn&apos;t Break{formData?.name?`, ${formData.name}`:""}
+        </div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,maxWidth:480,margin:"0 auto"}}>
+          A strong mindset is not a personality trait. It is a set of practiced habits applied consistently —
+          especially when you don&apos;t feel like it.
+          {formData?.challenge?` Specifically built for someone dealing with: "${formData.challenge.slice(0,70)}${formData.challenge.length>70?"…":""}".`:""}
+        </p>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:24,padding:"4px",background:"var(--midnight)",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)"}}>
+        {[{id:"mindset",label:"Strong Mindset"},{id:"tenx",label:"10x Principles"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all .2s",
+              background:tab===t.id?"var(--lift)":"none",
+              color:tab===t.id?"var(--cream)":"var(--cream-40)"}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* STRONG MINDSET */}
+      {tab==="mindset"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {MINDSET_PRINCIPLES.map((p,i)=>{
+            const isOpen=openPrinciple===i;
+            return(
+              <div key={i} style={{background:"var(--lift)",borderRadius:14,border:`1px solid ${isOpen?p.color:"rgba(255,255,255,0.06)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+                <button onClick={()=>setOpenPrinciple(o=>o===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left"}}>
+                  <div style={{width:38,height:38,borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.icon}</div>
+                  <div style={{flex:1,fontSize:14,fontWeight:600,color:isOpen?p.color:"var(--cream)"}}>{p.title}</div>
+                  <div style={{color:"var(--cream-30)",fontSize:16,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+                </button>
+                {isOpen&&(
+                  <div style={{padding:"0 18px 18px"}}>
+                    <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:14}}/>
+                    <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:12}}>{p.body}</p>
+                    <AudioPlayer text={`${p.title}: ${p.body}`} label="Listen" mini={false}/>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 10X PRINCIPLES */}
+      {tab==="tenx"&&(
+        <>
+          <div style={{marginBottom:20}}>
+            <div className="d3" style={{marginBottom:8}}>Simple Principles That Make You 10x Better at Anything</div>
+            <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.65}}>These are not motivational quotes. They are operating instructions for performance — drawn from the research on how elite performers actually think and work.</p>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {TENX_PRINCIPLES.map((p,i)=>{
+              const isOpen=openTenX===i;
+              return(
+                <div key={i} style={{background:"var(--lift)",borderRadius:14,border:`1px solid ${isOpen?p.color:"rgba(255,255,255,0.06)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+                  <button onClick={()=>setOpenTenX(o=>o===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left"}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.icon}</div>
+                    <div style={{flex:1,fontSize:14,fontWeight:600,color:isOpen?p.color:"var(--cream)"}}>{p.title}</div>
+                    <div style={{color:"var(--cream-30)",fontSize:16,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+                  </button>
+                  {isOpen&&(
+                    <div style={{padding:"0 18px 18px"}}>
+                      <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:14}}/>
+                      <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:12}}>{p.body}</p>
+                      {p.callout&&(
+                        <div style={{padding:"14px 16px",background:`${p.color}08`,border:`1px solid ${p.color}25`,borderRadius:12,marginBottom:12}}>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:10}}>{p.callout.label.toUpperCase()}</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {p.callout.items.map((item,ci)=>(
+                              <div key={ci} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                                <span style={{color:p.color,fontSize:10,marginTop:3,flexShrink:0}}>◎</span>
+                                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{item}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <AudioPlayer text={`${p.title}. ${p.body}`} label="Listen" mini={false}/>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -5526,8 +6027,47 @@ Write ONE single sentence — something true and specific to them that they woul
 
       <div style={{padding:"36px 0"}}>
         <div className="cx-md">
-          <div className="tabs" style={{marginBottom:32}}>
-            {MODULES.map(m=><button key={m.id} className={`tab ${mod===m.id?"on":""}`} onClick={()=>setMod(m.id)}><span>{m.icon}</span><span>{m.label}</span></button>)}
+          {/* ── TAB BAR: grouped, horizontally scrollable ─────────────────── */}
+          <div style={{marginBottom:32,overflowX:"auto",WebkitOverflowScrolling:"touch",
+            scrollbarWidth:"none",msOverflowStyle:"none",
+            // hide scrollbar on webkit
+            }}>
+            <style>{".tab-scroll::-webkit-scrollbar{display:none}"}</style>
+            <div className="tab-scroll" style={{display:"flex",flexDirection:"column",gap:0,minWidth:"max-content"}}>
+              {MODULE_GROUPS.map(group=>(
+                <div key={group.group} style={{display:"flex",flexDirection:"column",gap:0,marginBottom:6}}>
+                  {/* Group label */}
+                  <div style={{
+                    fontSize:"8px",fontFamily:"var(--f-mono)",
+                    color:group.color,letterSpacing:".14em",
+                    padding:"0 4px 4px 6px",textTransform:"uppercase",
+                    display:"flex",alignItems:"center",gap:6,
+                  }}>
+                    <div style={{flex:"0 0 16px",height:1,background:group.color,opacity:.4}}/>
+                    {group.group}
+                    <div style={{flex:1,height:1,background:group.color,opacity:.15}}/>
+                  </div>
+                  {/* Tabs in this group */}
+                  <div style={{display:"flex",gap:5,flexWrap:"nowrap"}}>
+                    {group.items.map(m=>(
+                      <button key={m.id}
+                        className={`tab ${mod===m.id?"on":""}`}
+                        onClick={()=>setMod(m.id)}
+                        style={{
+                          borderColor:mod===m.id?group.color:"transparent",
+                          whiteSpace:"nowrap",
+                          ...(mod===m.id?{
+                            background:`${group.color}14`,
+                            color:group.color,
+                          }:{}),
+                        }}>
+                        <span>{m.icon}</span><span>{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {mod==="today"&&(
@@ -5575,6 +6115,9 @@ Write ONE single sentence — something true and specific to them that they woul
             {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="invest"&&<InvestInYourselfModule formData={formData}/>}
+            {mod==="success"&&<DisgustinglySuccessfulModule formData={formData}/>}
+            {mod==="mindset10x"&&<MindsetTenXModule formData={formData}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
@@ -6382,11 +6925,6 @@ export default function DestinIQ(){
   const [rateLimited, setRateLimited]=useState(false);
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
-  // Tracks which user id we've already fully restored. Auth events (SIGNED_IN,
-  // TOKEN_REFRESHED, INITIAL_SESSION) fire repeatedly for the SAME user — notably
-  // every time the tab regains focus — so we use this to restore (and touch the
-  // `screen`) exactly once per user and ignore the redundant re-fires.
-  const restoredUidRef = useRef(null);
 
   // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
   const restoreUserSession = async (supaUser) => {
@@ -6415,20 +6953,8 @@ export default function DestinIQ(){
 
     // Load saved profile (onboarding answers + subscription)
     try{
-      const result = await loadUserProfileWithRetry(u.id);
-
-      if (result.status === "error") {
-        // ── CRITICAL: a failed READ must NEVER be mistaken for a new user. ──
-        // Sending an onboarded user to "intake" here was the bug that made
-        // onboarding re-appear after a refresh / tab-refocus. Show a retry
-        // screen instead; their saved data is untouched.
-        console.warn("restoreUserSession profile read failed:", result.error?.message||result.error);
-        setScreen("loaderror");
-        return;
-      }
-
-      if (result.status === "ok") {
-        const profile = result.profile;
+      const profile = await loadUserProfile(u.id);
+      if (profile) {
         if (profile.is_paid)    setIsPaid(true);
         if (profile.is_premium) setIsPremium(true);
         if (profile.streak){
@@ -6450,119 +6976,73 @@ export default function DestinIQ(){
         }
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
-        // ── Restore exactly where they left off ──
-        // Onboarding (intake) is shown ONLY when onboarding is genuinely
-        // incomplete — i.e. there is no saved report yet. A returning user with
-        // a completed report always goes straight to the dashboard, and a
-        // signed-in user never sees the marketing landing page.
+        // ── CRITICAL: Always restore exactly where they left off ──
+        // Signed-in users must NEVER see the marketing landing page — only
+        // brand-new users (no saved onboarding data) see the welcome/intake form.
         if (profile.form_data && profile.report) {
+          // Has both — go straight to the dashboard
           setScreen("results");
         } else {
-          // Row exists but onboarding wasn't finished (e.g. report generation
-          // was interrupted). Intake pre-fills from savedFormData, so nothing
-          // is lost.
+          // Either no onboarding data yet, or it exists but report generation
+          // was interrupted — either way, send to intake (it pre-fills from
+          // savedFormData, so nothing is lost) instead of the landing page.
           setScreen("intake");
         }
       } else {
-        // status === "new": definitively no profile row → genuine new user.
+        // No profile row yet at all — brand-new user, show the welcome/intake form.
         setScreen("intake");
       }
     }catch(e){
-      // Unexpected throw — treat as a read failure, not a new user.
-      console.warn("restoreUserSession unexpected error:",e.message);
-      setScreen("loaderror");
+      console.warn("restoreUserSession profile load error:",e.message);
+      // Even on error, never fall back to showing the landing page to a signed-in user.
+      setScreen("intake");
     }finally{
       setProfileLoading(false);
     }
   };
 
   useEffect(()=>{
-    let active = true;
-
-    // Single source of truth for routing on auth changes. Called by both the
-    // initial getSession() and every onAuthStateChange event, but it restores
-    // (and changes `screen`) ONLY when the signed-in user actually changes.
-    const handleSession = async (session, event) => {
-      if(!active) return;
-
+    // Check for an existing session on mount (handles OAuth redirects too).
+    // IMPORTANT: we await restoreUserSession before clearing authLoading so the
+    // app never flashes the landing page before we know the user is logged in.
+    supabase.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
-        const uid = session.user.id;
+        await restoreUserSession(session.user);
+      }
+      setAuthLoading(false);
+    });
 
-        // Restore once per user. Re-fires of SIGNED_IN / TOKEN_REFRESHED /
-        // INITIAL_SESSION for the SAME user (e.g. on tab refocus or a silent
-        // token refresh) are ignored here, so they can no longer reset `screen`
-        // and bounce the user back to onboarding/landing.
-        if(restoredUidRef.current !== uid){
-          restoredUidRef.current = uid;
-          await restoreUserSession(session.user);
-        }
-
-        // Referral tracking only on a genuine interactive sign-in.
-        if(event==="SIGNED_IN"&&typeof window!=="undefined"){
+    // Listen for sign-in / sign-out events (including OAuth callback)
+    const{data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,session)=>{
+      if(session?.user){
+        restoreUserSession(session.user);
+        // Track referral if URL has ?ref=
+        if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
           const ref=new URLSearchParams(window.location.search).get("ref");
+          // Basic UUID validation + don't let someone refer themselves
           const isValidUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref||"");
-          if(isValidUUID&&ref!==uid){
+          if(isValidUUID&&ref!==session.user.id){
             try{
-              const{error:refErr}=await supabase.from("referrals").insert({referrer_id:ref,referred_id:uid});
+              // insert will silently fail if it violates the unique(referred_id) constraint — that's fine,
+              // it just means this user was already recorded as referred before
+              const{error:refErr}=await supabase.from("referrals").insert({referrer_id:ref,referred_id:session.user.id});
               if(refErr) console.warn("Referral insert:",refErr.message);
             }catch(_){ /* referral already recorded or insert failed — ignore */ }
             window.history.replaceState({},"",window.location.pathname);
           }
         }
       } else {
-        // No session. Only tear down + route to landing on a GENUINE sign-out
-        // (we previously had a user). On a first load with no session we must
-        // NOT clobber a screen the user navigated to (e.g. they clicked "auth").
-        const wasSignedIn = restoredUidRef.current !== null;
-        restoredUidRef.current = null;
-        if(wasSignedIn){
-          setUser(null);
-          setUserId(null);
-          setFormData(null);
-          setReport(null);
-          setIsPaid(false);
-          setIsPremium(false);
-          setScreen("landing");
-        }
+        setUser(null);
+        setUserId(null);
+        setFormData(null);
+        setReport(null);
+        setIsPaid(false);
+        setIsPremium(false);
+        setScreen("landing");
       }
-      setAuthLoading(false);
-    };
-
-    // onAuthStateChange emits INITIAL_SESSION with the stored session right after
-    // construction, so this also handles the "already signed in, just refreshed"
-    // and OAuth-redirect cases.
-    const{data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
-      handleSession(session, event);
     });
-
-    // Fallback in case INITIAL_SESSION is slow to fire — the uid guard above
-    // guarantees this can't cause a duplicate restore.
-    supabase.auth.getSession().then(({data:{session}})=>{
-      handleSession(session, "INITIAL_SESSION");
-    });
-
-    return()=>{ active=false; subscription.unsubscribe(); };
+    return()=>subscription.unsubscribe();
   },[]);
-
-  // ── SCREEN NORMALIZER ───────────────────────────────────────────────────
-  // Keeps the signed-in user on a valid screen for their data, WITHOUT calling
-  // setScreen() during render. Runs only once auth + profile are settled.
-  //  • A signed-in user must never sit on the marketing landing page.
-  //  • A user with a completed report must never be shown the onboarding form
-  //    (this is the "onboarding only once" guarantee).
-  //  • `loaderror` is left alone — it has its own Retry flow and must not be
-  //    silently downgraded to onboarding.
-  useEffect(()=>{
-    if(authLoading||profileLoading||!user||screen==="loaderror") return;
-    if(screen==="landing"){
-      setScreen(formData&&report?"results":"intake");
-    } else if(screen==="intake"&&formData&&report){
-      setScreen("results");
-    } else if(screen==="results"&&!formData){
-      // results needs data; only a genuinely data-less user falls back to intake
-      setScreen("intake");
-    }
-  },[authLoading,profileLoading,user,screen,formData,report]);
 
   // Silently fetch IP location as soon as app loads
   useEffect(()=>{
@@ -6848,16 +7328,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             {screen==="auth"
               ? <AuthScreen onAuth={async(u)=>{
                     if(u.isNew) triggerWelcomeEmail(u);
-                    // Claim this uid before restoring so the SIGNED_IN event that
-                    // signInWithPassword/signUp/verifyOtp also fires won't trigger
-                    // a second, racing restore.
-                    restoredUidRef.current = u.id;
                     await restoreUserSession({
                       id:u.id,email:u.email,phone:u.phone,
                       user_metadata:{name:u.name,full_name:u.name},
                       app_metadata:{provider:u.provider},
                     });
-                    setAuthLoading(false);
                   }}
                   onBack={()=>setScreen("landing")}
                 />
@@ -6943,7 +7418,6 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           onBack={()=>setShowProfile(false)}
           onSignOut={async()=>{
             await supabase.auth.signOut();
-            restoredUidRef.current=null;
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
             setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
@@ -6962,26 +7436,14 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
-        {/* Routing is decided in restoreUserSession + the screenNormalizer effect
-            below — NOT with setScreen() calls during render (that anti-pattern
-            fought the auth listener and caused redirect oscillation). Here we
-            only render the screen the state already resolved to. */}
-        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
+        {/* Signed-in users never see the marketing landing page — redirect straight to intake or results */}
+        {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
+        {screen==="landing"  &&!(formData&&report)&&(setScreen("intake"),null)}
+        {/* Redirect intake→results if report already exists (prevent re-onboarding) */}
+        {screen==="intake"   &&formData&&report&&(setScreen("results"),null)}
+        {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
-        {screen==="loaderror"&&(
-          <div style={{minHeight:"70vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,textAlign:"center",padding:24}}>
-            <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em"}}>Couldn't load your account</div>
-            <p style={{fontSize:14,color:"var(--cream-60)",maxWidth:340,lineHeight:1.6}}>We couldn't reach your saved profile right now. Your data is safe — this is just a connection issue.</p>
-            <button className="btn btn-gold" onClick={()=>{
-              restoredUidRef.current=null;
-              setScreen("landing"); // neutral placeholder; the retry re-resolves it
-              supabase.auth.getSession().then(({data:{session}})=>{
-                if(session?.user){ restoredUidRef.current=session.user.id; restoreUserSession(session.user); }
-              });
-            }}>Retry</button>
-          </div>
-        )}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
@@ -6994,6 +7456,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             </div>
           </div>
         )}
+        {/* If somehow on results with no formData, send to intake (never landing for a signed-in user) */}
+        {screen==="results"  &&!formData&&(setScreen("intake"),null)}
 
         {showNotif&&formData&&(
           <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
