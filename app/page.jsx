@@ -4746,7 +4746,7 @@ function HabitTrackerPanel({userId, onClose, onNavigate}){
           {displayed.length===0&&(
             <div style={{textAlign:"center",padding:"40px 20px",color:"var(--cream-30)",fontSize:13}}>
               {filter==="all"
-                ? "No practices committed yet. Open any module and tap 'I'm doing this'."
+                ? "No practices committed yet. Open any module and tap \"I'm doing this\"."
                 : `No ${filter} practices yet.`}
             </div>
           )}
@@ -8584,32 +8584,6 @@ export default function DestinIQ(){
     return()=>window.removeEventListener("popstate",onPopState);
   },[showProfile,showAdmin,showShare,showNotif,showPolicy,screen,formData,report]);
 
-  // ── ROUTING GUARD useEffect ────────────────────────────────────────────
-  // Handles edge-case screen corrections AFTER state settles.
-  // This is the ONLY safe place to call setScreen based on state values —
-  // never call setScreen during render.
-  useEffect(()=>{
-    if(authLoading || profileLoading) return; // wait for auth + profile to load
-    if(!user) return;                          // unauthenticated — landing handles itself
-
-    // If user has both form_data and report, always show results — never intake or landing
-    if(formData && report && (screen==="intake" || screen==="landing")){
-      setScreen("results");
-      return;
-    }
-    // If on results but somehow no data, send to intake (not landing — user is logged in)
-    if(screen==="results" && !formData){
-      setScreen("intake");
-      return;
-    }
-    // If on landing but user is logged in, redirect appropriately
-    if(screen==="landing" && user){
-      setScreen(formData && report ? "results" : "intake");
-      return;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[authLoading, profileLoading, user, formData, report, screen]);
-
   const handleSubmit=useCallback(async(f)=>{
     try{
     if(!userId) return;
@@ -8937,6 +8911,14 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             restoreUserSession is the single source of routing truth on load/refresh.
             The useEffect below handles any edge-case redirects safely.
         ──────────────────────────────────────────────────────────────────────── */}
+        {/* landing screen for logged-in users — shows only for the brief moment
+            before restoreUserSession runs and sets the correct screen.
+            Shows a spinner rather than a blank page. */}
+        {screen==="landing"  &&(
+          <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{width:36,height:36,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+          </div>
+        )}
         {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
