@@ -150,6 +150,7 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ERROR BOUNDARY
@@ -182,8 +183,6 @@ class ErrorBoundary extends React.Component {
 // SUPABASE CLIENT
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
 // ═══════════════════════════════════════════════════════════════════════════════
-import { createClient } from "@supabase/supabase-js";
-
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA"
@@ -265,29 +264,22 @@ async function saveUserProfile(userId, data) {
   if (error) throw new Error(error.message);
 }
 
-/** Load user profile from Supabase. Returns null if not found.
- *  Uses maybeSingle() so "no rows" is not an error.
- *  Retries once on network failure to survive flaky connections. */
+/** Load user profile from Supabase. Returns null if not found or on error. */
 async function loadUserProfile(userId) {
-  const attempt = async () => {
+  try {
     const { data, error } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("user_id", userId)
-      .maybeSingle();          // null if no row — never throws PGRST116
-    if (error) throw new Error(error.message);
-    return data || null;
-  };
-  try {
-    return await attempt();
-  } catch (e) {
-    // One retry after 1.2s — handles cold-start latency and brief network blips
-    await new Promise(r => setTimeout(r, 1200));
-    try { return await attempt(); }
-    catch (e2) {
-      console.warn("loadUserProfile failed after retry:", e2.message);
-      return null;
+      .single();
+    // PGRST116 = "no rows returned" — not an error, just means new user
+    if (error && error.code !== "PGRST116") {
+      console.warn("loadUserProfile error:", error.message);
     }
+    return data || null;
+  } catch (e) {
+    console.warn("loadUserProfile exception:", e.message);
+    return null;
   }
 }
 
@@ -4746,7 +4738,7 @@ function HabitTrackerPanel({userId, onClose, onNavigate}){
           {displayed.length===0&&(
             <div style={{textAlign:"center",padding:"40px 20px",color:"var(--cream-30)",fontSize:13}}>
               {filter==="all"
-                ? "No practices committed yet. Open any module and tap \"I'm doing this\"."
+                ? "No practices committed yet. Open any module and tap "I'm doing this"."
                 : `No ${filter} practices yet.`}
             </div>
           )}
@@ -8304,17 +8296,7 @@ export default function DestinIQ(){
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
 
-  // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
-  // Prevents concurrent restoreUserSession calls from racing each other.
-  // Only one restore runs at a time — the first one wins.
-  const _restoreInProgress = useRef(false);
-
   const restoreUserSession = async (supaUser) => {
-    // If already restoring (e.g., onAuthStateChange INITIAL_SESSION races getSession),
-    // skip the second call entirely to prevent screen being reset mid-load.
-    if(_restoreInProgress.current) return;
-    _restoreInProgress.current = true;
-
     const u = supaUser;
     const meta = u.user_metadata || {};
     const appUser = {
@@ -8429,9 +8411,6 @@ export default function DestinIQ(){
       setScreen("intake");
     }finally{
       setProfileLoading(false);
-      // Release the lock so future REAL auth events (new sign-in, token refresh)
-      // can trigger a fresh restore if needed
-      _restoreInProgress.current = false;
     }
   };
 
@@ -8445,10 +8424,6 @@ export default function DestinIQ(){
     supabase.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
         await restoreUserSession(session.user);
-      } else {
-        // No session on mount — release the in-progress lock immediately
-        // so that when the user signs in, restoreUserSession can run freely
-        _restoreInProgress.current = false;
       }
       mountRestored = true;
       setAuthLoading(false);
@@ -8461,8 +8436,6 @@ export default function DestinIQ(){
       // Skip INITIAL_SESSION — getSession() above already handles it with await
       if(!mountRestored && (_event==="INITIAL_SESSION")) return;
       if(session?.user){
-        // For actual SIGNED_IN events (new login), always allow a fresh restore
-        if(_event==="SIGNED_IN") _restoreInProgress.current = false;
         restoreUserSession(session.user);
         // Track referral if URL has ?ref=
         if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
@@ -8482,8 +8455,7 @@ export default function DestinIQ(){
       } else {
         // SIGNED_OUT — clear all state AND localStorage paid keys
         // so the next user on this device doesn't inherit paid status
-        _restoreInProgress.current = false; // release lock so next sign-in can restore
-        setUser(null);
+          setUser(null);
         setUserId(null);
         setFormData(null);
         setReport(null);
@@ -8704,7 +8676,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           zero_income_business:fb.zero_income_business, product_business:fb.product_business,
           real_estate_hack:fb.real_estate_hack,
         };
-        await saveUserProfile(userId,{form_data:f,report:fbToSave,is_paid:isPaid,is_premium:isPremium,streak});
+        // NOTE: is_paid/is_premium NOT saved here — payment flow owns those fields
+        await saveUserProfile(userId,{form_data:f,report:fbToSave,streak});
       }catch(_){}
       if(e.message==="API_KEY_MISSING") setApiError("Demo mode: API key not configured. Showing sample report.");
     }
