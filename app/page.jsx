@@ -4746,7 +4746,7 @@ function HabitTrackerPanel({userId, onClose, onNavigate}){
           {displayed.length===0&&(
             <div style={{textAlign:"center",padding:"40px 20px",color:"var(--cream-30)",fontSize:13}}>
               {filter==="all"
-                ? "No practices committed yet. Open any module and tap "I'm doing this"."
+                ? "No practices committed yet. Open any module and tap 'I'm doing this'."
                 : `No ${filter} practices yet.`}
             </div>
           )}
