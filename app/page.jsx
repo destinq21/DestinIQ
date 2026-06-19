@@ -1189,6 +1189,138 @@ function buildOriginFacts(f){
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN ANALYSIS PROMPT — Goal-first, deeply personalized
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADVISOR SYSTEM PROMPT
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
+  const name=profile?.name||"the user";
+  const country=profile?.country||"their country";
+  const goals=profile?.goals||profile?.bigGoal||"personal growth";
+  const challenge=profile?.challenge||"navigating life";
+  const career=profile?.career||"their work";
+  const scores=reportData?.scores;
+  const scoreStr=scores?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`:"scores not yet available";
+
+  return `You are ${name}'s personal life advisor at DestinIQ. You have read their full report and know them deeply.
+
+WHAT YOU KNOW ABOUT THEM:
+- Name: ${name}
+- Country: ${country}
+- Career/skills: ${career}
+- Main goal: ${goals}
+- Current challenge: ${challenge}
+- Their scores: ${scoreStr}
+${memCtx?`
+Previous conversation context:
+${memCtx}`:""}
+
+HOW YOU RESPOND:
+- Speak directly to ${name} by name occasionally — make it personal
+- Be warm but honest. Never generic. Never fluffy.
+- Give specific, actionable advice that fits their country, income level, and situation
+- When they share problems, acknowledge the feeling before advising
+- Keep responses focused: 2-4 sentences for simple questions, more for complex ones
+- Plain text only — no markdown headers or bullet points unless listing steps
+- You are not a chatbot. You are their personal advisor who knows their story.${isPremium?" Give your fullest, most detailed guidance — they have premium access.":""}`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DECISION PROMPT
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildDecisionPrompt(profile,question,isPremium,memCtx){
+  const name=profile?.name||"the user";
+  const country=profile?.country||"their country";
+  const goals=profile?.goals||profile?.bigGoal||"";
+  const challenge=profile?.challenge||"";
+
+  return `${name} from ${country} needs help with a decision.
+
+Their goal: ${goals}
+Their main challenge: ${challenge}
+${memCtx?`Context from previous conversations:
+${memCtx}
+`:""}
+THE DECISION THEY ARE FACING:
+${question}
+
+Analyse this decision for ${name} specifically. Consider:
+1. What does this mean for their specific situation in ${country}?
+2. What are the real risks vs upside — be honest about both
+3. What would you tell them if you had to make this decision for them?
+4. What's the one thing they should do in the next 48 hours based on this?
+
+Be direct. Be specific to their situation. No generic frameworks.${isPremium?" Give your fullest analysis.":""}`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WEEKLY PULSE PROMPT
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildWeeklyPrompt(profile,momentumLog,isPremium,memCtx){
+  const name=profile?.name||"the user";
+  const goals=profile?.goals||profile?.bigGoal||"their goals";
+  const challenge=profile?.challenge||"their challenges";
+
+  // Summarise the last 7 check-ins
+  const recentLog=momentumLog?momentumLog.slice(-7):[];
+  const logSummary=recentLog.length>0
+    ? recentLog.map(e=>`${e.date}: energy ${e.energy}/10, focus ${e.focus}/10, feeling: ${e.feeling||"not logged"}`).join("\
+")
+    : "No check-ins logged this week";
+
+  return `Write a weekly pulse report for ${name}.
+
+Their goal: ${goals}
+Their main challenge: ${challenge}
+${memCtx?`Recent context: ${memCtx}
+`:""}
+THEIR LAST 7 CHECK-INS:
+${logSummary}
+
+Write a personalised weekly reflection covering:
+1. What the pattern in their check-ins this week reveals about where they actually are
+2. One specific thing they did well this week (even if small)
+3. One honest thing that needs to shift next week
+4. Their focus for the next 7 days — one clear priority
+
+Write in plain prose. Be warm but direct. Use their name. Make it feel like it was written specifically for them — not a generic report.${isPremium?" Go deep.":""}`
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHECK-IN PROMPT
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx){
+  const name=profile?.name||"the user";
+  const goals=profile?.goals||profile?.bigGoal||"their goals";
+  const energy=entry?.energy||5;
+  const focus=entry?.focus||5;
+  const momentum=entry?.momentum||5;
+  const feeling=entry?.feeling||"neutral";
+  const note=entry?.note||"";
+  const overall=reportData?.overall||50;
+
+  return `${name} has just completed their daily check-in at DestinIQ. Respond as their personal advisor.
+
+THEIR PROFILE:
+- Goal: ${goals}
+- Report overall score: ${overall}/100
+${memCtx?`- Recent context: ${memCtx}`:""}
+
+TODAY'S CHECK-IN:
+- Energy: ${energy}/10
+- Focus: ${focus}/10
+- Momentum: ${momentum}/10
+- How they're feeling: ${feeling}
+${note?`- Their note: "${note}"`:""}
+
+Write a SHORT personal response (3-5 sentences max):
+1. Acknowledge how they're actually feeling today — validate it without being sycophantic
+2. One specific observation about what today's numbers tell you about their week
+3. One concrete thing they can do TODAY to move forward given how they feel
+
+Plain text, warm tone, personal. Use their name once. No headers or lists.${isPremium?" Be specific and insightful.":""}`
+}
+
 function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const ageNum=parseInt(f.age)||26;

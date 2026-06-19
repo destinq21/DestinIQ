@@ -1,116 +1,106 @@
-import { NextRequest, NextResponse } from "next/server";
+/**
+ * /app/api/analyze/route.js
+ *
+ * Next.js App Router API route — handles all AI calls for DestinIQ.
+ * Place this file at:  app/api/analyze/route.js
+ *
+ * Required environment variable (set in Vercel → Settings → Environment Variables):
+ *   ANTHROPIC_API_KEY=sk-ant-...
+ */
 
-export const runtime = "edge"; // faster cold starts on Vercel
+export const runtime = "edge"; // runs on Vercel Edge for lowest latency
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
 
-// Input validation
-function isValidMessages(msgs: unknown): msgs is {role:string;content:string}[] {
-  if (!Array.isArray(msgs) || msgs.length === 0) return false;
-  return msgs.every(
-    (m) =>
-      m &&
-      typeof m === "object" &&
-      typeof (m as any).role === "string" &&
-      typeof (m as any).content === "string" &&
-      ["user","assistant"].includes((m as any).role) &&
-      (m as any).content.length > 0 &&
-      (m as any).content.length <= 8000
-  );
-}
-
-export async function POST(req: NextRequest) {
-  // ── 1. Parse + validate body ────────────────────────────────────────────────
-  let body: any;
+export async function POST(request: Request) {
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    // ── Parse request body ──────────────────────────────────────────────────
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-  const { system, messages, max_tokens } = body ?? {};
+    const { system, messages, max_tokens = 1800, model, tools } = body;
 
-  if (!system || typeof system !== "string" || system.length < 10) {
-    return NextResponse.json({ error: "Missing or invalid system prompt" }, { status: 400 });
-  }
-  if (!isValidMessages(messages)) {
-    return NextResponse.json({ error: "Invalid messages array" }, { status: 400 });
-  }
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return Response.json({ error: "messages array is required" }, { status: 400 });
+    }
 
-  // Clamp max_tokens: free=1800, premium=4000, hard ceiling=4096
-  const tokensRaw = typeof max_tokens === "number" ? max_tokens : 1800;
-  const tokens = Math.min(Math.max(tokensRaw, 100), 4096);
+    // ── Build the Anthropic request ─────────────────────────────────────────
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) {
+      console.error("ANTHROPIC_API_KEY is not set");
+      return Response.json(
+        { error: "API key not configured. Please set ANTHROPIC_API_KEY in Vercel environment variables." },
+        { status: 500 }
+      );
+    }
 
-  // ── 2. Check API key ─────────────────────────────────────────────────────────
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
-    return NextResponse.json(
-      { error: "API key not configured. Add ANTHROPIC_API_KEY to your environment variables." },
-      { status: 500 }
-    );
-  }
+    const anthropicBody = {
+      model: model || MODEL,
+      max_tokens: Math.min(max_tokens, 8000), // cap at 8000
+      messages,
+      ...(system ? { system } : {}),
+      ...(tools ? { tools } : {}),
+    };
 
-  // ── 3. Call Anthropic ────────────────────────────────────────────────────────
-  try {
-    const anthropicRes = await fetch(ANTHROPIC_API, {
+    // ── Call Anthropic ──────────────────────────────────────────────────────
+    const anthropicRes = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
+        "x-api-key": anthropicKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "interleaved-thinking-2025-05-14",
       },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: tokens,
-        system: system.slice(0, 10000), // safety cap on system prompt
-        messages: messages.map((m) => ({
-          role: m.role,
-          content: String(m.content).slice(0, 8000), // safety cap per message
-        })),
-      }),
+      body: JSON.stringify(anthropicBody),
     });
 
     if (!anthropicRes.ok) {
-      const err = await anthropicRes.json().catch(() => ({}));
-      const msg = (err as any)?.error?.message ?? `Anthropic API error ${anthropicRes.status}`;
-      console.error("Anthropic error:", msg);
-
-      // Specific status codes the client cares about
-      if (anthropicRes.status === 401) {
-        return NextResponse.json({ error: "API_KEY_INVALID" }, { status: 401 });
-      }
-      if (anthropicRes.status === 429) {
-        return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
-      }
-      return NextResponse.json({ error: msg }, { status: 502 });
+      const errText = await anthropicRes.text().catch(() => "unknown error");
+      console.error("Anthropic error:", anthropicRes.status, errText);
+      return Response.json(
+        { error: `Anthropic API error: ${anthropicRes.status}` },
+        { status: 502 }
+      );
     }
 
     const data = await anthropicRes.json();
-    const text: string =
-      (data.content ?? [])
-        .filter((b: any) => b.type === "text")
-        .map((b: any) => b.text as string)
-        .join("") ?? "";
 
-    if (!text) {
-      return NextResponse.json({ error: "Empty response from model" }, { status: 502 });
+    // ── Extract text from content blocks ────────────────────────────────────
+    // Handle both simple text responses and tool_use responses
+    if (data.content && Array.isArray(data.content)) {
+      type ContentBlock = { type?: string; text?: string };
+      const content = data.content as ContentBlock[];
+
+      // For tool-use responses (like web search), return the full content array
+      const hasToolUse = content.some((b) => b.type === "tool_use" || b.type === "tool_result");
+      if (hasToolUse || tools) {
+        return Response.json({ content, text: content.filter((b) => b.type === "text").map((b) => b.text).join("\n") });
+      }
+
+      // For regular text responses, extract and join text blocks
+      const text = content
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+
+      if (!text) {
+        return Response.json({ error: "Empty response from AI" }, { status: 502 });
+      }
+
+      return Response.json({ text, content });
     }
 
-    // ── 4. Return clean response ───────────────────────────────────────────────
-    return NextResponse.json({ text });
+    return Response.json({ error: "Unexpected response format" }, { status: 502 });
 
-  } catch (err: any) {
-    console.error("Analyze route error:", err);
-    return NextResponse.json(
-      { error: err?.message ?? "Internal server error" },
+  } catch (err: unknown) {
+    console.error("API route error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return Response.json(
+      { error: message || "Internal server error" },
       { status: 500 }
     );
   }
-}
-
-// Block every method except POST
-export async function GET() {
-  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
 }
