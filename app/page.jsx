@@ -100,8 +100,6 @@
  *   is_paid     boolean default false,
  *   is_premium  boolean default false,
  *   streak      int default 1,
- *   last_checkin_date text,
- *   notif_time  text,
  *   paystack_ref text,
  *   paid_plan   text,
  *   paid_at     timestamptz,
@@ -267,12 +265,30 @@ async function saveUserProfile(userId, data) {
   if (error) throw new Error(error.message);
 }
 
-/** Load user profile from Supabase. Returns null if not found. */
+/** Load user profile from Supabase. Returns null if not found.
+ *  Uses maybeSingle() so "no rows" is not an error.
+ *  Retries once on network failure to survive flaky connections. */
 async function loadUserProfile(userId) {
-  try {
-    const { data } = await supabase.from("user_profiles").select("*").eq("user_id", userId).single();
+  const attempt = async () => {
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();          // null if no row — never throws PGRST116
+    if (error) throw new Error(error.message);
     return data || null;
-  } catch (e) { return null; }
+  };
+  try {
+    return await attempt();
+  } catch (e) {
+    // One retry after 1.2s — handles cold-start latency and brief network blips
+    await new Promise(r => setTimeout(r, 1200));
+    try { return await attempt(); }
+    catch (e2) {
+      console.warn("loadUserProfile failed after retry:", e2.message);
+      return null;
+    }
+  }
 }
 
 /** Upsert a weekly report. */
@@ -292,9 +308,9 @@ const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; 
 // in the world are accepted and settle automatically. We just SHOW the price
 // converted to the user's local currency so it feels native to them.
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"GHS9/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:15,  label:"GHS15/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:99,  label:"GHS99/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"₵9/month",  currency:"GHS" },
+  pro:    { name:"Premium",   amount:15,  label:"₵15/month", currency:"GHS" },
+  annual: { name:"Annual Pro",amount:99,  label:"₵99/year",  currency:"GHS" },
 };
 
 // Approximate USD exchange rates for display purposes only — actual charge
@@ -676,118 +692,84 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .tab span:first-child{font-size:14px;}
 .tab:hover{color:var(--cream-60);}
 .tab.on{background:var(--lift);color:var(--cream);border:1px solid var(--line-gold);}
-@media(max-width:900px){
+/* ── RESPONSIVE BREAKPOINTS ──────────────────────────────────────────────── */
+
+/* Tablet: 641–900px */
+@media(min-width:641px)and(max-width:900px){
+  .cx,.cx-md{padding:0 28px;}
+  .plan-cards-grid{grid-template-columns:1fr 1fr;}
+  .score-explain-grid{grid-template-columns:1fr 1fr;}
+  .notif-3col{grid-template-columns:1fr 1fr;}
   .tabs{grid-template-columns:repeat(5,1fr);}
 }
+/* iPad portrait / large tablet: ≤840px */
+@media(max-width:840px){
+  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
+  .hero-grid>div:first-child{order:1;}
+  .hero-grid>div:last-child{order:2;}
+}
+/* Mobile: ≤640px */
 @media(max-width:640px){
-  .tabs{grid-template-columns:repeat(4,1fr);}
-  .tab{font-size:9.5px;padding:8px 2px;}
-  .tab span:first-child{font-size:13px;}
-  .cx,.cx-sm,.cx-md{padding:0 16px!important;}
-  .d1{font-size:clamp(28px,9vw,52px)!important;}
-  .d2{font-size:clamp(20px,6vw,36px)!important;}
-  .d3{font-size:clamp(17px,5vw,26px)!important;}
-  .card{padding:16px!important;}
+  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
   .nav{padding:0 14px!important;}
-  .fu{padding:0 16px 40px!important;}
+  .card{padding:14px!important;border-radius:14px!important;}
+  .fu{padding:0 0 40px!important;}
+  .d1{font-size:clamp(26px,8vw,48px)!important;line-height:1.1!important;}
+  .d2{font-size:clamp(20px,6vw,34px)!important;}
+  .d3{font-size:clamp(17px,5vw,24px)!important;}
+  .tabs{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px;padding:4px;grid-template-columns:unset;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex-shrink:0;font-size:9.5px;padding:7px 10px;min-width:58px;}
+  .tab span:first-child{font-size:13px;}
+  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tab-bar::-webkit-scrollbar{display:none;}
+  .tab-bar button{font-size:10px!important;padding:7px 10px!important;white-space:nowrap;}
   .results-grid{grid-template-columns:1fr!important;}
-  .score-grid{grid-template-columns:1fr 1fr!important;}
-  .score-explain-grid{grid-template-columns:1fr 1fr!important;}
-  .pillar-wrap{flex-direction:column!important;align-items:stretch!important;}
-  .pillar-wrap>div:last-child{min-width:unset!important;}
-  .nav-r{gap:6px!important;}
-  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
-  .pbar-wrap{width:100%!important;max-width:100%!important;}
-  .mom-stat-grid{grid-template-columns:repeat(3,1fr)!important;}
-  .reloc-grid{grid-template-columns:1fr!important;}
-  .reloc-stats{grid-template-columns:repeat(3,1fr)!important;}
+  .hero-grid{grid-template-columns:1fr!important;gap:28px!important;}
+  .row2{grid-template-columns:1fr!important;}
   .plan-cards-grid{grid-template-columns:1fr!important;}
   .paywall-faq{grid-template-columns:1fr!important;}
   .notif-3col{grid-template-columns:1fr!important;}
-  .decision-card{padding:14px!important;}
-  .timeline-item{padding-left:44px!important;}
-  .t-dot{width:30px!important;height:30px!important;font-size:9px!important;}
-  .score-cards-row{flex-direction:column!important;}
-  .intake-center{padding:0 8px!important;}
-  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
+  .reloc-grid{grid-template-columns:1fr!important;}
+  .score-explain-grid{grid-template-columns:1fr!important;}
+  .score-grid{grid-template-columns:1fr 1fr!important;}
+  .reloc-stats{grid-template-columns:repeat(3,1fr)!important;}
+  .mom-stat-grid{grid-template-columns:repeat(3,1fr)!important;}
+  .pillar-wrap{flex-direction:column!important;align-items:stretch!important;}
+  .pillar-wrap>div:last-child{min-width:unset!important;}
+  .nav-r{gap:5px!important;}
+  .streak-badge{padding:5px 10px!important;font-size:9px!important;}
+  .streak-fire{font-size:13px!important;}
+  .pbar-wrap{width:100%!important;max-width:100%!important;}
+  .lock-gate{padding:16px!important;}
+  .insight{padding:12px 14px!important;}
+  .reloc-header{padding:14px 16px 12px!important;}
+  .reloc-body{padding:14px 16px!important;}
+  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:8px!important;}
 }
+/* Small phones: ≤420px */
 @media(max-width:420px){
-  .tabs{grid-template-columns:repeat(3,1fr);}
-  .d1{font-size:26px!important;}
-  .nav-logo{font-size:15px!important;}
+  .cx,.cx-sm,.cx-md{padding:0 12px!important;}
+  .d1{font-size:clamp(22px,7.5vw,40px)!important;}
+  .d2{font-size:clamp(18px,5.5vw,28px)!important;}
   .card{padding:12px!important;}
+  .nav-logo{font-size:15px!important;}
+  .tab{font-size:9px!important;padding:6px 8px!important;min-width:50px!important;}
   .plan-cards-grid{grid-template-columns:1fr!important;}
 }
-@media(min-width:641px)and(max-width:900px){
-  .cx{padding:0 28px;}
-  .cx-md{padding:0 28px;}
-  .plan-cards-grid{grid-template-columns:1fr 1fr!important;}
-  .score-explain-grid{grid-template-columns:1fr 1fr!important;}
-  .notif-3col{grid-template-columns:1fr 1fr!important;}
+/* Very small screens: ≤360px */
+@media(max-width:360px){
+  .cx,.cx-sm,.cx-md{padding:0 10px!important;}
+  .d1{font-size:22px!important;}
+  .tab{font-size:8.5px!important;padding:5px 6px!important;min-width:44px!important;}
+  .card{padding:10px!important;}
 }
-@media(max-width:840px){
-  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
-  .hero-grid>div:first-child{order:1;}
-  .hero-grid>div:last-child{order:2;}
-}
-@media(max-width:600px){
-  .nav{padding:0 16px;}
-  .card{padding:18px;}
-  .cx,.cx-sm,.cx-md{padding:0 16px;}
-  .reloc-grid{grid-template-columns:1fr;}
-  .reloc-stats{grid-template-columns:repeat(3,1fr);}
-}
-.mom-slider-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
-.mom-slider-label{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-30);width:72px;flex-shrink:0;}
-.mom-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;outline:none;cursor:pointer;}
-.mom-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid var(--void);box-shadow:0 0 6px rgba(0,0,0,0.4);}
-.mom-val{font-family:var(--f-display);font-size:18px;font-weight:500;min-width:24px;text-align:right;}
-.mom-chart{display:flex;align-items:flex-end;gap:5px;height:80px;padding:0 4px;}
-.mom-bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;transition:height .6s cubic-bezier(.4,0,.2,1);position:relative;cursor:default;}
-.mom-bar:hover .mom-bar-tip{opacity:1;}
-.mom-bar-tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line);border-radius:4px;padding:3px 7px;font-family:var(--f-mono);font-size:9px;white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10;}
-.decision-card{background:var(--raised);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:12px;transition:border-color .3s;}
-.decision-card:hover{border-color:var(--line-gold);}
-.notif-panel{background:var(--raised);border:1px solid var(--line-gold);border-radius:16px;padding:24px;}
-.notif-time{width:100%;padding:10px 14px;background:var(--lift);border:1px solid var(--line);border-radius:8px;color:var(--cream);font-family:var(--f-mono);font-size:14px;outline:none;transition:all .25s;}
-.notif-time:focus{border-color:var(--line-gold);}
-.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:16px 0;}
-.week-day{aspect-ratio:1;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:8px;gap:2px;cursor:default;transition:transform .2s;}
-.week-day:hover{transform:scale(1.08);}
-.err-box{padding:12px 16px;background:var(--rose-dim);border:1px solid rgba(196,100,90,.25);border-radius:8px;color:var(--rose);font-size:13px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.tag{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;font-family:var(--f-mono);font-size:9px;letter-spacing:.08em;}
-.tg{background:var(--gold-dim);color:var(--gold);border:1px solid rgba(210,175,90,0.2);}
-.tt{background:var(--teal-dim);color:var(--teal);border:1px solid rgba(31,168,154,0.2);}
-.tr{background:var(--rose-dim);color:var(--rose);border:1px solid rgba(196,100,90,0.2);}
-.tv{background:var(--violet-dim);color:var(--violet);border:1px solid rgba(124,92,191,0.2);}
-.disc{font-size:11px;color:var(--cream-30);font-style:italic;text-align:center;line-height:1.8;padding:32px 24px;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
-@keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 4px currentColor;}50%{opacity:.5;box-shadow:0 0 10px currentColor;}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes slideTestim{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-@media(max-width:640px){
-  .cx{padding:0 16px;}
-  .cx-md{padding:0 16px;}
-  .d1{font-size:clamp(32px,9vw,52px)!important;}
-  .d2{font-size:clamp(22px,6vw,36px)!important;}
-  .card{padding:16px!important;}
-  .nav{padding:0 16px!important;}
-  .fu{padding:0 16px 40px!important;}
-  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .tab-bar button{font-size:10px!important;padding:8px 10px!important;white-space:nowrap;}
-  .results-grid{grid-template-columns:1fr!important;}
-  .score-grid{grid-template-columns:1fr 1fr!important;}
-}
-@media(max-width:400px){
-  .d1{font-size:28px!important;}
-  .nav-logo{font-size:16px!important;}
-}
-@media(max-width:840px){
-  .hero-grid{grid-template-columns:1fr!important;gap:36px!important;}
-  .hero-grid>div:first-child{order:1;}
-  .hero-grid>div:last-child{order:2;}
+/* Notch / safe area (iPhone X+, modern Android) */
+@supports(padding:max(0px)){
+  .nav{
+    padding-left:max(14px,env(safe-area-inset-left))!important;
+    padding-right:max(14px,env(safe-area-inset-right))!important;
+  }
 }
 .fu{animation:fadeUp .5s ease both;}
 .fu1{opacity:0;animation:fadeUp .5s .08s ease both;}
@@ -811,7 +793,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .reloc-stat{text-align:center;padding:12px 8px;background:var(--lift);border-radius:9px;}
 .reloc-stat-val{font-family:var(--f-display);font-size:17px;color:var(--gold);display:block;margin-bottom:3px;}
 .reloc-verdict{padding:14px 16px;border-left:2px solid var(--gold);background:var(--gold-glow);border-radius:0 9px 9px 0;font-size:13px;color:var(--cream-60);font-style:italic;line-height:1.7;}
-@media(max-width:600px){.nav{padding:0 16px;}.card{padding:18px;}.cx,.cx-sm,.cx-md{padding:0 16px;}.reloc-grid{grid-template-columns:1fr;}.reloc-stats{grid-template-columns:repeat(3,1fr);}}
+/* reloc responsive handled in main block above */
 `;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -825,24 +807,56 @@ const PILLARS=[
   {id:"mindset",   label:"Mindset",        color:"#9b72cf"},
   {id:"relations", label:"Relationships",  color:"#c4645a"},
 ];
-const MODULES=[
-  {id:"today",    icon:"◎",  label:"My Report"},
-  {id:"momentum", icon:"⚡",  label:"Daily Check-in"},
-  {id:"wins",     icon:"🏆",  label:"Win Tracker"},
-  {id:"progress", icon:"📈",  label:"My Progress"},
-  {id:"academy",  icon:"🔥",  label:"Growth Academy"},
-  {id:"hacks",    icon:"💡",  label:"Life Hacks"},
-  {id:"money",    icon:"💰",  label:"Money"},
-  {id:"online",   icon:"🌐",  label:"Earn Online"},
-  {id:"business", icon:"🏗️", label:"Start Business"},
-  {id:"decisions",icon:"◈",  label:"Big Decisions"},
-  {id:"weekly",   icon:"↗",  label:"Weekly Pulse"},
-  {id:"roadmap",  icon:"⟶",  label:"My Roadmap"},
-  {id:"mindset",  icon:"◇",  label:"Mindset"},
-  {id:"career",   icon:"◈",  label:"Career Path"},
-  {id:"relocate", icon:"✦",  label:"Relocate"},
-  {id:"advisor",  icon:"⬡",  label:"My Advisor"},
+// Tabs grouped by category — rendered as a single scrollable row
+// but with a thin category label above each group for orientation
+const MODULE_GROUPS=[
+  {
+    group:"Your Dashboard",
+    color:"var(--gold)",
+    items:[
+      {id:"today",    icon:"◎", label:"My Report"},
+      {id:"momentum", icon:"⚡", label:"Check-in"},
+      {id:"wins",     icon:"🏆", label:"Wins"},
+      {id:"progress", icon:"📈", label:"Progress"},
+      {id:"practices",icon:"✓", label:"My Practices"},
+      {id:"weekly",   icon:"↗", label:"Weekly Pulse"},
+    ],
+  },
+  {
+    group:"Make Money",
+    color:"var(--teal)",
+    items:[
+      {id:"money",    icon:"💰", label:"Money"},
+      {id:"online",   icon:"🌐", label:"Earn Online"},
+      {id:"business", icon:"🏗️", label:"Business"},
+      {id:"hacks",    icon:"💡", label:"Life Hacks"},
+    ],
+  },
+  {
+    group:"Level Up",
+    color:"#9b72cf",
+    items:[
+      {id:"invest",    icon:"📊", label:"Invest in You"},
+      {id:"success",   icon:"🔥", label:"Get Successful"},
+      {id:"discipline",icon:"⏰", label:"Daily Discipline"},
+      {id:"mindset10x",icon:"🧠", label:"10x Mindset"},
+      {id:"mindset",   icon:"◇", label:"Inner Mindset"},
+      {id:"career",    icon:"◈", label:"Career Path"},
+    ],
+  },
+  {
+    group:"Plan & Decide",
+    color:"var(--rose)",
+    items:[
+      {id:"roadmap",  icon:"⟶", label:"My Roadmap"},
+      {id:"decisions",icon:"◈", label:"Decisions"},
+      {id:"relocate", icon:"✦", label:"Relocate"},
+      {id:"advisor",  icon:"⬡", label:"My Advisor"},
+    ],
+  },
 ];
+// Flat list kept for backward compatibility (tab persistence, etc.)
+const MODULES = MODULE_GROUPS.flatMap(g=>g.items);
 const LOADING_PHRASES=["Reading what you shared…","Thinking about your situation…","Writing your roadmap…","Looking at what's really possible for you…","Almost there…","One moment more…"];
 
 function urlBase64ToUint8Array(base64String){
@@ -2281,22 +2295,45 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
         metadata: { userId: userId||"", plan:planKey, custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}] },
         callback:async(response)=>{
           console.log("Payment successful:", response.reference);
+
+          // ── STEP 1: Save to localStorage IMMEDIATELY ──────────────────
+          // This means refresh works instantly without waiting for Supabase.
+          // userId comes from the prop passed to Paywall — always available.
+          if(userId){
+            try{
+              localStorage.setItem(`diq_paid_${userId}`, "1");
+              localStorage.setItem(`diq_prem_${userId}`, "1");
+              localStorage.setItem(`diq_paystack_ref_${userId}`, response.reference);
+            }catch(_){}
+          }
+
+          // ── STEP 2: Save to Supabase (the authoritative record) ────────
+          // Try with userId prop first — no need to re-fetch session.
+          // Fall back to session lookup if userId is missing (shouldn't happen).
+          const saveToDb = async(uid) => {
+            await supabase.from("user_profiles").upsert({
+              user_id:    uid,
+              is_paid:    true,
+              is_premium: true,
+              paystack_ref: response.reference,
+              paid_plan:  planKey,
+              paid_at:    new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },{onConflict:"user_id"});
+          };
+
           try{
-            const{data:{session}}=await supabase.auth.getSession();
-            if(session?.user){
-              await supabase.from("user_profiles").upsert({
-                user_id:session.user.id,
-                is_paid:true,
-                is_premium:true,
-                paystack_ref:response.reference,
-                paid_plan:planKey,
-                paid_at:new Date().toISOString(),
-                updated_at:new Date().toISOString(),
-              },{onConflict:"user_id"});
+            if(userId){
+              await saveToDb(userId);
+            } else {
+              const{data:{session}}=await supabase.auth.getSession();
+              if(session?.user) await saveToDb(session.user.id);
             }
           }catch(saveErr){
-            console.warn("Could not save payment to DB:", saveErr.message);
+            console.warn("Supabase payment save failed — localStorage backup active:", saveErr.message);
+            // localStorage backup above means user won't lose access even if this fails
           }
+
           setLoading(false);
           onUnlock(response.reference);
         },
@@ -2866,7 +2903,25 @@ function SupportWidget(){
         .map(m=>({role:m.role,content:m.text||m.content||""}));
       const reply=await callAPI({
         messages:history,
-        system:"You are DestinIQ support. Be warm, concise, and helpful. Use plain text only - no bold, no headers. Numbered lists for steps. If issue needs human review, ask for their email.",
+        system:`You are the DestinIQ in-app support assistant. You are warm, direct, and actually helpful — you never deflect or say "contact support" as your first response.
+
+You know everything about DestinIQ:
+- It is a personal strategy app with AI-generated life reports covering: scores (life, wealth, mindset, relationships), daily check-ins, streak tracking, roadmap, career path, decisions, weekly pulse, earn online, business, relocate, mindset, life hacks, and an AI advisor.
+- Free users get a basic report. Paid users unlock all modules, regeneration, and premium AI.
+- Payments are via Paystack (card + mobile money). Subscription is monthly or annual.
+- Streaks increase by completing a daily check-in each calendar day.
+- Reports are generated by AI using the user's onboarding answers (name, age, country, income, skills, goals, challenges).
+- The relocation module lets users explore moving to other countries with visa info, cost of living, and business setup details.
+- Audio playback uses the browser's built-in text-to-speech — it works in Chrome and Edge, may not work in all browsers.
+- To reset onboarding, the user signs out and signs in again.
+
+HOW TO RESPOND:
+1. Always try to solve the problem yourself first.
+2. Give numbered steps when the solution involves actions.
+3. Only ask for their email if the issue genuinely requires account-level investigation (e.g. payment charged but not reflected after 10 mins).
+4. Never say "please contact support" — YOU are the support. Handle it.
+5. Plain text only — no markdown bold, no headers.
+6. Keep replies under 120 words unless steps require more.`,
         userId:null,isPremium:false,
       });
       setMsgs(m=>[...m,{role:"assistant",text:reply}]);
@@ -3006,6 +3061,61 @@ function SupportWidget(){
   );
 }
 
+// ── Testimonial Marquee — stable component so React never re-mounts it ────────
+// Defined outside Landing so it never resets its CSS animation on re-render.
+function TestimonialMarquee(){
+  return(
+    <div style={{position:"relative",overflow:"hidden",marginBottom:20}}>
+      <style>{`
+        .testim-track{
+          display:flex;
+          gap:14px;
+          width:max-content;
+          animation:slideTestim 40s linear infinite;
+          will-change:transform;
+        }
+        .testim-track:hover{
+          animation-play-state:paused;
+        }
+        @keyframes slideTestim{
+          0%{transform:translateX(0)}
+          100%{transform:translateX(-50%)}
+        }
+      `}</style>
+      <div className="testim-track">
+        {[...ALL_TESTIMONIALS,...ALL_TESTIMONIALS].map((t,i)=>(
+          <div key={i} style={{
+            width:"min(290px,calc(85vw - 16px))",
+            flexShrink:0,
+            background:"var(--night)",
+            border:`1px solid ${i%3===1?"var(--line-gold)":"var(--line)"}`,
+            borderRadius:16,
+            padding:"20px 18px",
+          }}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"var(--gold)",fontFamily:"var(--f-mono)",fontWeight:700,flexShrink:0}}>
+                {(t.name||"?")[0].toUpperCase()}
+              </div>
+              <div>
+                <div className="mono" style={{fontSize:"9px",color:"var(--cream-60)"}}>{t.name}</div>
+                <div style={{display:"flex",gap:1,marginTop:2}}>
+                  {[0,1,2,3,4].map(si=><span key={si} style={{color:"var(--gold)",fontSize:9}}>★</span>)}
+                </div>
+              </div>
+            </div>
+            <p style={{fontSize:12,lineHeight:1.8,color:"var(--cream-60)",fontStyle:"italic",margin:0}}>
+              &ldquo;{t.quote}&rdquo;
+            </p>
+          </div>
+        ))}
+      </div>
+      {/* Fade edges */}
+      <div style={{position:"absolute",top:0,left:0,bottom:0,width:50,background:"linear-gradient(90deg,var(--midnight),transparent)",pointerEvents:"none",zIndex:1}}/>
+      <div style={{position:"absolute",top:0,right:0,bottom:0,width:50,background:"linear-gradient(-90deg,var(--midnight),transparent)",pointerEvents:"none",zIndex:1}}/>
+    </div>
+  );
+}
+
 function Landing({onStart,ipLocation}){
   const [profileIdx, setProfileIdx] = useState(0);
   const [animScores, setAnimScores] = useState({life:0,wealth:0,mindset:0,relations:0});
@@ -3029,14 +3139,10 @@ function Landing({onStart,ipLocation}){
     return ()=>clearInterval(t);
   },[]);
 
-  // Cycle testimonials every 5s with fade
+  // Cycle testimonials every 5s — simple index increment, CSS handles the fade
   useEffect(()=>{
     const t=setInterval(()=>{
-      setTestimFade(false);
-      setTimeout(()=>{
-        setTestimIdx(i=>(i+1)%(ALL_TESTIMONIALS.length-2));
-        setTestimFade(true);
-      }, 350);
+      setTestimIdx(i=>(i+1)%ALL_TESTIMONIALS.length);
     }, 5000);
     return ()=>clearInterval(t);
   },[]);
@@ -3047,7 +3153,10 @@ function Landing({onStart,ipLocation}){
     return ()=>clearInterval(t);
   },[]);
 
-  const visibleTestimonials = ALL_TESTIMONIALS.slice(testimIdx, testimIdx+3);
+  // Show 3 testimonials, wrapping around the end of the array
+  const visibleTestimonials = [0,1,2].map(offset=>
+    ALL_TESTIMONIALS[(testimIdx+offset)%ALL_TESTIMONIALS.length]
+  );
 
   return(
     <div style={{paddingTop:60}}>
@@ -3251,37 +3360,8 @@ function Landing({onStart,ipLocation}){
           </div>
           <p style={{textAlign:"center",fontSize:13,color:"var(--cream-30)",marginBottom:28}}>Real people. Real results. Auto-updating as users share their experience.</p>
 
-          {/* Sliding track — two copies for infinite loop */}
-          <div style={{position:"relative",overflow:"hidden",marginBottom:20}}>
-            <div style={{
-              display:"flex",gap:14,
-              animation:"slideTestim 30s linear infinite",
-              width:"max-content",
-            }}>
-              {[...ALL_TESTIMONIALS,...ALL_TESTIMONIALS].map((t,i)=>(
-                <div key={i} style={{
-                  width:"min(280px,calc(85vw - 16px))",flexShrink:0,
-                  background:"var(--night)",border:`1px solid ${i%3===1?"var(--line-gold)":"var(--line)"}`,
-                  borderRadius:16,padding:"20px 18px",
-                }}>
-                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
-                    <div style={{width:28,height:28,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"var(--gold)",fontFamily:"var(--f-mono)",fontWeight:700}}>
-                      {t.name[0]}
-                    </div>
-                    <div>
-                      <div className="mono" style={{fontSize:"9px"}}>{t.name}</div>
-                      <div style={{display:"flex",gap:1,marginTop:2}}>{"★★★★★".split("").map((_,si)=><span key={si} style={{color:"var(--gold)",fontSize:9}}>★</span>)}</div>
-                    </div>
-                    {t.isNew&&<div style={{marginLeft:"auto",fontSize:9,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(31,168,154,0.1)",padding:"2px 6px",borderRadius:4}}>NEW</div>}
-                  </div>
-                  <p style={{fontSize:12,lineHeight:1.8,color:"var(--cream-60)",fontStyle:"italic",margin:0}}>"{t.quote}"</p>
-                </div>
-              ))}
-            </div>
-            {/* Fade edges */}
-            <div style={{position:"absolute",top:0,left:0,bottom:0,width:40,background:"linear-gradient(90deg,var(--midnight),transparent)",pointerEvents:"none"}}/>
-            <div style={{position:"absolute",top:0,right:0,bottom:0,width:40,background:"linear-gradient(-90deg,var(--midnight),transparent)",pointerEvents:"none"}}/>
-          </div>
+          {/* Sliding testimonials — infinite marquee */}
+          <TestimonialMarquee/>
 
           {/* Share your story CTA */}
           <TestimonialForm/>
@@ -4020,146 +4100,229 @@ function AuthScreen({onAuth, onBack}){
 // These replace the main card when mode is "forgot", "forgot_sent", or "reset".
 
 
+// ── RelocCard: defined OUTSIDE RelocationExplorer so it never gets recreated
+// on every parent render — this was causing state loss and crashes.
+// ── WORLD COUNTRIES LIST for the relocation search dropdown ──────────────────
+const WORLD_COUNTRIES=[
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia",
+  "Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Belarus","Belgium","Belize",
+  "Benin","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria",
+  "Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Chile","China",
+  "Colombia","Congo","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark",
+  "Dominican Republic","DR Congo","Ecuador","Egypt","El Salvador","Estonia","Ethiopia",
+  "Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Guatemala",
+  "Guinea","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq",
+  "Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan",
+  "Kenya","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Libya","Lithuania",
+  "Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Mauritania",
+  "Mauritius","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar",
+  "Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia",
+  "Norway","Oman","Pakistan","Palestine","Panama","Papua New Guinea","Paraguay","Peru",
+  "Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saudi Arabia",
+  "Senegal","Serbia","Sierra Leone","Singapore","Slovakia","Slovenia","Somalia",
+  "South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden",
+  "Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Trinidad and Tobago",
+  "Tunisia","Turkey","Uganda","Ukraine","United Arab Emirates","United Kingdom",
+  "United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
+];
+
+// ── RELOCATION PROMPT BUILDER ─────────────────────────────────────────────────
+function buildSingleCountryRelocationPrompt(formData, country, isPremium){
+  const name    = formData?.name    || "the user";
+  const from    = formData?.country || "their current country";
+  const skills  = formData?.skills  || formData?.career || "general skills";
+  const goals   = formData?.goals   || formData?.bigGoal || "improve their life";
+  const income  = formData?.income  || "unknown";
+  const age     = formData?.age     || "unknown";
+
+  return `Give ${name} (age ${age}, from ${from}, skills: ${skills}, goal: ${goals}, income: ${income}) a detailed relocation report for ${country}.
+
+Return ONLY a valid JSON object with these exact fields. No markdown. No code fences. Start with { end with }:
+
+{
+  "country": "${country}",
+  "fit": <number 0-100 based on how well this country matches their profile>,
+  "tagline": "<one punchy sentence — why this could work or not for them specifically>",
+  "overview": "<2-3 sentences about living in ${country} from the perspective of someone from ${from}>",
+  "pros": ["<3-4 genuine advantages for someone with their profile>"],
+  "cons": ["<3-4 real challenges they should expect>"],
+  "living": "<specific cost of living: rent, food, transport in ${country} in local currency and USD>",
+  "visa": "<easy|moderate|hard> — one word only",
+  "visa_detail": "<specific visa pathway for someone from ${from}: which visa, requirements, rough cost, processing time>",
+  "business": "<how to start a business in ${country} as a foreigner — registration, cost, what works for their skills>",
+  "timeline": "<realistic month-by-month plan: Month 1-3, Month 4-6, Month 7-12>",
+  "opportunity": <number 0-100 for income opportunity based on their skills>,
+  "cost": "<low|medium|high> — one word based on cost of living vs their income>",
+  "verdict": "<2-3 honest sentences: should they seriously consider this or not, and why>"
+}
+
+Be specific. Use real numbers. Reference their actual background. Do not be generic.`;
+}
+
+function RelocCard({r, onRetry}){
+  const [open, setOpen] = useState(false);
+  // Safe-guard every field — never trust AI JSON to be complete
+  const country   = r?.country   || "Unknown";
+  const fit       = Number(r?.fit) || 0;
+  const tagline   = r?.tagline   || "";
+  const visa      = r?.visa      || "";
+  const cost      = r?.cost      || "";
+  const overview  = r?.overview  || "";
+  const pros      = Array.isArray(r?.pros)  ? r.pros  : [];
+  const cons      = Array.isArray(r?.cons)  ? r.cons  : [];
+  const living    = r?.living    || "";
+  const visa_detail=r?.visa_detail||"";
+  const business  = r?.business  || "";
+  const timeline  = r?.timeline  || "";
+  const verdict   = r?.verdict   || "";
+  const fitColor  = fit>=75?"#4ADE80":fit>=55?"#FCD34D":"#F87171";
+
+  if(r?.error) return(
+    <div style={{background:"var(--night)",borderRadius:16,border:"1px solid rgba(248,113,113,0.25)",marginBottom:16,padding:"20px",textAlign:"center"}}>
+      <div style={{fontSize:24,marginBottom:8}}>🌍</div>
+      <div style={{fontSize:14,color:"var(--cream-50)",marginBottom:4}}>Couldn&apos;t load the {country} report</div>
+      <div style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>The AI timed out. Try again — it usually works on the second attempt.</div>
+      <button onClick={()=>onRetry&&onRetry(country)}
+        style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"10px 24px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+        Try again →
+      </button>
+    </div>
+  );
+
+  return(
+    <div style={{background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:16,overflow:"hidden"}}>
+      {/* Header row — always clickable */}
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{width:52,height:52,borderRadius:12,background:"var(--midnight)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <div style={{fontSize:18,fontWeight:800,color:fitColor,lineHeight:1}}>{fit||"—"}</div>
+          <div style={{fontSize:8,color:"var(--cream-40)",marginTop:1,letterSpacing:"0.05em"}}>FIT</div>
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:700,fontSize:15,color:"var(--cream)",marginBottom:3}}>{country}</div>
+          <div style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.4}}>{tagline}</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+          {visa&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
+            background:visa==="easy"?"rgba(74,222,128,0.15)":visa==="moderate"?"rgba(252,211,77,0.15)":"rgba(248,113,113,0.15)",
+            color:visa==="easy"?"#4ADE80":visa==="moderate"?"#FCD34D":"#F87171"}}>Visa: {visa}</span>}
+          {cost&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(255,255,255,0.06)",color:"var(--cream-60)"}}>Cost: {cost}</span>}
+          <span style={{color:"var(--cream-30)",fontSize:13}}>{open?"▲":"▼"}</span>
+        </div>
+      </div>
+
+      {/* Expanded detail */}
+      {open&&(
+        <div style={{padding:"0 20px 20px",borderTop:"1px solid var(--cream-10)"}}>
+          <div style={{paddingTop:16}}>
+            {overview&&<p style={{fontSize:13,color:"var(--cream-80)",lineHeight:1.75,marginBottom:16}}>{overview}</p>}
+            {(pros.length>0||cons.length>0)&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+                {pros.length>0&&<div style={{background:"rgba(74,222,128,0.07)",borderRadius:12,padding:14}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#4ADE80",marginBottom:8,letterSpacing:"0.08em"}}>WHY IT WORKS</div>
+                  {pros.map((p,i)=><div key={i} style={{fontSize:12,color:"var(--cream-70)",marginBottom:6,lineHeight:1.6,paddingLeft:10,borderLeft:"2px solid rgba(74,222,128,0.3)"}}>✓ {String(p)}</div>)}
+                </div>}
+                {cons.length>0&&<div style={{background:"rgba(248,113,113,0.07)",borderRadius:12,padding:14}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"#F87171",marginBottom:8,letterSpacing:"0.08em"}}>BE READY FOR</div>
+                  {cons.map((c,i)=><div key={i} style={{fontSize:12,color:"var(--cream-70)",marginBottom:6,lineHeight:1.6,paddingLeft:10,borderLeft:"2px solid rgba(248,113,113,0.3)"}}>! {String(c)}</div>)}
+                </div>}
+              </div>
+            )}
+            {living&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>💰 REAL COST OF LIVING</div>
+              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{living}</p>
+            </div>}
+            {visa_detail&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>🛂 YOUR VISA PATHWAY</div>
+              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{visa_detail}</p>
+            </div>}
+            {business&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>🏢 STARTING A BUSINESS THERE</div>
+              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{business}</p>
+            </div>}
+            {timeline&&<div style={{background:"rgba(255,255,255,0.04)",borderRadius:12,padding:14,marginBottom:12}}>
+              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:6,letterSpacing:"0.08em"}}>⏱ REALISTIC TIMELINE</div>
+              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.6,margin:0}}>{timeline}</p>
+            </div>}
+            {verdict&&<div style={{background:"rgba(156,124,255,0.12)",border:"1px solid rgba(156,124,255,0.25)",borderRadius:12,padding:14}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#A78BFA",marginBottom:6,letterSpacing:"0.08em"}}>OUR HONEST VERDICT</div>
+              <p style={{fontSize:13,color:"var(--cream-80)",lineHeight:1.7,margin:0,fontStyle:"italic"}}>{verdict}</p>
+            </div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RelocationExplorer({suggestedCountries, formData, userId, isPremium, isPaid, onUnlock}){
-  const [search, setSearch] = useState("");
+  const [search,   setSearch]   = useState("");
   const [selected, setSelected] = useState(null);
   const [customReport, setCustomReport] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [activeCard, setActiveCard] = useState(0);
-  const [view, setView] = useState("suggested"); // "suggested" | "custom"
-  const filtered = WORLD_COUNTRIES.filter(c=>c.toLowerCase().includes(search.toLowerCase()) && c.toLowerCase()!==(formData.country||"").toLowerCase()).slice(0,8);
+  const [loading,  setLoading]  = useState(false);
+  const [view,     setView]     = useState("suggested");
+  const [genErr,   setGenErr]   = useState("");
+
+  // Safe: formData may be null/undefined during hydration
+  const userCountry = (formData?.country || "").toLowerCase();
+  const filtered = (WORLD_COUNTRIES||[])
+    .filter(c=>c.toLowerCase().includes(search.toLowerCase()) && c.toLowerCase()!==userCountry)
+    .slice(0,8);
+
+  // Safe list of suggested countries — guard against nulls in each object
+  const safeList = (Array.isArray(suggestedCountries) ? suggestedCountries : [])
+    .filter(r=>r && typeof r==="object");
 
   const generateReport = async(country, attempt=1)=>{
-    setLoading(true); setCustomReport(null); setSelected(country); setView("custom");
+    if(!country) return;
+    setLoading(true); setGenErr(""); setCustomReport(null); setSelected(country); setView("custom");
     try{
-      const sys = "You are a relocation expert. Return ONLY a valid JSON object. No markdown. No code fences. No explanation. Start with { and end with }. Keep each field under 200 characters to ensure the JSON fits completely.";
-      const prompt = buildSingleCountryRelocationPrompt(formData, country, isPremium);
-      const raw = await callAPI({messages:[{role:"user",content:prompt}], system:sys, userId, isPremium:true}); // always use premium tokens for relocation
-      const clean = raw.replace(/```json|```/g,"").trim();
-      const start = clean.indexOf("{"); const end = clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error(`No JSON found`);
-      const parsed = JSON.parse(clean.slice(start, end+1));
-      if(!parsed.country) parsed.country = country;
+      const sys="You are a relocation expert. Return ONLY a valid JSON object. No markdown. No code fences. No explanation. Start with { and end with }. Keep each field under 200 characters.";
+      const prompt=buildSingleCountryRelocationPrompt(formData||{}, country, isPremium);
+      const raw=await callAPI({messages:[{role:"user",content:prompt}],system:sys,userId,isPremium:true});
+      const clean=raw.replace(/```json|```/g,"").trim();
+      const start=clean.indexOf("{"); const end=clean.lastIndexOf("}");
+      if(start===-1||end===-1) throw new Error("No JSON in response");
+      const parsed=JSON.parse(clean.slice(start,end+1));
+      if(!parsed.country) parsed.country=country;
+      // Ensure arrays are arrays
+      if(!Array.isArray(parsed.pros))  parsed.pros  = [];
+      if(!Array.isArray(parsed.cons))  parsed.cons  = [];
       setCustomReport(parsed);
-      setLoading(false);
-    } catch(e){
-      console.warn(`Relocation attempt ${attempt} failed:`, e.message);
-      if(attempt < 3){
-        setTimeout(()=>generateReport(country, attempt+1), 1800);
-        return;
-      }
-      setCustomReport({country,fit:0,tagline:"Couldn't load right now.",overview:"",pros:[],cons:[],business:"",living:"",visa_detail:"",opportunity:0,cost:"",visa:"",timeline:"",verdict:"",error:true});
+    }catch(e){
+      console.warn(`Relocation attempt ${attempt}:`, e.message);
+      if(attempt<3){ setTimeout(()=>generateReport(country,attempt+1),1800); return; }
+      setCustomReport({country,fit:0,tagline:"",overview:"",pros:[],cons:[],business:"",living:"",visa_detail:"",opportunity:0,cost:"",visa:"",timeline:"",verdict:"",error:true});
+    }finally{
       setLoading(false);
     }
   };
 
-  const RelocCard = ({r, idx})=>{
-    const [open, setOpen] = useState(false);
-    const fitColor = r.fit>=75?"#4ADE80":r.fit>=55?"#FCD34D":"#F87171";
-    if(r.error) return(
-      <div style={{background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:16,padding:"20px",textAlign:"center"}}>
-        <div style={{fontSize:14,color:"var(--cream-50)",marginBottom:12}}>Couldn't load the {r.country} report.</div>
-        <button onClick={()=>generateReport(r.country)} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"10px 20px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>Try again</button>
-      </div>
-    );
-    return (
-      <div style={{background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:16,overflow:"hidden"}}>
-        <div onClick={()=>setOpen(!open)} style={{padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:52,height:52,borderRadius:12,background:"var(--midnight)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <div style={{fontSize:18,fontWeight:800,color:fitColor,lineHeight:1}}>{r.fit||"—"}</div>
-            <div style={{fontSize:8,color:"var(--cream-40)",marginTop:1,letterSpacing:"0.05em"}}>FIT</div>
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:15,color:"var(--cream)",marginBottom:3}}>{r.country}</div>
-            <div style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.4}}>{r.tagline}</div>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-            {r.visa&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:r.visa==="easy"?"rgba(74,222,128,0.15)":r.visa==="moderate"?"rgba(252,211,77,0.15)":"rgba(248,113,113,0.15)",color:r.visa==="easy"?"#4ADE80":r.visa==="moderate"?"#FCD34D":"#F87171"}}>Visa: {r.visa}</span>}
-            {r.cost&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(255,255,255,0.06)",color:"var(--cream-60)"}}>Cost: {r.cost}</span>}
-          </div>
-        </div>
-        {open&&(
-          <div style={{padding:"0 20px 20px",borderTop:"1px solid var(--cream-10)"}}>
-            <div style={{paddingTop:16}}>
-              {r.overview&&<p style={{fontSize:13,color:"var(--cream-80)",lineHeight:1.75,marginBottom:16}}>{r.overview}</p>}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
-                <div style={{background:"rgba(74,222,128,0.07)",borderRadius:12,padding:14}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#4ADE80",marginBottom:8,letterSpacing:"0.08em"}}>WHY IT WORKS</div>
-                  {(r.pros||[]).map((p,i)=><div key={i} style={{fontSize:12,color:"var(--cream-70)",marginBottom:6,lineHeight:1.6,paddingLeft:10,borderLeft:"2px solid rgba(74,222,128,0.3)"}}>✓ {p}</div>)}
-                </div>
-                <div style={{background:"rgba(248,113,113,0.07)",borderRadius:12,padding:14}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#F87171",marginBottom:8,letterSpacing:"0.08em"}}>BE READY FOR</div>
-                  {(r.cons||[]).map((c,i)=><div key={i} style={{fontSize:12,color:"var(--cream-70)",marginBottom:6,lineHeight:1.6,paddingLeft:10,borderLeft:"2px solid rgba(248,113,113,0.3)"}}>! {c}</div>)}
-                </div>
-              </div>
-              {r.living&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>💰 REAL COST OF LIVING</div>
-                <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{r.living}</p>
-              </div>}
-              {r.visa_detail&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>🛂 YOUR VISA PATHWAY</div>
-                <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{r.visa_detail}</p>
-              </div>}
-              {r.business&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>🏢 STARTING A BUSINESS THERE</div>
-                <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{r.business}</p>
-              </div>}
-              {r.timeline&&<div style={{background:"rgba(255,255,255,0.04)",borderRadius:12,padding:14,marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:6,letterSpacing:"0.08em"}}>⏱ REALISTIC TIMELINE</div>
-                <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.6,margin:0}}>{r.timeline}</p>
-              </div>}
-              {r.verdict&&<div style={{background:"rgba(156,124,255,0.12)",border:"1px solid rgba(156,124,255,0.25)",borderRadius:12,padding:14}}>
-                <div style={{fontSize:10,fontWeight:700,color:"#A78BFA",marginBottom:6,letterSpacing:"0.08em"}}>OUR HONEST VERDICT</div>
-                <p style={{fontSize:13,color:"var(--cream-80)",lineHeight:1.7,margin:0,fontStyle:"italic"}}>{r.verdict}</p>
-              </div>}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
+  return(
     <LockGate isPaid={isPaid} onUnlock={onUnlock}>
       <div className="fu">
         <div className="d3" style={{marginBottom:6}}>Where in the world could you actually thrive?</div>
         <p className="body" style={{marginBottom:20,color:"var(--cream-60)"}}>
-          We matched your profile against countries where someone with your background, skills, and goals tends to break through. 
-          But you know your heart better than we do — if there's a specific country on your mind, type it below and we'll give you the full picture.
+          We matched your profile against countries where someone with your background, skills, and goals tends to break through.
+          Type any country below for a full custom report.
         </p>
 
         {/* Country search */}
         <div style={{marginBottom:24}}>
           <div style={{fontSize:11,fontWeight:700,color:"var(--cream-40)",letterSpacing:"0.08em",marginBottom:8}}>HAVE A COUNTRY IN MIND?</div>
           <div style={{position:"relative"}}>
-            <input
-              value={search}
-              onChange={e=>setSearch(e.target.value)}
+            <input value={search} onChange={e=>setSearch(e.target.value)}
               onBlur={()=>setTimeout(()=>setSearch(""),200)}
-              placeholder={`Search any country...`}
+              placeholder="Search any country…"
               style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"12px 16px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box"}}
             />
             {search.length>1&&filtered.length>0&&(
-              <div style={{
-                position:"absolute",
-                top:"calc(100% + 6px)",
-                left:0,
-                right:0,
-                background:"var(--midnight)",
-                border:"2px solid var(--gold)",
-                borderRadius:12,
-                overflow:"hidden auto",
-                maxHeight:260,
-                zIndex:9999,
-                boxShadow:"0 20px 60px rgba(0,0,0,0.95)",
-              }}>
+              <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,background:"var(--midnight)",border:"2px solid var(--gold)",borderRadius:12,overflow:"hidden auto",maxHeight:260,zIndex:9999,boxShadow:"0 20px 60px rgba(0,0,0,0.95)"}}>
                 {filtered.map(c=>(
-                  <div key={c}
-                    onMouseDown={(e)=>{e.preventDefault();setSearch("");generateReport(c);}}
+                  <div key={c} onMouseDown={e=>{e.preventDefault();setSearch("");generateReport(c);}}
                     style={{padding:"13px 18px",cursor:"pointer",fontSize:14,color:"var(--cream)",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--midnight)"}}
                     onMouseEnter={e=>e.currentTarget.style.background="var(--night)"}
-                    onMouseLeave={e=>e.currentTarget.style.background="var(--midnight)"}
-                  >
+                    onMouseLeave={e=>e.currentTarget.style.background="var(--midnight)"}>
                     <span>{c}</span>
                     <span style={{color:"var(--gold)",fontSize:13,fontWeight:600}}>→</span>
                   </div>
@@ -4169,16 +4332,16 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
           </div>
         </div>
 
-        {/* Loading state */}
+        {/* Loading */}
         {loading&&(
           <div style={{textAlign:"center",padding:"40px 20px",background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:20}}>
             <div style={{fontSize:28,marginBottom:12}}>🔍</div>
             <div style={{fontSize:14,color:"var(--cream-60)",marginBottom:6}}>Building your {selected} report…</div>
-            <div style={{fontSize:12,color:"var(--cream-40)"}}>Checking visa rules, costs, opportunities, and what it's really like to move there from {formData.country}.</div>
+            <div style={{fontSize:12,color:"var(--cream-40)"}}>Checking visa rules, costs, opportunities, and what it&apos;s really like to move there{formData?.country?` from ${formData.country}`:""}.</div>
           </div>
         )}
 
-        {/* Tab toggle */}
+        {/* Toggle between custom and suggested */}
         {!loading&&customReport&&(
           <div style={{display:"flex",gap:8,marginBottom:20}}>
             <button onClick={()=>setView("custom")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="custom"?"var(--violet)":"var(--midnight)",color:view==="custom"?"#fff":"var(--cream-60)",fontSize:12,cursor:"pointer",fontWeight:600}}>
@@ -4190,23 +4353,29 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
           </div>
         )}
 
-        {/* Custom country report */}
+        {/* Custom report */}
         {!loading&&customReport&&view==="custom"&&(
-          <RelocCard r={customReport} idx={0} />
+          <RelocCard r={customReport} onRetry={generateReport}/>
         )}
 
-        {/* Suggested countries */}
-        {(view==="suggested"||!customReport)&&!loading&&(
+        {/* Suggested list */}
+        {!loading&&(view==="suggested"||!customReport)&&(
           <>
-            {(!customReport)&&<div style={{fontSize:11,fontWeight:700,color:"var(--cream-40)",letterSpacing:"0.08em",marginBottom:12}}>OUR PICKS BASED ON YOUR PROFILE</div>}
-            {(suggestedCountries||[]).map((r,i)=><RelocCard key={r.country||i} r={r} idx={i} />)}
+            {!customReport&&<div style={{fontSize:11,fontWeight:700,color:"var(--cream-40)",letterSpacing:"0.08em",marginBottom:12}}>OUR PICKS BASED ON YOUR PROFILE</div>}
+            {safeList.length===0&&!customReport&&(
+              <div style={{padding:"32px 20px",background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:13,color:"var(--cream-40)",marginBottom:16}}>No suggested countries yet — search above to explore any country.</div>
+              </div>
+            )}
+            {safeList.map((r,i)=>(
+              <RelocCard key={r.country||i} r={r} onRetry={generateReport}/>
+            ))}
           </>
         )}
 
         <div className="insight teal" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75}}>
-            Visa rules shift often — always verify the latest requirements on the official embassy or government immigration website before making any decisions. 
-            We'll give you the map; the journey is yours to walk.
+            Visa rules shift often — always verify on the official embassy or government immigration website before making any decisions.
           </p>
         </div>
       </div>
@@ -4233,6 +4402,470 @@ function useGlobalVoice(){
   },[]);
   const set=v=>{_GV.voice=v;_GV.subs.forEach(s=>s(v));};
   return[v,set];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HABIT TRACKING SYSTEM
+// Global pub-sub store — same pattern as voice. Persisted to localStorage.
+// Tracks which practice items the user has committed to ("I'm doing this").
+// Each item has:  committed (bool) | status ("active"|"mastered"|"paused")
+//                 startedAt (ISO) | notes (string) | lastUpdated (ISO)
+// Key format: "module:itemId"  e.g. "discipline:wakeup" | "invest:study"
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// All trackable items across every module — single source of truth
+const ALL_TRACKABLE = [
+  // Daily Discipline (7)
+  {key:"discipline:wakeup",    module:"discipline", label:"Wake Up at 5:30–6 AM",           icon:"⏰", color:"var(--gold)"},
+  {key:"discipline:routine",   module:"discipline", label:"Build a Daily Routine",            icon:"🔁", color:"var(--teal)"},
+  {key:"discipline:consistency",module:"discipline",label:"Stay Consistent Daily",            icon:"📅", color:"#9b72cf"},
+  {key:"discipline:focus",     module:"discipline", label:"90-Minute Focus Blocks",           icon:"🎯", color:"var(--rose)"},
+  {key:"discipline:study",     module:"discipline", label:"Study Hard & Retain It",           icon:"📚", color:"var(--gold)"},
+  {key:"discipline:workout",   module:"discipline", label:"Weekly Workout Plan",              icon:"💪", color:"var(--teal)"},
+  {key:"discipline:mindset_d", module:"discipline", label:"Train My Mind Daily",              icon:"🧠", color:"#9b72cf"},
+  // Invest in Yourself (7)
+  {key:"invest:study",         module:"invest",     label:"Study Obsession (1 Bio/Month)",    icon:"📚", color:"var(--gold)"},
+  {key:"invest:body",          module:"invest",     label:"Obsess Over Energy",               icon:"⚡", color:"var(--teal)"},
+  {key:"invest:skills",        module:"invest",     label:"Stack High-Income Skills",         icon:"🛠️", color:"#9b72cf"},
+  {key:"invest:network",       module:"invest",     label:"Network Mathematics",              icon:"🔗", color:"var(--rose)"},
+  {key:"invest:money",         module:"invest",     label:"Make Money Move First",            icon:"💸", color:"var(--gold)"},
+  {key:"invest:create",        module:"invest",     label:"Create, Don't Consume",            icon:"✏️", color:"var(--teal)"},
+  {key:"invest:routine",       module:"invest",     label:"Build a Ruthless Routine",         icon:"⏰", color:"var(--gold)"},
+  // Get Successful (5)
+  {key:"success:01",           module:"success",    label:"Study the Greats' Patterns",       icon:"📖", color:"var(--gold)"},
+  {key:"success:02",           module:"success",    label:"Build a Ruthless Routine",         icon:"🔁", color:"var(--teal)"},
+  {key:"success:03",           module:"success",    label:"Upgrade My Network",               icon:"🔗", color:"#9b72cf"},
+  {key:"success:04",           module:"success",    label:"Create Something Daily",           icon:"✏️", color:"var(--rose)"},
+  {key:"success:05",           module:"success",    label:"Protect My Energy",                icon:"⚡", color:"var(--gold)"},
+  // Strong Mindset (8)
+  {key:"mindset:patient",      module:"mindset",    label:"Practice Patience",                icon:"⏳", color:"var(--gold)"},
+  {key:"mindset:proactive",    module:"mindset",    label:"Be Proactive Every Week",          icon:"⚡", color:"var(--teal)"},
+  {key:"mindset:change",       module:"mindset",    label:"Stay Open to Change",              icon:"🔄", color:"#9b72cf"},
+  {key:"mindset:letgo",        module:"mindset",    label:"Learn to Let Go",                  icon:"🍃", color:"var(--rose)"},
+  {key:"mindset:hope",         module:"mindset",    label:"Protect My Hope",                  icon:"☀️", color:"var(--gold)"},
+  {key:"mindset:thoughts",     module:"mindset",    label:"Audit My Thoughts Daily",          icon:"🧠", color:"var(--teal)"},
+  {key:"mindset:okay",         module:"mindset",    label:"Accept When I'm Not OK",           icon:"💙", color:"#9b72cf"},
+  {key:"mindset:dontquit",     module:"mindset",    label:"Don't Quit When It's Hard",        icon:"🏁", color:"var(--rose)"},
+  // 10x Principles (6)
+  {key:"tenx:consistency",     module:"tenx",       label:"Show Up Consistently",             icon:"📅", color:"var(--gold)"},
+  {key:"tenx:process",         module:"tenx",       label:"Focus on Process Not Outcome",     icon:"🔬", color:"var(--teal)"},
+  {key:"tenx:friction",        module:"tenx",       label:"Remove Friction from Good Habits", icon:"✂️", color:"#9b72cf"},
+  {key:"tenx:feedback",        module:"tenx",       label:"Get Feedback Fast",                icon:"⚡", color:"var(--rose)"},
+  {key:"tenx:mentors",         module:"tenx",       label:"Learn from People Ahead",          icon:"🔭", color:"var(--gold)"},
+  {key:"tenx:focus",           module:"tenx",       label:"Shape My Environment for Focus",   icon:"🎯", color:"var(--teal)"},
+];
+
+const MODULE_LABELS = {
+  discipline:"Daily Discipline",
+  invest:"Invest in Yourself",
+  success:"Get Successful",
+  mindset:"Strong Mindset",
+  tenx:"10x Principles",
+};
+
+// Global store — loaded from localStorage on first use
+const _HT = { data:{}, subs:[], userId:null };
+
+function _htLoad(uid){
+  if(!uid) return;
+  try{
+    const raw = localStorage.getItem(`diq_habits_${uid}`);
+    _HT.data = raw ? JSON.parse(raw) : {};
+  }catch{ _HT.data = {}; }
+}
+function _htSave(uid){
+  if(!uid) return;
+  try{ localStorage.setItem(`diq_habits_${uid}`, JSON.stringify(_HT.data)); }catch{}
+}
+function _htNotify(){ _HT.subs.forEach(s=>s({..._HT.data})); }
+
+function useHabitTracker(userId){
+  const [data, setData] = useState(_HT.data);
+  useEffect(()=>{
+    if(userId && _HT.userId !== userId){
+      _HT.userId = userId;
+      _htLoad(userId);
+      setData({..._HT.data});
+    }
+    _HT.subs.push(setData);
+    return()=>{ _HT.subs = _HT.subs.filter(s=>s!==setData); };
+  },[userId]);
+
+  const commit = (key, notes="")=>{
+    const now = new Date().toISOString();
+    _HT.data[key] = {
+      committed: true,
+      status: "active",
+      startedAt: _HT.data[key]?.startedAt || now,
+      lastUpdated: now,
+      notes,
+    };
+    _htSave(_HT.userId);
+    _htNotify();
+  };
+
+  const updateStatus = (key, status)=>{
+    if(!_HT.data[key]) return;
+    _HT.data[key] = { ..._HT.data[key], status, lastUpdated: new Date().toISOString() };
+    _htSave(_HT.userId);
+    _htNotify();
+  };
+
+  const uncommit = (key)=>{
+    delete _HT.data[key];
+    _htSave(_HT.userId);
+    _htNotify();
+  };
+
+  const addNote = (key, notes)=>{
+    if(!_HT.data[key]) return;
+    _HT.data[key] = { ..._HT.data[key], notes, lastUpdated: new Date().toISOString() };
+    _htSave(_HT.userId);
+    _htNotify();
+  };
+
+  const committed   = ALL_TRACKABLE.filter(t=>data[t.key]?.committed);
+  const mastered    = committed.filter(t=>data[t.key]?.status==="mastered");
+  const active      = committed.filter(t=>data[t.key]?.status==="active");
+  const paused      = committed.filter(t=>data[t.key]?.status==="paused");
+  const total       = ALL_TRACKABLE.length;
+  const pct         = Math.round((committed.length/total)*100);
+
+  return { data, commit, uncommit, updateStatus, addNote, committed, mastered, active, paused, total, pct };
+}
+
+// ── HabitButton: the "I'm doing this" button used inside every module ─────────
+function HabitButton({itemKey, userId, compact=false}){
+  const ht = useHabitTracker(userId);
+  const item = ALL_TRACKABLE.find(t=>t.key===itemKey);
+  const entry = ht.data[itemKey];
+  const isCommitted = entry?.committed;
+  const status = entry?.status || "active";
+  const [showNote, setShowNote] = useState(false);
+  const [noteVal, setNoteVal] = useState(entry?.notes||"");
+
+  if(!item) return null;
+
+  const STATUS_META = {
+    active:   {label:"Active",   color:"var(--teal)",  bg:"rgba(31,168,154,0.12)",  border:"rgba(31,168,154,0.3)"},
+    mastered: {label:"Mastered", color:"var(--gold)",  bg:"rgba(210,175,90,0.12)",  border:"rgba(210,175,90,0.3)"},
+    paused:   {label:"Paused",   color:"var(--cream-40)", bg:"rgba(255,255,255,0.04)", border:"rgba(255,255,255,0.1)"},
+  };
+  const sm = STATUS_META[status];
+
+  if(compact){
+    // Compact chip used in tracker overview
+    return(
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",
+        background:isCommitted?sm.bg:"rgba(255,255,255,0.03)",
+        border:`1px solid ${isCommitted?sm.border:"rgba(255,255,255,0.08)"}`,
+        borderRadius:20,cursor:"pointer",transition:"all .2s"}}
+        onClick={()=>isCommitted?ht.uncommit(itemKey):ht.commit(itemKey)}>
+        <span style={{fontSize:12}}>{isCommitted?"✓":"○"}</span>
+        <span style={{fontSize:11,color:isCommitted?sm.color:"var(--cream-30)",fontWeight:isCommitted?600:400}}>{item.icon} {item.label}</span>
+      </div>
+    );
+  }
+
+  return(
+    <div style={{marginTop:14}}>
+      {!isCommitted?(
+        <button
+          onClick={()=>{ ht.commit(itemKey); setShowNote(true); }}
+          style={{
+            width:"100%",padding:"12px 16px",
+            background:"rgba(31,168,154,0.06)",
+            border:"1px dashed rgba(31,168,154,0.35)",
+            borderRadius:12,cursor:"pointer",
+            display:"flex",alignItems:"center",gap:10,
+            transition:"all .2s",
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(31,168,154,0.12)";e.currentTarget.style.borderStyle="solid";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="rgba(31,168,154,0.06)";e.currentTarget.style.borderStyle="dashed";}}
+        >
+          <div style={{width:28,height:28,borderRadius:"50%",border:"2px dashed rgba(31,168,154,0.5)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <span style={{fontSize:14}}>+</span>
+          </div>
+          <div style={{textAlign:"left"}}>
+            <div style={{fontSize:13,fontWeight:600,color:"var(--teal)"}}>I'm doing this</div>
+            <div style={{fontSize:11,color:"var(--cream-30)",marginTop:1}}>Add to your practice tracker</div>
+          </div>
+        </button>
+      ):(
+        <div style={{background:sm.bg,border:`1px solid ${sm.border}`,borderRadius:12,padding:"12px 14px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:showNote?10:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:24,height:24,borderRadius:"50%",background:sm.border,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <span style={{fontSize:12,color:sm.color}}>✓</span>
+              </div>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:sm.color}}>In your practice</div>
+                {entry?.startedAt&&<div style={{fontSize:10,color:"var(--cream-30)",marginTop:1}}>
+                  Started {new Date(entry.startedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+                </div>}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              {/* Status picker */}
+              <select value={status} onChange={e=>ht.updateStatus(itemKey,e.target.value)}
+                style={{background:"var(--midnight)",border:`1px solid ${sm.border}`,borderRadius:8,padding:"4px 8px",color:sm.color,fontSize:10,fontFamily:"var(--f-mono)",cursor:"pointer",outline:"none"}}>
+                <option value="active">Active</option>
+                <option value="mastered">Mastered ✦</option>
+                <option value="paused">Paused</option>
+              </select>
+              <button onClick={()=>setShowNote(n=>!n)}
+                style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"4px 8px",color:"var(--cream-40)",fontSize:10,cursor:"pointer"}}>
+                {showNote?"▲":"📝"}
+              </button>
+              <button onClick={()=>ht.uncommit(itemKey)}
+                style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 8px",color:"var(--cream-30)",fontSize:10,cursor:"pointer"}}
+                title="Remove from tracker">✕</button>
+            </div>
+          </div>
+          {showNote&&(
+            <div style={{marginTop:8}}>
+              <textarea
+                value={noteVal}
+                onChange={e=>setNoteVal(e.target.value)}
+                onBlur={()=>ht.addNote(itemKey,noteVal)}
+                placeholder="Add a note — how is this going? What have you noticed?"
+                rows={2}
+                style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Master Progress Tracker Panel — shows all 33 items, filter by module ──────
+function HabitTrackerPanel({userId, onClose, onNavigate}){
+  const ht = useHabitTracker(userId);
+  const [filter, setFilter] = useState("all");   // "all"|"active"|"mastered"|"paused"|module key
+  const [expandKey, setExpandKey] = useState(null);
+
+  const modules = ["all","discipline","invest","success","mindset","tenx"];
+
+  const displayed = ALL_TRACKABLE.filter(t=>{
+    if(filter==="all") return true;
+    if(filter==="active")   return ht.data[t.key]?.status==="active" && ht.data[t.key]?.committed;
+    if(filter==="mastered") return ht.data[t.key]?.status==="mastered";
+    if(filter==="paused")   return ht.data[t.key]?.status==="paused";
+    return t.module===filter;
+  });
+
+  // Group by module for the "all" view
+  const byModule = {};
+  displayed.forEach(t=>{
+    if(!byModule[t.module]) byModule[t.module]=[];
+    byModule[t.module].push(t);
+  });
+
+  const STATUS_META = {
+    active:   {label:"Active",   color:"var(--teal)",  bg:"rgba(31,168,154,0.1)",  border:"rgba(31,168,154,0.25)"},
+    mastered: {label:"Mastered ✦",color:"var(--gold)", bg:"rgba(210,175,90,0.1)",  border:"rgba(210,175,90,0.25)"},
+    paused:   {label:"Paused",   color:"var(--cream-40)",bg:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.1)"},
+  };
+
+  const daysActive = (entry)=>{
+    if(!entry?.startedAt) return 0;
+    return Math.floor((Date.now()-new Date(entry.startedAt).getTime())/(1000*60*60*24));
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(5,6,15,0.92)",backdropFilter:"blur(10px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:"100%",maxWidth:580,background:"var(--raised)",borderRadius:"20px 20px 0 0",border:"1px solid var(--line-gold)",maxHeight:"92vh",display:"flex",flexDirection:"column",animation:"slideIn .3s ease"}}>
+
+        {/* Header */}
+        <div style={{padding:"20px 22px 0",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
+            <div>
+              <div className="mono" style={{marginBottom:4,fontSize:"10px"}}>YOUR PRACTICE TRACKER</div>
+              <div style={{fontSize:18,fontWeight:700,color:"var(--cream)"}}>
+                {ht.committed.length} of {ht.total} practices committed
+              </div>
+            </div>
+            <button onClick={onClose} style={{background:"none",border:"1px solid var(--line)",borderRadius:8,padding:"6px 10px",color:"var(--cream-40)",cursor:"pointer",fontSize:14}}>✕</button>
+          </div>
+
+          {/* Master progress bar */}
+          <div style={{marginBottom:6}}>
+            <div style={{height:8,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden",marginBottom:6}}>
+              <div style={{height:"100%",width:`${ht.pct}%`,background:"linear-gradient(90deg,var(--teal),var(--gold))",borderRadius:4,transition:"width .6s ease"}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>
+              <span>{ht.pct}% committed</span>
+              <div style={{display:"flex",gap:14}}>
+                <span style={{color:"var(--teal)"}}>{ht.active.length} active</span>
+                <span style={{color:"var(--gold)"}}>{ht.mastered.length} mastered</span>
+                {ht.paused.length>0&&<span style={{color:"var(--cream-30)"}}>{ht.paused.length} paused</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Module progress mini-bars */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,marginBottom:16}}>
+            {["discipline","invest","success","mindset","tenx"].map(mod=>{
+              const items = ALL_TRACKABLE.filter(t=>t.module===mod);
+              const done  = items.filter(t=>ht.data[t.key]?.committed).length;
+              const pct   = Math.round((done/items.length)*100);
+              return(
+                <div key={mod} onClick={()=>setFilter(mod)} style={{cursor:"pointer",padding:"6px 8px",background:filter===mod?"var(--lift)":"var(--midnight)",borderRadius:8,border:`1px solid ${filter===mod?"var(--line-gold)":"rgba(255,255,255,0.06)"}`,transition:"all .2s"}}>
+                  <div style={{fontSize:9,color:"var(--cream-30)",marginBottom:4,fontFamily:"var(--f-mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{MODULE_LABELS[mod].split(" ")[0]}</div>
+                  <div style={{height:3,background:"rgba(255,255,255,0.06)",borderRadius:2,marginBottom:3}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:"var(--gold)",borderRadius:2}}/>
+                  </div>
+                  <div style={{fontSize:9,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{done}/{items.length}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Filter tabs */}
+          <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:12,scrollbarWidth:"none"}}>
+            {[["all","All"],["active","Active"],["mastered","Mastered ✦"],["paused","Paused"],
+              ...modules.slice(1).map(m=>[m,MODULE_LABELS[m]])
+            ].map(([val,lbl])=>(
+              <button key={val} onClick={()=>setFilter(val)}
+                style={{
+                  flexShrink:0,padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all .2s",whiteSpace:"nowrap",
+                  background:filter===val?"var(--gold)":"rgba(255,255,255,0.05)",
+                  color:filter===val?"#000":"var(--cream-40)",
+                }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* List */}
+        <div style={{flex:1,overflowY:"auto",padding:"4px 22px 24px"}}>
+          {displayed.length===0&&(
+            <div style={{textAlign:"center",padding:"40px 20px",color:"var(--cream-30)",fontSize:13}}>
+              {filter==="all"
+                ? "No practices committed yet. Open any module and tap "I'm doing this"."
+                : `No ${filter} practices yet.`}
+            </div>
+          )}
+
+          {(filter==="all"?Object.entries(byModule):[[filter,displayed]]).map(([mod,items])=>(
+            <div key={mod} style={{marginBottom:20}}>
+              {filter==="all"&&<div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em",marginBottom:10,paddingTop:8}}>
+                {MODULE_LABELS[mod]?.toUpperCase()||mod.toUpperCase()}
+              </div>}
+              <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                {items.map(item=>{
+                  const entry   = ht.data[item.key];
+                  const isIn    = entry?.committed;
+                  const status  = entry?.status||"active";
+                  const sm      = STATUS_META[status]||STATUS_META.active;
+                  const days    = daysActive(entry);
+                  const isExp   = expandKey===item.key;
+
+                  return(
+                    <div key={item.key} style={{
+                      background: isIn ? sm.bg : "rgba(255,255,255,0.02)",
+                      border:`1px solid ${isIn?sm.border:"rgba(255,255,255,0.06)"}`,
+                      borderRadius:12,overflow:"hidden",transition:"all .2s",
+                    }}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",cursor:isIn?"pointer":"default"}}
+                        onClick={()=>isIn&&setExpandKey(isExp?null:item.key)}>
+                        {/* Toggle button */}
+                        <button
+                          onClick={e=>{e.stopPropagation(); isIn?ht.uncommit(item.key):ht.commit(item.key);}}
+                          style={{
+                            width:28,height:28,borderRadius:"50%",flexShrink:0,cursor:"pointer",border:"none",
+                            background: isIn ? sm.border : "rgba(255,255,255,0.06)",
+                            color: isIn ? sm.color : "var(--cream-30)",
+                            fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",
+                            transition:"all .2s",
+                          }}>
+                          {isIn?"✓":"○"}
+                        </button>
+
+                        <span style={{fontSize:15,flexShrink:0}}>{item.icon}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:isIn?600:400,color:isIn?"var(--cream)":"var(--cream-40)",lineHeight:1.4}}>{item.label}</div>
+                          {isIn&&<div style={{display:"flex",alignItems:"center",gap:8,marginTop:3}}>
+                            <span style={{fontSize:9,fontFamily:"var(--f-mono)",color:sm.color,background:sm.bg,padding:"1px 6px",borderRadius:10,border:`1px solid ${sm.border}`}}>{sm.label}</span>
+                            {days>0&&<span style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{days}d in</span>}
+                            {entry?.notes&&<span style={{fontSize:9,color:"var(--cream-30)"}}>📝</span>}
+                          </div>}
+                        </div>
+
+                        {isIn&&(
+                          <select value={status} onClick={e=>e.stopPropagation()} onChange={e=>ht.updateStatus(item.key,e.target.value)}
+                            style={{background:"var(--midnight)",border:`1px solid ${sm.border}`,borderRadius:8,padding:"3px 6px",color:sm.color,fontSize:9,fontFamily:"var(--f-mono)",cursor:"pointer",outline:"none",flexShrink:0}}>
+                            <option value="active">Active</option>
+                            <option value="mastered">Mastered</option>
+                            <option value="paused">Paused</option>
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Expanded note editor */}
+                      {isIn&&isExp&&(
+                        <div style={{padding:"0 14px 12px",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".08em",marginBottom:6,marginTop:10}}>YOUR NOTES</div>
+                          <NoteEditor itemKey={item.key} ht={ht}/>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer CTA */}
+        {ht.committed.length===0&&(
+          <div style={{padding:"14px 22px",borderTop:"1px solid var(--line)",flexShrink:0,background:"var(--raised)"}}>
+            <p style={{fontSize:12,color:"var(--cream-30)",textAlign:"center",margin:0,lineHeight:1.6}}>
+              Open any module tab → expand a section → tap <strong style={{color:"var(--teal)"}}>"I'm doing this"</strong>
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Note editor extracted so it has its own stable state
+function NoteEditor({itemKey, ht}){
+  const [val, setVal] = useState(ht.data[itemKey]?.notes||"");
+  return(
+    <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={()=>ht.addNote(itemKey,val)}
+      placeholder="How is this going? What have you noticed? What's hard?"
+      rows={2}
+      style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
+    />
+  );
+}
+
+// ── Mini progress bar widget shown in the Dashboard nav ───────────────────────
+function HabitMiniBar({userId, onClick}){
+  const ht = useHabitTracker(userId);
+  if(ht.committed.length===0) return(
+    <button onClick={onClick} style={{background:"rgba(255,255,255,0.04)",border:"1px dashed rgba(255,255,255,0.12)",borderRadius:10,padding:"5px 12px",color:"var(--cream-30)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",flexShrink:0}}
+      title="Track your practices">
+      Track practices
+    </button>
+  );
+  return(
+    <button onClick={onClick} style={{background:"rgba(31,168,154,0.08)",border:"1px solid rgba(31,168,154,0.2)",borderRadius:10,padding:"5px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,transition:"all .2s"}}
+      title="View your practice tracker"
+      onMouseEnter={e=>e.currentTarget.style.background="rgba(31,168,154,0.15)"}
+      onMouseLeave={e=>e.currentTarget.style.background="rgba(31,168,154,0.08)"}>
+      <div style={{width:40,height:4,background:"rgba(255,255,255,0.06)",borderRadius:2,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${ht.pct}%`,background:"linear-gradient(90deg,var(--teal),var(--gold))",borderRadius:2}}/>
+      </div>
+      <span style={{fontSize:10,fontFamily:"var(--f-mono)",color:"var(--teal)",fontWeight:700}}>{ht.committed.length}/{ht.total}</span>
+    </button>
+  );
 }
 
 // Re-resolve a voice from fresh getVoices() right before speaking.
@@ -5157,308 +5790,6 @@ const PROGRESS_TAGS=[
   {id:"personal",label:"Personal",color:"var(--cream-40)"},
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// GROWTH ACADEMY — Disgustingly Successful · Strong Mindset · 10x Principles
-// ═══════════════════════════════════════════════════════════════════════════════
-const ACADEMY_CONTENT = [
-  {
-    id: "invest",
-    icon: "📈",
-    color: "#d2af5a",
-    title: "Best Investments in Your 20s & 30s",
-    subtitle: "Your 20s decide your 40s. Not your salary — your choices.",
-    intro: "The highest-return investment you will ever make is not in stocks or crypto. It is in yourself. The people who are disgustingly comfortable at 40 made specific bets on themselves at 25. Here is what those bets look like.",
-    items: [
-      {
-        n: 1,
-        icon: "📚",
-        title: "Study Obsession",
-        body: "Read biographies of the people who built empires — Steve Jobs, Elon Musk, Rockefeller, Oprah, Warren Buffett. Not to worship them. To study their patterns. Success leaves clues. You learn what actually works in the real world and you avoid repeating their mistakes. Most people read fiction. You read lives.",
-        action: "This week: Pick one biography and commit to it. Start with 'Shoe Dog' by Phil Knight or 'The Snowball' by Warren Buffett.",
-      },
-      {
-        n: 2,
-        icon: "💪",
-        title: "Invest in Your Health Now",
-        body: "Your body is the vehicle for everything else. A sick, tired, low-energy version of you can not build an empire. Sleep 7-8 hours. Move your body daily. Cut what drains you. The people who are most productive are not the ones who work the most — they are the ones who protect their energy the most.",
-        action: "Start with one thing: sleep at the same time every night for 21 days.",
-      },
-      {
-        n: 3,
-        icon: "🧠",
-        title: "Invest in Skills, Not Just Degrees",
-        body: "The market pays for value, not credentials. One specific, rare skill — coding, copywriting, sales, video editing, design — compounds over a lifetime. A degree opens one door. A marketable skill opens hundreds. The best time to acquire it was yesterday. The second best time is now.",
-        action: "Pick one skill that the market wants. Spend 1 hour every day on it for 6 months. Watch what happens.",
-      },
-      {
-        n: 4,
-        icon: "🌐",
-        title: "Build an Audience or Network",
-        body: "The most valuable asset in the next 20 years is not money — it is attention and relationships. An audience of 10,000 people who trust you is worth more than a year's salary. Your network determines your net worth. Every person you know meaningfully is a door to a room you have never been in.",
-        action: "Post one thing online per week about something you are learning. Start building in public.",
-      },
-      {
-        n: 5,
-        icon: "💰",
-        title: "Start Saving Before You Think You Can",
-        body: "Compound interest does not care about your excuses. Even GH₵ 100 a month invested consistently from age 24 becomes something significant by 40. The habit matters more than the amount. The person who starts small and stays consistent beats the person who waits to invest 'big' every single time.",
-        action: "Open a separate savings account today. Set up an automatic transfer of whatever you can — even the smallest amount. Start today.",
-      },
-    ],
-  },
-  {
-    id: "success",
-    icon: "🚀",
-    color: "#9b72cf",
-    title: "How to Become Disgustingly Successful",
-    subtitle: "Not lucky. Not gifted. Just following the right rules.",
-    intro: "Disgustingly successful people are not smarter than you. They are not more talented than you. They just operate on a different set of rules — consistently, without apology. Here are those rules.",
-    items: [
-      {
-        n: 1,
-        icon: "📖",
-        title: "Study Obsession",
-        body: "Read everything. Biographies, business books, psychology, history. The most successful people in the world are almost all obsessive readers. They understand that every book is a mentor who lived a full life and distilled it into 300 pages. That is the best deal in the world. Most people scroll. You read.",
-        action: "Read 10 pages every morning before you check your phone. Non-negotiable.",
-      },
-      {
-        n: 2,
-        icon: "⏰",
-        title: "Ruthless Routine",
-        body: "Successful people do not rely on motivation — they rely on systems. A ruthless morning routine that protects the first 2 hours of your day from other people's demands is the single most powerful habit you can build. The way you start your morning determines the quality of everything that follows.",
-        action: "Design your non-negotiable morning: Wake up. No phone for 30 minutes. Move your body. Plan the day. Then work.",
-      },
-      {
-        n: 3,
-        icon: "🤝",
-        title: "Network Mathematics",
-        body: "Your income is the average of your 5 closest contacts. This is not motivational rhetoric — it is documented sociology. The people around you shape your beliefs about what is possible, what is normal, and what you deserve. One connection with the right person can shortcut 5 years of struggle. Protect and upgrade your circle deliberately.",
-        action: "Identify one person 5 years ahead of where you want to be. Find a way to add value to them first — then connect.",
-      },
-      {
-        n: 4,
-        icon: "🎯",
-        title: "Create, Don't Consume",
-        body: "The world is divided into two types of people: those who consume what others build, and those who build what others consume. Creators accumulate leverage over time. Consumers stay dependent. Every hour you spend creating something — a business, content, a product, a skill — is an investment. Every hour you spend consuming entertainment is spending time you borrowed from your future.",
-        action: "For every 30 minutes you consume today, create for 10 minutes. Write, build, draw, record — anything.",
-      },
-      {
-        n: 5,
-        icon: "⚡",
-        title: "Obsess Over Energy",
-        body: "Time management is a lie. Energy management is the truth. You can have 24 hours and do nothing meaningful if your energy is gone. The most productive people protect their mental and physical energy like a billionaire protects their money. They sleep enough. They say no constantly. They cut energy vampires — people, habits, environments — without guilt.",
-        action: "Write down 3 things that drain your energy every week. Eliminate one this week.",
-      },
-      {
-        n: 6,
-        icon: "🏆",
-        title: "The Final Truth",
-        body: "Disgusting success is built daily. Not emotionally. Not randomly. Systematically. You do not need to feel motivated. You do not need the perfect moment. You need a clear direction, a consistent process, and the patience to trust it. Most people overestimate what they can do in a day and underestimate what they can do in a year of discipline.",
-        action: "Write down your one goal for the next 12 months. Put it where you see it every morning. Work on it daily regardless of how you feel.",
-      },
-    ],
-  },
-  {
-    id: "mindset",
-    icon: "🧠",
-    color: "#1fa89a",
-    title: "How to Develop a Strong Mindset",
-    subtitle: "Your thoughts create your reality. Here is how to master them.",
-    intro: "A strong mindset is not born — it is built. The difference between people who collapse under pressure and people who grow under it is not intelligence or circumstance. It is the mental habits they have practised over time. These are the ones that matter most.",
-    items: [
-      {n:1,icon:"⏳",title:"Be Patient",body:"Everything worth having takes longer than you want it to. Impatience is the enemy of greatness. The people who win big are not the ones who moved the fastest — they are the ones who stayed in the game the longest. Plant the seed. Water it daily. Stop digging it up every week to check if it is growing.",action:"When you feel impatient today, say this: 'I am early. Not late. I am building something real.'"},
-      {n:2,icon:"🎯",title:"Be Proactive",body:"Stop waiting for things to happen to you. Start making things happen. Reactive people respond to life. Proactive people create it. Every day you wait for someone to give you an opportunity is a day someone else is creating their own. The world rewards people who move first.",action:"Identify one thing you have been waiting for someone else to give you. Go get it yourself this week."},
-      {n:3,icon:"🔄",title:"Be Open to Change",body:"The map is not the territory. The plan you made last year may not fit the reality of today. Flexibility is not weakness — it is intelligence. The most resilient people in the world are not the most rigid. They are the ones who adapt fastest without losing their direction.",action:"Ask yourself: What belief am I holding onto that no longer serves where I am going?"},
-      {n:4,icon:"🕊️",title:"Learn to Let Go",body:"Grudges, past failures, people who hurt you — carrying them costs you energy you need for building. Letting go does not mean what happened was okay. It means you choose not to let it occupy space in your present. The weight you drop is the weight you use to move forward.",action:"Write down one thing you have been carrying. Then write: 'I release this so I can move forward.' Mean it."},
-      {n:5,icon:"🌅",title:"Stay Hopeful",body:"Hope is not naive. Hope is strategic. Without a belief that things can be better, no action is possible. The people who change their circumstances against all odds are the ones who refused to accept that this was permanent. Your situation is not your destination.",action:"Every morning, name one thing you are genuinely looking forward to — even something small."},
-      {n:6,icon:"💭",title:"Check Your Thoughts",body:"You have thousands of thoughts per day. Most of them are automatic, repetitive, and negative. They are not truth — they are habits. The person who learns to observe their thoughts without believing every single one has a superpower. Before you react to a thought, ask: Is this true? Is this useful?",action:"When a negative thought arrives today, pause and ask: 'Is this a fact or is this a feeling?'"},
-      {n:7,icon:"💙",title:"It's Okay Not to Be Okay",body:"Strength does not mean pretending everything is fine. It means being honest enough to admit when it is not — and still moving forward anyway. The most resilient people are not the ones who never struggle. They are the ones who struggle openly and keep going. You do not have to perform wellness. You have to practise it.",action:"Today: Tell one person how you are actually doing. Not 'fine.' The real answer."},
-      {n:8,icon:"🔥",title:"Don't Give Up",body:"Most people quit at 70%. The last 30% is where the breakthrough lives. The reason so few people reach their goals is not lack of talent — it is quitting too soon. Success is largely a function of who is still in the game when everyone else has left. Be that person.",action:"Think of something you have almost given up on. What is one small step you can take today to stay in the game?"},
-    ],
-  },
-  {
-    id: "principles",
-    icon: "⚡",
-    color: "#e8963a",
-    title: "Principles That Make You 10x Better",
-    subtitle: "Simple rules. Compounding results.",
-    intro: "Most people look for complex solutions to simple problems. The people who become exceptional usually follow a small set of principles obsessively. Here are the ones that compound the fastest.",
-    items: [
-      {n:1,icon:"📅",title:"Consistency Beats Intensity",body:"One hour every day beats 8 hours on Saturday. The person who shows up every day — even imperfectly — compounds in ways that weekend warriors never can. Your brain literally wires itself around what you do repeatedly. Intensity creates bursts. Consistency creates transformation.",action:"Pick one habit. Do it every day for 30 days — even for just 10 minutes. Track it."},
-      {n:2,icon:"🎯",title:"Focus on the Process, Not the Outcome",body:"You cannot control whether you win. You can control how well you prepare, how hard you work, and how consistently you show up. Outcomes are results of processes. Fall in love with the process and the outcomes become inevitable.",action:"For your biggest goal today — shift your focus from the result to the actions. What is the process? Do that."},
-      {n:3,icon:"🧹",title:"Remove Friction From Good Habits",body:"Willpower is a limited resource. Stop relying on it. Instead, engineer your environment so the right choice is the easy choice. If you want to read more, put the book on your pillow. If you want to exercise, sleep in your gym clothes. Make the good habit require less effort than the bad one.",action:"Identify your most important habit and ask: How can I make starting this even easier?"},
-      {n:4,icon:"🔁",title:"Get Feedback Fast",body:"The fastest learners are not the most talented — they are the ones who iterate the quickest. Every attempt is information. Every failure is feedback. The person who does 100 reps of anything — and adjusts — beats the person who takes one perfect shot every time. Move faster. Learn faster.",action:"Share your work with someone this week before you think it is ready. Their feedback is data."},
-      {n:5,icon:"👥",title:"Learn From People Ahead of You",body:"You do not need to reinvent the wheel. Someone has already solved the problem you are struggling with. Find them. Study them. Ask them. A 30-minute conversation with the right person can save you 3 years of confusion. Most people are too proud to admit what they do not know. Be the one who asks.",action:"Identify one person 5-10 years ahead of you in your field. Read everything they have written or said. Then reach out."},
-      {n:6,icon:"📵",title:"Eliminate Distractions, Not Just Add Discipline",body:"Focus is not a willpower problem — it is an environment problem. Most people try to discipline themselves into focus while keeping every distraction within arm's reach. Remove the phone from the room. Turn off notifications. Block the sites. Your environment shapes your behaviour more than your intentions ever will.",action:"For the next 2 hours: phone in another room, notifications off. Nothing else. See what you produce."},
-    ],
-  },
-];
-
-const ACADEMY_STORE = "destiniq_academy_v1";
-
-function GrowthAcademy({profile}){
-  const [activeSection, setActiveSection] = useState("invest");
-  const [expanded, setExpanded] = useState({});
-  const [done, setDone] = useState(()=>{
-    try{ return JSON.parse(localStorage.getItem(ACADEMY_STORE)||"{}"); }catch{ return {}; }
-  });
-  const age = parseInt(profile?.age)||25;
-
-  const toggleDone = (sectionId, itemN) => {
-    const key = `${sectionId}_${itemN}`;
-    const next = {...done, [key]: !done[key]};
-    setDone(next);
-    try{ localStorage.setItem(ACADEMY_STORE, JSON.stringify(next)); }catch(_){}
-  };
-
-  const toggleExpand = (sectionId, itemN) => {
-    const key = `${sectionId}_${itemN}`;
-    setExpanded(e => ({...e, [key]: !e[key]}));
-  };
-
-  const section = ACADEMY_CONTENT.find(s => s.id === activeSection);
-  const totalItems = ACADEMY_CONTENT.reduce((a,s) => a + s.items.length, 0);
-  const doneCount = Object.values(done).filter(Boolean).length;
-  const pct = Math.round((doneCount/totalItems)*100);
-
-  // Personalised intro based on age
-  const ageNote = age < 28
-    ? `You are ${age}. You are early. Most people your age are still figuring out what to do. You already know there is more. That puts you ahead.`
-    : age < 35
-    ? `You are ${age}. The best investment years of your life are right now. What you build in the next 5 years will define the next 20.`
-    : `You are ${age}. It is not too late — it is never too late. But the time to move is now. Not next month. Now.`;
-
-  const audioText = section
-    ? `${section.title}. ${section.intro} ${section.items.map(i=>`${i.title}: ${i.body}`).join(". ")}`
-    : "";
-
-  return(
-    <div className="fu">
-      {/* Header */}
-      <div style={{marginBottom:24}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,flexWrap:"wrap"}}>
-          <div className="d3">Growth Academy</div>
-          <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:20,padding:"3px 10px",letterSpacing:".08em"}}>🔥 {pct}% COMPLETE</span>
-        </div>
-        <p style={{fontSize:14,color:"rgba(237,232,216,0.5)",lineHeight:1.7,marginBottom:10}}>{ageNote}</p>
-        {/* Progress bar */}
-        <div style={{height:3,background:"rgba(255,255,255,0.06)",borderRadius:2,overflow:"hidden"}}>
-          <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,var(--gold),var(--teal))",borderRadius:2,transition:"width .6s ease"}}/>
-        </div>
-        <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)",marginTop:6}}>{doneCount} of {totalItems} principles engaged</div>
-      </div>
-
-      {/* Section tabs */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:24}}>
-        {ACADEMY_CONTENT.map(s=>{
-          const sectionDone = s.items.filter(i=>done[`${s.id}_${i.n}`]).length;
-          const isActive = activeSection === s.id;
-          return(
-            <button key={s.id} onClick={()=>setActiveSection(s.id)}
-              style={{
-                display:"flex",alignItems:"center",gap:10,
-                padding:"12px 14px",borderRadius:12,border:`1.5px solid ${isActive?s.color:"rgba(255,255,255,0.07)"}`,
-                background:isActive?`${s.color}10`:"rgba(255,255,255,0.02)",
-                cursor:"pointer",textAlign:"left",transition:"all .2s",
-              }}>
-              <span style={{fontSize:20,flexShrink:0}}>{s.icon}</span>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:11,fontWeight:600,color:isActive?s.color:"rgba(255,255,255,0.55)",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.title}</div>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)",marginTop:2}}>{sectionDone}/{s.items.length} done</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active section */}
-      {section&&(
-        <div>
-          {/* Section header */}
-          <div style={{padding:"20px 20px 18px",background:`${section.color}08`,border:`1px solid ${section.color}25`,borderRadius:16,marginBottom:20}}>
-            <div style={{fontSize:11,color:section.color,fontFamily:"var(--f-mono)",letterSpacing:".1em",marginBottom:8}}>{section.icon} {section.id.toUpperCase()}</div>
-            <div className="d3" style={{marginBottom:6,color:"var(--cream)"}}>{section.title}</div>
-            <div style={{fontSize:13,color:"rgba(255,255,255,0.4)",fontStyle:"italic",marginBottom:12}}>{section.subtitle}</div>
-            <p style={{fontSize:14,color:"rgba(237,232,216,0.6)",lineHeight:1.75,margin:0}}>{section.intro}</p>
-            <div style={{marginTop:12}}>
-              <AudioPlayer text={audioText} label="Listen to this section"/>
-            </div>
-          </div>
-
-          {/* Principle cards */}
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {section.items.map(item=>{
-              const key = `${section.id}_${item.n}`;
-              const isDone = !!done[key];
-              const isOpen = !!expanded[key];
-              return(
-                <div key={item.n} style={{
-                  background:isDone?"rgba(20,184,154,0.04)":"rgba(255,255,255,0.02)",
-                  border:`1.5px solid ${isDone?"rgba(20,184,154,0.25)":"rgba(255,255,255,0.07)"}`,
-                  borderRadius:14,overflow:"hidden",transition:"all .25s",
-                }}>
-                  {/* Card header — always visible */}
-                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px 16px",cursor:"pointer"}}
-                    onClick={()=>toggleExpand(section.id, item.n)}>
-                    {/* Number badge */}
-                    <div style={{width:32,height:32,borderRadius:"50%",background:isDone?"rgba(20,184,154,0.15)":"rgba(255,255,255,0.05)",border:`1.5px solid ${isDone?"var(--teal)":section.color+"40"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:13,fontWeight:700,color:isDone?"var(--teal)":section.color,transition:"all .25s"}}>
-                      {isDone?"✓":item.n}
-                    </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:14}}>{item.icon}</span>
-                        <span style={{fontSize:14,fontWeight:600,color:isDone?"var(--teal)":"var(--cream)",transition:"color .25s"}}>{item.title}</span>
-                      </div>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                      {/* Mark done button */}
-                      <button
-                        onClick={e=>{e.stopPropagation();toggleDone(section.id, item.n);}}
-                        style={{
-                          fontSize:10,padding:"4px 10px",borderRadius:20,
-                          border:`1px solid ${isDone?"rgba(20,184,154,0.4)":"rgba(255,255,255,0.1)"}`,
-                          background:isDone?"rgba(20,184,154,0.1)":"none",
-                          color:isDone?"var(--teal)":"rgba(255,255,255,0.3)",
-                          cursor:"pointer",fontFamily:"var(--f-mono)",
-                          transition:"all .2s",whiteSpace:"nowrap",
-                        }}>
-                        {isDone?"✓ Doing this":"Mark as doing"}
-                      </button>
-                      <span style={{color:"rgba(255,255,255,0.2)",fontSize:12,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>▾</span>
-                    </div>
-                  </div>
-
-                  {/* Expandable body */}
-                  {isOpen&&(
-                    <div style={{padding:"0 16px 16px",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                      <p style={{fontSize:14,color:"rgba(237,232,216,0.65)",lineHeight:1.8,margin:"14px 0 12px"}}>{item.body}</p>
-                      {/* Action */}
-                      <div style={{padding:"12px 14px",background:`${section.color}08`,border:`1px solid ${section.color}20`,borderRadius:10}}>
-                        <div style={{fontSize:9,color:section.color,fontFamily:"var(--f-mono)",letterSpacing:".08em",marginBottom:6}}>YOUR ACTION</div>
-                        <p style={{fontSize:13,color:"rgba(237,232,216,0.7)",lineHeight:1.7,margin:0,fontStyle:"italic"}}>{item.action}</p>
-                      </div>
-                      <div style={{marginTop:10}}>
-                        <AudioPlayer text={`${item.title}: ${item.body}. Your action: ${item.action}`} label="Listen" mini={false}/>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Section footer */}
-          <div style={{marginTop:20,padding:"14px 16px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,textAlign:"center"}}>
-            <p style={{fontSize:12,color:"rgba(255,255,255,0.25)",margin:0,lineHeight:1.7}}>
-              Tap each principle to expand. Mark it as "doing" when you start applying it. Come back and re-read the ones that hit hardest.
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ProgressFeed({profile,reportData,userId,isPremium}){
   const [entries,setEntries]=useState(()=>loadProgress());
   const [input,setInput]=useState("");
@@ -5620,7 +5951,1277 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVEST IN YOURSELF MODULE
+// Investments for your 20s–30s — because your 20s decide your 40s.
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// DAILY DISCIPLINE MODULE
+// For people who are done with distractions and want the FYP they wish they had:
+// wake-up times, routines, focus, grind — deeply explained.
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── PracticesView — the "My Practices" tab — full embedded tracker ────────────
+function PracticesView({userId}){
+  const ht = useHabitTracker(userId);
+  const [filter,setFilter]=useState("all");
+  const [expandKey,setExpandKey]=useState(null);
+
+  const STATUS_META={
+    active:  {label:"Active",    color:"var(--teal)",  bg:"rgba(31,168,154,0.1)",  border:"rgba(31,168,154,0.25)"},
+    mastered:{label:"Mastered ✦",color:"var(--gold)",  bg:"rgba(210,175,90,0.1)",  border:"rgba(210,175,90,0.25)"},
+    paused:  {label:"Paused",    color:"var(--cream-40)",bg:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.1)"},
+  };
+
+  const daysActive=(entry)=>{
+    if(!entry?.startedAt) return 0;
+    return Math.floor((Date.now()-new Date(entry.startedAt).getTime())/(86400000));
+  };
+
+  const displayed=ALL_TRACKABLE.filter(t=>{
+    if(filter==="all") return true;
+    if(filter==="committed") return ht.data[t.key]?.committed;
+    if(filter==="mastered") return ht.data[t.key]?.status==="mastered";
+    if(filter==="not_started") return !ht.data[t.key]?.committed;
+    return t.module===filter;
+  });
+
+  const byModule={};
+  ALL_TRACKABLE.forEach(t=>{
+    if(!byModule[t.module]) byModule[t.module]=[];
+    byModule[t.module].push(t);
+  });
+
+  return(
+    <div className="fu">
+      {/* Header */}
+      <div style={{marginBottom:24}}>
+        <div className="d3" style={{marginBottom:6}}>My Practices</div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.65,marginBottom:16}}>
+          Every practice you commit to is tracked here. Mark things active, note your progress, and move them to Mastered when they become part of who you are.
+        </p>
+
+        {/* Overall progress bar */}
+        <div style={{background:"var(--lift)",borderRadius:16,padding:"18px 20px",border:"1px solid var(--line-gold)",marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <div>
+              <div style={{fontSize:22,fontWeight:800,color:"var(--cream)"}}>{ht.committed.length}<span style={{fontSize:14,color:"var(--cream-40)",fontWeight:400}}>/{ht.total}</span></div>
+              <div style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>PRACTICES COMMITTED</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"var(--gold)"}}>{ht.pct}%</div>
+              <div style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>OVERALL</div>
+            </div>
+          </div>
+          <div style={{height:10,background:"rgba(255,255,255,0.06)",borderRadius:5,overflow:"hidden",marginBottom:10}}>
+            <div style={{height:"100%",width:`${ht.pct}%`,background:"linear-gradient(90deg,var(--teal),var(--gold))",borderRadius:5,transition:"width .8s ease"}}/>
+          </div>
+          <div style={{display:"flex",gap:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:"var(--teal)"}}/>
+              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{ht.active.length} active</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:"var(--gold)"}}/>
+              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{ht.mastered.length} mastered</span>
+            </div>
+            {ht.paused.length>0&&<div style={{display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:"rgba(255,255,255,0.2)"}}/>
+              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{ht.paused.length} paused</span>
+            </div>}
+          </div>
+        </div>
+
+        {/* Per-module mini progress */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:16}}>
+          {Object.entries(byModule).map(([mod,items])=>{
+            const done=items.filter(t=>ht.data[t.key]?.committed).length;
+            const pct=Math.round((done/items.length)*100);
+            return(
+              <div key={mod} onClick={()=>setFilter(f=>f===mod?"all":mod)}
+                style={{padding:"10px 12px",background:filter===mod?"var(--lift)":"var(--raised)",border:`1px solid ${filter===mod?"var(--line-gold)":"rgba(255,255,255,0.06)"}`,borderRadius:12,cursor:"pointer",transition:"all .2s"}}>
+                <div style={{fontSize:10,color:"var(--cream-40)",fontFamily:"var(--f-mono)",marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{MODULE_LABELS[mod]}</div>
+                <div style={{height:4,background:"rgba(255,255,255,0.06)",borderRadius:2,marginBottom:4}}>
+                  <div style={{height:"100%",width:`${pct}%`,background: pct===100?"var(--gold)":"var(--teal)",borderRadius:2,transition:"width .5s"}}/>
+                </div>
+                <div style={{fontSize:10,fontWeight:700,color:pct===100?"var(--gold)":"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{done}/{items.length}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Filter pills */}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[["all","All 33"],["committed","Committed"],["mastered","Mastered ✦"],["not_started","Not started yet"],
+            ...Object.keys(byModule).map(m=>[m,MODULE_LABELS[m]])
+          ].map(([val,lbl])=>(
+            <button key={val} onClick={()=>setFilter(val)}
+              style={{padding:"5px 13px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all .2s",
+                background:filter===val?"var(--gold)":"rgba(255,255,255,0.05)",
+                color:filter===val?"#000":"var(--cream-40)"}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Items list */}
+      {displayed.length===0&&(
+        <div style={{textAlign:"center",padding:"48px 20px",background:"var(--raised)",borderRadius:16,border:"1px solid rgba(255,255,255,0.06)"}}>
+          <div style={{fontSize:32,marginBottom:12}}>
+            {filter==="not_started"?"🚀":filter==="mastered"?"✦":"📋"}
+          </div>
+          <div style={{fontSize:14,color:"var(--cream-50)",marginBottom:8}}>
+            {filter==="not_started"?"You've committed to everything! Incredible."
+             :filter==="mastered"?"Nothing mastered yet — keep going."
+             :filter==="committed"?"No practices committed yet."
+             :"No practices in this filter."}
+          </div>
+          {filter==="committed"&&<p style={{fontSize:12,color:"var(--cream-30)",maxWidth:320,margin:"0 auto"}}>
+            Open any module tab — Daily Discipline, Invest in Yourself, Get Successful, 10x Mindset — expand a section and tap "I'm doing this".
+          </p>}
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {displayed.map(item=>{
+          const entry=ht.data[item.key];
+          const isIn=entry?.committed;
+          const status=entry?.status||"active";
+          const sm=STATUS_META[status]||STATUS_META.active;
+          const days=daysActive(entry);
+          const isExp=expandKey===item.key;
+
+          return(
+            <div key={item.key} style={{
+              background:isIn?sm.bg:"rgba(255,255,255,0.02)",
+              border:`1px solid ${isIn?sm.border:"rgba(255,255,255,0.06)"}`,
+              borderRadius:14,overflow:"hidden",transition:"all .25s",
+            }}>
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"13px 16px",cursor:"pointer"}}
+                onClick={()=>isIn&&setExpandKey(isExp?null:item.key)}>
+
+                {/* Commit toggle */}
+                <button onClick={e=>{e.stopPropagation();isIn?ht.uncommit(item.key):ht.commit(item.key);}}
+                  style={{width:32,height:32,borderRadius:"50%",flexShrink:0,cursor:"pointer",border:"none",
+                    background:isIn?sm.border:"rgba(255,255,255,0.06)",
+                    color:isIn?sm.color:"var(--cream-30)",
+                    fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}
+                  title={isIn?"Remove from tracker":"I'm doing this"}>
+                  {isIn?"✓":"○"}
+                </button>
+
+                <span style={{fontSize:17,flexShrink:0}}>{item.icon}</span>
+
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:isIn?600:400,color:isIn?"var(--cream)":"var(--cream-40)",lineHeight:1.4,marginBottom:isIn?3:0}}>{item.label}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{MODULE_LABELS[item.module]}</span>
+                    {isIn&&<span style={{fontSize:9,fontFamily:"var(--f-mono)",color:sm.color,background:sm.bg,padding:"1px 7px",borderRadius:10,border:`1px solid ${sm.border}`}}>{sm.label}</span>}
+                    {isIn&&days>0&&<span style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{days}d in</span>}
+                    {isIn&&entry?.notes&&<span style={{fontSize:9,color:"var(--cream-30)"}}>📝 note</span>}
+                  </div>
+                </div>
+
+                {isIn&&(
+                  <select value={status} onClick={e=>e.stopPropagation()} onChange={e=>ht.updateStatus(item.key,e.target.value)}
+                    style={{background:"var(--midnight)",border:`1px solid ${sm.border}`,borderRadius:8,padding:"4px 8px",color:sm.color,fontSize:10,fontFamily:"var(--f-mono)",cursor:"pointer",outline:"none",flexShrink:0}}>
+                    <option value="active">Active</option>
+                    <option value="mastered">Mastered ✦</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Note editor — shows when expanded */}
+              {isIn&&isExp&&(
+                <div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".08em",marginBottom:6,marginTop:12}}>
+                    YOUR PROGRESS NOTE
+                  </div>
+                  <NoteEditor itemKey={item.key} ht={ht}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Motivational footer */}
+      {ht.committed.length>0&&(
+        <div style={{marginTop:24,padding:"20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
+          <div style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75}}>
+            {ht.mastered.length===0&&ht.committed.length<5&&"Every great life is built one committed practice at a time. Keep going."}
+            {ht.committed.length>=5&&ht.mastered.length===0&&"You're building something real. The first 21 days of any practice are the hardest."}
+            {ht.mastered.length>0&&ht.mastered.length<3&&`You've mastered ${ht.mastered.length} practice${ht.mastered.length>1?"s":""}. That's not a small thing. It means the habit is now part of you.`}
+            {ht.mastered.length>=3&&`${ht.mastered.length} practices mastered. You are not the same person who started. Keep compounding.`}
+          </div>
+          {ht.pct===100&&<div style={{marginTop:10,fontSize:15,color:"var(--gold)",fontWeight:700}}>
+            ✦ All 33 practices committed. You're playing a different game entirely.
+          </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DISCIPLINE_SECTIONS=[
+  {
+    id:"wakeup",
+    icon:"⏰",
+    color:"var(--gold)",
+    title:"When to Wake Up — And Why It Actually Matters",
+    wakeTime:"5:30 AM – 6:00 AM",
+    subtitle:"The first hour of your day is the most uncontested hour you will ever have. Don't waste it.",
+    body:"The most productive people in the world — builders, athletes, writers, founders — protect their mornings aggressively. Not because waking up early is a personality trait, but because the first 60–90 minutes before the world needs you are the only time your mind is fully yours. No notifications. No one asking things of you. No decisions that belong to other people. That window is where real progress is built.",
+    breakdown:[
+      {time:"5:30 AM", label:"Wake up", detail:"No snooze. Get up immediately. The first decision of the day sets the tone for every decision that follows. Snoozing is practice for giving up."},
+      {time:"5:30 – 5:45 AM", label:"Hydrate + no phone", detail:"Drink water before anything else. Your brain is dehydrated after sleep. Do not touch your phone — looking at notifications first thing hands control of your morning to everyone else."},
+      {time:"5:45 – 6:15 AM", label:"Move your body", detail:"30 minutes of movement — a walk, a run, a workout, stretching. This is not about fitness. It raises your cortisol (the focus hormone) to its natural peak and sets your cognitive baseline for the day."},
+      {time:"6:15 – 6:30 AM", label:"Review your day's one goal", detail:"Not your to-do list. One goal. What is the single most important thing you need to move forward today? Write it down. Say it out loud if you need to. This is your anchor."},
+      {time:"6:30 – 8:00 AM", label:"Deep work — no interruptions", detail:"This is your most cognitively powerful window. No calls, no social media, no WhatsApp. Work on the thing that matters most. This block alone, done consistently, changes your life within 90 days."},
+    ],
+    truth:"Most people start their day reactively — checking their phone, responding to others, watching content. You are giving the first and best hours of your brain to other people's agendas. The person who owns their morning owns their life.",
+    links:[
+      {label:"The Miracle Morning by Hal Elrod",url:"https://www.amazon.com/Miracle-Morning-Not-So-Obvious-Guaranteed-Transform/dp/0979019710",type:"book"},
+      {label:"My Morning Routine — routines from top performers",url:"https://mymorningroutine.com",type:"resource"},
+      {label:"5 AM Club by Robin Sharma",url:"https://www.amazon.com/AM-Club-Morning-Elevate-Life/dp/1443456624",type:"book"},
+      {label:"Huberman Lab — morning routine science",url:"https://www.hubermanlab.com/episode/master-your-sleep-and-be-more-alert-when-awake",type:"resource"},
+    ],
+  },
+  {
+    id:"routine",
+    icon:"🔁",
+    color:"var(--teal)",
+    title:"Build a Routine That Actually Sticks",
+    subtitle:"Your routine is the architecture of your discipline. Design it once, execute it forever.",
+    body:"A routine is not a rigid schedule. It is a sequence of defaults — a series of decisions you made once so you don't have to make them again every day. The more decisions you automate with routine, the more cognitive energy you have for the work that actually matters. Most people fail at routines not because they lack willpower, but because they designed a routine that requires willpower to execute. The goal is a routine that feels like friction NOT to do.",
+    blocks:[
+      {label:"Morning Block (5:30–8:30 AM)", items:["Wake, hydrate, no phone","30 min movement","1 goal review","90 min deep work on your most important task"]},
+      {label:"Work Block (9 AM–1 PM)", items:["Focused execution on your main goal","No social media — use Freedom or Cold Turkey to block","Check messages only at 9 AM, 12 PM, 5 PM","1 short break at 11 AM (10 mins, walk outside)"]},
+      {label:"Recovery Block (1–3 PM)", items:["Lunch — real food, not junk, it affects your 3 PM energy","10–20 min nap or rest if needed (optional but powerful)","Light tasks, admin, messages in this window"]},
+      {label:"Evening Block (6–9 PM)", items:["Exercise if you didn't in the morning","Learning — read, watch something that builds a skill, not entertainment","Review: what did I do today? What moves tomorrow?","Wind down: no screens after 9:30 PM"]},
+      {label:"Sleep (10–10:30 PM)", items:["Same time every night — this is not optional","Dark, cool room","No phone in the bedroom","You are programming your body's clock. Inconsistency breaks it."]},
+    ],
+    truth:"The routine is not the destination. It is the container that holds your discipline when motivation is gone. And motivation will always go.",
+    links:[
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"Freedom — block sites during work blocks",url:"https://freedom.to",type:"tool"},
+      {label:"Notion daily planner template (free)",url:"https://www.notion.so/templates/daily-planner",type:"tool"},
+      {label:"Structured — visual daily planner app",url:"https://structured.app",type:"tool"},
+    ],
+  },
+  {
+    id:"consistency",
+    icon:"📅",
+    color:"#9b72cf",
+    title:"Stay Consistent When Motivation Disappears",
+    subtitle:"Motivation is a feeling. Discipline is a decision. Feelings come and go. Decisions hold.",
+    body:"Here is what nobody tells you about consistency: you will not feel motivated most of the time. The people you follow online who look disciplined are not motivated every day — they built systems that run even when they feel nothing. The difference between the person who makes it and the person who almost made it is almost never talent. It is the ability to show up on the days when showing up feels pointless.",
+    rules:[
+      {rule:"Never miss twice", detail:"Miss one day — fine, life happens. Miss two days in a row and you are no longer breaking a streak, you are building a new habit of not showing up. One miss is an exception. Two misses is a pattern. Never let the pattern start."},
+      {rule:"Lower the bar on hard days", detail:"Your routine on a hard day does not have to be your routine on a great day. On the days when you can't do everything, do the smallest version. 10 minutes of exercise instead of 45. One paragraph instead of a chapter. Something always beats nothing."},
+      {rule:"Track it visibly", detail:"The moment you can see your streak — physically, on a wall, in an app, in a journal — breaking it becomes painful in a way that keeps you honest. What gets measured gets protected. That's why DestinIQ shows your streak every single day."},
+      {rule:"Remove the decision", detail:"Every day you have to decide whether to start your routine, you will sometimes decide no. Automate the start: set an alarm, lay out your workout clothes, open your notes app before bed. Make starting require zero decisions."},
+      {rule:"Find your why in 10 seconds", detail:"When you don't want to start, give yourself 10 seconds to remember one specific, personal reason you started. Not an abstract goal — a real image. The life you want. The person you're building. Hold it for 10 seconds, then begin."},
+    ],
+    truth:"Every day you show up when you don't feel like it, you are building the mental proof that you are someone who doesn't quit. That proof is more valuable than any single session.",
+    links:[
+      {label:"Can't Hurt Me by David Goggins",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287",type:"book"},
+      {label:"The Compound Effect by Darren Hardy",url:"https://www.amazon.com/Compound-Effect-Darren-Hardy/dp/159315724X",type:"book"},
+      {label:"Streaks — habit tracking app",url:"https://streaksapp.com",type:"tool"},
+      {label:"Habitica — gamify your habits",url:"https://habitica.com",type:"tool"},
+    ],
+  },
+  {
+    id:"focus",
+    icon:"🎯",
+    color:"var(--rose)",
+    title:"How to Stay Focused When Everything Distracts You",
+    subtitle:"Focus is not a personality trait. It is an environment design problem.",
+    body:"If you have to rely on willpower to stay focused, you will lose. Your phone was designed by some of the smartest engineers in the world to be more compelling than your goals. You cannot out-discipline a device built to prevent you from doing exactly that. The solution is not more discipline — it is fewer choices. Remove the distraction from reach before the work session starts. What you cannot see, you will not reach for.",
+    tactics:[
+      {tactic:"The 90-minute block", detail:"Work on one thing for 90 minutes with zero interruptions. Phone in another room (not face down — in another room). Notifications off. This one practice, done 5 days a week, puts you in the top 5% of productive people on Earth. Most people never achieve 90 uninterrupted minutes in a full working day."},
+      {tactic:"Grayscale your phone", detail:"Go to Settings → Accessibility → Display → Color Filters → Grayscale. A grey screen is significantly less addictive than a colorful one. Instagram and TikTok without color lose 40% of their pull. Try it for one week and you will not turn it back."},
+      {tactic:"No phone in the first 60 minutes", detail:"The most common version of this instruction is ignored because people don't understand why. Here is why: the moment you check your phone, your brain switches from creative/strategic mode into reactive mode. It takes 20 minutes on average to get back. You lose that every morning if you check first thing."},
+      {tactic:"Batch your communication", detail:"Check messages, email, and social media at 3 fixed times per day: 9 AM, 1 PM, 5 PM. Outside of those times, they are closed. This alone will recover 2–3 hours of focused work daily that is currently being fragmented by random interruptions."},
+      {tactic:"One tab, one task", detail:"Every open browser tab is a pending decision asking for your attention. Work with one tab open at a time. Use a tool like OneTab to collapse everything else. Your screen should show only what you are currently working on."},
+    ],
+    truth:"The person who can focus for 3 hours a day while everyone else is distracted for 8 hours will produce more in a week than most people produce in a month. Focus is the new superpower.",
+    links:[
+      {label:"Deep Work by Cal Newport",url:"https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692",type:"book"},
+      {label:"Freedom — block distracting websites",url:"https://freedom.to",type:"tool"},
+      {label:"One Sec — pause before opening apps",url:"https://one-sec.app",type:"tool"},
+      {label:"Forest — stay off your phone while working",url:"https://www.forestapp.cc",type:"tool"},
+      {label:"Cold Turkey Blocker",url:"https://getcoldturkey.com",type:"tool"},
+    ],
+  },
+  {
+    id:"study",
+    icon:"📚",
+    color:"var(--gold)",
+    title:"How to Study Hard and Actually Retain It",
+    subtitle:"Studying hard is not about hours. It is about how you use the hours.",
+    body:"Most people study by re-reading and highlighting. Research consistently shows this is one of the least effective methods for actually retaining information. You are not learning — you are recognizing, which feels the same but produces no lasting change. Real learning happens through active recall, spaced repetition, and application. If you can't explain it without looking at it, you don't know it yet.",
+    methods:[
+      {method:"Active recall", detail:"After reading a section, close the book and write down everything you can remember without looking. This feels harder than re-reading — that's the point. Difficulty during learning is a signal of actual encoding. Use flashcards, Anki, or just a blank page."},
+      {method:"The Feynman Technique", detail:"Take any concept you are studying and explain it as if you were teaching it to a 12-year-old. The moment you hit a point where your explanation gets vague, that is the exact gap in your understanding. Go back to that specific gap, learn it, and try again."},
+      {method:"Spaced repetition", detail:"Review material 1 day after learning it. Then 3 days later. Then 7 days. Then 21 days. This mirrors how long-term memory is actually built. Cramming fills short-term memory, not long-term. Anki automates this schedule for you."},
+      {method:"Study in 45-minute blocks", detail:"45 minutes of focused study, 10–15 minute break. During the break, do nothing related to the material — walk, stretch, do nothing. Your brain consolidates learning during rest, not during more studying. Cramming 4 hours straight is worse than 4 × 45-minute focused blocks."},
+      {method:"Teach it immediately", detail:"Within 24 hours of learning something important, teach it to someone — a friend, a family member, even an imaginary student. Teaching exposes exactly what you don't actually understand and forces you to structure what you do. It accelerates retention by a factor of 4x over passive review."},
+    ],
+    truth:"The student who studies 3 focused hours using the right methods will outperform the student who studies 8 distracted hours every single time. Time is not the variable. Method is.",
+    links:[
+      {label:"Anki — free spaced repetition flashcards",url:"https://apps.ankiweb.net",type:"tool"},
+      {label:"Make It Stick — the science of learning",url:"https://www.amazon.com/Make-Stick-Science-Successful-Learning/dp/0674729013",type:"book"},
+      {label:"A Mind for Numbers by Barbara Oakley",url:"https://www.amazon.com/Mind-Numbers-Science-Flunked-Algebra/dp/039916524X",type:"book"},
+      {label:"Coursera learning science courses",url:"https://www.coursera.org/learn/learning-how-to-learn",type:"tool"},
+    ],
+  },
+  {
+    id:"workout",
+    icon:"💪",
+    color:"var(--teal)",
+    title:"Working Out — The Discipline That Builds All Other Discipline",
+    subtitle:"You are not working out for your body. You are working out for your mind.",
+    body:"Exercise is the highest-leverage discipline habit that exists. Every time you finish a workout when you didn't want to start one, you have proved to yourself that you can do hard things. That proof transfers. The person who is consistent in their fitness is statistically more likely to be consistent in their work, their relationships, and their finances. Exercise is not a health strategy — it is a character-building practice.",
+    plan:[
+      {day:"Monday", workout:"Strength (upper body) — 45 mins", notes:"Push-ups, rows, shoulder press. Use bodyweight if you have no gym. Resistance is the stimulus — not the equipment."},
+      {day:"Tuesday", workout:"Run or walk — 30 mins", notes:"Moderate pace. This is active recovery and cardiovascular baseline. Not a race."},
+      {day:"Wednesday", workout:"Strength (lower body + core) — 45 mins", notes:"Squats, lunges, planks. Core strength is posture, energy, and injury prevention combined."},
+      {day:"Thursday", workout:"Rest or light stretch — 20 mins", notes:"Rest is part of the programme. Your muscles grow during rest, not during the workout. Honour this."},
+      {day:"Friday", workout:"Full body circuit — 40 mins", notes:"Compound movements: squat, push, pull, hinge. High intensity. Short rest periods."},
+      {day:"Saturday", workout:"Long walk or sport — 45–60 mins", notes:"Something you enjoy. A sport, a long walk, a hike. This is movement as living, not movement as obligation."},
+      {day:"Sunday", workout:"Complete rest", notes:"Recovery is not weakness. It is the completion of the cycle that makes you stronger."},
+    ],
+    truth:"You don't need a gym. You don't need equipment. You need your bodyweight and 30–45 minutes. The excuse that you need more than that to start is the reason most people never start.",
+    links:[
+      {label:"Nike Training Club — free guided workouts",url:"https://www.nike.com/ntc-app",type:"tool"},
+      {label:"Bodyweight fitness subreddit (free programme)",url:"https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/",type:"resource"},
+      {label:"Can't Hurt Me by David Goggins",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287",type:"book"},
+      {label:"Freeletics — bodyweight training app",url:"https://www.freeletics.com",type:"tool"},
+    ],
+  },
+  {
+    id:"mindset_d",
+    icon:"🧠",
+    color:"#9b72cf",
+    title:"Staying Focused When Motivation Fades",
+    subtitle:"Motivation is the spark. Discipline is the engine. You need both — but only one is reliable.",
+    body:"Motivation is an emotion. Emotions are temporary, inconsistent, and influenced by things completely outside your control — your sleep, the weather, a conversation, a notification. If you are waiting to feel motivated to start, you will wait for a long time, and the days will pass. Discipline is the decision to begin before the feeling arrives. And here is what most people don't know: the feeling usually arrives after you begin, not before.",
+    mental_tools:[
+      {tool:"The 2-minute rule", detail:"If you don't want to start, commit to just 2 minutes. Just open the book. Just put on your shoes. Just sit at your desk. 90% of the time, starting for 2 minutes turns into a full session. The resistance is in the beginning, not the middle."},
+      {tool:"Identity-based motivation", detail:"Instead of saying 'I want to work out,' say 'I am someone who works out.' Instead of 'I want to study,' say 'I am someone who studies every day.' Identity follows behaviour — but behaviour also follows identity. Claim the identity before you've fully earned it, then earn it."},
+      {tool:"The 10-year test", detail:"When you don't want to do the work: ask yourself how you will feel about today's choice in 10 years. Not 10 days. 10 years. Almost always, the answer immediately makes the right decision obvious. Future you is always watching."},
+      {tool:"Visualise the next 5 minutes, not the goal", detail:"Don't think about the whole run when you're tired. Think about the next 5 minutes. Don't think about finishing the book. Think about the next 2 pages. Breaking the action down to the smallest next step removes the overwhelm that kills momentum."},
+    ],
+    truth:"The people you most admire for their discipline did not become that way through motivation. They became that way through hundreds of small, invisible choices to begin when they didn't want to — until beginning became automatic.",
+    links:[
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"Discipline Equals Freedom by Jocko Willink",url:"https://www.amazon.com/Discipline-Equals-Freedom-Field-Manual/dp/1250156089",type:"book"},
+      {label:"David Goggins on discipline (YouTube)",url:"https://www.youtube.com/results?search_query=david+goggins+discipline",type:"resource"},
+    ],
+  },
+];
+
+function DailyDisciplineModule({formData, userId}){
+  const [open,setOpen]=useState(null);
+  const name=formData?.name||"";
+
+  return(
+    <div className="fu">
+      {/* Hero */}
+      <div style={{marginBottom:28,padding:"24px",background:"linear-gradient(135deg,rgba(210,175,90,0.07),rgba(196,100,90,0.04))",border:"1px solid var(--line-gold)",borderRadius:18,textAlign:"center"}}>
+        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:8}}>YOUR DISCIPLINE SYSTEM</div>
+        <div className="d3" style={{marginBottom:10}}>
+          {name?"Done with Distractions, "+name+"?":"Done with Distractions?"}<br/>
+          <span style={{color:"var(--gold)"}}>Here's the system that replaces them.</span>
+        </div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,maxWidth:480,margin:"0 auto"}}>
+          Waking up early. Building routines. Studying hard. Working out. Staying focused when motivation fades.
+          Every one of these is explained below — deeply, specifically, and with the tools to actually do it.
+        </p>
+      </div>
+
+      {/* Sections */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {DISCIPLINE_SECTIONS.map(s=>{
+          const isOpen=open===s.id;
+          return(
+            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+              {/* Header */}
+              <button onClick={()=>setOpen(o=>o===s.id?null:s.id)}
+                style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+                <div style={{width:44,height:44,borderRadius:12,background:`${s.color}14`,border:`1px solid ${s.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                  {s.icon}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:isOpen?s.color:"var(--cream)",marginBottom:3}}>{s.title}</div>
+                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.subtitle}</div>
+                  {s.wakeTime&&!isOpen&&(
+                    <div style={{marginTop:5,display:"inline-flex",alignItems:"center",gap:5,padding:"2px 10px",background:`${s.color}12`,border:`1px solid ${s.color}25`,borderRadius:20}}>
+                      <span style={{fontSize:10,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700}}>{s.wakeTime}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{color:s.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+              </button>
+
+              {/* Expanded */}
+              {isOpen&&(
+                <div style={{padding:"0 20px 22px"}}>
+                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
+
+                  {/* Wake time badge */}
+                  {s.wakeTime&&(
+                    <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"6px 14px",background:`${s.color}12`,border:`1px solid ${s.color}28`,borderRadius:24,marginBottom:14}}>
+                      <span style={{fontSize:18}}>⏰</span>
+                      <span style={{fontSize:13,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700}}>{s.wakeTime}</span>
+                    </div>
+                  )}
+
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{s.body}</p>
+
+                  {/* Hour-by-hour breakdown */}
+                  {s.breakdown&&(
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>HOUR BY HOUR</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {s.breakdown.map((b,i)=>(
+                          <div key={i} style={{display:"flex",gap:12,padding:"12px 14px",background:"var(--midnight)",borderRadius:12,border:"1px solid rgba(255,255,255,0.05)"}}>
+                            <div style={{flexShrink:0,minWidth:80}}>
+                              <div style={{fontSize:10,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700,lineHeight:1.4}}>{b.time}</div>
+                            </div>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:3}}>{b.label}</div>
+                              <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>{b.detail}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Routine blocks */}
+                  {s.blocks&&(
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>YOUR DAILY STRUCTURE</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                        {s.blocks.map((b,i)=>(
+                          <div key={i} style={{background:"var(--midnight)",borderRadius:12,padding:"14px",border:`1px solid ${s.color}18`}}>
+                            <div style={{fontSize:12,fontWeight:700,color:s.color,marginBottom:8,fontFamily:"var(--f-mono)"}}>{b.label}</div>
+                            {b.items.map((item,j)=>(
+                              <div key={j} style={{display:"flex",gap:8,marginBottom:5}}>
+                                <span style={{color:s.color,fontSize:9,marginTop:4,flexShrink:0}}>◎</span>
+                                <span style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65}}>{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rules / Tactics / Methods / Plan */}
+                  {(s.rules||s.tactics||s.methods||s.mental_tools)&&(
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>
+                        {s.rules?"THE RULES":s.tactics?"THE TACTICS":s.methods?"THE METHODS":"MENTAL TOOLS"}
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {(s.rules||s.tactics||s.methods||s.mental_tools).map((item,i)=>{
+                          const label=item.rule||item.tactic||item.method||item.tool;
+                          const detail=item.detail;
+                          return(
+                            <div key={i} style={{background:"var(--midnight)",borderRadius:12,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.05)"}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginBottom:5}}>{i+1}. {label}</div>
+                              <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7}}>{detail}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Workout plan */}
+                  {s.plan&&(
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>WEEKLY WORKOUT PLAN</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                        {s.plan.map((day,i)=>(
+                          <div key={i} style={{display:"flex",gap:12,padding:"11px 14px",background:"var(--midnight)",borderRadius:11,border:"1px solid rgba(255,255,255,0.05)",alignItems:"flex-start"}}>
+                            <div style={{flexShrink:0,minWidth:88}}>
+                              <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700}}>{day.day}</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:2}}>{day.workout}</div>
+                              <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.55}}>{day.notes}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* The hard truth */}
+                  <div style={{padding:"14px 16px",background:`${s.color}07`,borderLeft:`3px solid ${s.color}`,borderRadius:"0 12px 12px 0",marginBottom:14}}>
+                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:6}}>THE TRUTH</div>
+                    <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.75,fontStyle:"italic"}}>{s.truth}</p>
+                  </div>
+
+                  {/* Resource links */}
+                  <ResourceLinks links={s.links} accentColor={s.color}/>
+                  <HabitButton itemKey={`discipline:${s.id}`} userId={userId}/>
+                  <AudioPlayer text={`${s.title}. ${s.body}`} label="Listen" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom CTA */}
+      <div style={{marginTop:28,padding:"22px 20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
+        <div style={{fontSize:22,marginBottom:10}}>🏁</div>
+        <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:8}}>
+          This is the FYP you actually need{name?`, ${name}`:""}
+        </div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,maxWidth:400,margin:"0 auto 16px"}}>
+          Not 60-second clips that feel good for a moment and then disappear. 
+          A complete, deeply explained system you can open any day and execute.
+          Your DestinIQ streak is the proof you're living it.
+        </p>
+        <div style={{fontFamily:"var(--f-mono)",fontSize:11,color:"var(--gold)",letterSpacing:".1em"}}>
+          ◎ CHECK IN DAILY · TRACK YOUR STREAK · BUILD THE LIFE
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const INVEST_SECTIONS=[
+  {
+    id:"study",
+    icon:"📚",
+    color:"var(--gold)",
+    title:"Study Obsession",
+    subtitle:"Your 20s decide your 40s — what you pour in now compounds for decades.",
+    body:"Read biographies of the greats — Steve Jobs, Elon Musk, Rockefeller, Oprah, Howard Schultz. Not to worship them. To study their patterns. Success leaves clues. You learn what actually worked in real life — their morning routines, how they handled rejection, the decisions they made at 25 that changed everything. You start to see that most legendary careers weren't lucky accidents. They were the result of compounding small, obsessive inputs over years.",
+    habits:[
+      "Read 1 biography or autobiography per month — not self-help, actual life stories of people who built something.",
+      "Keep a pattern journal: write down 1 pattern you noticed in what you read each week.",
+      "Study failures as hard as successes — what did they do at the moment it nearly fell apart?",
+      "Pick one mentor dead or alive and study them deeply for 90 days before moving to the next.",
+    ],
+    why:"Why it works: you compress decades of experience into weeks. You stop making beginner mistakes that people before you already made and documented.",
+    links:[
+      {label:"Steve Jobs by Walter Isaacson",url:"https://www.amazon.com/Steve-Jobs-Walter-Isaacson/dp/1451648537",type:"book"},
+      {label:"Elon Musk by Walter Isaacson",url:"https://www.amazon.com/Elon-Musk-Walter-Isaacson/dp/1982181281",type:"book"},
+      {label:"Titan: The Life of John D. Rockefeller",url:"https://www.amazon.com/Titan-Life-John-Rockefeller-Sr/dp/1400077303",type:"book"},
+      {label:"The Autobiography of Malcolm X",url:"https://www.amazon.com/Autobiography-Malcolm-Told-Alex-Haley/dp/0345350685",type:"book"},
+      {label:"Becoming by Michelle Obama",url:"https://www.amazon.com/Becoming-Michelle-Obama/dp/1524763136",type:"book"},
+      {label:"Pour Your Heart Into It by Howard Schultz",url:"https://www.amazon.com/Pour-Your-Heart-Into-Starbucks/dp/0786883561",type:"book"},
+      {label:"Browse all biographies on Goodreads",url:"https://www.goodreads.com/shelf/show/biography",type:"resource"},
+    ],
+  },
+  {
+    id:"body",
+    icon:"⚡",
+    color:"var(--teal)",
+    title:"Obsess Over Energy",
+    subtitle:"Your body is your highest-return investment. Protect it like your most valuable asset.",
+    body:"Everything — discipline, creativity, focus, emotional control — runs on energy. Sleep 7–8 hours like your career depends on it, because it does. Exercise 4–5 times a week, not for aesthetics but for cognitive performance. What you eat determines how clearly you think at 3pm. Most people negotiate their energy away for short-term comfort and then wonder why they can't execute on their goals.",
+    habits:[
+      "Sleep before midnight. Non-negotiable. Your prefrontal cortex — the part that makes decisions — degrades fast on poor sleep.",
+      "Exercise in the morning, before the world asks things of you. Even 30 minutes changes your entire day.",
+      "Cut one thing from your diet that you know is draining you. Not everything — just one thing this month.",
+      "Track your energy hourly for one week. You will immediately see the patterns that are costing you hours of output.",
+    ],
+    why:"Why it works: high-energy people outperform high-talent people. You can outwork smarter people if you protect your engine.",
+    links:[
+      {label:"Why We Sleep by Matthew Walker",url:"https://www.amazon.com/Why-We-Sleep-Unlocking-Dreams/dp/1501144316",type:"book"},
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"Huberman Lab Podcast (free, science-based)",url:"https://www.hubermanlab.com/podcast",type:"resource"},
+      {label:"Nike Training Club — free workouts",url:"https://www.nike.com/ntc-app",type:"tool"},
+      {label:"MyFitnessPal — track food & energy",url:"https://www.myfitnesspal.com",type:"tool"},
+    ],
+  },
+  {
+    id:"skills",
+    icon:"🛠️",
+    color:"#9b72cf",
+    title:"Stack High-Income Skills",
+    subtitle:"One skill makes you employable. A stack of 2–3 rare skills makes you irreplaceable.",
+    body:"Pick skills that compound and are hard to outsource: sales, persuasion, writing, coding, design, leadership, public speaking, negotiation. Then layer them. A programmer who can also sell is 10x more valuable than a programmer who only codes. A designer who can write copy commands double the rates. Your 20s are the lowest-cost time to acquire these skills — you have time, low obligations, and the brain plasticity to absorb new things fast.",
+    habits:[
+      "Spend 1 hour daily learning a skill that will be worth more in 5 years than it is today.",
+      "Teach what you learn immediately — tutoring, content, or just explaining to a friend. Teaching is the fastest form of retention.",
+      "Take on projects that scare you slightly — just beyond your current ability is where growth happens fastest.",
+      "Build a portfolio, not just a CV. Evidence of work beats claims about work every time.",
+    ],
+    why:"Why it works: skills are the only asset that can't be taken from you, and the compounding is silent but violent.",
+    links:[
+      {label:"Coursera — accredited online courses",url:"https://www.coursera.org",type:"tool"},
+      {label:"freeCodeCamp — learn coding free",url:"https://www.freecodecamp.org",type:"tool"},
+      {label:"Canva Design School — free design training",url:"https://www.canva.com/learn/",type:"tool"},
+      {label:"Copywriting course by CopyHackers (free articles)",url:"https://copyhackers.com/blog/",type:"resource"},
+      {label:"Toastmasters — public speaking clubs worldwide",url:"https://www.toastmasters.org/find-a-club",type:"tool"},
+      {label:"The Lean Startup by Eric Ries",url:"https://www.amazon.com/Lean-Startup-Entrepreneurs-Continuous-Innovation/dp/0307887898",type:"book"},
+      {label:"$100M Offers by Alex Hormozi",url:"https://www.amazon.com/100M-Offers-People-Stupid-Saying/dp/B09X4BXFJ8",type:"book"},
+    ],
+  },
+  {
+    id:"network",
+    icon:"🔗",
+    color:"var(--rose)",
+    title:"Network Mathematics",
+    subtitle:"You are the average of the 5 people you spend most time with. Choose them like your life depends on it.",
+    body:"Your network is not just who you know — it is what you believe is possible. Spend time with people who are building, who read, who have real standards for themselves, and your own standards quietly rise. Spend time with people who complain, who settle, who see ambition as arrogance — and your ceiling drops without you noticing. The math is ruthless: one right introduction can do what 10 years of solo effort cannot.",
+    habits:[
+      "Every month, reach out to one person you admire who is 5–10 years ahead of where you want to be. Not to ask for anything. Just to connect.",
+      "Give before you take — show up with value, a resource, an observation, something useful. Transactions come much later.",
+      "Audit your 5 closest people every 6 months. Not to cut people harshly, but to be honest about who is pulling you forward.",
+      "Go to one event, conference, or gathering in your field every quarter. Most of your best opportunities will come from a room.",
+    ],
+    why:"Why it works: talent and hardwork get you to a certain level. Network gets you the rest of the way.",
+    links:[
+      {label:"LinkedIn — connect with your industry",url:"https://www.linkedin.com",type:"tool"},
+      {label:"Meetup — find local professional events",url:"https://www.meetup.com",type:"tool"},
+      {label:"Lunchclub — AI-matched networking",url:"https://lunchclub.com",type:"tool"},
+      {label:"Never Eat Alone by Keith Ferrazzi",url:"https://www.amazon.com/Never-Eat-Alone-Secrets-Relationship/dp/0385346654",type:"book"},
+      {label:"How to Win Friends & Influence People",url:"https://www.amazon.com/How-Win-Friends-Influence-People/dp/0671027034",type:"book"},
+      {label:"Eventbrite — find conferences near you",url:"https://www.eventbrite.com",type:"tool"},
+    ],
+  },
+  {
+    id:"money",
+    icon:"💸",
+    color:"var(--gold)",
+    title:"Make Your Money Move Before You Do",
+    subtitle:"Spending is easy. Building wealth is a skill. Start in your 20s or pay in your 40s.",
+    body:"The single biggest financial mistake of the 20s: treating savings as what's left after spending, instead of what comes out first. Pay yourself first — 20% off the top before you touch a single cedi, naira, dollar, or pound. Then make that money work: index funds, a skill that generates income, a small side business. Compound interest is not a metaphor. It is a machine that runs 24 hours a day — but only if you start it early.",
+    habits:[
+      "Save at least 20% of every single income — no matter how small. Make it automatic so it's not a decision.",
+      "Learn one investment vehicle this year — index funds, real estate basics, or a simple business model. One. Deeply.",
+      "Avoid lifestyle inflation aggressively in your 20s. The car, the apartment upgrade, the clothing — that money invested now is worth 10x at 40.",
+      "Track every major expense for 30 days. You will find at least 2–3 things you're paying for that give you zero real return.",
+    ],
+    why:"Why it works: starting at 22 vs 32 in compound growth is not a 10-year difference — it is a 300–500% difference in outcome.",
+    links:[
+      {label:"The Psychology of Money by Morgan Housel",url:"https://www.amazon.com/Psychology-Money-Timeless-Lessons-Happiness/dp/0857197681",type:"book"},
+      {label:"I Will Teach You to Be Rich by Ramit Sethi",url:"https://www.amazon.com/Will-Teach-You-Rich-Second/dp/1523505745",type:"book"},
+      {label:"Rich Dad Poor Dad by Robert Kiyosaki",url:"https://www.amazon.com/Rich-Dad-Poor-Teach-Middle/dp/1612680194",type:"book"},
+      {label:"Investopedia — free financial education",url:"https://www.investopedia.com",type:"resource"},
+      {label:"YNAB — budgeting tool (You Need A Budget)",url:"https://www.youneedabudget.com",type:"tool"},
+      {label:"Compound interest calculator",url:"https://www.investor.gov/financial-tools-calculators/calculators/compound-interest-calculator",type:"tool"},
+    ],
+  },
+  {
+    id:"create",
+    icon:"✏️",
+    color:"var(--teal)",
+    title:"Create, Don't Just Consume",
+    subtitle:"Consumers pay. Creators get paid. Your 20s are your cheapest time to become a creator.",
+    body:"Every hour you spend scrolling, watching, and consuming, someone else is building the thing you wish you had built. Creation — writing, building, making, teaching, designing — is how you turn what you know into leverage. You do not need to be perfect to start. You need to start to get good. The creator who ships imperfect work consistently crushes the person who is perfecting something in private.",
+    habits:[
+      "Create something every single day — a post, a paragraph, a prototype, a line of code, a sketch. Something.",
+      "Ship before you feel ready. Waiting for perfect is waiting forever. Version 1 always beats Version Never.",
+      "Build in public — share your process, your learning, your failures. People trust builders who show their work.",
+      "Pick one medium to master this year: writing, video, audio, or code. One. Go deep before going wide.",
+    ],
+    why:"Why it works: creation compounds. Your 100th post teaches you things your 1st post never could. The reps are the lesson.",
+    links:[
+      {label:"Ghost — start a newsletter or blog",url:"https://ghost.org",type:"tool"},
+      {label:"Substack — write and get paid",url:"https://substack.com",type:"tool"},
+      {label:"YouTube — publish your ideas as video",url:"https://www.youtube.com/upload",type:"tool"},
+      {label:"GitHub — build and share code projects",url:"https://github.com",type:"tool"},
+      {label:"Show Your Work by Austin Kleon",url:"https://www.amazon.com/Show-Your-Work-Austin-Kleon/dp/076117897X",type:"book"},
+      {label:"The War of Art by Steven Pressfield",url:"https://www.amazon.com/War-Art-Through-Creative-Battles/dp/1936891026",type:"book"},
+    ],
+  },
+  {
+    id:"routine",
+    icon:"⏰",
+    color:"var(--gold)",
+    title:"Ruthless Routine",
+    subtitle:"Motivation gets you started. Routine keeps you going when motivation disappears — and it will.",
+    body:"Discipline is not a personality trait. It is a system. Successful people do not rely on feeling motivated — they build environments and routines that make good behavior the default. Your morning decides your day. Your week structure decides your month. Your habits, repeated 300 times, decide your year. The goal is to make your best version the path of least resistance, not the heroic effort.",
+    habits:[
+      "Design your morning before you sleep — know exactly what you will do first when you wake up. Remove the decision.",
+      "Block time for your most important work first, before email, before social media, before anything reactive.",
+      "End every day with a 5-minute review: what did I do, what moved forward, what needs to move tomorrow.",
+      "Protect your routine like a meeting you cannot miss — because it is the most important meeting of your day.",
+    ],
+    why:"Why it works: willpower depletes. Systems don't. A person with a strong routine at 60% motivation outperforms a person relying on inspiration at 100%.",
+    links:[
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"The Miracle Morning by Hal Elrod",url:"https://www.amazon.com/Miracle-Morning-Not-So-Obvious-Guaranteed-Transform/dp/0979019710",type:"book"},
+      {label:"Notion — free routine & planning template",url:"https://www.notion.so/templates/daily-planner",type:"tool"},
+      {label:"Todoist — daily task management",url:"https://todoist.com",type:"tool"},
+      {label:"Cal Newport — Deep Work (free articles)",url:"https://calnewport.com/blog/",type:"resource"},
+      {label:"My Morning Routine — real routines from successful people",url:"https://mymorningroutine.com",type:"resource"},
+    ],
+  },
+];
+
+// ── ResourceLinks: shared link card renderer used across all 3 modules ────────
+const LINK_TYPE_META={
+  book:    {emoji:"📖", label:"Book",     bg:"rgba(210,175,90,0.08)",  border:"rgba(210,175,90,0.2)",  color:"var(--gold)"},
+  resource:{emoji:"🔗", label:"Resource", bg:"rgba(31,168,154,0.08)",  border:"rgba(31,168,154,0.2)",  color:"var(--teal)"},
+  tool:    {emoji:"🛠", label:"Tool",     bg:"rgba(155,114,207,0.08)", border:"rgba(155,114,207,0.2)", color:"#9b72cf"},
+};
+function ResourceLinks({links, accentColor}){
+  if(!links||links.length===0) return null;
+  return(
+    <div style={{marginTop:16}}>
+      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:accentColor||"var(--gold)",letterSpacing:".12em",marginBottom:10}}>
+        START HERE — DIRECT LINKS
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:7}}>
+        {links.map((lk,i)=>{
+          const meta=LINK_TYPE_META[lk.type]||LINK_TYPE_META.resource;
+          return(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{
+                display:"flex",alignItems:"center",gap:10,
+                padding:"10px 14px",
+                background:meta.bg,
+                border:`1px solid ${meta.border}`,
+                borderRadius:10,
+                textDecoration:"none",
+                transition:"opacity .15s",
+              }}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}
+            >
+              <span style={{fontSize:15,flexShrink:0}}>{meta.emoji}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,color:"var(--cream)",fontWeight:500,lineHeight:1.4}}>{lk.label}</div>
+              </div>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:meta.border,color:meta.color,fontFamily:"var(--f-mono)",flexShrink:0,letterSpacing:".05em"}}>
+                {meta.label} ↗
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InvestInYourselfModule({formData, userId}){
+  const [open,setOpen]=useState(null);
+  const toggleAccordion=(id)=>setOpen(o=>o===id?null:id);
+  return(
+    <div className="fu">
+      <div style={{marginBottom:28}}>
+        <div className="d3" style={{marginBottom:8}}>Invest In Yourself{formData?.name?`, ${formData.name}`:""} — Your 20s Decide Your 40s</div>
+        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.75,maxWidth:620}}>
+          The highest-return investments you can make are not in stocks or real estate — they're in yourself.
+          What you build{formData?.age&&parseInt(formData.age)<=35?" in the next few years":" starting now"} is the foundation everything else sits on.
+          {formData?.country?` In ${formData.country}, the people who compound these habits fastest are the ones who start before they feel ready.`:` These are the inputs that compound.`}
+        </p>
+        {formData?.goals&&(
+          <div style={{marginTop:14,padding:"12px 16px",background:"rgba(210,175,90,0.06)",border:"1px solid var(--line-gold)",borderRadius:10,display:"flex",gap:10,alignItems:"flex-start"}}>
+            <span style={{color:"var(--gold)",flexShrink:0,marginTop:2}}>◎</span>
+            <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.65}}>
+              Your goal: <em style={{color:"var(--cream-70)"}}>&ldquo;{formData.goals}&rdquo;</em> — every section below feeds directly into that.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {INVEST_SECTIONS.map(s=>{
+          const isOpen=open===s.id;
+          return(
+            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+              {/* Header */}
+              <button onClick={()=>toggleAccordion(s.id)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+                <div style={{width:42,height:42,borderRadius:12,background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{s.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{s.title}</div>
+                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.subtitle}</div>
+                </div>
+                <div style={{color:s.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+              </button>
+
+              {/* Expanded content */}
+              {isOpen&&(
+                <div style={{padding:"0 20px 20px"}}>
+                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{s.body}</p>
+
+                  {/* Daily habits */}
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>WHAT TO ACTUALLY DO</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {s.habits.map((h,i)=>(
+                        <div key={i} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+                          <div style={{width:22,height:22,borderRadius:"50%",background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:s.color,fontWeight:700}}>{i+1}</div>
+                          <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{h}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Why it works */}
+                  <div style={{padding:"12px 16px",background:`${s.color}08`,borderLeft:`2px solid ${s.color}`,borderRadius:"0 10px 10px 0"}}>
+                    <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.7,fontStyle:"italic"}}>{s.why}</p>
+                  </div>
+
+                  <ResourceLinks links={s.links} accentColor={s.color}/>
+                  <HabitButton itemKey={`invest:${s.id}`} userId={userId}/>
+                  <AudioPlayer text={`${s.title}. ${s.body} ${s.habits.join(". ")}`} label="Listen" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom quote */}
+      <div style={{marginTop:32,padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
+        <p style={{fontFamily:"var(--f-display)",fontSize:18,fontStyle:"italic",color:"var(--gold)",lineHeight:1.6,margin:0}}>
+          &ldquo;The best time to plant a tree was 20 years ago. The second best time is today.&rdquo;
+        </p>
+        <p style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginTop:8}}>Your compound interest starts the moment you start.</p>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISGUSTINGLY SUCCESSFUL MODULE
+// Not lucky. Not gifted. Just following the right rules.
+// ═══════════════════════════════════════════════════════════════════════════════
+const SUCCESS_RULES=[
+  {
+    number:"01",
+    color:"var(--gold)",
+    title:"Study Obsession",
+    hook:"Read biographies of the greats. Not to worship them. To steal their patterns.",
+    detail:"Steve Jobs. Elon Musk. Rockefeller. Oprah. Howard Schultz. Katherine Johnson. These people were not just talented — they were patterned. They made specific choices, at specific moments, that changed everything. When you read their actual stories, not the highlight reels, you see the patterns: they worked when others rested, they obsessed when others kept things balanced, they were willing to look stupid before they looked brilliant. Success leaves clues. You can steal from people who already figured it out.",
+    actions:[
+      "Read 1 real biography per month — not summaries, the full book.",
+      "After each one, write 3 patterns you noticed. What did they all do that most people don't?",
+      "Pick 1 mistake they made and figure out if you are currently making the same one.",
+    ],
+    links:[
+      {label:"Steve Jobs by Walter Isaacson",url:"https://www.amazon.com/Steve-Jobs-Walter-Isaacson/dp/1451648537",type:"book"},
+      {label:"Elon Musk by Walter Isaacson",url:"https://www.amazon.com/Elon-Musk-Walter-Isaacson/dp/1982181281",type:"book"},
+      {label:"Titan: Life of John D. Rockefeller Sr.",url:"https://www.amazon.com/Titan-Life-John-Rockefeller-Sr/dp/1400077303",type:"book"},
+      {label:"Katherine Johnson: NASA biography",url:"https://www.nasa.gov/people/katherine-johnson",type:"resource"},
+      {label:"Goodreads — browse top biographies",url:"https://www.goodreads.com/shelf/show/biography",type:"resource"},
+    ],
+  },
+  {
+    number:"02",
+    color:"var(--teal)",
+    title:"Ruthless Routine",
+    hook:"Motivation is a visitor. Discipline is a resident. Build the system that runs when you don't feel like it.",
+    detail:"Every high performer you study has a morning routine, an output quota, a non-negotiable block of deep work. They are not more motivated than you. They designed environments and systems that make their best work the default behavior. Your feelings are unreliable. Your calendar is not. Structure your day so that your most important work happens first, before the world gets its hands on your attention.",
+    actions:[
+      "Design your ideal morning and run it for 21 days straight — no modification, just execute.",
+      "Block 2–3 hours of uninterrupted deep work daily — guard it like a meeting with your largest client.",
+      "End each day with a 5-minute review: did today move you forward or just keep you busy?",
+    ],
+    links:[
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"Deep Work by Cal Newport",url:"https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692",type:"book"},
+      {label:"My Morning Routine — real routines from top performers",url:"https://mymorningroutine.com",type:"resource"},
+      {label:"Notion daily planner template (free)",url:"https://www.notion.so/templates/daily-planner",type:"tool"},
+    ],
+  },
+  {
+    number:"03",
+    color:"#9b72cf",
+    title:"Network Mathematics",
+    hook:"One right introduction beats 10 years of solo effort. The math is real.",
+    detail:"Your network is not who you know. It is what you believe is possible. The people around you define your ceiling, whether you notice it or not. The ambitious person who surrounds themselves with builders starts to believe bigger without trying. The talented person who stays in a circle of complainers slowly loses the ambition they started with. Upgrade your environment, and your results follow automatically — even before you do any more work.",
+    actions:[
+      "Reach out to one person you admire every month — no ask, just genuine connection.",
+      "Attend one event or gathering in your field every quarter. Your next opportunity will come from a room.",
+      "Give before you take — show up with value, ideas, connections. Transactions come much later.",
+    ],
+    links:[
+      {label:"LinkedIn — connect with your industry",url:"https://www.linkedin.com",type:"tool"},
+      {label:"Never Eat Alone by Keith Ferrazzi",url:"https://www.amazon.com/Never-Eat-Alone-Secrets-Relationship/dp/0385346654",type:"book"},
+      {label:"Lunchclub — AI-matched 1:1 networking",url:"https://lunchclub.com",type:"tool"},
+      {label:"Eventbrite — find events in your field",url:"https://www.eventbrite.com",type:"tool"},
+      {label:"Meetup — local professional groups",url:"https://www.meetup.com",type:"tool"},
+    ],
+  },
+  {
+    number:"04",
+    color:"var(--rose)",
+    title:"Create, Don't Consume",
+    hook:"Consumers pay. Creators get paid. Stop feeding algorithms and start building things.",
+    detail:"Every hour you spend consuming, someone else is building the thing you wish you had created. Writing, building, designing, teaching, making — this is how you convert what you know into leverage. Creation is also the fastest path to clarity. You don't know what you think until you write it. You don't know if an idea works until you build it. The creator who ships imperfect work consistently beats the perfectionist who never finishes.",
+    actions:[
+      "Create something every day — a post, a paragraph, a prototype, a line of code. Even if nobody sees it.",
+      "Ship before you are ready. Done is the engine of more. Perfect is the enemy of real.",
+      "Pick one medium to master this year: writing, video, audio, or code. One. Go very deep.",
+    ],
+    links:[
+      {label:"Substack — write and earn from your audience",url:"https://substack.com",type:"tool"},
+      {label:"Ghost — professional blog & newsletter",url:"https://ghost.org",type:"tool"},
+      {label:"GitHub — share your code projects",url:"https://github.com",type:"tool"},
+      {label:"Show Your Work by Austin Kleon",url:"https://www.amazon.com/Show-Your-Work-Austin-Kleon/dp/076117897X",type:"book"},
+      {label:"The War of Art by Steven Pressfield",url:"https://www.amazon.com/War-Art-Through-Creative-Battles/dp/1936891026",type:"book"},
+    ],
+  },
+  {
+    number:"05",
+    color:"var(--gold)",
+    title:"Obsess Over Energy",
+    hook:"You cannot build an empire running on empty. Your body is not a cost — it is your infrastructure.",
+    detail:"Sleep, movement, nutrition, and mental recovery are not indulgences — they are performance inputs. A well-rested, physically active person with average talent will outperform a brilliant, depleted person almost every time. You cannot think clearly, make good decisions, or sustain long-term effort on 5 hours of sleep and zero movement. This is not wellness advice. It is performance strategy.",
+    actions:[
+      "Protect 7–8 hours of sleep — especially during your most important work phases.",
+      "Move your body for at least 30 minutes daily. The cognitive benefits alone are worth it.",
+      "Audit your energy for 7 days: rate yourself every 3 hours. Find the patterns that are costing you output.",
+    ],
+    links:[
+      {label:"Why We Sleep by Matthew Walker",url:"https://www.amazon.com/Why-We-Sleep-Unlocking-Dreams/dp/1501144316",type:"book"},
+      {label:"Huberman Lab Podcast — free science-based health show",url:"https://www.hubermanlab.com/podcast",type:"resource"},
+      {label:"Nike Training Club — free workouts",url:"https://www.nike.com/ntc-app",type:"tool"},
+      {label:"Eight Sleep — sleep tracking (resource)",url:"https://www.eightsleep.com/blog/sleep-performance/",type:"resource"},
+    ],
+  },
+];
+
+const SUCCESS_TRUTH={
+  title:"The Final Truth",
+  lines:[
+    "Disgusting success is built daily. Not emotionally. Not randomly. Systematically.",
+    "The person who shows up without motivation and executes their system beats the inspired person who acts only when they feel like it.",
+    "You don't need luck. You need a repeatable process, applied with obsessive consistency, for longer than most people are willing to go.",
+    "The rules are not a secret. Everyone has access to them. The difference is who actually follows them.",
+  ],
+};
+
+function DisgustinglySuccessfulModule({formData, userId}){
+  const [open,setOpen]=useState(null);
+  return(
+    <div className="fu">
+      {/* Hero */}
+      <div style={{marginBottom:32,padding:"28px 24px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(20,184,154,0.04))",border:"1px solid var(--line-gold)",borderRadius:18,textAlign:"center"}}>
+        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:10}}>THE REAL PLAYBOOK</div>
+        <div className="d2" style={{marginBottom:12,fontSize:"clamp(22px,4vw,32px)"}}>
+          How to Become Disgustingly Successful{formData?.name?`, ${formData.name}`:""}
+        </div>
+        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.75,maxWidth:520,margin:"0 auto"}}>
+          Not lucky. Not gifted. Just following the right rules — and following them when no one is watching,
+          when it's not working yet, and when it would be much easier to stop.
+          {formData?.challenge?` You said your challenge is "${formData.challenge.slice(0,80)}${formData.challenge.length>80?"…":""}". Every rule below is a direct answer to that.`:""}
+        </p>
+      </div>
+
+      {/* Rules */}
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32}}>
+        {SUCCESS_RULES.map(r=>{
+          const isOpen=open===r.number;
+          return(
+            <div key={r.number} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?r.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+              <button onClick={()=>setOpen(o=>o===r.number?null:r.number)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+                <div style={{width:42,height:42,borderRadius:12,background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--f-mono)",fontSize:13,fontWeight:700,color:r.color,flexShrink:0}}>{r.number}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{r.title}</div>
+                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5,fontStyle:"italic"}}>"{r.hook}"</div>
+                </div>
+                <div style={{color:r.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+              </button>
+              {isOpen&&(
+                <div style={{padding:"0 20px 20px"}}>
+                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{r.detail}</p>
+                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:r.color,letterSpacing:".12em",marginBottom:10}}>EXECUTE THIS WEEK</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                    {r.actions.map((a,i)=>(
+                      <div key={i} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+                        <div style={{width:22,height:22,borderRadius:"50%",background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:r.color,fontWeight:700}}>{i+1}</div>
+                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{a}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <ResourceLinks links={r.links} accentColor={r.color}/>
+                  <HabitButton itemKey={`success:${r.number}`} userId={userId}/>
+                  <AudioPlayer text={`Rule ${r.number}: ${r.title}. ${r.detail}`} label="Listen" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Final Truth */}
+      <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:18}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:14}}>THE FINAL TRUTH</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {SUCCESS_TRUTH.lines.map((l,i)=>(
+            <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+              <span style={{color:"var(--gold)",fontSize:10,marginTop:4,flexShrink:0}}>◎</span>
+              <p style={{fontSize:14,color:i===0?"var(--cream)":"var(--cream-60)",fontWeight:i===0?600:400,lineHeight:1.75,margin:0}}>{l}</p>
+            </div>
+          ))}
+        </div>
+        <AudioPlayer text={SUCCESS_TRUTH.lines.join(" ")} label="Listen to the full truth" mini={false}/>
+      </div>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 10X MINDSET MODULE
+// Strong mindset principles + 10x performance principles
+// ═══════════════════════════════════════════════════════════════════════════════
+const MINDSET_PRINCIPLES=[
+  {icon:"⏳",color:"var(--gold)",title:"Be Patient",
+   body:"Most worthwhile things take longer than you expect. Impatience is what causes people to quit at the exact moment they are about to break through. Build a 3-year frame for your goals and a daily frame for your actions. The daily actions are yours to control. The 3-year result is the compound of those actions. Patience is not passive waiting — it is aggressive consistency without demanding an immediate reward.",
+   links:[
+     {label:"The Almanack of Naval Ravikant (free PDF)",url:"https://www.navalmanack.com",type:"book"},
+     {label:"Grit by Angela Duckworth",url:"https://www.amazon.com/Grit-Passion-Perseverance-Angela-Duckworth/dp/1501111108",type:"book"},
+   ]},
+  {icon:"⚡",color:"var(--teal)",title:"Be Proactive",
+   body:"Reactive people manage problems. Proactive people prevent them. Every week, ask yourself: what is the one thing that, if I handle it now, removes 10 problems in the future? Proactivity is a thinking habit first — you have to train yourself to look ahead before looking around. Start each morning asking: what do I want to happen today, and what can I do in the next hour to make it more likely?",
+   links:[
+     {label:"The 7 Habits of Highly Effective People",url:"https://www.amazon.com/Habits-Highly-Effective-People-Powerful/dp/1982137274",type:"book"},
+     {label:"Getting Things Done by David Allen",url:"https://www.amazon.com/Getting-Things-Done-Stress-Free-Productivity/dp/0143126563",type:"book"},
+   ]},
+  {icon:"🔄",color:"#9b72cf",title:"Be Open to Change",
+   body:"The person who updates their beliefs when they get new evidence moves faster than the person who defends what they already decided. Change is not weakness — refusing to change when the evidence demands it is. Every 6 months, audit your top 3 beliefs about yourself, your work, and your goals. Ask honestly: is this still true, or am I holding this belief because I've held it for a long time?",
+   links:[
+     {label:"Mindset by Carol Dweck",url:"https://www.amazon.com/Mindset-Psychology-Carol-S-Dweck/dp/0345472322",type:"book"},
+     {label:"The Art of Thinking Clearly by Rolf Dobelli",url:"https://www.amazon.com/Art-Thinking-Clearly-Rolf-Dobelli/dp/0062219693",type:"book"},
+   ]},
+  {icon:"🍃",color:"var(--rose)",title:"Learn to Let Go",
+   body:"Some people are carrying losses from 3 years ago like they happened this morning. Every unit of energy spent resisting something that has already happened is energy that cannot go into what comes next. Letting go is not forgetting — it is refusing to let the past allocate your present resources. Process it, extract the lesson, then physically move your focus to the next thing.",
+   links:[
+     {label:"The Power of Now by Eckhart Tolle",url:"https://www.amazon.com/Power-Now-Guide-Spiritual-Enlightenment/dp/1577314808",type:"book"},
+     {label:"Letting Go by David R. Hawkins",url:"https://www.amazon.com/Letting-Go-Pathway-Surrender-Hawkins/dp/1401945015",type:"book"},
+   ]},
+  {icon:"☀️",color:"var(--gold)",title:"Stay Hopeful",
+   body:"Hope is not naive optimism — it is the rational belief that your actions can influence your outcomes. People without hope stop trying. People with realistic hope keep adjusting and moving. Protect your hope aggressively: limit time with people who drain it, regularly review evidence of your own progress, and zoom out when the present moment feels impossible.",
+   links:[
+     {label:"Man's Search for Meaning by Viktor Frankl",url:"https://www.amazon.com/Mans-Search-Meaning-Viktor-Frankl/dp/0807014273",type:"book"},
+     {label:"Learned Optimism by Martin Seligman",url:"https://www.amazon.com/Learned-Optimism-Change-Your-Mind/dp/1400078393",type:"book"},
+   ]},
+  {icon:"🧠",color:"var(--teal)",title:"Check Your Thoughts",
+   body:"Your internal monologue is either your best coach or your worst saboteur. Most people never audit it. When you catch a thought like 'I can't do this' or 'this always happens to me,' pause and ask: is this actually true, or is this a habit my brain has? You do not have to believe every thought you have. You have to notice it, question it, and replace it with one that is both true and useful.",
+   links:[
+     {label:"Feeling Good by David D. Burns (CBT classic)",url:"https://www.amazon.com/Feeling-Good-New-Mood-Therapy/dp/0380810336",type:"book"},
+     {label:"The Happiness Trap by Russ Harris (ACT)",url:"https://www.amazon.com/Happiness-Trap-Stop-Struggling-Living/dp/1590305841",type:"book"},
+     {label:"Woebot — free AI mental wellness app",url:"https://woebothealth.com",type:"tool"},
+   ]},
+  {icon:"💙",color:"#9b72cf",title:"It's Okay Not to Be Okay",
+   body:"Pretending to be fine when you're not costs enormous energy and cuts you off from the help available to you. Acknowledging difficulty is not weakness — it is the first accurate assessment of your situation. You cannot navigate from a position you're lying about. Name what's hard, allow it to be hard, then ask: what is the smallest thing I can do from here that moves me slightly forward?",
+   links:[
+     {label:"Maybe You Should Talk to Someone by Lori Gottlieb",url:"https://www.amazon.com/Maybe-You-Should-Talk-Someone/dp/1328662055",type:"book"},
+     {label:"7 Cups — free online emotional support",url:"https://www.7cups.com",type:"tool"},
+     {label:"Headspace — guided meditation & mindfulness",url:"https://www.headspace.com",type:"tool"},
+   ]},
+  {icon:"🏁",color:"var(--rose)",title:"Don't Give Up",
+   body:"Giving up too early is the single most common reason for failure — not incompetence, not bad luck, not the wrong idea. Most people quit right before the compounding would have kicked in. Before you quit anything, ask: am I quitting because this genuinely isn't working, or am I quitting because it's hard right now and harder than I expected? Those are two very different situations requiring two very different responses.",
+   links:[
+     {label:"Grit by Angela Duckworth",url:"https://www.amazon.com/Grit-Passion-Perseverance-Angela-Duckworth/dp/1501111108",type:"book"},
+     {label:"Can't Hurt Me by David Goggins",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287",type:"book"},
+     {label:"The Dip by Seth Godin",url:"https://www.amazon.com/Dip-Little-Book-Teaches-Stick/dp/1591841666",type:"book"},
+   ]},
+];
+
+const TENX_PRINCIPLES=[
+  {
+    title:"Consistency Beats Intensity",
+    icon:"📅",
+    color:"var(--gold)",
+    body:"The person who shows up every day at 70% outperforms the person who shows up at 100% three times a week. Consistency is not glamorous. It does not make good Instagram content. But it is what separates the person who makes it from the person who almost made it. Design your work so that your worst day is still enough to move forward.",
+    links:[
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"The Compound Effect by Darren Hardy",url:"https://www.amazon.com/Compound-Effect-Darren-Hardy/dp/159315724X",type:"book"},
+      {label:"Streaks app — habit tracking",url:"https://streaksapp.com",type:"tool"},
+    ],
+  },
+  {
+    title:"Focus on Process, Not Outcome",
+    icon:"🔬",
+    color:"var(--teal)",
+    body:"Outcomes are the result of a thousand process decisions you made when no one was watching. Obsessing over results without controlling inputs is anxiety, not strategy. Define the exact behaviors that produce your goal, then measure those behaviors daily. The outcome becomes the inevitable consequence of a well-executed process, not something you achieve by wanting it harder.",
+    links:[
+      {label:"The Score Takes Care of Itself by Bill Walsh",url:"https://www.amazon.com/Score-Takes-Care-Itself-Philosophy/dp/1591843472",type:"book"},
+      {label:"Measure What Matters by John Doerr (OKRs)",url:"https://www.amazon.com/Measure-What-Matters-Google-Foundation/dp/0525536221",type:"book"},
+    ],
+  },
+  {
+    title:"Remove Friction from Good Habits",
+    icon:"✂️",
+    color:"#9b72cf",
+    body:"You do not rise to the level of your motivation — you fall to the level of your environment. If good habits require willpower every time, they will fail eventually. Make them the default: gym clothes by the bed, healthy food at the front of the fridge, phone in another room during deep work, book on your pillow. Every point of friction you remove is 5 years of sustained behavior you gain.",
+    links:[
+      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+      {label:"Tiny Habits by BJ Fogg",url:"https://www.amazon.com/Tiny-Habits-Changes-Change-Everything/dp/0358003326",type:"book"},
+      {label:"Habitica — gamify your habits (free)",url:"https://habitica.com",type:"tool"},
+    ],
+  },
+  {
+    title:"Get Feedback Fast",
+    icon:"⚡",
+    color:"var(--rose)",
+    body:"Slow feedback loops are expensive. The faster you can test an idea and learn from reality, the faster you improve. Ship small, learn fast, adjust early. Every week of building without feedback is a week of potentially going in the wrong direction. Build a feedback mechanism into everything you do: test your ideas with real people, show your work before it's ready, and value honest criticism over comfortable silence.",
+    links:[
+      {label:"The Lean Startup by Eric Ries",url:"https://www.amazon.com/Lean-Startup-Entrepreneurs-Continuous-Innovation/dp/0307887898",type:"book"},
+      {label:"Typeform — create quick user feedback surveys",url:"https://www.typeform.com",type:"tool"},
+      {label:"UserTesting — get real feedback on your ideas",url:"https://www.usertesting.com",type:"tool"},
+    ],
+  },
+  {
+    title:"Learn from People Ahead of You",
+    icon:"🔭",
+    color:"var(--gold)",
+    body:"You can compress 10 years of someone's experience into 3 hours of honest conversation. Stop learning exclusively from peers who are at the same level as you — you will all discover the same things at the same time. Find people who are 5–10 years ahead on the specific path you're on, and learn what they know about the phase you're currently in. This is not networking for status — it is intelligence gathering for your own journey.",
+    links:[
+      {label:"MentorCruise — find a paid mentor",url:"https://mentorcruise.com",type:"tool"},
+      {label:"ADPList — free mentorship from industry pros",url:"https://adplist.org",type:"tool"},
+      {label:"Lunchclub — AI-matched 1:1 conversations",url:"https://lunchclub.com",type:"tool"},
+      {label:"Indie Hackers — community of founders sharing real numbers",url:"https://www.indiehackers.com",type:"resource"},
+    ],
+  },
+  {
+    title:"Eliminate Distractions — Shape Your Environment",
+    icon:"🎯",
+    color:"var(--teal)",
+    body:"Focus is less about willpower and more about environment. You cannot out-discipline a phone that is designed by a team of engineers to be more addictive than your goals. Stop trying to resist your phone and start designing a life where it has less access to you. Remove apps that steal time. Turn off all non-essential notifications. Put the phone in another room during your most important 2 hours of the day. What you don't see, you don't reach for.",
+    callout:{
+      label:"Try This Starting Today",
+      items:[
+        "Delete any app that you open out of boredom rather than intention — not forever, just for 30 days.",
+        "Turn off all notifications except calls and messages from specific people. Every other notification is someone else's agenda interrupting yours.",
+        "Set your phone to grayscale. Color is an attention tool. Grayscale removes 40% of the addictive pull.",
+        "Create a physical 'phone-free zone' in your home — your desk during work hours, your dinner table, your bed.",
+      ],
+    },
+    links:[
+      {label:"Deep Work by Cal Newport",url:"https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692",type:"book"},
+      {label:"Digital Minimalism by Cal Newport",url:"https://www.amazon.com/Digital-Minimalism-Choosing-Focused-Noisy/dp/0525536515",type:"book"},
+      {label:"Freedom — block distracting sites & apps",url:"https://freedom.to",type:"tool"},
+      {label:"Cold Turkey — hardcore website blocker",url:"https://getcoldturkey.com",type:"tool"},
+      {label:"One Sec — adds a pause before opening apps",url:"https://one-sec.app",type:"tool"},
+    ],
+  },
+];
+
+function MindsetTenXModule({formData, userId}){
+  const [openPrinciple,setOpenPrinciple]=useState(null);
+  const [openTenX,setOpenTenX]=useState(null);
+  const [tab,setTab]=useState("mindset"); // "mindset" | "tenx"
+  return(
+    <div className="fu">
+      {/* Hero */}
+      <div style={{marginBottom:24,padding:"22px 24px",background:"linear-gradient(135deg,rgba(155,114,207,0.08),rgba(31,168,154,0.04))",border:"1px solid rgba(155,114,207,0.2)",borderRadius:16,textAlign:"center"}}>
+        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".15em",marginBottom:8}}>MENTAL OPERATING SYSTEM</div>
+        <div className="d3" style={{marginBottom:8}}>
+          Build a Mind That Doesn&apos;t Break{formData?.name?`, ${formData.name}`:""}
+        </div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,maxWidth:480,margin:"0 auto"}}>
+          A strong mindset is not a personality trait. It is a set of practiced habits applied consistently —
+          especially when you don&apos;t feel like it.
+          {formData?.challenge?` Specifically built for someone dealing with: "${formData.challenge.slice(0,70)}${formData.challenge.length>70?"…":""}".`:""}
+        </p>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:24,padding:"4px",background:"var(--midnight)",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)"}}>
+        {[{id:"mindset",label:"Strong Mindset"},{id:"tenx",label:"10x Principles"}].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all .2s",
+              background:tab===t.id?"var(--lift)":"none",
+              color:tab===t.id?"var(--cream)":"var(--cream-40)"}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* STRONG MINDSET */}
+      {tab==="mindset"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {MINDSET_PRINCIPLES.map((p,i)=>{
+            const isOpen=openPrinciple===i;
+            return(
+              <div key={i} style={{background:"var(--lift)",borderRadius:14,border:`1px solid ${isOpen?p.color:"rgba(255,255,255,0.06)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+                <button onClick={()=>setOpenPrinciple(o=>o===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left"}}>
+                  <div style={{width:38,height:38,borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.icon}</div>
+                  <div style={{flex:1,fontSize:14,fontWeight:600,color:isOpen?p.color:"var(--cream)"}}>{p.title}</div>
+                  <div style={{color:"var(--cream-30)",fontSize:16,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+                </button>
+                {isOpen&&(
+                  <div style={{padding:"0 18px 18px"}}>
+                    <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:14}}/>
+                    <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:12}}>{p.body}</p>
+                    <ResourceLinks links={p.links} accentColor={p.color}/>
+                    <HabitButton itemKey={`mindset:${["patient","proactive","change","letgo","hope","thoughts","okay","dontquit"][i]||i}`} userId={userId}/>
+                    <AudioPlayer text={`${p.title}: ${p.body}`} label="Listen" mini={false}/>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 10X PRINCIPLES */}
+      {tab==="tenx"&&(
+        <>
+          <div style={{marginBottom:20}}>
+            <div className="d3" style={{marginBottom:8}}>Simple Principles That Make You 10x Better at Anything</div>
+            <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.65}}>These are not motivational quotes. They are operating instructions for performance — drawn from the research on how elite performers actually think and work.</p>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {TENX_PRINCIPLES.map((p,i)=>{
+              const isOpen=openTenX===i;
+              return(
+                <div key={i} style={{background:"var(--lift)",borderRadius:14,border:`1px solid ${isOpen?p.color:"rgba(255,255,255,0.06)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+                  <button onClick={()=>setOpenTenX(o=>o===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left"}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.icon}</div>
+                    <div style={{flex:1,fontSize:14,fontWeight:600,color:isOpen?p.color:"var(--cream)"}}>{p.title}</div>
+                    <div style={{color:"var(--cream-30)",fontSize:16,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+                  </button>
+                  {isOpen&&(
+                    <div style={{padding:"0 18px 18px"}}>
+                      <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:14}}/>
+                      <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:12}}>{p.body}</p>
+                      {p.callout&&(
+                        <div style={{padding:"14px 16px",background:`${p.color}08`,border:`1px solid ${p.color}25`,borderRadius:12,marginBottom:12}}>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:10}}>{p.callout.label.toUpperCase()}</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {p.callout.items.map((item,ci)=>(
+                              <div key={ci} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                                <span style={{color:p.color,fontSize:10,marginTop:3,flexShrink:0}}>◎</span>
+                                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{item}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <ResourceLinks links={p.links} accentColor={p.color}/>
+                      <HabitButton itemKey={`tenx:${["consistency","process","friction","feedback","mentors","focus"][i]||i}`} userId={userId}/>
+                      <AudioPlayer text={`${p.title}. ${p.body}`} label="Listen" mini={false}/>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
+  const [showTracker,setShowTracker]=useState(false);
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
     return localStorage.getItem("diq_active_tab")||"today";
@@ -5766,26 +7367,30 @@ Write ONE single sentence — something true and specific to them that they woul
       {showCheckin&&(
         <div style={{padding:"32px 0",borderBottom:"1px solid var(--line)",background:"rgba(31,168,154,0.03)"}}>
           <div className="cx-md"><CheckIn profile={formData} reportData={data} streak={streak} onComplete={async()=>{
-            // Increment streak only once per calendar day
-            const today=new Date().toISOString().slice(0,10);
-            const lastKey=`destiniq_checkin_${userId}`;
-            const last=localStorage.getItem(lastKey)||"";
-            if(last!==today){
-              localStorage.setItem(lastKey,today);
-              const newStreak=streak+1;
-              setStreak(newStreak);
-              // Persist to Supabase
+            // ── INCREMENT STREAK — once per calendar day only ──────────────
+            const today   = new Date().toISOString().slice(0,10);
+            const lastKey = `destiniq_checkin_${userId}`;
+            let last = "";
+            try{ last = localStorage.getItem(lastKey)||""; }catch{}
+
+            if(last !== today){
+              // First check-in of the day — increment
+              try{ localStorage.setItem(lastKey, today); }catch{}
+              const newStreak = streak + 1;
+              setStreak(newStreak); // update UI immediately
               if(userId){
-                try{
-                  await supabase.from("user_profiles").upsert({
-                    user_id:userId,
-                    streak:newStreak,
-                    last_checkin_date:today,
-                    updated_at:new Date().toISOString(),
-                  },{onConflict:"user_id"});
-                }catch(e){console.warn("Streak save failed:",e.message);}
+                // Persist to Supabase — this is the authoritative source
+                supabase.from("user_profiles").upsert({
+                  user_id: userId,
+                  streak: newStreak,
+                  last_checkin_date: today,
+                  updated_at: new Date().toISOString(),
+                },{onConflict:"user_id"})
+                .then(({error})=>{ if(error) console.warn("Streak save:", error.message); })
+                .catch(e=>console.warn("Streak save:", e.message));
               }
             }
+            // else: already checked in today — don't increment again
             setShowCheckin(false);
           }} userId={userId} isPremium={isPremium}/></div>
         </div>
@@ -5793,8 +7398,52 @@ Write ONE single sentence — something true and specific to them that they woul
 
       <div style={{padding:"36px 0"}}>
         <div className="cx-md">
-          <div className="tabs" style={{marginBottom:32}}>
-            {MODULES.map(m=><button key={m.id} className={`tab ${mod===m.id?"on":""}`} onClick={()=>setMod(m.id)}><span>{m.icon}</span><span>{m.label}</span></button>)}
+          {/* ── Habit tracker mini bar */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:10,flexWrap:"wrap"}}>
+            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em"}}>YOUR MODULES</div>
+            <HabitMiniBar userId={userId} onClick={()=>setShowTracker(true)}/>
+          </div>
+          {/* ── TAB BAR: grouped, horizontally scrollable ─────────────────── */}
+          <div style={{marginBottom:20,overflowX:"auto",WebkitOverflowScrolling:"touch",
+            scrollbarWidth:"none",msOverflowStyle:"none",
+            // hide scrollbar on webkit
+            }}>
+            <style>{".tab-scroll::-webkit-scrollbar{display:none}"}</style>
+            <div className="tab-scroll" style={{display:"flex",flexDirection:"column",gap:0,minWidth:"max-content"}}>
+              {MODULE_GROUPS.map(group=>(
+                <div key={group.group} style={{display:"flex",flexDirection:"column",gap:0,marginBottom:6}}>
+                  {/* Group label */}
+                  <div style={{
+                    fontSize:"8px",fontFamily:"var(--f-mono)",
+                    color:group.color,letterSpacing:".14em",
+                    padding:"0 4px 4px 6px",textTransform:"uppercase",
+                    display:"flex",alignItems:"center",gap:6,
+                  }}>
+                    <div style={{flex:"0 0 16px",height:1,background:group.color,opacity:.4}}/>
+                    {group.group}
+                    <div style={{flex:1,height:1,background:group.color,opacity:.15}}/>
+                  </div>
+                  {/* Tabs in this group */}
+                  <div style={{display:"flex",gap:5,flexWrap:"nowrap"}}>
+                    {group.items.map(m=>(
+                      <button key={m.id}
+                        className={`tab ${mod===m.id?"on":""}`}
+                        onClick={()=>setMod(m.id)}
+                        style={{
+                          borderColor:mod===m.id?group.color:"transparent",
+                          whiteSpace:"nowrap",
+                          ...(mod===m.id?{
+                            background:`${group.color}14`,
+                            color:group.color,
+                          }:{}),
+                        }}>
+                        <span>{m.icon}</span><span>{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {mod==="today"&&(
@@ -5838,11 +7487,15 @@ Write ONE single sentence — something true and specific to them that they woul
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium}/>}
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium}/>}
-            {mod==="academy"&&<GrowthAcademy profile={formData}/>}
             {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="practices"&&<PracticesView userId={userId}/>}
+            {mod==="invest"&&<InvestInYourselfModule formData={formData} userId={userId}/>}
+            {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId}/>}
+            {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId}/>}
+            {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
 
@@ -6652,7 +8305,16 @@ export default function DestinIQ(){
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
 
   // ── SUPABASE SESSION MANAGEMENT ─────────────────────────────────────────
+  // Prevents concurrent restoreUserSession calls from racing each other.
+  // Only one restore runs at a time — the first one wins.
+  const _restoreInProgress = useRef(false);
+
   const restoreUserSession = async (supaUser) => {
+    // If already restoring (e.g., onAuthStateChange INITIAL_SESSION races getSession),
+    // skip the second call entirely to prevent screen being reset mid-load.
+    if(_restoreInProgress.current) return;
+    _restoreInProgress.current = true;
+
     const u = supaUser;
     const meta = u.user_metadata || {};
     const appUser = {
@@ -6663,6 +8325,20 @@ export default function DestinIQ(){
     setUser(appUser);
     setUserId(u.id);
     setProfileLoading(true);
+
+    // ── INSTANT PAID RESTORE from localStorage ────────────────────────────
+    // Set isPaid/isPremium immediately from the local backup so paid users
+    // NEVER see the paywall or "Upgrade" button while Supabase loads.
+    // The Supabase result below will confirm or correct this within ~1 second.
+    try {
+      if (localStorage.getItem(`diq_paid_${u.id}`) === "1") {
+        setIsPaid(true);
+      }
+      if (localStorage.getItem(`diq_prem_${u.id}`) === "1") {
+        setIsPremium(true);
+      }
+    } catch(_) {}
+
     hydrateUserData(u.id);
 
     // Load avatar for nav bar
@@ -6680,38 +8356,64 @@ export default function DestinIQ(){
     try{
       const profile = await loadUserProfile(u.id);
       if (profile) {
-        if (profile.is_paid)    setIsPaid(true);
-        if (profile.is_premium) setIsPremium(true);
-        if (profile.streak){
-          // Check if streak is still valid — reset if last check-in was >1 day ago
-          const today=new Date().toISOString().slice(0,10);
-          const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
-          const lastCheckin=profile.last_checkin_date||"";
-          const localLast=localStorage.getItem(`destiniq_checkin_${u.id}`)||"";
-          const effectiveLast=[lastCheckin,localLast].filter(Boolean).sort().pop()||"";
-          if(effectiveLast===today||effectiveLast===yesterday){
-            setStreak(profile.streak||1);
-          } else if(effectiveLast){
-            // Streak broken — reset to 1 but keep showing current day as start
-            setStreak(1);
-            supabase.from("user_profiles").upsert({user_id:u.id,streak:1,updated_at:new Date().toISOString()},{onConflict:"user_id"}).catch(()=>{});
+        // ── SUBSCRIPTION STATUS ─────────────────────────────────────────
+        // Source 1: Supabase (authoritative)
+        if (profile.is_paid) {
+          setIsPaid(true);
+          // Keep localStorage in sync with DB
+          try { localStorage.setItem(`diq_paid_${u.id}`, "1"); } catch(_){}
+        } else {
+          // DB says not paid — clear localStorage backup so it doesn't contradict
+          // (covers edge case: admin revokes access)
+          try { localStorage.removeItem(`diq_paid_${u.id}`); } catch(_){}
+        }
+        if (profile.is_premium) {
+          setIsPremium(true);
+          try { localStorage.setItem(`diq_prem_${u.id}`, "1"); } catch(_){}
+        } else {
+          try { localStorage.removeItem(`diq_prem_${u.id}`); } catch(_){}
+        }
+        // ── STREAK RESTORATION ──────────────────────────────────────────────
+        // Single source of truth: Supabase last_checkin_date + localStorage backup
+        // A streak is valid if the user checked in today OR yesterday.
+        // If the last check-in was 2+ days ago, the streak resets to 1.
+        {
+          const savedStreak = profile.streak || 1;
+          const today     = new Date().toISOString().slice(0,10);
+          const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+          // Use the most recent of DB date and localStorage date (handles timing gaps)
+          const dbLast    = profile.last_checkin_date || "";
+          const localLast = (() => { try{ return localStorage.getItem(`destiniq_checkin_${u.id}`)||""; }catch{return "";} })();
+          const lastSeen  = [dbLast, localLast].filter(Boolean).sort().pop() || "";
+
+          if (!lastSeen) {
+            // Never checked in before — keep whatever streak DB has (could be 1 from signup)
+            setStreak(savedStreak);
+          } else if (lastSeen === today) {
+            // Already checked in today — show current streak as-is
+            setStreak(savedStreak);
+          } else if (lastSeen === yesterday) {
+            // Checked in yesterday — streak is still alive
+            setStreak(savedStreak);
           } else {
-            setStreak(profile.streak||1);
+            // Missed a day — streak broken, reset to 1
+            setStreak(1);
+            supabase.from("user_profiles").upsert({
+              user_id: u.id, streak: 1,
+              updated_at: new Date().toISOString(),
+            }, {onConflict:"user_id"}).catch(()=>{});
+            // Also update localStorage so next restore agrees
+            try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
           }
         }
-        // Batch ALL state updates together so React renders them atomically
-        // This prevents any race condition where screen="results" but formData=null
         if (profile.form_data)  setFormData(profile.form_data);
         if (profile.report)     setReport(profile.report);
         // ── CRITICAL: Always restore exactly where they left off ──
-        // Signed-in users must NEVER see the marketing landing or intake page.
-        // We set screen LAST so formData and report are already in state first.
+        // Signed-in users must NEVER see the marketing landing page — only
+        // brand-new users (no saved onboarding data) see the welcome/intake form.
         if (profile.form_data && profile.report) {
           // Has both — go straight to the dashboard
           setScreen("results");
-        } else if (profile.form_data && !profile.report) {
-          // Has intake data but report failed/missing — stay on landing, not intake
-          setScreen("landing");
         } else {
           // Either no onboarding data yet, or it exists but report generation
           // was interrupted — either way, send to intake (it pre-fills from
@@ -6724,27 +8426,43 @@ export default function DestinIQ(){
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
-      // Even on error, never fall back to showing the landing page to a signed-in user.
       setScreen("intake");
     }finally{
       setProfileLoading(false);
+      // Release the lock so future REAL auth events (new sign-in, token refresh)
+      // can trigger a fresh restore if needed
+      _restoreInProgress.current = false;
     }
   };
 
   useEffect(()=>{
-    // Check for an existing session on mount (handles OAuth redirects too).
-    // IMPORTANT: we await restoreUserSession before clearing authLoading so the
-    // app never flashes the landing page before we know the user is logged in.
+    // mountRestored: ref (not state) so it never triggers a re-render.
+    // Prevents the double-fire: getSession() + onAuthStateChange INITIAL_SESSION
+    // both call restoreUserSession, and the second (unguarded) call races with
+    // the first and can reset screen back to "intake" after it was set to "results".
+    let mountRestored = false;
+
     supabase.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
         await restoreUserSession(session.user);
+      } else {
+        // No session on mount — release the in-progress lock immediately
+        // so that when the user signs in, restoreUserSession can run freely
+        _restoreInProgress.current = false;
       }
+      mountRestored = true;
       setAuthLoading(false);
     });
 
-    // Listen for sign-in / sign-out events (including OAuth callback)
+    // AUTH STATE CHANGES — only handle REAL changes after mount is done.
+    // Skip INITIAL_SESSION: getSession() above already handled it with await.
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,session)=>{
+      // Skip the automatic initial fire — we already handled it above
+      // Skip INITIAL_SESSION — getSession() above already handles it with await
+      if(!mountRestored && (_event==="INITIAL_SESSION")) return;
       if(session?.user){
+        // For actual SIGNED_IN events (new login), always allow a fresh restore
+        if(_event==="SIGNED_IN") _restoreInProgress.current = false;
         restoreUserSession(session.user);
         // Track referral if URL has ?ref=
         if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
@@ -6762,13 +8480,22 @@ export default function DestinIQ(){
           }
         }
       } else {
+        // SIGNED_OUT — clear all state AND localStorage paid keys
+        // so the next user on this device doesn't inherit paid status
+        _restoreInProgress.current = false; // release lock so next sign-in can restore
         setUser(null);
         setUserId(null);
         setFormData(null);
         setReport(null);
         setIsPaid(false);
         setIsPremium(false);
+        setStreak(1);
         setScreen("landing");
+        try{
+          Object.keys(localStorage).forEach(k=>{
+            if(k.startsWith("diq_")||k.startsWith("destiniq_")) localStorage.removeItem(k);
+          });
+        }catch(_){}
       }
     });
     return()=>subscription.unsubscribe();
@@ -6857,6 +8584,32 @@ export default function DestinIQ(){
     return()=>window.removeEventListener("popstate",onPopState);
   },[showProfile,showAdmin,showShare,showNotif,showPolicy,screen,formData,report]);
 
+  // ── ROUTING GUARD useEffect ────────────────────────────────────────────
+  // Handles edge-case screen corrections AFTER state settles.
+  // This is the ONLY safe place to call setScreen based on state values —
+  // never call setScreen during render.
+  useEffect(()=>{
+    if(authLoading || profileLoading) return; // wait for auth + profile to load
+    if(!user) return;                          // unauthenticated — landing handles itself
+
+    // If user has both form_data and report, always show results — never intake or landing
+    if(formData && report && (screen==="intake" || screen==="landing")){
+      setScreen("results");
+      return;
+    }
+    // If on results but somehow no data, send to intake (not landing — user is logged in)
+    if(screen==="results" && !formData){
+      setScreen("intake");
+      return;
+    }
+    // If on landing but user is logged in, redirect appropriately
+    if(screen==="landing" && user){
+      setScreen(formData && report ? "results" : "intake");
+      return;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[authLoading, profileLoading, user, formData, report, screen]);
+
   const handleSubmit=useCallback(async(f)=>{
     try{
     if(!userId) return;
@@ -6943,12 +8696,14 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           product_business:    parsed.product_business,
           real_estate_hack:    parsed.real_estate_hack,
         };
+        // NOTE: is_paid and is_premium are intentionally NOT included here.
+        // They are written ONLY by the payment flow (Paystack callback + handlePay).
+        // Including them here would overwrite paid status back to false if the
+        // user regenerates their report while the state hasn't fully loaded.
         const {error:saveError} = await supabase.from("user_profiles").upsert({
           user_id: userId,
           form_data: f,
           report: reportToSave,
-          is_paid: isPaid,
-          is_premium: isPremium,
           streak,
           updated_at: new Date().toISOString(),
         },{onConflict:"user_id"});
@@ -6993,7 +8748,16 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
   // We write is_paid:true to Supabase immediately so it survives any refresh.
   const handlePay=async(paystackRef)=>{
     setIsPaid(true);
-    setStreak(s=>s+1);
+    setIsPremium(true);
+    // Belt-and-suspenders: write to localStorage here too in case the
+    // Paywall's callback missed it (e.g. userId was null at payment time)
+    if(userId){
+      try{
+        localStorage.setItem(`diq_paid_${userId}`, "1");
+        localStorage.setItem(`diq_prem_${userId}`, "1");
+        if(paystackRef) localStorage.setItem(`diq_paystack_ref_${userId}`, paystackRef);
+      }catch(_){}
+    }
     setScreen("results");
     if(userId){
       try{
@@ -7112,6 +8876,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                 🔔
               </button>
             )}
+
             {screen==="results"&&!isPaid&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={handleUnlock}>Upgrade</button>}
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
             {screen==="results"&&report&&<button className="btn btn-ghost" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>setShowShare(true)}>Share 📤</button>}
@@ -7166,12 +8931,13 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
-        {/* Signed-in users never see the marketing landing page — redirect straight to intake or results */}
-        {screen==="landing"  &&formData&&report&&(setScreen("results"),null)}
-        {screen==="landing"  &&!(formData&&report)&&(setScreen("intake"),null)}
-        {/* Redirect intake→results if report already exists (prevent re-onboarding) */}
-        {screen==="intake"   &&formData&&report&&(setScreen("results"),null)}
-        {screen==="intake"   &&!(formData&&report)&&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
+        {/* ── SCREEN ROUTER ─────────────────────────────────────────────────────
+            RULE: setScreen is NEVER called here in render — only in effects and
+            event handlers. Calling setState during render causes loops and flicker.
+            restoreUserSession is the single source of routing truth on load/refresh.
+            The useEffect below handles any edge-case redirects safely.
+        ──────────────────────────────────────────────────────────────────────── */}
+        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
@@ -7186,10 +8952,17 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             </div>
           </div>
         )}
-        {/* If somehow on results with no formData, send to intake (never landing for a signed-in user) */}
-        {/* Guard removed - race condition fix */}
+        {screen==="results"  &&!formData&&(
+          <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)"}}>Restoring your session…</div>
+          </div>
+        )}
+
         {showNotif&&formData&&(
           <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
+        )}
+        {showTracker&&(
+          <HabitTrackerPanel userId={userId} onClose={()=>setShowTracker(false)}/>
         )}
         </>}
 
