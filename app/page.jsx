@@ -7212,8 +7212,8 @@ function MindsetTenXModule({formData, userId}){
 }
 
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation}){
-  const [showTracker,setShowTracker]=useState(false);
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation,showTracker,setShowTracker}){
+
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
     return localStorage.getItem("diq_active_tab")||"today";
@@ -8295,6 +8295,7 @@ export default function DestinIQ(){
   const [rateLimited, setRateLimited]=useState(false);
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
+  const [showTracker,  setShowTracker  ]=useState(false);
 
   const restoreUserSession = async (supaUser) => {
     const u = supaUser;
@@ -8897,7 +8898,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
-              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}/>
+              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}
+              showTracker={showTracker} setShowTracker={setShowTracker}/>
         )}
         {screen==="results"  &&formData&&!report&&(
           <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
