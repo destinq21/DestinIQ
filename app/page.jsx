@@ -294,7 +294,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -1427,9 +1427,9 @@ JSON SCHEMA (fill every field with REAL, DEEP, SPECIFIC content):
       "type": "job or freelance or business",
       "timeline": "e.g. 2–4 months to first income",
       "effort": "Low, Medium, or High",
-      "income": "Realistic income range in USD and local currency equivalent",
+      "income": "Realistic earnings — show BOTH: USD for international work e.g. '$500–1,200/month' AND local equivalent e.g. '(GH₵7,500–18,000/month)'. Startup costs in ${currSym} only.",
       "why": "Why this specific path fits ${name}'s exact profile. Reference their skills, their country, their income situation. 2-3 sentences.",
-      "how": ["Exact step 1 with real platform/tool/contact","Exact step 2","Exact step 3","Exact step 4","Exact step 5"]
+      "how": ["Exact step 1 with real platform/tool/contact and any cost in ${currSym}","Exact step 2","Exact step 3","Exact step 4","Exact step 5"]
     },
     {
       "title": "Career path 2 — different type from path 1",
@@ -1451,12 +1451,13 @@ JSON SCHEMA (fill every field with REAL, DEEP, SPECIFIC content):
     }
   ],
   "life_hacks": [
-    "Life hack 1: Specific and actionable for ${name} in ${country}. Not generic. Reference real local tools, real local amounts.",
-    "Life hack 2: Different category from hack 1.",
-    "Life hack 3: Something about time and productivity.",
-    "Life hack 4: Something about money management in ${country}.",
-    "Life hack 5: Something about relationships and energy management.",
-    "Life hack 6: Something about health and discipline."
+    "MONEY HACK (${country}): [Real shortcut to save or earn money in ${country}. Name the exact app, market, bank, or method. Include a specific amount in ${currSym}. E.g. 'Buy data bundles weekly not daily on MTN — saves GH₵ 40/month. Go to *170# → Buy Bundle.']",
+    "FOOD HACK (${country}): [Real way to eat better and cheaper in ${country}. Name real markets, specific foods, real prices in ${currSym}. Not generic — specific to what people actually eat in ${country}.]",
+    "TIME HACK: [A real system or tool for getting more done. Not 'make a to-do list' — something specific like 'use the 2-minute rule: if it takes under 2 minutes, do it now. This alone eliminates 80% of procrastinated tasks.' Reference a real free app if applicable.]",
+    "PHONE/DATA HACK (${country}): [Specific shortcut using the phone or internet that people in ${country} overlook. Could be a USSD code, a local app, a WhatsApp trick, a free service. Real and local.]",
+    "HEALTH HACK: [Practical health shortcut that costs little or nothing and is realistic for someone at ${income} income. Not a gym — real and achievable. E.g. 'Walk for 20 minutes after your evening meal — not morning when it's hard. Studies show post-meal walking reduces blood sugar spikes by 30% and improves sleep.']",
+    "SKILL HACK: [A real shortcut for learning or improving a skill faster. Name a specific free resource, platform, or method. E.g. 'YouTube is a free university — search your skill + tutorial + 2024. Watch 30 minutes every evening instead of scrolling. In 6 months you will be ahead of people who did 4-year degrees in that skill.']",
+    "RELATIONSHIP/NETWORK HACK (${country}): [A real, specific action to build better relationships or a stronger network in ${country}. Reference where people in ${country} actually meet: churches, markets, WhatsApp groups, alumni networks, coworking spaces, events. Specific and local.]"
   ],
   "emotional_strength": [
     "Practice 1: Specific to ${name}'s challenge: '${challenge}'.",
@@ -5579,7 +5580,29 @@ EARNINGS FROM ONLINE WORK = USD only — add local equivalent in brackets e.g. "
   const todayPlatforms=platformSets[dayIndex];
 
   const prompts={
-    life_hacks:`Write 7 real specific actionable life hacks for ${name} in ${country} with income ${income} and goal "${goals}". Reference real local apps, markets, and services in ${country}. Each hack must be 2-3 sentences with HOW to do it not just what to do. Return ONLY a JSON array of 7 strings.`,
+    life_hacks:`Generate 7 REAL life hacks for ${name} living in ${country} earning ${income} with goal "${goals}".
+
+WHAT A REAL LIFE HACK IS:
+- A specific shortcut that saves real time or real money
+- Something that uses local knowledge — real markets, real apps, real USSD codes, real WhatsApp groups
+- Something the person hasn't thought of — not "save money" but exactly HOW
+- Must include a real local detail: name of market, app, bank, platform, service, or code
+
+WHAT A LIFE HACK IS NOT:
+- Generic advice like "wake up early" or "be disciplined"
+- Motivational statements
+- Things they already know
+
+CATEGORIES TO COVER (one hack per category):
+1. MONEY: A specific way to save or earn extra money in ${country}. Include a real amount in ${currSym}.
+2. FOOD/FUEL: How to spend less on daily essentials in ${country}. Name real markets or methods.
+3. TIME: A system or tool that saves 1+ hours per week. Name the exact app or method.
+4. PHONE/DATA: A USSD code, app, or phone trick that works in ${country} and most people don't know.
+5. HEALTH: One free or almost free health habit that fits a busy life in ${country}.
+6. SKILL: The fastest way to learn something valuable using free resources — name the specific platform.
+7. NETWORK: A specific place or method to meet better people in ${country}. Name real venues, groups, or events.
+
+Return ONLY a valid JSON array of 7 strings. Each string = 2-3 sentences. Start with the category in caps. No markdown. No code fences.`,
     emotional_strength:`Write 4 emotional strength practices for ${name} facing: "${challenge}". Each must be specific not generic. Include WHEN, HOW, and WHY for their specific situation. Return ONLY a JSON array of 4 strings (each 2-3 sentences).`,
     money_protection:`Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
     online_income:`Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
@@ -5657,13 +5680,26 @@ function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     <div className="fu">
       <ModuleShell title="LIFE HACKS" color="var(--gold)" audioText={hacks.length?hacks.join(". "):""} onRegen={()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr)} loading={lLoading} err={lErr} isPaid={isPaid} onUnlock={onUnlock}>
         {hacks.length===0&&!lLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your personalised life hacks.</p>}
-        {hacks.map((h,i)=>(
-          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<hacks.length-1?"1px solid rgba(255,255,255,0.05)":"none",alignItems:"flex-start"}}>
-            <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7,margin:0,flex:1}}>{h}</p>
-            <AudioPlayer text={h} label="" mini={true}/>
-          </div>
-        ))}
+        {hacks.map((h,i)=>{
+          const colonIdx=h.indexOf(":");
+          const hasCategory=colonIdx>0&&colonIdx<18;
+          const category=hasCategory?h.slice(0,colonIdx).trim():null;
+          const body=hasCategory?h.slice(colonIdx+1).trim():h;
+          const catColors={"MONEY":"var(--gold)","FOOD":"var(--teal)","FOOD/FUEL":"var(--teal)","TIME":"#9b72cf","PHONE":"var(--rose)","PHONE/DATA":"var(--rose)","HEALTH":"#4ADE80","SKILL":"var(--teal)","NETWORK":"var(--gold)"};
+          const catColor=(category&&catColors[category])||"var(--gold)";
+          return(
+            <div key={i} style={{padding:"13px 16px",marginBottom:10,background:"var(--midnight)",borderRadius:12,border:`1px solid ${catColor}20`}}>
+              {category&&<div style={{fontSize:9,fontFamily:"var(--f-mono)",color:catColor,letterSpacing:".12em",marginBottom:7,display:"flex",alignItems:"center",gap:5}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:catColor}}/>
+                {category}
+              </div>}
+              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                <p style={{fontSize:13,color:"rgba(255,255,255,0.72)",lineHeight:1.8,margin:0,flex:1}}>{body}</p>
+                <AudioPlayer text={body} label="" mini={true}/>
+              </div>
+            </div>
+          );
+        })}
       </ModuleShell>
       <ModuleShell title="EMOTIONAL STRENGTH" color="var(--teal)" audioText={emotional.length?emotional.join(". "):""} onRegen={()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr)} loading={eLoading} err={eErr} isPaid={isPaid} onUnlock={onUnlock}>
         {emotional.length===0&&!eLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate emotional strength practices.</p>}
@@ -5675,6 +5711,204 @@ function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
           </div>
         ))}
       </ModuleShell>
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JIM ROHN FINANCIAL WISDOM
+// "Profits are better than wages. Wages make you a living. Profits make you a fortune."
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const JIM_ROHN_PRINCIPLES = [
+  {
+    id:"7030",
+    icon:"💰",
+    color:"var(--gold)",
+    title:"The 70/30 Rule — Jim Rohn's Master Money Formula",
+    quote:"Learn to live on 70% of what you make and do something important with the other 30%.",
+    body:"This is the foundation of everything Jim Rohn taught about money. It is deceptively simple and almost universally ignored. Of every dollar or cedi or naira that comes into your hands: 70% covers your life — rent, food, transport, clothing, and your cost of living. The remaining 30% is split three ways. Ten percent goes to charity or giving — not because it makes you feel good, but because generosity is a discipline that keeps you from becoming someone who hoards and fears. Ten percent goes to active capital — money you put to work through a business, a skill investment, or a learning fund. Ten percent goes to passive savings — a wealth account you never touch, that grows silently while you sleep. The key word is 'learn.' You may not be able to do this today. Start at 1%. Then 3%. Then 5%. The discipline matters more than the percentage.",
+    steps:[
+      "70% — your cost of living: rent, food, transport, utilities, phone. Track this for 30 days first.",
+      "10% — giving: church, family in need, someone who needs a meal. This is non-negotiable for Rohn.",
+      "10% — active capital: money that WORKS. A skill course. Starting your side hustle. Buying stock in a company you understand.",
+      "10% — passive savings: open a separate account. Name it 'Wealth Account'. Never withdraw from it. Ever.",
+    ],
+    application:"If you earn GH₵2,000/month: GH₵1,400 is your life budget. GH₵200 goes to giving. GH₵200 goes to a skill or micro-business. GH₵200 goes into your wealth account. In 12 months you'll have GH₵2,400 saved and a skill or business that generates more.",
+  },
+  {
+    id:"profits",
+    icon:"📈",
+    color:"var(--teal)",
+    title:"Profits Are Better Than Wages",
+    quote:"Wages make you a living. Profits make you a fortune.",
+    body:"This was the idea that changed Jim Rohn's life at age 25, when his mentor Earl Shoaff first said it to him. A wage is what someone gives you for your time. A profit is what you earn because you created value beyond your own labor. The difference is not just financial — it is psychological. A wage-earner asks 'how much am I worth per hour?' A profit-earner asks 'how much value can I create?' Wages have a ceiling set by someone else. Profits have a ceiling set by your creativity, your market, and your execution. This does not mean quit your job tomorrow. It means start building something alongside your job — anything — that generates profit rather than just a paycheck. A small business. A skill you sell. A product. A course. Something that pays you whether you show up or not.",
+    steps:[
+      "Keep your job (wages) — it funds your life while you build your profits.",
+      "Start a micro-business alongside it — even GH₵50/month profit is the beginning of a different identity.",
+      "Reinvest every profit back into the business for the first 12 months. Do not spend what the business makes.",
+      "When profits equal 50% of your wages, you have options. That is the target.",
+    ],
+    application:"Rohn said: 'Work full-time on your job and part-time on your fortune.' Most people do it the other way around — they give their employer their best hours and their business their worst.",
+  },
+  {
+    id:"philosophy",
+    icon:"🧠",
+    color:"#9b72cf",
+    title:"Your Money Philosophy Determines Your Financial Future",
+    quote:"The philosophy of the rich versus the poor is this: the rich invest their money and spend what is left. The poor spend their money and invest what is left.",
+    body:"Jim Rohn believed that financial results were a direct consequence of financial philosophy — not income, not opportunity, not luck. Two people can earn the same salary and in 10 years be in completely different positions, because one paid themselves first and one spent first. This is not a budgeting tip. It is a statement about identity and belief. If you believe money is meant to be spent when you have it, you will always spend it. If you believe money is a tool to build with, you will always build with it. The first step is not opening a savings account — it is changing what you believe money is for.",
+    steps:[
+      "Write down your current money philosophy in one sentence — what do you actually believe money is for?",
+      "Read it back and ask: does this philosophy make people rich or keep people poor?",
+      "Decide on a new philosophy. Rohn's: 'I invest first, then live on what remains.'",
+      "Build one habit that matches the new philosophy — automate a transfer of any amount on payday. Even 2%.",
+    ],
+    application:"Rohn used to say: 'If you keep doing what you've always done, you'll keep getting what you've always got.' The philosophy changes first. The results follow.",
+  },
+  {
+    id:"amount",
+    icon:"⚡",
+    color:"var(--rose)",
+    title:"It Is Not the Amount — It Is the Habit",
+    quote:"It's not the amount that counts, it's the plan that counts. It's not what you save but that you save.",
+    body:"One of the most damaging financial beliefs is: 'I don't earn enough to save.' Jim Rohn destroyed this belief with one argument: if you cannot save out of GH₵500, you cannot save out of GH₵5,000. The problem is not the amount — it is the absence of a saving habit. A person who saves GH₵10 a month consistently is building something more important than money: they are building the identity of someone who saves. And that identity, once real, will apply at every income level. The amount will grow as the income grows, because the habit is already there. The person who doesn't save GH₵10 at GH₵500 will not save GH₵500 at GH₵5,000. The habit must be built now, at whatever level you are at.",
+    steps:[
+      "Start with any amount — GH₵5, ₦500, KSh 100. The number does not matter yet.",
+      "Save it on the day you receive income — not after expenses. Before anything else.",
+      "Keep a visible record of what you've saved. Watch the number. Celebrate it.",
+      "Increase the amount by any small percentage every 3 months. 5% more than last time.",
+    ],
+    application:"'A little bit saved regularly beats a large amount saved irregularly.' Set up an automatic transfer for the day after payday — any amount. You will not miss it. You will build it.",
+  },
+  {
+    id:"seasons",
+    icon:"🌱",
+    color:"var(--teal)",
+    title:"The Seasons of Financial Life",
+    quote:"Winter always follows summer. The person who didn't prepare in summer is in serious trouble in winter.",
+    body:"Jim Rohn applied the four seasons to money. Spring is when opportunity is fresh — you are young, energy is high, income potential is growing. This is the time to plant: build skills, build businesses, build savings, build the habits that will define your financial life. Summer is when you maintain what you built in spring — not the time to relax, but to tend and guard. Fall is when you harvest — the compounding of earlier decisions begins to pay off. And then winter comes. Financial winter: a job loss, a recession, a health crisis, an unexpected expense. The question Rohn asked is: 'What did you do in the summer?' The person who saved and invested in the spring and summer survives financial winter. The person who spent everything does not.",
+    steps:[
+      "Identify your current season honestly — which one are you in?",
+      "If you are in Spring: plant aggressively. Every month without a habit is a month wasted.",
+      "If you are in Summer: guard your progress. Do not increase lifestyle faster than income.",
+      "If you are in Fall: harvest AND reinvest. Do not spend the entire harvest.",
+      "If you are in Winter: hold steady. Do not panic. Cut expenses. Survive. Spring comes.",
+    ],
+    application:"Most people never prepare for winter because they feel invincible in summer. Every financial mistake Rohn described was made by people who thought summer would last forever.",
+  },
+];
+
+const JIM_ROHN_BOOKS = [
+  {label:"The Art of Exceptional Living — Jim Rohn (audiobook)",url:"https://www.amazon.com/Art-Exceptional-Living-Jim-Rohn/dp/B00005A5ZB",emoji:"📖"},
+  {label:"7 Strategies for Wealth & Happiness — Jim Rohn",url:"https://www.amazon.com/Strategies-Wealth-Happiness-Jim-Rohn/dp/0761511148",emoji:"📖"},
+  {label:"Leading an Inspired Life — Jim Rohn",url:"https://www.amazon.com/Leading-Inspired-Life-Jim-Rohn/dp/0940685221",emoji:"📖"},
+  {label:"Jim Rohn — The Day That Turns Your Life Around (YouTube, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+the+day+that+turns+your+life+around",emoji:"🎧"},
+  {label:"Jim Rohn — How to Have Your Best Year Ever (YouTube, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+best+year+ever+full+seminar",emoji:"🎧"},
+  {label:"Jim Rohn — Building Your Network Marketing Business (full, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+building+your+network+marketing+business+full",emoji:"🎧"},
+  {label:"The Seasons of Life (PDF summary) — Jim Rohn",url:"https://www.jimrohn.com",emoji:"🌐"},
+];
+
+function JimRohnMoneySection(){
+  const [open, setOpen] = useState(null);
+  return(
+    <div style={{marginTop:20,marginBottom:8}}>
+      {/* Header */}
+      <div style={{padding:"20px 20px 16px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(155,114,207,0.04))",border:"1px solid rgba(210,175,90,0.2)",borderRadius:"18px 18px 0 0",borderBottom:"none"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+          <div style={{width:44,height:44,borderRadius:12,background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+            📜
+          </div>
+          <div>
+            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".14em",marginBottom:4}}>FINANCIAL PHILOSOPHY</div>
+            <div style={{fontSize:17,fontWeight:700,color:"var(--cream)",lineHeight:1.3}}>Jim Rohn on Money</div>
+          </div>
+        </div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,margin:0}}>
+          Jim Rohn spent 40 years teaching the same principles — and they still work because they are built on human nature, not market conditions.
+          He learned them broke at 25. By 31 he was a millionaire. Everything below is what he taught between those two points.
+        </p>
+      </div>
+
+      {/* Principles */}
+      <div style={{border:"1px solid rgba(210,175,90,0.15)",borderTop:"none",borderRadius:"0 0 18px 18px",overflow:"hidden"}}>
+        {JIM_ROHN_PRINCIPLES.map((p,i)=>{
+          const isOpen = open===p.id;
+          return(
+            <div key={p.id} style={{borderBottom:i<JIM_ROHN_PRINCIPLES.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
+              {/* Header row */}
+              <button onClick={()=>setOpen(o=>o===p.id?null:p.id)}
+                style={{width:"100%",background:isOpen?`${p.color}06`:"none",border:"none",padding:"16px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left",transition:"background .2s"}}>
+                <div style={{width:38,height:38,borderRadius:10,background:`${p.color}10`,border:`1px solid ${p.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                  {p.icon}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700,color:isOpen?p.color:"var(--cream)",lineHeight:1.35,marginBottom:3}}>{p.title}</div>
+                  <div style={{fontSize:11,color:"var(--cream-30)",fontStyle:"italic",lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    &ldquo;{p.quote.slice(0,70)}{p.quote.length>70?"…":""}&rdquo;
+                  </div>
+                </div>
+                <div style={{color:p.color,fontSize:16,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
+              </button>
+
+              {/* Expanded */}
+              {isOpen&&(
+                <div style={{padding:"0 20px 20px",background:`${p.color}03`}}>
+                  <div style={{height:1,background:"rgba(255,255,255,0.05)",marginBottom:16}}/>
+
+                  {/* The quote */}
+                  <div style={{padding:"12px 16px",background:`${p.color}08`,borderLeft:`3px solid ${p.color}`,borderRadius:"0 10px 10px 0",marginBottom:16}}>
+                    <p style={{fontSize:14,fontStyle:"italic",color:"var(--cream)",lineHeight:1.75,margin:"0 0 4px 0"}}>
+                      &ldquo;{p.quote}&rdquo;
+                    </p>
+                    <div style={{fontSize:10,color:`${p.color}`,fontFamily:"var(--f-mono)"}}>— Jim Rohn</div>
+                  </div>
+
+                  {/* Explanation */}
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.85,marginBottom:16}}>{p.body}</p>
+
+                  {/* Steps */}
+                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:10}}>HOW TO APPLY IT</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+                    {p.steps.map((step,si)=>(
+                      <div key={si} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.04)"}}>
+                        <div style={{width:24,height:24,borderRadius:"50%",background:`${p.color}10`,border:`1px solid ${p.color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:p.color,fontWeight:700}}>{si+1}</div>
+                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Real-world application */}
+                  <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12}}>
+                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-40)",letterSpacing:".1em",marginBottom:6}}>IN YOUR CONTEXT</div>
+                    <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:0}}>{p.application}</p>
+                  </div>
+
+                  <AudioPlayer text={`${p.title}. ${p.quote}. ${p.body}`} label="Listen to Jim Rohn" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Books and resources */}
+      <div style={{marginTop:12,padding:"14px 16px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:14}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".12em",marginBottom:10}}>JIM ROHN — BOOKS & FREE SPEECHES</div>
+        <div style={{display:"flex",flexDirection:"column",gap:7}}>
+          {JIM_ROHN_BOOKS.map((lk,i)=>(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
+              <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
+              <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
+            </a>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -5726,6 +5960,9 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
           </>
         )}
       </ModuleShell>
+
+      {/* ── JIM ROHN FINANCIAL PHILOSOPHY ─────────────────────────────────── */}
+      <JimRohnMoneySection/>
 
       {/* Money tools - universal links */}
       <div style={{marginTop:4,padding:"14px 16px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.12)",borderRadius:14}}>
@@ -6913,13 +7150,19 @@ function DailyDisciplineModule({formData, userId, isPaid, onUnlock}){
       <div style={{marginTop:28,padding:"22px 20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
         <div style={{fontSize:22,marginBottom:10}}>🏁</div>
         <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:8}}>
-          This is the FYP you actually need{name ? `, ${name}` : ""}
+          This is the FYP you actually need{name?`, ${name}`:""}
         </div>
         <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,maxWidth:400,margin:"0 auto 16px"}}>
           Not 60-second clips that feel good for a moment and then disappear. 
           A complete, deeply explained system you can open any day and execute.
           Your DestinIQ streak is the proof you're living it.
         </p>
+        <div style={{marginBottom:14,padding:"12px 16px",background:"rgba(210,175,90,0.06)",borderRadius:10,border:"1px solid rgba(210,175,90,0.15)"}}>
+          <p style={{fontSize:13,color:"var(--gold)",fontStyle:"italic",lineHeight:1.7,margin:"0 0 4px 0"}}>
+            &ldquo;Motivation is what gets you started. Habit is what keeps you going.&rdquo;
+          </p>
+          <p style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)",margin:0}}>— Jim Rohn</p>
+        </div>
         <div style={{fontFamily:"var(--f-mono)",fontSize:11,color:"var(--gold)",letterSpacing:".1em"}}>
           ◎ CHECK IN DAILY · TRACK YOUR STREAK · BUILD THE LIFE
         </div>
@@ -6935,7 +7178,7 @@ const INVEST_SECTIONS=[
     color:"var(--gold)",
     title:"Study Obsession",
     subtitle:"Your 20s decide your 40s — what you pour in now compounds for decades.",
-    body:"Read biographies of the greats — Steve Jobs, Elon Musk, Rockefeller, Oprah, Howard Schultz. Not to worship them. To study their patterns. Success leaves clues. You learn what actually worked in real life — their morning routines, how they handled rejection, the decisions they made at 25 that changed everything. You start to see that most legendary careers weren't lucky accidents. They were the result of compounding small, obsessive inputs over years.",
+    body:"Read biographies of the greats — Steve Jobs, Elon Musk, Rockefeller, Oprah, Howard Schultz, Jim Rohn. Not to worship them. To study their patterns. Jim Rohn taught this principle better than anyone: 'Formal education will make you a living. Self-education will make you a fortune.' Success leaves clues. You learn what actually worked in real life — their morning routines, how they handled rejection, the decisions they made at 25 that changed everything. Most legendary careers were not lucky accidents. They were the result of compounding small, obsessive inputs over years.",
     habits:[
       "Read 1 biography or autobiography per month — not self-help, actual life stories of people who built something.",
       "Keep a pattern journal: write down 1 pattern you noticed in what you read each week.",
@@ -7239,8 +7482,9 @@ const SUCCESS_RULES=[
     links:[
       {label:"Steve Jobs by Walter Isaacson",url:"https://www.amazon.com/Steve-Jobs-Walter-Isaacson/dp/1451648537",type:"book"},
       {label:"Elon Musk by Walter Isaacson",url:"https://www.amazon.com/Elon-Musk-Walter-Isaacson/dp/1982181281",type:"book"},
+      {label:"The Art of Exceptional Living — Jim Rohn",url:"https://www.amazon.com/Art-Exceptional-Living-Jim-Rohn/dp/B00005A5ZB",type:"book"},
+      {label:"Jim Rohn — The Day That Turns Your Life Around (YouTube)",url:"https://www.youtube.com/results?search_query=jim+rohn+turn+your+life+around",type:"resource"},
       {label:"Titan: Life of John D. Rockefeller Sr.",url:"https://www.amazon.com/Titan-Life-John-Rockefeller-Sr/dp/1400077303",type:"book"},
-      {label:"Katherine Johnson: NASA biography",url:"https://www.nasa.gov/people/katherine-johnson",type:"resource"},
       {label:"Goodreads — browse top biographies",url:"https://www.goodreads.com/shelf/show/biography",type:"resource"},
     ],
   },
@@ -7397,6 +7641,31 @@ function DisgustinglySuccessfulModule({formData, userId, isPaid, onUnlock}){
           ))}
         </div>
         <AudioPlayer text={SUCCESS_TRUTH.lines.join(" ")} label="Listen to the full truth" mini={false}/>
+      </div>
+
+      {/* Jim Rohn wisdom */}
+      <div style={{marginTop:16,padding:"16px 18px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:14}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em",marginBottom:10}}>LEARN FROM THE MASTER</div>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,marginBottom:12,fontStyle:"italic"}}>
+          Jim Rohn spent 40 years teaching exactly this. His work on personal philosophy, seasons of life, and the disciplines of success is still the most practical breakdown of why some people make it and most don&apos;t. Start here:
+        </p>
+        <div style={{display:"flex",flexDirection:"column",gap:7}}>
+          {[
+            {emoji:"📖",label:"The Art of Exceptional Living — Jim Rohn",url:"https://www.amazon.com/Art-Exceptional-Living-Jim-Rohn/dp/B00005A5ZB"},
+            {emoji:"📖",label:"7 Strategies for Wealth & Happiness — Jim Rohn",url:"https://www.amazon.com/Strategies-Wealth-Happiness-Jim-Rohn/dp/0761511148"},
+            {emoji:"🎧",label:"Jim Rohn — The Day That Turns Your Life Around (free, YouTube)",url:"https://www.youtube.com/results?search_query=jim+rohn+the+day+that+turns+your+life+around"},
+            {emoji:"🎧",label:"Jim Rohn — Building Your Network Marketing Business (full speech)",url:"https://www.youtube.com/results?search_query=jim+rohn+building+your+network+marketing+business"},
+          ].map((lk,i)=>(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <span style={{fontSize:14}}>{lk.emoji}</span>
+              <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
+              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -9197,9 +9466,14 @@ export default function DestinIQ(){
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
-        system:`You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person, anywhere in the world. Tailor everything to their actual country.
+        system:`⚠️ CURRENCY LAW — READ BEFORE ANYTHING ELSE:
+RULE A: Every cost, price, startup budget, savings amount, rent, or fee = ${currCode} (${currSym}) ONLY.
+RULE B: Earnings from online platforms (Upwork, Fiverr, YouTube, remote jobs) = USD + local equivalent in brackets.
+VIOLATION EXAMPLE: Writing "$200 startup cost" for a user in ${country} = WRONG. GH₵3,000 startup cost = CORRECT.
 
-CURRENCY RULE — ABSOLUTE AND NON-NEGOTIABLE. READ THIS FIRST:
+You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person in ${country}. Tailor everything to their actual country.
+
+CURRENCY RULE — ABSOLUTE AND NON-NEGOTIABLE:
 TWO SEPARATE RULES:
   RULE A — COSTS, SAVINGS, BUDGETS, STARTUP MONEY = LOCAL CURRENCY ONLY.
     Any amount the user must SPEND, SAVE, or INVEST uses their country's currency:
