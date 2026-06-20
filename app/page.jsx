@@ -1404,6 +1404,16 @@ JSON SCHEMA (fill every field with REAL, DEEP, SPECIFIC content):
   "mindset": "DEEP paragraph: What mental pattern is keeping ${name} stuck? What is the story they tell themselves? What is the reframe that actually works? Give them one morning practice that is specific to their situation. Minimum 4 sentences.",
   "relationships": "DEEP paragraph: How are ${name}'s relationships (or lack of them) affecting their progress? What type of person do they need in their corner right now? What should they stop tolerating? Minimum 3 sentences.",
   "closing": "2 powerful sentences. Tell ${name} what you believe about their ability to change their situation. Make it honest — not motivational poster. Make it feel personal.",
+  "strengths": [
+    "Strength 1: A specific thing ${name} already has — skill, mindset, circumstance, or resource — that they are not fully using. 1 sentence, specific.",
+    "Strength 2: Another real asset in ${name}'s profile. Not generic. Reference something they actually said.",
+    "Strength 3: A third genuine strength or advantage ${name} has right now."
+  ],
+  "risks": [
+    "Risk 1: The most likely thing that will derail ${name} if they do not watch for it. Be direct.",
+    "Risk 2: A second specific trap or blindspot for someone in ${name}'s situation.",
+    "Risk 3: A habit or belief that is quietly working against ${name}'s goal right now."
+  ],
   "sections": [
     {"title": "The Real Picture", "content": "What is actually going on in ${name}'s life right now — beneath the surface? Connect their income, age, country, goals, and challenge into one coherent honest picture."},
     {"title": "What ${name} Has That They Are Not Using", "content": "Name 2-3 specific strengths or resources in their profile they are underutilising. Be specific about HOW they can use each one."},
@@ -5878,7 +5888,7 @@ function JimRohnMoneySection(){
             <div key={p.id} style={{padding:"12px 14px",background:"rgba(0,0,0,0.2)",borderRadius:12,borderLeft:`3px solid ${p.color}`}}>
               <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".1em",marginBottom:5}}>{p.icon} {p.title.toUpperCase()}</div>
               <p style={{fontSize:13,color:"var(--cream)",fontStyle:"italic",lineHeight:1.65,margin:"0 0 6px 0"}}>&ldquo;{p.quote}&rdquo;</p>
-              {expanded&&<p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:"6px 0 0 0"}}>{p.steps[0]}</p>}
+              {expanded&&p.steps?.length>0&&<p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:"6px 0 0 0"}}>{p.steps[0]}</p>}
             </div>
           ))}
         </div>
@@ -8000,6 +8010,16 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
   const [refreshingInsight,setRefreshingInsight]=useState(false);
   const [closingLine,setClosingLine]=useState(data.closing||"");
   const [refreshingClosing,setRefreshingClosing]=useState(false);
+
+  // Auto-fix if closing is empty or contains AI confusion text
+  useEffect(()=>{
+    const bad = ["i don't have",'i need more','no context','no posts','no information'];
+    const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
+    if(isBad && formData?.name) {
+      setTimeout(()=>refreshClosing(), 500);
+    }
+  // eslint-disable-next-line
+  },[]);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
 
   // Auto-generate fresh insight if missing, generic, or from a previous day
@@ -8057,16 +8077,50 @@ Do NOT use generic motivational language. Do NOT ask for more information — wo
     if(refreshingClosing) return;
     setRefreshingClosing(true);
     try{
-      const name=sanitize(formData?.name)||"there";
-      const goal=sanitize(formData?.goals)||"their goal";
+      const name    = sanitize(formData?.name)    ||"there";
+      const country = sanitize(formData?.country) ||"their country";
+      const goal    = sanitize(formData?.goals)   ||"their goal";
       const challenge=sanitize(formData?.challenge)||"their challenge";
-      const prompt=`Person: ${name}, from ${sanitize(formData?.country)||"their country"}. Goal: "${goal}". Challenge: "${challenge}".
+      const skill   = sanitize(formData?.skills)  ||"their skills";
+      const age     = formData?.age||"";
 
-Write ONE single sentence — something true and specific to them that they would screenshot and keep. Not motivational fluff. Something that sounds like it was written by someone who has been paying close attention to exactly what they wrote. Output ONLY that one sentence, nothing else, no quotes around it.`;
-      const reply=await callAPI({messages:[{role:"user",content:prompt}],system:"You write one honest, specific sentence at a time. No quotes, no preamble, no explanation — just the sentence.",userId,isPremium,maxTokens:150});
+      const prompt=`Write ONE powerful sentence for ${name}${age?" (age "+age+")":""} from ${country}.
+Goal: "${goal}"
+Challenge: "${challenge}"
+Skills: "${skill}"
+
+Rules:
+- Use ${name}'s name
+- Reference their actual goal or challenge or country
+- Sound like someone who read their full story
+- Be honest and direct, not a motivational poster
+- Output ONLY the sentence — no quotes, no preamble, nothing else`;
+
+      const reply=await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:`You write one powerful truth sentence. You ALWAYS generate something specific — never ask for more information. ${name} from ${country} wants "${goal}". Work with that. One sentence only. No quotes around it.`,
+        userId,isPremium:true,maxTokens:120
+      });
+
+      const bad=["i don't have","i need more","could you share","no context","please tell","can you provide"];
       const clean=(reply||"").trim().replace(/^["']|["']$/g,"");
-      if(clean&&clean.length>10) setClosingLine(clean);
-    }catch(e){ /* keep existing */ }
+      const isBad = !clean||clean.length<15||bad.some(p=>clean.toLowerCase().includes(p));
+
+      if(!isBad){
+        setClosingLine(clean);
+      } else {
+        // Local fallback — specific to this user, never fails
+        const options=[
+          `${name}, the gap between where you are in ${country} and where you want to be is not luck — it is a sequence of decisions you have not made yet.`,
+          `${name}, the challenge you named is not a sign that you are behind — it is a sign that you are honest enough to see what needs to change.`,
+          `${name}, wanting "${goal.slice(0,40)}${goal.length>40?"...":""}" is the right instinct — the question is whether you are willing to be uncomfortable long enough to get there.`,
+        ];
+        setClosingLine(options[new Date().getDate()%3]);
+      }
+    }catch(e){
+      const name=sanitize(formData?.name)||"there";
+      setClosingLine(`${name}, showing up every day — even when it feels like nothing is changing — is how everything eventually changes.`);
+    }
     setRefreshingClosing(false);
   };
 
@@ -8228,9 +8282,17 @@ Write ONE single sentence — something true and specific to them that they woul
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
                 <div className="card card-sm"><div className="mono" style={{marginBottom:10,fontSize:"9px"}}>What you bring to this</div>
-                  {data.strengths?.map((s,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--teal)",flexShrink:0}}>◎</span>{s}</div>)}</div>
+                  {(data.strengths?.length>0
+                    ? data.strengths
+                    : data.sections?.[1]?.content ? [data.sections[1].content] : []
+                  ).map((s,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--teal)",flexShrink:0}}>◎</span>{s}</div>)}
+                </div>
                 <div className="card card-sm"><div className="mono" style={{marginBottom:10,fontSize:"9px"}}>What to watch out for</div>
-                  {data.risks?.map((r,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--rose)",flexShrink:0}}>◇</span>{r}</div>)}</div>
+                  {(data.risks?.length>0
+                    ? data.risks
+                    : data.pillar_detail?.mindset ? [data.pillar_detail.mindset] : []
+                  ).map((r,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--rose)",flexShrink:0}}>◇</span>{r}</div>)}
+                </div>
               </div>
               <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
@@ -8696,7 +8758,7 @@ function AboutUsPage({onBack}){
             ["What makes it different","Three things: (1) Your report is built from what you share — not stock content. (2) The advice respects where you live — costs are in your local currency, opportunities are real for your country. (3) It doesn't just tell you what to do — it tells you what you have, what you're missing, and exactly what to do this week."],
             ["Our philosophy","We believe most people are more capable than their circumstances suggest. The gap between potential and reality is usually not talent — it's information, direction, and the discipline that comes from finally seeing your situation clearly. Jim Rohn said it: 'Work harder on yourself than you do on your job.' DestinIQ is the tool that makes that real."],
             ["The team","DestinIQ is an independent product built by a small team. We are users of the product first — we built what we wish existed when we were trying to figure out our own paths."],
-            ["Contact us","For support, questions, or feedback: use the in-app support chat (bottom right) or email destiniq@gmail.com. We read every message."],
+            ["Contact us","For support, questions, or feedback: use the in-app support chat (bottom right) or email destiniq21@gmail.com. We read every message."],
           ].map(([h,b])=>(
             <div key={h} style={{marginBottom:28}}>
               <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
@@ -8731,7 +8793,7 @@ function PolicyPage({type,onBack}){
               ["Payments","Payments are processed by Paystack. We do not store your card details. Paystack's privacy policy applies to payment data."],
               ["Your Rights","You can request deletion of your account and all associated data at any time by contacting us through the support chat or emailing us directly. We will process deletion requests within 24 hours."],
               ["Cookies","We use only essential cookies required for authentication. We do not use tracking or advertising cookies."],
-              ["Contact","For any privacy concerns, contact us via the support widget in the app or email destiniq@gmail.com."],
+              ["Contact","For any privacy concerns, contact us via the support widget in the app or email destiniq21@gmail.com."],
             ].map(([h,b])=>(
               <div key={h} style={{marginBottom:28}}>
                 <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
@@ -8750,7 +8812,7 @@ function PolicyPage({type,onBack}){
               ["Intellectual Property","All DestinIQ content, design, and code is owned by DestinIQ. Your personal data and reports belong to you."],
               ["Limitation of Liability","DestinIQ provides guidance and tools, not guarantees. We are not liable for decisions you make based on the app's output. Use the service as one input among many in your life decisions."],
               ["Changes","We may update these terms from time to time. Continued use of the service after changes constitutes acceptance of the new terms."],
-              ["Contact","Questions about these terms? Contact us via the in-app support chat or email destiniq@gmail.com."],
+              ["Contact","Questions about these terms? Contact us via the in-app support chat or email destiniq21@gmail.com."],
             ].map(([h,b])=>(
               <div key={h} style={{marginBottom:28}}>
                 <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
@@ -9488,6 +9550,9 @@ export default function DestinIQ(){
         // ── CRITICAL: Always restore exactly where they left off ──
         // Signed-in users must NEVER see the marketing landing page — only
         // brand-new users (no saved onboarding data) see the welcome/intake form.
+        // Save streak to localStorage as instant backup (so page refresh shows correct streak)
+        try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
+
         if (profile.form_data && profile.report) {
           // Has both — go straight to the dashboard
           setScreen("results");
@@ -9548,9 +9613,11 @@ export default function DestinIQ(){
           }
         }
       } else {
-        // SIGNED_OUT — clear all state AND localStorage paid keys
-        // so the next user on this device doesn't inherit paid status
-          setUser(null);
+        // SIGNED_OUT fires on EVERY page reload during Supabase token refresh.
+        // DO NOT clear localStorage here — that would wipe wins, streak, check-ins.
+        // localStorage is only cleared by the explicit Sign Out button.
+        // Just reset React state so the UI shows landing until the SIGNED_IN fires.
+        setUser(null);
         setUserId(null);
         setFormData(null);
         setReport(null);
@@ -9558,11 +9625,8 @@ export default function DestinIQ(){
         setIsPremium(false);
         setStreak(1);
         setScreen("landing");
-        try{
-          Object.keys(localStorage).forEach(k=>{
-            if(k.startsWith("diq_")||k.startsWith("destiniq_")) localStorage.removeItem(k);
-          });
-        }catch(_){}
+        // Note: localStorage is intentionally NOT cleared here.
+        // It is cleared by the explicit onSignOut handler when user clicks Sign out.
       }
     });
     return()=>subscription.unsubscribe();
@@ -9731,6 +9795,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           greeting:      parsed.greeting,
           teaser:        parsed.teaser,
           closing:       parsed.closing,
+          strengths:     parsed.strengths||[],
+          risks:         parsed.risks||[],
           daily_insight: parsed.daily_insight,
           life:          parsed.life,
           wealth:        parsed.wealth,
