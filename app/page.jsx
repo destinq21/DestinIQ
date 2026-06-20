@@ -1194,19 +1194,22 @@ function buildOriginFacts(f){
 // ADVISOR SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
-  const name=profile?.name||"the user";
-  const country=profile?.country||"their country";
-  const goals=profile?.goals||profile?.bigGoal||"personal growth";
+  const name    = profile?.name    ||"the user";
+  const country = profile?.country ||"their country";
+  const goals   = profile?.goals   ||profile?.bigGoal||"personal growth";
   const challenge=profile?.challenge||"navigating life";
-  const career=profile?.career||"their work";
-  const scores=reportData?.scores;
-  const scoreStr=scores?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`:"scores not yet available";
+  const career  = profile?.career  ||"their work";
+  const income  = profile?.income  ||"unknown";
+  const scores  = reportData?.scores;
+  const scoreStr= scores?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`:"scores not yet available";
+  const {code:currCode,symbol:currSym} = getLocalCurrency(country);
 
   return `You are ${name}'s personal life advisor at DestinIQ. You have read their full report and know them deeply.
 
 WHAT YOU KNOW ABOUT THEM:
 - Name: ${name}
 - Country: ${country}
+- Income: ${income}
 - Career/skills: ${career}
 - Main goal: ${goals}
 - Current challenge: ${challenge}
@@ -1214,6 +1217,11 @@ WHAT YOU KNOW ABOUT THEM:
 ${memCtx?`
 Previous conversation context:
 ${memCtx}`:""}
+
+CURRENCY RULE — NON-NEGOTIABLE:
+- Any cost, price, savings amount, budget, or expense = ${currCode} (${currSym}) — NEVER USD for ${country} costs.
+- Any earnings from online work, freelancing, or remote jobs = USD + local equivalent e.g. "$500/month (${currSym}7,500)".
+- Example: If ${name} asks how much to save, say "${currSym}500/month" NOT "$50/month".
 
 HOW YOU RESPOND:
 - Speak directly to ${name} by name occasionally — make it personal
@@ -1229,10 +1237,11 @@ HOW YOU RESPOND:
 // DECISION PROMPT
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildDecisionPrompt(profile,question,isPremium,memCtx){
-  const name=profile?.name||"the user";
-  const country=profile?.country||"their country";
-  const goals=profile?.goals||profile?.bigGoal||"";
+  const name    = profile?.name    ||"the user";
+  const country = profile?.country ||"their country";
+  const goals   = profile?.goals   ||profile?.bigGoal||"";
   const challenge=profile?.challenge||"";
+  const {code:currCode,symbol:currSym} = getLocalCurrency(country);
 
   return `${name} from ${country} needs help with a decision.
 
@@ -1241,25 +1250,29 @@ Their main challenge: ${challenge}
 ${memCtx?`Context from previous conversations:
 ${memCtx}
 `:""}
+CURRENCY RULE: Any costs, prices, investments, or amounts = ${currCode} (${currSym}). Online earnings = USD + local equivalent.
+
 THE DECISION THEY ARE FACING:
 ${question}
 
 Analyse this decision for ${name} specifically. Consider:
-1. What does this mean for their specific situation in ${country}?
-2. What are the real risks vs upside — be honest about both
+1. What does this mean for their specific situation in ${country}? Include real amounts in ${currSym} where relevant.
+2. What are the real risks vs upside — be honest about both. Use real numbers in ${currSym}.
 3. What would you tell them if you had to make this decision for them?
-4. What's the one thing they should do in the next 48 hours based on this?
+4. What's the one thing they should do in the next 48 hours?
 
-Be direct. Be specific to their situation. No generic frameworks.${isPremium?" Give your fullest analysis.":""}`
+Be direct. Be specific to their situation in ${country}. No generic frameworks.${isPremium?" Give your fullest analysis.":""}`
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY PULSE PROMPT
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildWeeklyPrompt(profile,momentumLog,isPremium,memCtx){
-  const name=profile?.name||"the user";
-  const goals=profile?.goals||profile?.bigGoal||"their goals";
+  const name    = profile?.name    ||"the user";
+  const country = profile?.country ||"their country";
+  const goals   = profile?.goals   ||profile?.bigGoal||"their goals";
   const challenge=profile?.challenge||"their challenges";
+  const {code:currCode,symbol:currSym} = getLocalCurrency(country);
 
   // Summarise the last 7 check-ins
   const recentLog=momentumLog?momentumLog.slice(-7):[];
@@ -1267,10 +1280,11 @@ function buildWeeklyPrompt(profile,momentumLog,isPremium,memCtx){
     ? recentLog.map(e=>`${e.date}: energy ${e.energy}/10, focus ${e.focus}/10, feeling: ${e.feeling||"not logged"}`).join("\n")
     : "No check-ins logged this week";
 
-  return `Write a weekly pulse report for ${name}.
+  return `Write a weekly pulse report for ${name} in ${country}.
 
 Their goal: ${goals}
 Their main challenge: ${challenge}
+CURRENCY: All money amounts = ${currCode} (${currSym}). Online earnings = USD + local equivalent.
 ${memCtx?`Recent context: ${memCtx}
 `:""}
 THEIR LAST 7 CHECK-INS:
@@ -1280,29 +1294,32 @@ Write a personalised weekly reflection covering:
 1. What the pattern in their check-ins this week reveals about where they actually are
 2. One specific thing they did well this week (even if small)
 3. One honest thing that needs to shift next week
-4. Their focus for the next 7 days — one clear priority
+4. Their focus for the next 7 days — one clear priority. Include a specific action with any costs in ${currSym}.
 
-Write in plain prose. Be warm but direct. Use their name. Make it feel like it was written specifically for them — not a generic report.${isPremium?" Go deep.":""}`
+Write in plain prose. Be warm but direct. Use their name. All amounts in ${currSym}.${isPremium?" Go deep.":""}`
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHECK-IN PROMPT
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx){
-  const name=profile?.name||"the user";
-  const goals=profile?.goals||profile?.bigGoal||"their goals";
-  const energy=entry?.energy||5;
-  const focus=entry?.focus||5;
-  const momentum=entry?.momentum||5;
-  const feeling=entry?.feeling||"neutral";
-  const note=entry?.note||"";
-  const overall=reportData?.overall||50;
+  const name    = profile?.name    ||"the user";
+  const country = profile?.country ||"their country";
+  const goals   = profile?.goals   ||profile?.bigGoal||"their goals";
+  const energy  = entry?.energy    ||5;
+  const focus   = entry?.focus     ||5;
+  const momentum= entry?.momentum  ||5;
+  const feeling = entry?.feeling   ||"neutral";
+  const note    = entry?.note      ||"";
+  const overall = reportData?.overall||50;
+  const {code:currCode,symbol:currSym} = getLocalCurrency(country);
 
-  return `${name} has just completed their daily check-in at DestinIQ. Respond as their personal advisor.
+  return `${name} from ${country} has just completed their daily check-in at DestinIQ. Respond as their personal advisor.
 
 THEIR PROFILE:
 - Goal: ${goals}
 - Report overall score: ${overall}/100
+- If mentioning money: costs = ${currCode} (${currSym}), online earnings = USD
 ${memCtx?`- Recent context: ${memCtx}`:""}
 
 TODAY'S CHECK-IN:
@@ -4365,6 +4382,11 @@ function buildSingleCountryRelocationPrompt(formData, country, isPremium){
 
   return `Give ${name} (age ${age}, from ${from}, skills: ${skills}, goal: ${goals}, income: ${income}) a detailed relocation report for ${country}.
 
+CURRENCY RULE FOR THIS REPORT:
+- All amounts the person will SPEND in ${country} = ${country}'s local currency + USD equivalent in brackets.
+- Visa fees, startup costs, rent, food = local currency first.
+- Income potential = USD (since online work pays in USD globally).
+
 Return ONLY a valid JSON object with these exact fields. No markdown. No code fences. Start with { end with }:
 
 {
@@ -4374,7 +4396,7 @@ Return ONLY a valid JSON object with these exact fields. No markdown. No code fe
   "overview": "<2-3 sentences about living in ${country} from the perspective of someone from ${from}>",
   "pros": ["<3-4 genuine advantages for someone with their profile>"],
   "cons": ["<3-4 real challenges they should expect>"],
-  "living": "<specific cost of living: rent, food, transport in ${country} in local currency and USD>",
+  "living": "<specific cost of living in ${country}: monthly rent for decent apartment, food budget, transport. Use ${country}'s LOCAL CURRENCY for all amounts — add USD equivalent in brackets. E.g. 'Rent: KSh 45,000/month ($350). Food: KSh 15,000/month. Total budget: KSh 80,000/month ($620)'>",
   "visa": "<easy|moderate|hard> — one word only",
   "visa_detail": "<specific visa pathway for someone from ${from}: which visa, requirements, rough cost, processing time>",
   "business": "<how to start a business in ${country} as a foreigner — registration, cost, what works for their skills>",
@@ -8353,25 +8375,126 @@ Write ONE single sentence — something true and specific to them that they woul
           )}
 
           {mod==="mindset"&&(
-            <LockGate isPaid={isPaid} onUnlock={onUnlock}>
-              <div className="fu">
-                <div className="d3" style={{marginBottom:20}}>What's really going on inside</div>
-                {[
-                  {icon:"◇",title:"What keeps tripping you up",key:"pattern",accent:"rose"},
-                  {icon:"↺",title:"A different way to see it",key:"reframe",accent:"gold"},
-                  {icon:"◎",title:"What's really happening emotionally",key:"emotional",accent:"violet"},
-                  {icon:"◈",title:"One thing to try every morning",key:"practice",accent:"teal"},
-                ].map(s=>(
-                  <div className="card" key={s.key} style={{marginBottom:14}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                      <span style={{color:`var(--${s.accent})`,fontFamily:"var(--f-mono)",fontSize:18}}>{s.icon}</span>
-                      <span style={{fontFamily:"var(--f-display)",fontSize:18,fontWeight:500}}>{s.title}</span>
-                    </div>
-                    <p className="body">{data.mindset?.[s.key]}</p>
-                  </div>
-                ))}
+            <div className="fu">
+              {/* Header */}
+              <div style={{marginBottom:24}}>
+                <div className="d3" style={{marginBottom:8}}>
+                  {formData?.name?"Your Inner Mindset, "+formData.name:"Your Inner Mindset"}
+                </div>
+                <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,margin:0}}>
+                  This is the psychological layer of your report — what the AI noticed about your thinking
+                  patterns, your emotional reality, and what to actually do about it every day.
+                  This is not generic advice. It is written specifically for you.
+                </p>
               </div>
-            </LockGate>
+
+              {/* 4 Deep Cards */}
+              {[
+                {
+                  icon:"◇",
+                  label:"PATTERN",
+                  title:"What keeps tripping you up",
+                  key:"pattern",
+                  color:"var(--rose)",
+                  bg:"rgba(248,113,113,0.05)",
+                  border:"rgba(248,113,113,0.2)",
+                  reflection:"When did this pattern last show up? What triggered it?",
+                  why:"Understanding your pattern is the first step. You cannot change what you haven't named."
+                },
+                {
+                  icon:"↺",
+                  label:"REFRAME",
+                  title:"A different way to see it",
+                  key:"reframe",
+                  color:"var(--gold)",
+                  bg:"rgba(210,175,90,0.05)",
+                  border:"rgba(210,175,90,0.2)",
+                  reflection:"Does this reframe feel true to you? What would change if you believed it?",
+                  why:"A reframe doesn't dismiss the problem — it puts it in a context where you can act."
+                },
+                {
+                  icon:"◎",
+                  label:"EMOTIONAL TRUTH",
+                  title:"What's really happening emotionally",
+                  key:"emotional",
+                  color:"#9b72cf",
+                  bg:"rgba(155,114,207,0.05)",
+                  border:"rgba(155,114,207,0.2)",
+                  reflection:"Has anyone ever said this to you before? How does it feel to read it?",
+                  why:"Most people address the surface problem and wonder why nothing changes. This is the deeper layer."
+                },
+                {
+                  icon:"◈",
+                  label:"MORNING PRACTICE",
+                  title:"One thing to try every morning",
+                  key:"practice",
+                  color:"var(--teal)",
+                  bg:"rgba(31,168,154,0.05)",
+                  border:"rgba(31,168,154,0.2)",
+                  reflection:"Can you commit to this for 7 days? What would get in the way?",
+                  why:"A morning practice isn't about perfection — it's about giving your mind a direction before the world sets one for you."
+                },
+              ].map(s=>{
+                const text = data.mindset?.[s.key];
+                if(!text) return null;
+                return(
+                  <div key={s.key} style={{marginBottom:16,background:"var(--lift)",borderRadius:18,border:`1px solid ${s.border}`,overflow:"hidden"}}>
+                    {/* Header */}
+                    <div style={{padding:"16px 20px",background:s.bg,borderBottom:`1px solid ${s.border}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                        <span style={{color:s.color,fontFamily:"var(--f-mono)",fontSize:16}}>{s.icon}</span>
+                        <span style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em"}}>{s.label}</span>
+                      </div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--cream)"}}>{s.title}</div>
+                    </div>
+
+                    <div style={{padding:"16px 20px"}}>
+                      {/* Main content */}
+                      <p style={{fontSize:14,color:"var(--cream-70)",lineHeight:1.85,marginBottom:14}}>{text}</p>
+
+                      {/* Why this matters */}
+                      <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderLeft:`2px solid ${s.color}`,borderRadius:"0 8px 8px 0",marginBottom:14}}>
+                        <p style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.65,margin:0,fontStyle:"italic"}}>{s.why}</p>
+                      </div>
+
+                      {/* Self-reflection prompt */}
+                      <div style={{padding:"10px 14px",background:s.bg,border:`1px solid ${s.border}`,borderRadius:10,marginBottom:14}}>
+                        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".1em",marginBottom:4}}>REFLECT ON THIS</div>
+                        <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.65,fontStyle:"italic"}}>
+                          {s.reflection}
+                        </p>
+                      </div>
+
+                      <AudioPlayer text={`${s.title}. ${text}. ${s.why}`} label="Listen" mini={false}/>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Mindset resources */}
+              <div style={{marginTop:8,padding:"16px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:14}}>
+                <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".12em",marginBottom:12}}>GO DEEPER — MINDSET RESOURCES</div>
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  {[
+                    {emoji:"📖",label:"Mindset by Carol Dweck — the growth vs fixed mindset",url:"https://www.amazon.com/Mindset-Psychology-Carol-S-Dweck/dp/0345472322"},
+                    {emoji:"📖",label:"Feeling Good by David Burns — change how you think (CBT)",url:"https://www.amazon.com/Feeling-Good-New-Mood-Therapy/dp/0380810336"},
+                    {emoji:"📖",label:"The Power of Now — Eckhart Tolle",url:"https://www.amazon.com/Power-Now-Guide-Spiritual-Enlightenment/dp/1577314808"},
+                    {emoji:"🎧",label:"Jim Rohn — Personal Philosophy (YouTube, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+personal+philosophy"},
+                    {emoji:"🛠",label:"Woebot — free AI mental wellness check-ins",url:"https://woebothealth.com"},
+                    {emoji:"🛠",label:"Reflectly — guided daily reflection journal app",url:"https://reflectly.app"},
+                  ].map((lk,i)=>(
+                    <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+                      style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
+                      onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+                      onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                      <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
+                      <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
+                      <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {mod==="career"&&(
