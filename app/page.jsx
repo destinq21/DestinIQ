@@ -300,9 +300,9 @@ const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; 
 // in the world are accepted and settle automatically. We just SHOW the price
 // converted to the user's local currency so it feels native to them.
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"₵9/month",  currency:"GHS" },
-  pro:    { name:"Premium",   amount:15,  label:"₵15/month", currency:"GHS" },
-  annual: { name:"Annual Pro",amount:99,  label:"₵99/year",  currency:"GHS" },
+  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
+  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
+  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
 };
 
 // Approximate USD exchange rates for display purposes only — actual charge
@@ -1339,6 +1339,8 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const loc=ipLocation?.city?`${ipLocation.city}, ${country}`:country;
 
   // Currency rules baked in
+  // Resolve local currency for this user's country
+  const {code:currCode, symbol:currSym} = getLocalCurrency(country);
   const currencyNote=`MANDATORY CURRENCY RULES:
 COSTS/SAVINGS/STARTUP = LOCAL CURRENCY ONLY: ${country} uses ${currCode} (${currSym}). Write ALL prices, rents, costs in ${currSym}. NEVER use $ for costs in ${country}.
 EARNINGS FROM ONLINE WORK = USD. Earnings on Upwork/Fiverr/remote = USD, add local equivalent in brackets e.g. "$500 (${currSym}3,500/month)".`;
@@ -5561,15 +5563,17 @@ function getLocalCurrency(country){
 
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
   setLoading(true); setErr("");
-  const country=profile?.country||"their country";
-  const skills=profile?.skills||"general";
-  const goals=profile?.goals||"success";
-  const name=profile?.name||"the user";
-  const income=profile?.income||"Under $500";
-  const challenge=profile?.challenge||"getting started";
-  const currencyNote=`MANDATORY CURRENCY RULES:
-COSTS/STARTUP/SAVINGS = LOCAL CURRENCY: ${country} = ${currCode} (${currSym}). All prices, startup costs, rents, savings = ${currSym}. NEVER $ for costs.
-EARNINGS FROM ONLINE PLATFORMS = USD with local equivalent e.g. "$800/month (${currSym}12,000)".`;
+  const country  = profile?.country  || "their country";
+  const skills   = profile?.skills   || "general";
+  const goals    = profile?.goals    || "success";
+  const name     = profile?.name     || "the user";
+  const income   = profile?.income   || "Under $500";
+  const challenge= profile?.challenge|| "getting started";
+  // Resolve local currency — MUST happen before currencyNote is built
+  const {code:currCode, symbol:currSym} = getLocalCurrency(country);
+  const currencyNote = `MANDATORY CURRENCY RULES:
+COSTS/STARTUP/SAVINGS = LOCAL CURRENCY: ${country} uses ${currCode} (${currSym}). All prices, startup costs, rents, savings must be in ${currSym}. NEVER use $ for costs in ${country}.
+EARNINGS FROM ONLINE WORK = USD only — add local equivalent in brackets e.g. "$800/month (${currSym}12,000)".`;
   const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
   const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
   const todayPlatforms=platformSets[dayIndex];
@@ -5592,7 +5596,14 @@ EARNINGS FROM ONLINE PLATFORMS = USD with local equivalent e.g. "$800/month (${c
     const e=clean[0]==="["?clean.lastIndexOf("]"):clean.lastIndexOf("}");
     const parsed=JSON.parse(s>=0?clean.slice(s,e+1):clean);
     setData(parsed);setErr("");
-  }catch(e){setErr("Couldn't generate right now. Tap retry.");}
+  }catch(e){
+    const msg = e?.message||"";
+    if(msg.toLowerCase().includes("credit")||msg.toLowerCase().includes("billing")){
+      setErr("⚠️ AI credits needed. Go to console.anthropic.com → Billing to add credits.");
+    } else {
+      setErr("Couldn't generate right now. Tap retry.");
+    }
+  }
   setLoading(false);
 }
 
@@ -5632,7 +5643,15 @@ function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [eLoading,setELoading]=useState(false);
   const [lErr,setLErr]=useState("");
   const [eErr,setEErr]=useState("");
-  useEffect(()=>{setHacks(Array.isArray(data?.life_hacks)?data.life_hacks:[]);setEmotional(Array.isArray(data?.emotional_strength)?data.emotional_strength:[]);},[data]);
+  useEffect(()=>{
+    const h=Array.isArray(data?.life_hacks)?data.life_hacks:[];
+    const e=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
+    setHacks(h);
+    setEmotional(e);
+    // Auto-generate if no data from saved report
+    if(!h.length && formData) setTimeout(()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr),300);
+    if(!e.length && formData) setTimeout(()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr),1800);
+  },[]);
 
   return(
     <div className="fu">
@@ -5665,7 +5684,14 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [re,setRe]=useState(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});
   const [mpL,setMpL]=useState(false);const [reL,setReL]=useState(false);
   const [mpE,setMpE]=useState("");const [reE,setReE]=useState("");
-  useEffect(()=>{setMp(data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{});setRe(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});},[data]);
+  useEffect(()=>{
+    const mp0=data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{};
+    const re0=data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{};
+    setMp(mp0); setRe(re0);
+    // Auto-generate if no saved data
+    if(!mp0.rule&&formData) setTimeout(()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE),300);
+    if(!re0.method&&formData) setTimeout(()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE),2500);
+  },[]);
   const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Save: ${mp.savings_target}`,mp.avoid&&`Stop spending on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
   const reAudio=[re.method&&`Method: ${re.method}`,re.how_it_works,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
   return(
@@ -5731,7 +5757,11 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
-  useEffect(()=>{setOnline(Array.isArray(data?.online_income)?data.online_income:[]);},[data]);
+  useEffect(()=>{
+    const saved=Array.isArray(data?.online_income)?data.online_income:[];
+    setOnline(saved);
+    if(!saved.length&&formData) setTimeout(()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr),300);
+  },[]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
   return(
@@ -5777,7 +5807,13 @@ function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [pb,setPb]=useState(Array.isArray(data?.product_business)?data.product_business:[]);
   const [zbL,setZbL]=useState(false);const [pbL,setPbL]=useState(false);
   const [zbE,setZbE]=useState("");const [pbE,setPbE]=useState("");
-  useEffect(()=>{setZb(data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{});setPb(Array.isArray(data?.product_business)?data.product_business:[]);},[data]);
+  useEffect(()=>{
+    const zb0=data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{};
+    const pb0=Array.isArray(data?.product_business)?data.product_business:[];
+    setZb(zb0); setPb(pb0);
+    if(!zb0.idea&&formData) setTimeout(()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE),300);
+    if(!pb0.length&&formData) setTimeout(()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE),2500);
+  },[]);
   const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
