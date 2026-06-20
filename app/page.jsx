@@ -2723,7 +2723,13 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
 function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
-  const [loading,setLoading]=useState(false);const [result,setResult]=useState(null);const [error,setError]=useState("");
+  const [loading,setLoading]=useState(false);const [error,setError]=useState("");
+  // Persist result across sessions — show "already checked in today" when user returns
+  const todayStr = new Date().toISOString().slice(0,10);
+  const ciResultKey = `diq_ci_result_${userId}_${todayStr}`;
+  const [result,setResult]=useState(()=>{
+    try{ return localStorage.getItem(ciResultKey)||null; }catch{ return null; }
+  });
 
   const submit=async()=>{
     if(!feeling||!did.trim()) return;
@@ -2733,10 +2739,13 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
     pushToMemory(userId,"user",`Check-in: ${score}/10, ${feeling}, did="${did}"`);
     try{
       const reply=await callAPI({messages:[{role:"user",content:buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx)}],system:"You are a warm, emotionally intelligent coach who genuinely knows this person. Respond like a caring mentor who has read their full story — not a tool. Be honest, be human, acknowledge what they're feeling before you advise.",userId,isPremium});
-      pushToMemory(userId,"assistant",reply);setResult(reply);
+      pushToMemory(userId,"assistant",reply);
+      try{localStorage.setItem(ciResultKey,reply);}catch{}
+      setResult(reply);
     }catch(e){
       const fb=`${profile.name}, you showed up today — that matters more than most people realise. Score ${score}/10 is data, not judgment. The next 24 hours are a fresh calculation.`;
       if(e.message==="API_KEY_MISSING"){setError("API key not configured.");return;}
+      try{localStorage.setItem(ciResultKey,fb);}catch{}
       setResult(fb);pushToMemory(userId,"assistant",fb);
     }
     setLoading(false);
@@ -2746,11 +2755,14 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
     <div className="fu">
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
         <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-        <div className="tag tt">Got it. Thank you.</div>
+        <div className="tag tt">✓ Checked in today</div>
       </div>
-      <div className="d3" style={{marginBottom:20}}>Something for today</div>
-      <div style={{fontSize:15,lineHeight:1.85,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap"}}>{result}</div>
-      <div style={{marginTop:24}}><button className="btn btn-ghost" onClick={onComplete}>← Back</button></div>
+      <div className="d3" style={{marginBottom:20}}>Your reflection for today</div>
+      <div style={{fontSize:15,lineHeight:1.85,color:"var(--cream-60)",fontWeight:300,whiteSpace:"pre-wrap",marginBottom:24}}>{result}</div>
+      <div style={{padding:"12px 16px",background:"rgba(31,168,154,0.06)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:12,marginBottom:20}}>
+        <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>✓ You already checked in today. Come back tomorrow to continue your streak.</p>
+      </div>
+      <button className="btn btn-ghost" onClick={onComplete}>← Back to dashboard</button>
     </div>
   );
 
@@ -2821,8 +2833,16 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
       pushToMemory(userId,"assistant",reply);setMsgs(p=>[...p,{role:"assistant",content:reply}]);
     }catch(e){
       console.error("Advisor error:",e.message,e);
-      if(e.message==="API_KEY_MISSING"){setError("Connection issue — please try again.");}
-      else setMsgs(p=>[...p,{role:"assistant",content:`Something went wrong on our end — ${e.message||"unknown error"}. Please try sending again.`}]);
+      const msg = e.message||"";
+      let friendly = "Something went wrong — please try again in a moment.";
+      if(msg.toLowerCase().includes("credit")||msg.toLowerCase().includes("billing")){
+        friendly = "⚠️ AI credits are low. Please go to console.anthropic.com → Billing to top up, then try again.";
+      } else if(msg.toLowerCase().includes("api key")||msg.toLowerCase().includes("unauthorized")){
+        friendly = "⚠️ API key issue. Check that ANTHROPIC_API_KEY is set in your Vercel environment variables.";
+      } else if(msg.toLowerCase().includes("502")||msg.toLowerCase().includes("gateway")){
+        friendly = "⚠️ The AI service is temporarily unavailable. Please wait a moment and try again.";
+      }
+      setMsgs(p=>[...p,{role:"assistant",content:friendly}]);
     }
     setLoading(false);
   };
@@ -3504,7 +3524,7 @@ function Landing({onStart,ipLocation}){
         <div className="cx-md" style={{textAlign:"center"}}>
           <div className="mono fu" style={{marginBottom:16}}>Simple Pricing</div>
           <h2 className="d2 fu1" style={{marginBottom:16}}>Start free.<br/><span className="em">Go deeper when you're ready.</span></h2>
-          <p className="body-lg fu2" style={{maxWidth:480,margin:"0 auto 48px"}}>Your personal clarity report is free. Upgrade to unlock your roadmap, career paths, weekly pulse, relocation reports, unlimited advisor, and every module refresh.</p>
+          <p className="body-lg fu2" style={{maxWidth:480,margin:"0 auto 48px"}}>Your free clarity report shows your scores, strengths, and exactly where to focus. Upgrade to unlock your roadmap, career paths, Jim Rohn financial philosophy, weekly pulse, relocation reports, and unlimited personal advisor.</p>
 
           <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:20,maxWidth:760,margin:"0 auto"}}>
             {/* Free plan */}
@@ -4335,6 +4355,8 @@ function AuthScreen({onAuth, onBack}){
           <span onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"terms"}))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
           {" "}and{" "}
           <span onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
+          {" "}·{" "}
+          <span onClick={()=>window.dispatchEvent(new CustomEvent("showAbout"))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>About Us</span>
         </div>
       </div>
     </div>
@@ -5833,24 +5855,38 @@ const JIM_ROHN_BOOKS = [
 ];
 
 function JimRohnMoneySection(){
-  const [open, setOpen] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   return(
-    <div style={{marginTop:20,marginBottom:8}}>
-      {/* Header */}
-      <div style={{padding:"20px 20px 16px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(155,114,207,0.04))",border:"1px solid rgba(210,175,90,0.2)",borderRadius:"18px 18px 0 0",borderBottom:"none"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-          <div style={{width:44,height:44,borderRadius:12,background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-            📜
-          </div>
+    <div style={{marginTop:20,marginBottom:8,background:"linear-gradient(135deg,rgba(210,175,90,0.06),rgba(155,114,207,0.03))",border:"1px solid rgba(210,175,90,0.2)",borderRadius:18}}>
+      {/* Header — always visible */}
+      <div style={{padding:"18px 20px 14px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{fontSize:22}}>📜</div>
           <div>
-            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".14em",marginBottom:4}}>FINANCIAL PHILOSOPHY</div>
-            <div style={{fontSize:17,fontWeight:700,color:"var(--cream)",lineHeight:1.3}}>Jim Rohn on Money</div>
+            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".14em",marginBottom:3}}>FINANCIAL PHILOSOPHY</div>
+            <div style={{fontSize:16,fontWeight:700,color:"var(--cream)"}}>Jim Rohn on Money</div>
           </div>
         </div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,margin:0}}>
-          Jim Rohn spent 40 years teaching the same principles — and they still work because they are built on human nature, not market conditions.
-          He learned them broke at 25. By 31 he was a millionaire. Everything below is what he taught between those two points.
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,margin:"0 0 14px 0"}}>
+          Broke at 25. Millionaire at 31. He spent 40 years explaining exactly what changed and why.
+          These are the 5 rules that made the difference.
         </p>
+
+        {/* 5 KEY QUOTES — always visible, no accordion needed */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {JIM_ROHN_PRINCIPLES.map((p,i)=>(
+            <div key={p.id} style={{padding:"12px 14px",background:"rgba(0,0,0,0.2)",borderRadius:12,borderLeft:`3px solid ${p.color}`}}>
+              <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".1em",marginBottom:5}}>{p.icon} {p.title.toUpperCase()}</div>
+              <p style={{fontSize:13,color:"var(--cream)",fontStyle:"italic",lineHeight:1.65,margin:"0 0 6px 0"}}>&ldquo;{p.quote}&rdquo;</p>
+              {expanded&&<p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:"6px 0 0 0"}}>{p.steps[0]}</p>}
+            </div>
+          ))}
+        </div>
+
+        <button onClick={()=>setExpanded(e=>!e)}
+          style={{width:"100%",marginTop:12,padding:"10px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10,color:"var(--gold)",fontSize:12,fontFamily:"var(--f-mono)",cursor:"pointer",letterSpacing:".05em"}}>
+          {expanded?"▲ Show less":"▼ Show step-by-step application for each"}
+        </button>
       </div>
 
       {/* Principles */}
@@ -7966,11 +8002,13 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
   const [refreshingClosing,setRefreshingClosing]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
 
-  // Auto-generate fresh insight if saved one is empty or generic
+  // Auto-generate fresh insight if missing, generic, or from a previous day
   useEffect(()=>{
     const saved = data.daily_insight||"";
-    const isGeneric = !saved || saved.includes("I need more information") || saved.includes("generic") || saved.length < 40;
-    if(isGeneric && formData?.challenge && formData?.goals && userId){
+    const todayLabel = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+    const isOld = saved && !saved.includes(todayLabel.split(",")[0]); // check if today's day name is in insight
+    const isGeneric = !saved || saved.includes("I need more information") || saved.length < 40;
+    if((isGeneric || isOld) && formData?.challenge && formData?.goals && userId){
       refreshDailyInsight();
     }
   // eslint-disable-next-line
@@ -8632,6 +8670,46 @@ Write ONE single sentence — something true and specific to them that they woul
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ABOUT US
+// ═══════════════════════════════════════════════════════════════════════════════
+function AboutUsPage({onBack}){
+  return(
+    <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
+      <div className="cx-md">
+        <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
+
+        <div style={{fontFamily:"var(--f-display)",fontSize:36,color:"var(--cream)",marginBottom:8}}>About DestinIQ</div>
+        <div style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:40}}>Built for people who are serious about their lives</div>
+
+        <div style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.9}}>
+
+          <div style={{marginBottom:36,padding:"24px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:16}}>
+            <p style={{fontSize:16,color:"var(--cream)",lineHeight:1.8,margin:0,fontStyle:"italic"}}>
+              &ldquo;Most personal development tools give you motivation. DestinIQ gives you a mirror — and then a map.&rdquo;
+            </p>
+          </div>
+
+          {[
+            ["What is DestinIQ?","DestinIQ is an AI-powered personal intelligence platform. You tell it your real situation — your goals, your income, your country, your challenges — and it builds a deeply personalised life strategy report. Not templates. Not generic advice. A real analysis of where you are and a specific plan for where you can go."],
+            ["Why we built it","Most people know what they want. The problem is the gap between knowing and doing — and that gap is usually filled with confusion, distraction, and advice that doesn't fit their actual life. DestinIQ was built to close that gap. By combining AI with real personal context, we can give people the kind of clarity that used to require expensive coaches or consultants."],
+            ["Who it's for","DestinIQ was built for people between 18 and 45 who are working toward something — financial freedom, a career change, a business, a better life for their family. It works for someone in Accra as well as someone in London, because the advice is built from their actual situation, not a Western default."],
+            ["What makes it different","Three things: (1) Your report is built from what you share — not stock content. (2) The advice respects where you live — costs are in your local currency, opportunities are real for your country. (3) It doesn't just tell you what to do — it tells you what you have, what you're missing, and exactly what to do this week."],
+            ["Our philosophy","We believe most people are more capable than their circumstances suggest. The gap between potential and reality is usually not talent — it's information, direction, and the discipline that comes from finally seeing your situation clearly. Jim Rohn said it: 'Work harder on yourself than you do on your job.' DestinIQ is the tool that makes that real."],
+            ["The team","DestinIQ is an independent product built by a small team. We are users of the product first — we built what we wish existed when we were trying to figure out our own paths."],
+            ["Contact us","For support, questions, or feedback: use the in-app support chat (bottom right) or email destiniq@gmail.com. We read every message."],
+          ].map(([h,b])=>(
+            <div key={h} style={{marginBottom:28}}>
+              <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
+              <p style={{margin:0}}>{b}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 1. PRIVACY POLICY & TERMS OF SERVICE
 // ═══════════════════════════════════════════════════════════════════════════════
 function PolicyPage({type,onBack}){
@@ -8818,6 +8896,9 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
             await saveUserProfile(user.id,{is_paid:false,is_premium:false});
             alert("Subscription cancelled. Contact support for refunds.");
           }} style={{width:"100%",background:"none",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"12px",color:"#F87171",fontSize:13,cursor:"pointer",marginBottom:10}}>Cancel subscription</button>}
+          <button onClick={()=>{window.dispatchEvent(new CustomEvent("showAbout"));}} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>About DestinIQ</button>
+          <button onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"terms"}))} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>Terms of Service</button>
+          <button onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Privacy Policy</button>
           <button onClick={onSignOut} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Sign out</button>
           <p style={{fontSize:11,color:"var(--cream-20)",textAlign:"center",margin:0}}>To delete your account and all data, contact us via the support chat.</p>
         </div>
@@ -9301,6 +9382,7 @@ export default function DestinIQ(){
   const [showProfile, setShowProfile]=useState(false);
   const [showAdmin,   setShowAdmin  ]=useState(false);
   const [showPolicy,  setShowPolicy ]=useState(null); // "privacy"|"terms"|null
+  const [showAbout,   setShowAbout  ]=useState(false);
   const [showShare,   setShowShare  ]=useState(false);
   const [showReferral,setShowReferral]=useState(false);
   const [navPhotoURL, setNavPhotoURL]=useState(null);
@@ -9529,8 +9611,10 @@ export default function DestinIQ(){
   // Listen for policy events from auth screen footer links
   useEffect(()=>{
     const handler=(e)=>setShowPolicy(e.detail);
+    const handleAbout=()=>setShowAbout(true);
     window.addEventListener("showPolicy",handler);
-    return()=>window.removeEventListener("showPolicy",handler);
+    window.addEventListener("showAbout",handleAbout);
+    return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);};
   },[]);
 
   // ── BROWSER BACK BUTTON ──────────────────────────────────────────────
@@ -9810,7 +9894,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                       <button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("auth")}>Get started free →</button>
                     </div>
                   </nav>
-                  {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
+                  {showAbout &&<AboutUsPage onBack={()=>setShowAbout(false)}/>}
+      {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
                   {!showPolicy&&<Landing onStart={()=>setScreen("auth")} ipLocation={ipLocation}/>}
                 </>
             }
