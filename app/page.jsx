@@ -764,10 +764,10 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   }
 }
 .fu{animation:fadeUp .5s ease both;}
-.fu1{opacity:0;animation:fadeUp .5s .08s ease both;}
-.fu2{opacity:0;animation:fadeUp .5s .16s ease both;}
-.fu3{opacity:0;animation:fadeUp .5s .24s ease both;}
-.fu4{opacity:0;animation:fadeUp .5s .32s ease both;}
+.fu1{animation:fadeUp .5s ease both;}
+.fu2{animation:fadeUp .5s .08s ease both;}
+.fu3{animation:fadeUp .5s .16s ease both;}
+.fu4{animation:fadeUp .5s .24s ease both;}
 .msg-in{animation:msgIn .3s ease both;}
 .reloc-card{background:var(--raised);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:20px;transition:border-color .3s;}
 .reloc-card:hover{border-color:var(--line-gold);}
@@ -924,7 +924,7 @@ async function getLocalContext(city,country){
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
-        model:"claude-sonnet-4-5",
+        model:"claude-haiku-4-5-20251001",
         max_tokens:900,
         tools:[{"type":"web_search_20250305","name":"web_search"}],
         system:"You are a local economic researcher. Today is "+today+". Search for real current data. Give specific numbers, local currency, real examples. Be factual and precise.",
@@ -1264,8 +1264,7 @@ function buildWeeklyPrompt(profile,momentumLog,isPremium,memCtx){
   // Summarise the last 7 check-ins
   const recentLog=momentumLog?momentumLog.slice(-7):[];
   const logSummary=recentLog.length>0
-    ? recentLog.map(e=>`${e.date}: energy ${e.energy}/10, focus ${e.focus}/10, feeling: ${e.feeling||"not logged"}`).join("\
-")
+    ? recentLog.map(e=>`${e.date}: energy ${e.energy}/10, focus ${e.focus}/10, feeling: ${e.feeling||"not logged"}`).join("\n")
     : "No check-ins logged this week";
 
   return `Write a weekly pulse report for ${name}.
@@ -1340,7 +1339,9 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const loc=ipLocation?.city?`${ipLocation.city}, ${country}`:country;
 
   // Currency rules baked in
-  const currencyNote=`All startup costs, savings amounts, and local prices MUST use ${country}'s local currency and symbol (e.g. GH₵ for Ghana, ₦ for Nigeria, KSh for Kenya, R for South Africa, £ for UK, $ for USA). Online income earnings should be in USD with local equivalent in parentheses.`;
+  const currencyNote=`MANDATORY CURRENCY RULES:
+COSTS/SAVINGS/STARTUP = LOCAL CURRENCY ONLY: ${country} uses ${currCode} (${currSym}). Write ALL prices, rents, costs in ${currSym}. NEVER use $ for costs in ${country}.
+EARNINGS FROM ONLINE WORK = USD. Earnings on Upwork/Fiverr/remote = USD, add local equivalent in brackets e.g. "$500 (${currSym}3,500/month)".`;
 
   return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
 
@@ -1865,20 +1866,61 @@ function Ring({score,color,size=96,label}){
   );
 }
 
+// ── LockGate: full section gate (paid modules) ───────────────────────────────
 function LockGate({children,isPaid,onUnlock,teaser=""}){
   if(isPaid) return children;
-  // Free users see a meaningful teaser, not a total blackout
   return(
     <div className="lock-wrap">
-      {/* Show top portion blurred so users know what they're missing */}
-      <div className="lock-blur" style={{maxHeight:220,overflow:"hidden"}}>{children}</div>
+      <div className="lock-blur" style={{maxHeight:200,overflow:"hidden"}}>{children}</div>
       <div className="lock-gate">
-        <div style={{fontSize:28,marginBottom:10}}>🔒</div>
-        <div className="d3" style={{marginBottom:6,fontSize:"1em"}}>This insight is for members</div>
-        {teaser&&<p style={{fontSize:13,color:"var(--cream-50)",maxWidth:300,marginBottom:16,lineHeight:1.6,textAlign:"center"}}>{teaser}</p>}
-        {!teaser&&<p className="body" style={{maxWidth:300,marginBottom:16,textAlign:"center"}}>Upgrade to unlock this section and every other premium module — roadmap, decisions, weekly pulse, and your full life advisor.</p>}
-        <button className="btn btn-gold" onClick={onUnlock}>Unlock full access</button>
-        <p style={{fontSize:11,color:"var(--cream-30)",marginTop:10}}>From $9/month · Cancel anytime</p>
+        <div style={{fontSize:26,marginBottom:8}}>🔒</div>
+        <div className="d3" style={{marginBottom:6,fontSize:"1em"}}>Members only</div>
+        {teaser
+          ? <p style={{fontSize:13,color:"var(--cream-50)",maxWidth:300,marginBottom:16,lineHeight:1.6,textAlign:"center"}}>{teaser}</p>
+          : <p className="body" style={{maxWidth:300,marginBottom:16,textAlign:"center"}}>Unlock your roadmap, decisions, career paths, weekly pulse, and relocation reports.</p>}
+        <button className="btn btn-gold" onClick={onUnlock}>Unlock from $9/month</button>
+        <p style={{fontSize:11,color:"var(--cream-30)",marginTop:8}}>Cancel anytime · No hidden fees</p>
+      </div>
+    </div>
+  );
+}
+
+// ── FreeGate: shows after free content when user is not paid ─────────────────
+// Usage: render your items normally (sliced), then add <FreeGate> after the slice.
+function FreeGate({total, freeCount, isPaid, onUnlock, label="sections"}){
+  if(isPaid || total <= freeCount) return null;
+  const locked = total - freeCount;
+  return(
+    <div style={{marginTop:10,padding:"22px 20px",background:"linear-gradient(180deg,var(--lift),var(--night))",borderRadius:16,border:"1px solid rgba(210,175,90,0.15)",textAlign:"center"}}>
+      <div style={{fontSize:22,marginBottom:8}}>🔒</div>
+      <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:6}}>
+        {locked} more {label} locked
+      </div>
+      <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:16,lineHeight:1.6}}>
+        Free users see {freeCount} of {total}. Upgrade to unlock all {total}.
+      </p>
+      <button className="btn btn-gold" onClick={onUnlock}>
+        Unlock all {total} → from $9/month
+      </button>
+    </div>
+  );
+}
+
+// ── ContentSlice: shows first N of an array with a blur gate ─────────────────
+// Used for dynamic modules (Life Hacks, Earn Online etc.)
+function ContentSlice({children, totalCount, freeCount=3, isPaid, onUnlock, what="items"}){
+  if(isPaid || totalCount<=freeCount) return children;
+  const locked = totalCount - freeCount;
+  return(
+    <div>
+      {children}
+      <div style={{marginTop:10,padding:"16px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.18)",borderRadius:12,textAlign:"center"}}>
+        <div style={{fontSize:13,color:"var(--cream-50)",marginBottom:12}}>
+          🔒 {locked} more {what} locked — upgrade to see all {totalCount} and refresh anytime
+        </div>
+        <button className="btn btn-gold" style={{fontSize:12,padding:"8px 20px"}} onClick={onUnlock}>
+          Unlock all → from $9/month
+        </button>
       </div>
     </div>
   );
@@ -2728,7 +2770,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
   // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
-  const FREE_DAILY_LIMIT=3;
+  const FREE_DAILY_LIMIT=2; // Free users: 2 advisor messages per day
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [usedToday,setUsedToday]=useState(()=>{
     if(typeof window==="undefined") return 0;
@@ -2776,7 +2818,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
     <div className="fu">
       <div style={{marginBottom:20}}>
         <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPaid&&<span style={{color:"var(--gold)"}}>✦ You have unlimited access.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> You have {remaining} of {FREE_DAILY_LIMIT} free messages left today.</span>}</p>
+        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPaid&&<span style={{color:"var(--gold)"}}>✦ You have unlimited access.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} messages today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade for unlimited →</button></span>}</p>
       </div>
       <div className="card">
         <div className="chat-scroll" ref={scrollRef}>
@@ -3442,7 +3484,7 @@ function Landing({onStart,ipLocation}){
         <div className="cx-md" style={{textAlign:"center"}}>
           <div className="mono fu" style={{marginBottom:16}}>Simple Pricing</div>
           <h2 className="d2 fu1" style={{marginBottom:16}}>Start free.<br/><span className="em">Go deeper when you're ready.</span></h2>
-          <p className="body-lg fu2" style={{maxWidth:480,margin:"0 auto 48px"}}>Your full report, momentum tracking, and roadmap are free — forever. Upgrade when you want unlimited advisor conversations, deeper money and business plans, and full relocation reports.</p>
+          <p className="body-lg fu2" style={{maxWidth:480,margin:"0 auto 48px"}}>Your personal clarity report is free. Upgrade to unlock your roadmap, career paths, weekly pulse, relocation reports, unlimited advisor, and every module refresh.</p>
 
           <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:20,maxWidth:760,margin:"0 auto"}}>
             {/* Free plan */}
@@ -3850,6 +3892,65 @@ function Loading(){
   );
 }
 
+
+
+// ── getCareerLinks: returns direct links based on career type + user profile ──
+function getCareerLinks(career, formData){
+  const type = (career?.type||"").toLowerCase();
+  const title = (career?.title||"").toLowerCase();
+  const skills = (formData?.skills||formData?.career||"").toLowerCase();
+  const links = [];
+
+  // Freelance platforms
+  if(type==="freelance"||title.includes("freelance")||title.includes("remote")){
+    links.push({label:"Upwork — find freelance clients worldwide",url:"https://www.upwork.com",type:"platform"});
+    links.push({label:"Fiverr — sell your skills as a service",url:"https://www.fiverr.com",type:"platform"});
+    links.push({label:"Toptal — premium freelance network",url:"https://www.toptal.com",type:"platform"});
+  }
+  // Tech / coding
+  if(skills.includes("code")||skills.includes("developer")||skills.includes("programming")||title.includes("developer")||title.includes("software")){
+    links.push({label:"freeCodeCamp — free coding curriculum",url:"https://www.freecodecamp.org",type:"course"});
+    links.push({label:"GitHub — build your portfolio",url:"https://github.com",type:"tool"});
+    links.push({label:"We Work Remotely — remote tech jobs",url:"https://weworkremotely.com",type:"platform"});
+  }
+  // Design
+  if(skills.includes("design")||title.includes("design")){
+    links.push({label:"Canva Design School — free design training",url:"https://www.canva.com/learn/",type:"course"});
+    links.push({label:"Behance — build your design portfolio",url:"https://www.behance.net",type:"tool"});
+    links.push({label:"99designs — design contest platform",url:"https://99designs.com",type:"platform"});
+  }
+  // Writing / content
+  if(skills.includes("writ")||skills.includes("content")||title.includes("writ")||title.includes("content")){
+    links.push({label:"ProBlogger Job Board",url:"https://problogger.com/jobs",type:"platform"});
+    links.push({label:"Substack — build a paid newsletter",url:"https://substack.com",type:"platform"});
+    links.push({label:"Copyhackers — free copywriting training",url:"https://copyhackers.com/blog/",type:"course"});
+  }
+  // Sales / marketing
+  if(skills.includes("sales")||skills.includes("market")||title.includes("sales")||title.includes("market")){
+    links.push({label:"HubSpot Academy — free sales & marketing courses",url:"https://academy.hubspot.com",type:"course"});
+    links.push({label:"LinkedIn — build your sales network",url:"https://www.linkedin.com",type:"platform"});
+  }
+  // Teaching / tutoring
+  if(title.includes("teach")||title.includes("tutor")||title.includes("train")){
+    links.push({label:"Preply — teach your skill online",url:"https://www.preply.com/en/become-a-tutor",type:"platform"});
+    links.push({label:"Teachable — build your own course",url:"https://teachable.com",type:"platform"});
+    links.push({label:"Udemy — sell courses to millions",url:"https://www.udemy.com/teaching/",type:"platform"});
+  }
+  // Business / entrepreneur
+  if(type==="business"||title.includes("business")||title.includes("entrepreneur")){
+    links.push({label:"Coursera — Business & Entrepreneurship",url:"https://www.coursera.org/browse/business",type:"course"});
+    links.push({label:"Shopify — start an online store",url:"https://www.shopify.com",type:"platform"});
+  }
+  // General always-useful links
+  links.push({label:"LinkedIn — professional network & job search",url:"https://www.linkedin.com",type:"platform"});
+  if(links.length < 3){
+    links.push({label:"Coursera — find accredited courses for your path",url:"https://www.coursera.org",type:"course"});
+    links.push({label:"Deel — get paid internationally from anywhere",url:"https://www.deel.com",type:"tool"});
+  }
+  // Deduplicate by URL
+  const seen = new Set();
+  return links.filter(l=>{ if(seen.has(l.url)) return false; seen.add(l.url); return true; }).slice(0,5);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
@@ -5466,7 +5567,9 @@ async function regenerateModule(key, profile, userId, isPremium, setData, setLoa
   const name=profile?.name||"the user";
   const income=profile?.income||"Under $500";
   const challenge=profile?.challenge||"getting started";
-  const currencyNote=`MANDATORY: All local costs and amounts MUST use ${country}'s local currency with correct symbol (GH₵ Ghana, ₦ Nigeria, KSh Kenya, R South Africa, £ UK, $ USA etc). Online income in USD with local equivalent in parentheses.`;
+  const currencyNote=`MANDATORY CURRENCY RULES:
+COSTS/STARTUP/SAVINGS = LOCAL CURRENCY: ${country} = ${currCode} (${currSym}). All prices, startup costs, rents, savings = ${currSym}. NEVER $ for costs.
+EARNINGS FROM ONLINE PLATFORMS = USD with local equivalent e.g. "$800/month (${currSym}12,000)".`;
   const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
   const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
   const todayPlatforms=platformSets[dayIndex];
@@ -5597,6 +5700,29 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
           </>
         )}
       </ModuleShell>
+
+      {/* Money tools - universal links */}
+      <div style={{marginTop:4,padding:"14px 16px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.12)",borderRadius:14}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:10}}>MONEY TOOLS — START HERE</div>
+        <div style={{display:"flex",flexDirection:"column",gap:7}}>
+          {[
+            {label:"YNAB — best budgeting app (You Need A Budget)",url:"https://www.youneedabudget.com",emoji:"📊"},
+            {label:"Wise — send & receive money globally at low fees",url:"https://wise.com",emoji:"💸"},
+            {label:"Investopedia — free financial education",url:"https://www.investopedia.com",emoji:"📚"},
+            {label:"Compound interest calculator",url:"https://www.investor.gov/financial-tools-calculators/calculators/compound-interest-calculator",emoji:"🧮"},
+            {label:"The Psychology of Money (book) — Morgan Housel",url:"https://www.amazon.com/Psychology-Money-Timeless-Lessons-Happiness/dp/0857197681",emoji:"📖"},
+          ].map((lk,i)=>(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <span style={{fontSize:14}}>{lk.emoji}</span>
+              <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
+              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
+            </a>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -5655,6 +5781,28 @@ function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
+      {/* Business links - shown once above modules */}
+      <div style={{marginBottom:16,padding:"12px 16px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:12}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:10}}>SUPPLIER & PLATFORM LINKS</div>
+        <div style={{display:"flex",flexDirection:"column",gap:7}}>
+          {[
+            {label:"Alibaba — buy wholesale products to resell",url:"https://www.alibaba.com",emoji:"🏭"},
+            {label:"DHgate — small-order wholesale supplier",url:"https://www.dhgate.com",emoji:"📦"},
+            {label:"Shopify — start an online store",url:"https://www.shopify.com",emoji:"🛒"},
+            {label:"Jumia — sell on Africa's largest marketplace",url:"https://www.jumia.com",emoji:"🌍"},
+            {label:"Paystack — accept payments in your country",url:"https://paystack.com",emoji:"💳"},
+          ].map((lk,i)=>(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <span style={{fontSize:14}}>{lk.emoji}</span>
+              <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
+              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
+            </a>
+          ))}
+        </div>
+      </div>
       <ModuleShell title="START WITH ZERO MONEY" color="var(--gold)" audioText={zbAudio} onRegen={()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE)} loading={zbL} err={zbE} isPaid={isPaid} onUnlock={onUnlock}>
         {!zb.idea&&!zbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate a zero-capital business plan for {formData?.country||"your country"}.</p>}
         {zb.idea&&(
@@ -5834,7 +5982,31 @@ function WinTracker({profile,userId,isPremium}){
               ))}
             </div>
           )}
-          {todayWins.length===0&&<p style={{fontSize:12,color:"rgba(255,255,255,0.25)",textAlign:"center",padding:"16px 0"}}>No wins logged yet today. What's one thing you'll do before the day ends?</p>}
+          {todayWins.length===0&&(
+            <div style={{textAlign:"center",padding:"16px 0 8px"}}>
+              <p style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:16}}>No wins logged yet today. What&apos;s one small thing you&apos;ll do before the day ends?</p>
+              <div style={{padding:"14px 18px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.12)",borderRadius:12,textAlign:"left"}}>
+                <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em",marginBottom:8}}>NEED MOTIVATION?</div>
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  {[
+                    {emoji:"📖",label:"Can't Hurt Me — David Goggins (read or listen)",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287"},
+                    {emoji:"🎧",label:"David Goggins on discipline (YouTube)",url:"https://www.youtube.com/results?search_query=david+goggins+motivation"},
+                    {emoji:"📱",label:"Streaks app — habit tracking",url:"https://streaksapp.com"},
+                    {emoji:"🏆",label:"Habitica — gamify your wins",url:"https://habitica.com"},
+                  ].map((lk,i)=>(
+                    <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+                      style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
+                      onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+                      onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                      <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
+                      <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
+                      <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -5891,7 +6063,38 @@ function WinTracker({profile,userId,isPremium}){
           </div>
           {currentStreak>=7&&<div style={{padding:"14px 16px",background:"rgba(210,175,90,0.07)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,fontSize:13,color:"var(--gold)",lineHeight:1.6}}>🏆 You've maintained a {currentStreak}-day streak. Most people quit by day 3. You didn't.</div>}
           {currentStreak===0&&totalWins>0&&<div style={{padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.6}}>You've logged {totalWins} wins total. Today is a new day — log one thing and restart your streak.</div>}
-          {totalWins===0&&<div style={{textAlign:"center",padding:"20px 0",color:"rgba(255,255,255,0.25)",fontSize:13}}>Start logging wins daily. Even small ones. After 7 days you'll see something change.</div>}
+          {totalWins===0&&<div style={{textAlign:"center",padding:"20px 0",color:"rgba(255,255,255,0.25)",fontSize:13}}>Start logging wins daily. Even small ones. After 7 days you&apos;ll see something change.</div>}
+
+          {/* Motivational resources — always shown in stats tab */}
+          <div style={{marginTop:24,padding:"16px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14}}>
+            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--teal)",letterSpacing:".12em",marginBottom:12}}>TOOLS TO TRACK YOUR JOURNEY</div>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {[
+                {emoji:"📊",label:"Notion — free daily log & tracker template",url:"https://www.notion.so/templates/daily-planner",type:"tool"},
+                {emoji:"✅",label:"Todoist — daily task & win tracking",url:"https://todoist.com",type:"tool"},
+                {emoji:"📖",label:"The Compound Effect — Darren Hardy",url:"https://www.amazon.com/Compound-Effect-Darren-Hardy/dp/159315724X",type:"book"},
+                {emoji:"📖",label:"Atomic Habits — James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
+                {emoji:"🎯",label:"Streaks — habit streak tracking app",url:"https://streaksapp.com",type:"tool"},
+                {emoji:"🧠",label:"James Clear's newsletter — weekly habit insights (free)",url:"https://jamesclear.com/3-2-1",type:"resource"},
+              ].map((lk,i)=>(
+                <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",
+                    background:lk.type==="book"?"rgba(210,175,90,0.05)":lk.type==="tool"?"rgba(31,168,154,0.05)":"rgba(155,114,207,0.05)",
+                    border:`1px solid ${lk.type==="book"?"rgba(210,175,90,0.12)":lk.type==="tool"?"rgba(31,168,154,0.12)":"rgba(155,114,207,0.12)"}`,
+                    borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+                  onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                  <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
+                  <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
+                  <span style={{fontSize:9,
+                    color:lk.type==="book"?"var(--gold)":lk.type==="tool"?"var(--teal)":"#9b72cf",
+                    fontFamily:"var(--f-mono)",flexShrink:0}}>
+                    {lk.type==="book"?"Book ↗":lk.type==="tool"?"Tool ↗":"Read ↗"}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -5914,7 +6117,7 @@ const PROGRESS_TAGS=[
   {id:"personal",label:"Personal",color:"var(--cream-40)"},
 ];
 
-function ProgressFeed({profile,reportData,userId,isPremium}){
+function ProgressFeed({profile,reportData,userId,isPremium,isPaid,onUnlock}){
   const [entries,setEntries]=useState(()=>loadProgress());
   const [input,setInput]=useState("");
   const [tag,setTag]=useState("roadmap");
@@ -5922,8 +6125,12 @@ function ProgressFeed({profile,reportData,userId,isPremium}){
   const [expandedId,setExpandedId]=useState(null);
   const [filter,setFilter]=useState("all");
 
+  const FREE_PROGRESS_LIMIT = 3;
+  const canPost = isPaid || entries.length < FREE_PROGRESS_LIMIT;
+
   const submit=async()=>{
     if(!input.trim()||loading) return;
+    if(!canPost){ onUnlock&&onUnlock(); return; }
     const entry={
       id:Date.now(),
       text:input.trim(),
@@ -6004,9 +6211,16 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
         </div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
           <span style={{fontSize:11,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)"}}>{input.length}/600</span>
-          <button onClick={submit} disabled={!input.trim()||loading} className="btn btn-gold" style={{fontSize:13}}>
-            {loading?"Getting your coaching…":"Send update →"}
-          </button>
+          {!isPaid && entries.length >= FREE_PROGRESS_LIMIT ? (
+            <button onClick={()=>onUnlock&&onUnlock()} className="btn btn-gold" style={{fontSize:13}}>
+              🔒 Upgrade to post more updates
+            </button>
+          ):(
+            <button onClick={submit} disabled={!input.trim()||loading} className="btn btn-gold" style={{fontSize:13}}>
+              {loading?"Getting your coaching…":"Send update →"}
+            </button>
+          )}
+          {!isPaid&&<p style={{fontSize:11,color:"var(--cream-30)",margin:"6px 0 0"}}>Free: {Math.max(0,FREE_PROGRESS_LIMIT-entries.length)} of {FREE_PROGRESS_LIMIT} updates remaining · <button onClick={()=>onUnlock&&onUnlock()} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11,padding:0}}>Upgrade for unlimited</button></p>}
         </div>
       </div>
 
@@ -6026,12 +6240,45 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
 
       {/* Feed */}
       {filtered.length===0&&(
-        <div style={{textAlign:"center",padding:"32px 0"}}>
-          <div style={{fontSize:40,marginBottom:12}}>📈</div>
-          <div className="d3" style={{marginBottom:8}}>Your progress story starts here</div>
-          <p style={{fontSize:13,color:"rgba(255,255,255,0.35)",maxWidth:380,margin:"0 auto",lineHeight:1.7}}>
-            Every time you try something from your roadmap, career path, or business plan — come back and tell your coach what happened. They'll help you adjust and keep moving.
-          </p>
+        <div style={{padding:"28px 0 8px"}}>
+          <div style={{textAlign:"center",marginBottom:24}}>
+            <div style={{fontSize:40,marginBottom:12}}>📈</div>
+            <div className="d3" style={{marginBottom:8}}>Your progress story starts here</div>
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.35)",maxWidth:380,margin:"0 auto",lineHeight:1.7}}>
+              Every time you try something from your roadmap, career path, or business plan — come back and tell your coach what happened. They&apos;ll help you adjust and keep moving.
+            </p>
+          </div>
+
+          {/* Resources to help them get started */}
+          <div style={{padding:"16px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14}}>
+            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em",marginBottom:12}}>WHILE YOU BUILD YOUR STORY — READ THESE</div>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {[
+                {emoji:"📖",label:"The Lean Startup — Eric Ries (test ideas fast)",url:"https://www.amazon.com/Lean-Startup-Entrepreneurs-Continuous-Innovation/dp/0307887898",type:"book"},
+                {emoji:"📖",label:"Grit — Angela Duckworth (why persistence wins)",url:"https://www.amazon.com/Grit-Passion-Perseverance-Angela-Duckworth/dp/1501111108",type:"book"},
+                {emoji:"🎧",label:"How I Built This — Guy Raz (founder stories, podcast)",url:"https://www.npr.org/series/490248027/how-i-built-this",type:"resource"},
+                {emoji:"📖",label:"The $100 Startup — Chris Guillebeau",url:"https://www.amazon.com/100-Startup-Reinvent-Living-Create/dp/0307951529",type:"book"},
+                {emoji:"🛠",label:"Notion — track your roadmap steps",url:"https://www.notion.so/templates",type:"tool"},
+                {emoji:"🧠",label:"Indie Hackers — real founders sharing real numbers",url:"https://www.indiehackers.com",type:"resource"},
+              ].map((lk,i)=>(
+                <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",
+                    background:lk.type==="book"?"rgba(210,175,90,0.05)":lk.type==="tool"?"rgba(31,168,154,0.05)":"rgba(155,114,207,0.05)",
+                    border:`1px solid ${lk.type==="book"?"rgba(210,175,90,0.12)":lk.type==="tool"?"rgba(31,168,154,0.12)":"rgba(155,114,207,0.12)"}`,
+                    borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+                  onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                  <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
+                  <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
+                  <span style={{fontSize:9,
+                    color:lk.type==="book"?"var(--gold)":lk.type==="tool"?"var(--teal)":"#9b72cf",
+                    fontFamily:"var(--f-mono)",flexShrink:0}}>
+                    {lk.type==="book"?"Book ↗":lk.type==="tool"?"Tool ↗":"Listen ↗"}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -6070,6 +6317,28 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
             </div>
           );
         })}
+      </div>
+      {/* Resource strip — always visible at bottom */}
+      <div style={{marginTop:24,padding:"14px 16px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:14}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".12em",marginBottom:10}}>WHEN YOU GET STUCK — GO HERE</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {[
+            {emoji:"🧠",label:"ADPList — free mentors",url:"https://adplist.org"},
+            {emoji:"🌐",label:"Indie Hackers",url:"https://www.indiehackers.com"},
+            {emoji:"📖",label:"Grit — A. Duckworth",url:"https://www.amazon.com/Grit-Passion-Perseverance-Angela-Duckworth/dp/1501111108"},
+            {emoji:"🛠",label:"MentorCruise",url:"https://mentorcruise.com"},
+            {emoji:"💸",label:"Deel — get paid globally",url:"https://www.deel.com"},
+          ].map((lk,i)=>(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:20,textDecoration:"none",transition:"opacity .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <span style={{fontSize:12}}>{lk.emoji}</span>
+              <span style={{fontSize:11,color:"var(--cream-60)"}}>{lk.label}</span>
+              <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -6448,7 +6717,7 @@ const DISCIPLINE_SECTIONS=[
   },
 ];
 
-function DailyDisciplineModule({formData, userId}){
+function DailyDisciplineModule({formData, userId, isPaid, onUnlock}){
   const [open,setOpen]=useState(null);
   const name=formData?.name||"";
 
@@ -6467,12 +6736,12 @@ function DailyDisciplineModule({formData, userId}){
         </p>
       </div>
 
-      {/* Sections */}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {DISCIPLINE_SECTIONS.map(s=>{
+      {/* Sections — first 2 free, rest need paid */}
+      {/* Free: first 2 sections. Paid: all sections */}
+      {(isPaid ? DISCIPLINE_SECTIONS : DISCIPLINE_SECTIONS.slice(0,2)).map(s=>{
           const isOpen=open===s.id;
           return(
-            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:10}}>
               {/* Header */}
               <button onClick={()=>setOpen(o=>o===s.id?null:s.id)}
                 style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
@@ -6602,13 +6871,13 @@ function DailyDisciplineModule({formData, userId}){
             </div>
           );
         })}
-      </div>
+      <FreeGate total={DISCIPLINE_SECTIONS.length} freeCount={2} isPaid={isPaid} onUnlock={onUnlock} label="discipline sections"/>
 
       {/* Bottom CTA */}
       <div style={{marginTop:28,padding:"22px 20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
         <div style={{fontSize:22,marginBottom:10}}>🏁</div>
         <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:8}}>
-          This is the FYP you actually need{name?`, ${name}`:""}
+          This is the FYP you actually need{name ? `, ${name}` : ""}
         </div>
         <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,maxWidth:400,margin:"0 auto 16px"}}>
           Not 60-second clips that feel good for a moment and then disappear. 
@@ -6833,7 +7102,7 @@ function ResourceLinks({links, accentColor}){
   );
 }
 
-function InvestInYourselfModule({formData, userId}){
+function InvestInYourselfModule({formData, userId, isPaid, onUnlock}){
   const [open,setOpen]=useState(null);
   const toggleAccordion=(id)=>setOpen(o=>o===id?null:id);
   return(
@@ -6855,11 +7124,10 @@ function InvestInYourselfModule({formData, userId}){
         )}
       </div>
 
-      <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        {INVEST_SECTIONS.map(s=>{
+      {(isPaid ? INVEST_SECTIONS : INVEST_SECTIONS.slice(0,2)).map(s=>{
           const isOpen=open===s.id;
           return(
-            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:12}}>
               {/* Header */}
               <button onClick={()=>toggleAccordion(s.id)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
                 <div style={{width:42,height:42,borderRadius:12,background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{s.icon}</div>
@@ -6902,7 +7170,7 @@ function InvestInYourselfModule({formData, userId}){
             </div>
           );
         })}
-      </div>
+      <FreeGate total={INVEST_SECTIONS.length} freeCount={2} isPaid={isPaid} onUnlock={onUnlock} label="invest sections"/>
 
       {/* Bottom quote */}
       <div style={{marginTop:32,padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
@@ -7026,7 +7294,7 @@ const SUCCESS_TRUTH={
   ],
 };
 
-function DisgustinglySuccessfulModule({formData, userId}){
+function DisgustinglySuccessfulModule({formData, userId, isPaid, onUnlock}){
   const [open,setOpen]=useState(null);
   return(
     <div className="fu">
@@ -7043,12 +7311,12 @@ function DisgustinglySuccessfulModule({formData, userId}){
         </p>
       </div>
 
-      {/* Rules */}
-      <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32}}>
-        {SUCCESS_RULES.map(r=>{
+      {/* Rules — first 2 free */}
+      <div style={{marginBottom:32}}>
+      {(isPaid ? SUCCESS_RULES : SUCCESS_RULES.slice(0,2)).map(r=>{
           const isOpen=open===r.number;
           return(
-            <div key={r.number} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?r.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s"}}>
+            <div key={r.number} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?r.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:12}}>
               <button onClick={()=>setOpen(o=>o===r.number?null:r.number)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
                 <div style={{width:42,height:42,borderRadius:12,background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--f-mono)",fontSize:13,fontWeight:700,color:r.color,flexShrink:0}}>{r.number}</div>
                 <div style={{flex:1,minWidth:0}}>
@@ -7078,6 +7346,7 @@ function DisgustinglySuccessfulModule({formData, userId}){
             </div>
           );
         })}
+      <FreeGate total={SUCCESS_RULES.length} freeCount={2} isPaid={isPaid} onUnlock={onUnlock} label="success rules"/>
       </div>
 
       {/* Final Truth */}
@@ -7236,7 +7505,7 @@ const TENX_PRINCIPLES=[
   },
 ];
 
-function MindsetTenXModule({formData, userId}){
+function MindsetTenXModule({formData, userId, isPaid, onUnlock}){
   const [openPrinciple,setOpenPrinciple]=useState(null);
   const [openTenX,setOpenTenX]=useState(null);
   const [tab,setTab]=useState("mindset"); // "mindset" | "tenx"
@@ -7294,8 +7563,18 @@ function MindsetTenXModule({formData, userId}){
         </div>
       )}
 
-      {/* 10X PRINCIPLES */}
-      {tab==="tenx"&&(
+      {/* 10X PRINCIPLES — paid only */}
+      {tab==="tenx"&&!isPaid&&(
+        <div style={{textAlign:"center",padding:"32px 20px"}}>
+          <div style={{fontSize:28,marginBottom:10}}>🔒</div>
+          <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>10x Principles — Members Only</div>
+          <p style={{fontSize:13,color:"var(--cream-40)",maxWidth:300,margin:"0 auto 20px",lineHeight:1.65}}>
+            The 6 performance principles are locked for free users. Upgrade to unlock all 14 mindset sections.
+          </p>
+          <button className="btn btn-gold" onClick={onUnlock}>Unlock from $9/month</button>
+        </div>
+      )}
+      {tab==="tenx"&&isPaid&&(
         <>
           <div style={{marginBottom:20}}>
             <div className="d3" style={{marginBottom:8}}>Simple Principles That Make You 10x Better at Anything</div>
@@ -7441,8 +7720,8 @@ Write ONE single sentence — something true and specific to them that they woul
                   </div>
                 )}
               </div>
-              <h1 className="d2 fu1" style={{marginBottom:8}}>{formData.name}</h1>
-              <p className="body fu2" style={{fontStyle:"italic",maxWidth:500}}>&ldquo;{data.greeting}&rdquo;</p>
+              <h1 className="d2 fu1" style={{marginBottom:8}}>{formData?.name||""}</h1>
+              {data.greeting&&<p className="body fu2" style={{fontStyle:"italic",maxWidth:500}}>&ldquo;{data.greeting}&rdquo;</p>}
             </div>
             <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
@@ -7610,46 +7889,160 @@ Write ONE single sentence — something true and specific to them that they woul
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium}/>}
-            {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium}/>}
+            {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="practices"&&<PracticesView userId={userId}/>}
-            {mod==="invest"&&<InvestInYourselfModule formData={formData} userId={userId}/>}
-            {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId}/>}
-            {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId}/>}
-            {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId}/>}
+            {mod==="invest"&&<InvestInYourselfModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+
+
 
           {mod==="roadmap"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
-                <div className="d3" style={{marginBottom:6}}>Your path forward, step by step</div>
-                <p className="body" style={{marginBottom:28}}>Not a template. Not generic advice. This is built around what you told us — your life, your country, your real situation.</p>
-                {data.roadmap?.map((r,i)=>(
-                  <div className="timeline-item" key={i}>
-                    <div className="t-dot">{String(i+1).padStart(2,"0")}</div>
-                    <div className="t-body">
-                      <div className="t-phase">{r.phase}</div>
-                      <div className="t-title">{r.title}</div>
-                      <p className="t-desc" style={{marginBottom:12}}>{r.desc}</p>
-                      {/* Numbered step-by-step list */}
+                {/* Header */}
+                <div style={{marginBottom:28}}>
+                  <div className="d3" style={{marginBottom:8}}>
+                    {formData?.name?"Your Roadmap, "+formData.name:"Your Roadmap"}
+                  </div>
+                  <p className="body" style={{marginBottom:0,lineHeight:1.75}}>
+                    Not a template. Not generic advice. This roadmap is built around your exact situation in {formData?.country||"your country"}.
+                    Every cost shown is in local currency. Every step has a direct action you can take today.
+                  </p>
+                </div>
+
+                {/* Phase cards */}
+                {(data.roadmap||[]).map((r,i)=>{
+                  const phaseColors=["var(--gold)","var(--teal)","#9b72cf"];
+                  const color=phaseColors[i]||"var(--gold)";
+                  return(
+                  <div key={i} style={{marginBottom:24,background:"var(--lift)",borderRadius:18,border:`1px solid ${color}20`,overflow:"hidden"}}>
+                    {/* Phase header */}
+                    <div style={{padding:"16px 20px",background:`linear-gradient(135deg,${color}08,transparent)`,borderBottom:`1px solid ${color}15`,display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:44,height:44,borderRadius:12,background:`${color}14`,border:`1px solid ${color}30`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <div style={{fontFamily:"var(--f-mono)",fontSize:13,fontWeight:800,color,lineHeight:1}}>{String(i+1).padStart(2,"0")}</div>
+                      </div>
+                      <div>
+                        <div style={{fontSize:10,fontFamily:"var(--f-mono)",color,letterSpacing:".1em",marginBottom:3}}>{r.phase}</div>
+                        <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",lineHeight:1.3}}>{r.title}</div>
+                      </div>
+                    </div>
+
+                    <div style={{padding:"16px 20px"}}>
+                      {/* Deep description */}
+                      <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.85,marginBottom:16}}>{r.desc}</p>
+
+                      {/* Steps — with local currency note */}
                       {Array.isArray(r.steps)&&r.steps.length>0&&(
-                        <div style={{marginBottom:12}}>
+                        <div style={{marginBottom:16}}>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color,letterSpacing:".1em",marginBottom:10}}>
+                            EXACT STEPS — COSTS IN {(formData?.country||"YOUR COUNTRY").toUpperCase()} CURRENCY
+                          </div>
                           {r.steps.map((step,si)=>(
-                            <div key={si} style={{display:"flex",gap:10,marginBottom:8,padding:"10px 14px",background:"var(--lift)",borderRadius:8,border:"1px solid var(--line)"}}>
-                              <div style={{width:22,height:22,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--gold)"}}>{si+1}</div>
-                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300}}>{step}</p>
+                            <div key={si} style={{display:"flex",gap:10,marginBottom:8,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+                              <div style={{width:24,height:24,borderRadius:"50%",background:`${color}12`,border:`1px solid ${color}25`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color,fontWeight:700}}>{si+1}</div>
+                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.65,margin:0}}>{step}</p>
                             </div>
                           ))}
                         </div>
                       )}
-                      {r.win&&<div className="t-win"><strong>Do this first:</strong> {r.win}</div>}
+
+                      {/* Win / milestone */}
+                      {r.win&&(
+                        <div style={{padding:"12px 16px",background:`${color}08`,border:`1px solid ${color}20`,borderRadius:12,marginBottom:16,display:"flex",gap:10,alignItems:"flex-start"}}>
+                          <span style={{fontSize:18,flexShrink:0}}>🎯</span>
+                          <div>
+                            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color,letterSpacing:".1em",marginBottom:4}}>MILESTONE — WHAT YOU&apos;LL HAVE BY THE END</div>
+                            <p style={{fontSize:13,color:"var(--cream)",fontWeight:600,margin:0,lineHeight:1.6}}>{r.win}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Direct links for this phase */}
+                      {i===0&&(
+                        <div>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".1em",marginBottom:10}}>TOOLS TO START THIS PHASE</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {[
+                              {label:"Notion — free planning & tracking template",url:"https://www.notion.so/templates",type:"tool"},
+                              {label:"Todoist — daily task manager (free)",url:"https://todoist.com",type:"tool"},
+                              {label:"Google Calendar — schedule your roadmap blocks",url:"https://calendar.google.com",type:"tool"},
+                            ].map((lk,li)=>(
+                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
+                                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 13px",background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
+                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
+                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                                <span style={{fontSize:14}}>🛠</span>
+                                <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
+                                <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {i===1&&(
+                        <div>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--teal)",letterSpacing:".1em",marginBottom:10}}>LEVEL UP IN THIS PHASE</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {[
+                              {label:"Coursera — take a skill course relevant to your path",url:"https://www.coursera.org",type:"course"},
+                              {label:"LinkedIn Learning — professional skills",url:"https://www.linkedin.com/learning/",type:"course"},
+                              {label:"YouTube — search your exact skill for free tutorials",url:"https://www.youtube.com",type:"resource"},
+                            ].map((lk,li)=>(
+                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
+                                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 13px",background:"rgba(31,168,154,0.06)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
+                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
+                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                                <span style={{fontSize:14}}>📚</span>
+                                <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
+                                <span style={{fontSize:9,color:"var(--teal)",fontFamily:"var(--f-mono)"}}>↗</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {i===2&&(
+                        <div>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".1em",marginBottom:10}}>SCALE IN THIS PHASE</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {[
+                              {label:"Deel — get paid internationally in USD",url:"https://www.deel.com",type:"tool"},
+                              {label:"Wise — transfer money globally at low fees",url:"https://wise.com",type:"tool"},
+                              {label:"Lunchclub — find mentors and collaborators",url:"https://lunchclub.com",type:"platform"},
+                            ].map((lk,li)=>(
+                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
+                                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 13px",background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
+                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
+                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                                <span style={{fontSize:14}}>🌐</span>
+                                <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
+                                <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <AudioPlayer text={`Phase ${i+1}: ${r.phase}. ${r.title}. ${r.desc} ${r.win?`By the end: ${r.win}`:""}`} label="Listen" mini={false}/>
                     </div>
                   </div>
-                ))}
+                );})}
+
+                {/* Currency reminder */}
+                <div style={{padding:"14px 18px",background:"rgba(31,168,154,0.05)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:12,display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>💡</span>
+                  <p style={{fontSize:12,color:"var(--cream-50)",margin:0,lineHeight:1.7}}>
+                    All startup costs and budgets in this roadmap are shown in {formData?.country||"your country"}&apos;s local currency.
+                    When you reach the earning phase, income figures are in USD — because online income is typically paid in USD regardless of where you live.
+                  </p>
+                </div>
               </div>
             </LockGate>
           )}
@@ -7679,42 +8072,101 @@ Write ONE single sentence — something true and specific to them that they woul
           {mod==="career"&&(
             <LockGate isPaid={isPaid} onUnlock={onUnlock}>
               <div className="fu">
-                <div className="d3" style={{marginBottom:6}}>What you could actually be doing</div>
-                <p className="body" style={{marginBottom:24}}>Real paths matched to your skills, your country, and where you are right now — with exact steps to start.</p>
-                {data.career?.map((o,i)=>(
-                  <div className="card" key={i} style={{marginBottom:16}}>
-                    <div style={{display:"flex",gap:14,marginBottom:14}}>
-                      <div style={{width:44,height:44,borderRadius:10,background:"var(--gold-dim)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{o.type==="job"?"💼":o.type==="business"?"⚡":"◈"}</div>
-                      <div style={{flex:1}}>
-                        <div style={{fontFamily:"var(--f-display)",fontSize:18,fontWeight:500,marginBottom:5}}>{o.title}</div>
-                        <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                          <span className="tag tg">{o.type}</span><span className="tag tt">{o.timeline}</span>
-                          <span className="tag" style={{background:"transparent",border:"1px solid var(--line)",color:"var(--cream-30)",fontSize:"9px",padding:"3px 9px",borderRadius:5,fontFamily:"var(--f-mono)"}}>Effort: {o.effort}</span>
-                          <span className="tag tv">{o.income}</span>
+                {/* Header */}
+                <div style={{marginBottom:28}}>
+                  <div className="d3" style={{marginBottom:8}}>Your Career Paths{formData?.name?`, ${formData.name}`:""}</div>
+                  <p className="body" style={{marginBottom:0,lineHeight:1.75}}>
+                    Three real paths matched to your skills, your country, and where you are right now.
+                    Each one has what it pays, what it costs to start (in {formData?.country||"your country"}&apos;s currency), and the exact steps to begin this week.
+                  </p>
+                </div>
+
+                {(data.career||[]).map((o,i)=>{
+                  // Derive resource links from job type and steps content
+                  const careerLinks = getCareerLinks(o, formData);
+                  return(
+                  <div key={i} style={{marginBottom:24,background:"var(--lift)",borderRadius:18,border:"1px solid rgba(255,255,255,0.07)",overflow:"hidden"}}>
+                    {/* Title bar */}
+                    <div style={{padding:"18px 20px",background:"linear-gradient(135deg,rgba(210,175,90,0.06),transparent)",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+                      <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                        <div style={{width:46,height:46,borderRadius:12,background:"var(--gold-dim)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+                          {o.type==="job"?"💼":o.type==="freelance"?"🌐":o.type==="business"?"⚡":"◈"}
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:17,fontWeight:700,color:"var(--cream)",marginBottom:6,lineHeight:1.3}}>{o.title}</div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            <span style={{fontSize:10,padding:"3px 10px",borderRadius:20,background:"rgba(210,175,90,0.1)",color:"var(--gold)",fontFamily:"var(--f-mono)",border:"1px solid rgba(210,175,90,0.2)"}}>{o.type}</span>
+                            <span style={{fontSize:10,padding:"3px 10px",borderRadius:20,background:"rgba(31,168,154,0.08)",color:"var(--teal)",fontFamily:"var(--f-mono)",border:"1px solid rgba(31,168,154,0.15)"}}>{o.timeline}</span>
+                            <span style={{fontSize:10,padding:"3px 10px",borderRadius:20,background:"rgba(255,255,255,0.04)",color:"var(--cream-40)",fontFamily:"var(--f-mono)",border:"1px solid rgba(255,255,255,0.08)"}}>Effort: {o.effort}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Income — shown prominently */}
+                      <div style={{marginTop:12,padding:"10px 14px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:10,display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:16}}>💰</span>
+                        <div>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:2}}>EARNING POTENTIAL</div>
+                          <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{o.income}</div>
                         </div>
                       </div>
                     </div>
-                    {/* Why this fits */}
-                    {o.why&&<div style={{padding:"10px 14px",background:"var(--gold-glow)",borderLeft:"2px solid var(--gold)",borderRadius:"0 8px 8px 0",marginBottom:12}}>
-                      <div className="mono" style={{fontSize:"8px",marginBottom:4}}>Why this fits your profile</div>
-                      <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.7,fontWeight:300}}>{o.why}</p>
-                    </div>}
-                    {/* Also show desc if present */}
-                    {o.desc&&!o.why&&<p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,marginBottom:12}}>{o.desc}</p>}
-                    {/* How to start — numbered steps */}
-                    {o.how&&Array.isArray(o.how)&&o.how.length>0&&(
-                      <div>
-                        <div className="mono" style={{fontSize:"8px",marginBottom:8}}>How to start — step by step</div>
-                        {o.how.map((step,si)=>(
-                          <div key={si} style={{display:"flex",gap:10,marginBottom:7,padding:"9px 12px",background:"var(--lift)",borderRadius:7,border:"1px solid var(--line)"}}>
-                            <div style={{width:20,height:20,borderRadius:"50%",background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--teal)"}}>{si+1}</div>
-                            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.6,fontWeight:300}}>{step}</p>
+
+                    <div style={{padding:"16px 20px"}}>
+                      {/* Why this fits */}
+                      {o.why&&(
+                        <div style={{padding:"12px 16px",background:"rgba(210,175,90,0.04)",borderLeft:"2px solid var(--gold)",borderRadius:"0 10px 10px 0",marginBottom:16}}>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:5}}>WHY THIS FITS YOU</div>
+                          <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,margin:0}}>{o.why}</p>
+                        </div>
+                      )}
+                      {o.desc&&!o.why&&<p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,marginBottom:16}}>{o.desc}</p>}
+
+                      {/* Steps */}
+                      {o.how&&Array.isArray(o.how)&&o.how.length>0&&(
+                        <div style={{marginBottom:16}}>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--teal)",letterSpacing:".1em",marginBottom:10}}>HOW TO START — THIS WEEK</div>
+                          {o.how.map((step,si)=>(
+                            <div key={si} style={{display:"flex",gap:10,marginBottom:8,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
+                              <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(31,168,154,0.1)",border:"1px solid rgba(31,168,154,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--teal)",fontWeight:700}}>{si+1}</div>
+                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.65,margin:0}}>{step}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Resource links — direct links to platforms, courses, tools */}
+                      {careerLinks.length>0&&(
+                        <div>
+                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".1em",marginBottom:10}}>START HERE — DIRECT LINKS</div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {careerLinks.map((lk,li)=>(
+                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
+                                style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
+                                  background:lk.type==="course"?"rgba(155,114,207,0.08)":lk.type==="platform"?"rgba(31,168,154,0.08)":"rgba(210,175,90,0.08)",
+                                  border:`1px solid ${lk.type==="course"?"rgba(155,114,207,0.2)":lk.type==="platform"?"rgba(31,168,154,0.2)":"rgba(210,175,90,0.2)"}`,
+                                  borderRadius:10,textDecoration:"none",transition:"opacity .15s"}}
+                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
+                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                                <span style={{fontSize:15,flexShrink:0}}>{lk.type==="course"?"📚":lk.type==="platform"?"🌐":"🛠"}</span>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:13,color:"var(--cream)",fontWeight:500}}>{lk.label}</div>
+                                </div>
+                                <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
+                                  background:lk.type==="course"?"rgba(155,114,207,0.15)":lk.type==="platform"?"rgba(31,168,154,0.15)":"rgba(210,175,90,0.15)",
+                                  color:lk.type==="course"?"#9b72cf":lk.type==="platform"?"var(--teal)":"var(--gold)",
+                                  fontFamily:"var(--f-mono)",flexShrink:0}}>
+                                  {lk.type} ↗
+                                </span>
+                              </a>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        </div>
+                      )}
+
+                      <AudioPlayer text={`${o.title}. ${o.why||o.desc||""}. How to start: ${(o.how||[]).join(". ")}`} label="Listen" mini={false}/>
+                    </div>
                   </div>
-                ))}
+                );})}
               </div>
             </LockGate>
           )}
@@ -8709,17 +9161,23 @@ export default function DestinIQ(){
       const prompt=buildAnalysisPrompt(f,isPremium,buildMemoryContext(userId),ipLocation,localCtx);
       const raw=await callAPI({
         messages:[{role:"user",content:prompt}],
-        system:`You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person, anywhere in the world — not just Africa. Tailor everything to their actual country, whether that is Ghana, the Philippines, Brazil, India, Poland, the USA, or anywhere else.
+        system:`You are a world-class personal strategy advisor, life coach, and financial mentor writing an intensely personal report for ONE person, anywhere in the world. Tailor everything to their actual country.
 
-CURRENCY RULE — THIS IS MANDATORY AND NON-NEGOTIABLE:
-- Detect the person's country from their profile.
-- EVERY startup cost, savings target, budget, or amount of money to SPEND must be in that country's LOCAL currency with the correct symbol.
-- Ghana → GH₵ (Ghana Cedis / GHS). NEVER use $ or ₹ for a Ghanaian user.
-- Nigeria → ₦ (NGN). Kenya → KSh (KES). South Africa → R (ZAR). Rwanda → RWF. Uganda → USh (UGX).
-- UK → £ (GBP). Eurozone → € (EUR). India → ₹ (INR). Philippines → ₱ (PHP).
-- USA / no detected country → $ (USD).
-- EARNINGS and ONLINE INCOME figures should be in USD (since online income is usually paid in USD), with local currency equivalent in parentheses.
-- DO NOT mix currencies. DO NOT use INR for anyone outside India. DO NOT use USD for Ghanaian cost-of-living figures.
+CURRENCY RULE — ABSOLUTE AND NON-NEGOTIABLE. READ THIS FIRST:
+TWO SEPARATE RULES:
+  RULE A — COSTS, SAVINGS, BUDGETS, STARTUP MONEY = LOCAL CURRENCY ONLY.
+    Any amount the user must SPEND, SAVE, or INVEST uses their country's currency:
+    Ghana → GH₵   Nigeria → ₦   Kenya → KSh   South Africa → R
+    Rwanda → RWF   Uganda → USh   Tanzania → TSh   Ethiopia → Birr
+    UK → £   Europe → €   India → ₹   Philippines → ₱   USA → $
+    NEVER write a cost in USD for someone who lives in Ghana, Nigeria, Kenya, etc.
+    If cost of renting in Ghana is GH₵800/month, write GH₵800 — NOT $55.
+  RULE B — EARNINGS, INCOME, REVENUE FROM ONLINE WORK = USD.
+    Any income the user will EARN from online platforms, freelancing, or digital work = USD.
+    This is because Upwork, Fiverr, YouTube etc. pay in USD regardless of country.
+    You may add the local equivalent in brackets: e.g. "$500/month (GH₵7,800)".
+  DO NOT MIX THESE TWO RULES. DO NOT use $ for a startup cost in Ghana.
+  DO NOT use GH₵ for what they'll earn on Upwork.
 
 Beyond the standard report sections, you MUST include these additional sections in your JSON response:
 - life_hacks: 5 specific, practical life hacks tailored to their goal and country.

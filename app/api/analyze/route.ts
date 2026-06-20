@@ -1,106 +1,102 @@
-/**
- * /app/api/analyze/route.js
- *
- * Next.js App Router API route — handles all AI calls for DestinIQ.
- * Place this file at:  app/api/analyze/route.js
- *
- * Required environment variable (set in Vercel → Settings → Environment Variables):
- *   ANTHROPIC_API_KEY=sk-ant-...
- */
-
-export const runtime = "edge"; // runs on Vercel Edge for lowest latency
+import { NextRequest } from "next/server";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-5";
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
-export async function POST(request: Request) {
+const VALID_MODELS = [
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6",
+  "claude-opus-4-6",
+  "claude-opus-4-7",
+  "claude-opus-4-8",
+];
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+export async function POST(request: NextRequest) {
   try {
-    // ── Parse request body ──────────────────────────────────────────────────
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const { system, messages, max_tokens = 1800, model, tools } = body;
+    const system = body.system as string | undefined;
+    const messages = body.messages as unknown[];
+    const max_tokens = (body.max_tokens as number) || 1800;
+    const model = body.model as string | undefined;
+    const tools = body.tools as unknown[] | undefined;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return Response.json({ error: "messages array is required" }, { status: 400 });
     }
 
-    // ── Build the Anthropic request ─────────────────────────────────────────
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) {
-      console.error("ANTHROPIC_API_KEY is not set");
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey || !apiKey.startsWith("sk-")) {
       return Response.json(
-        { error: "API key not configured. Please set ANTHROPIC_API_KEY in Vercel environment variables." },
+        { error: "ANTHROPIC_API_KEY not set in Vercel environment variables." },
         { status: 500 }
       );
     }
 
-    const anthropicBody = {
-      model: model || MODEL,
-      max_tokens: Math.min(max_tokens, 8000), // cap at 8000
-      messages,
-      ...(system ? { system } : {}),
-      ...(tools ? { tools } : {}),
-    };
+    const chosenModel = model && VALID_MODELS.includes(model) ? model : DEFAULT_MODEL;
 
-    // ── Call Anthropic ──────────────────────────────────────────────────────
+    const payload: Record<string, unknown> = {
+      model: chosenModel,
+      max_tokens: Math.min(Number(max_tokens) || 1800, 8192),
+      messages,
+    };
+    if (system) payload.system = system;
+    if (tools) payload.tools = tools;
+
     const anthropicRes = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "interleaved-thinking-2025-05-14",
       },
-      body: JSON.stringify(anthropicBody),
+      body: JSON.stringify(payload),
     });
 
     if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text().catch(() => "unknown error");
-      console.error("Anthropic error:", anthropicRes.status, errText);
-      return Response.json(
-        { error: `Anthropic API error: ${anthropicRes.status}` },
-        { status: 502 }
-      );
+      let errMsg = `Anthropic error ${anthropicRes.status}`;
+      try {
+        const errData = await anthropicRes.json() as { error?: { message?: string } };
+        if (errData?.error?.message) errMsg = errData.error.message;
+      } catch { /* ignore */ }
+      return Response.json({ error: errMsg }, { status: 502 });
     }
 
-    const data = await anthropicRes.json();
+    const data = await anthropicRes.json() as {
+      content?: Array<{ type: string; text?: string }>;
+      model?: string;
+      usage?: unknown;
+    };
 
-    // ── Extract text from content blocks ────────────────────────────────────
-    // Handle both simple text responses and tool_use responses
-    if (data.content && Array.isArray(data.content)) {
-      type ContentBlock = { type?: string; text?: string };
-      const content = data.content as ContentBlock[];
-
-      // For tool-use responses (like web search), return the full content array
-      const hasToolUse = content.some((b) => b.type === "tool_use" || b.type === "tool_result");
-      if (hasToolUse || tools) {
-        return Response.json({ content, text: content.filter((b) => b.type === "text").map((b) => b.text).join("\n") });
-      }
-
-      // For regular text responses, extract and join text blocks
-      const text = content
-        .filter((b) => b.type === "text")
-        .map((b) => b.text)
-        .join("");
-
-      if (!text) {
-        return Response.json({ error: "Empty response from AI" }, { status: 502 });
-      }
-
-      return Response.json({ text, content });
+    if (!data.content || !Array.isArray(data.content)) {
+      return Response.json({ error: "Unexpected response from Anthropic" }, { status: 502 });
     }
 
-    return Response.json({ error: "Unexpected response format" }, { status: 502 });
+    const text = data.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join("");
+
+    const hasToolBlocks = data.content.some(
+      (b) => b.type === "tool_use" || b.type === "tool_result"
+    );
+
+    if (!text && !hasToolBlocks) {
+      return Response.json({ error: "Empty response from AI" }, { status: 502 });
+    }
+
+    return Response.json({ text, content: data.content, model: data.model, usage: data.usage });
 
   } catch (err: unknown) {
-    console.error("API route error:", err);
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json(
-      { error: message || "Internal server error" },
-      { status: 500 }
-    );
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return Response.json({ error: msg }, { status: 500 });
   }
 }
