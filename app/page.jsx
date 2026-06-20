@@ -294,7 +294,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -8013,7 +8013,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
 
   // Auto-fix if closing is empty or contains AI confusion text
   useEffect(()=>{
-    const bad = ["i don't have",'i need more','no context','no posts','no information'];
+    const bad = ["i don't have","i need more","no context","no posts","no information"];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
     if(isBad && formData?.name) {
       setTimeout(()=>refreshClosing(), 500);
@@ -9452,6 +9452,9 @@ export default function DestinIQ(){
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
   const [showTracker,  setShowTracker  ]=useState(false);
+  // Tracks whether sign-out was explicitly triggered by the user.
+  // Supabase fires SIGNED_OUT on every token refresh — we ignore those.
+  const explicitSignOut = useRef(false);
 
   const restoreUserSession = async (supaUser) => {
     const u = supaUser;
@@ -9465,17 +9468,14 @@ export default function DestinIQ(){
     setUserId(u.id);
     setProfileLoading(true);
 
-    // ── INSTANT PAID RESTORE from localStorage ────────────────────────────
-    // Set isPaid/isPremium immediately from the local backup so paid users
-    // NEVER see the paywall or "Upgrade" button while Supabase loads.
-    // The Supabase result below will confirm or correct this within ~1 second.
+    // ── INSTANT RESTORE from localStorage ────────────────────────────────────
+    // Restore paid/premium/streak BEFORE Supabase responds.
+    // Eliminates the flash of "Free" or streak=0 on every page refresh.
     try {
-      if (localStorage.getItem(`diq_paid_${u.id}`) === "1") {
-        setIsPaid(true);
-      }
-      if (localStorage.getItem(`diq_prem_${u.id}`) === "1") {
-        setIsPremium(true);
-      }
+      if (localStorage.getItem(`diq_paid_${u.id}`) === "1")   setIsPaid(true);
+      if (localStorage.getItem(`diq_prem_${u.id}`) === "1")   setIsPremium(true);
+      const lsStreak = parseInt(localStorage.getItem(`diq_streak_${u.id}`) || "0");
+      if (lsStreak > 0) setStreak(lsStreak);
     } catch(_) {}
 
     hydrateUserData(u.id);
@@ -9613,20 +9613,28 @@ export default function DestinIQ(){
           }
         }
       } else {
-        // SIGNED_OUT fires on EVERY page reload during Supabase token refresh.
-        // DO NOT clear localStorage here — that would wipe wins, streak, check-ins.
-        // localStorage is only cleared by the explicit Sign Out button.
-        // Just reset React state so the UI shows landing until the SIGNED_IN fires.
-        setUser(null);
-        setUserId(null);
-        setFormData(null);
-        setReport(null);
-        setIsPaid(false);
-        setIsPremium(false);
-        setStreak(1);
-        setScreen("landing");
-        // Note: localStorage is intentionally NOT cleared here.
-        // It is cleared by the explicit onSignOut handler when user clicks Sign out.
+        // SIGNED_OUT fires on every page reload during Supabase token refresh.
+        // We ONLY reset state if the user explicitly clicked Sign Out.
+        // Otherwise we ignore it — getSession() on the next refresh handles auth.
+        if(explicitSignOut.current){
+          explicitSignOut.current = false;
+          setUser(null);
+          setUserId(null);
+          setFormData(null);
+          setReport(null);
+          setIsPaid(false);
+          setIsPremium(false);
+          setStreak(1);
+          setScreen("landing");
+          // Clear localStorage only on explicit sign-out
+          try{
+            Object.keys(localStorage).forEach(k=>{
+              if(k.startsWith("diq_")||k.startsWith("destiniq_")) localStorage.removeItem(k);
+            });
+          }catch(_){}
+        }
+        // If NOT explicit sign-out: ignore SIGNED_OUT — it's just a token refresh.
+        // State is already correct from restoreUserSession.
       }
     });
     return()=>subscription.unsubscribe();
@@ -10034,7 +10042,10 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           onPhotoUpdate={(url)=>setNavPhotoURL(url)}
           onBack={()=>setShowProfile(false)}
           onSignOut={async()=>{
+            // Set flag BEFORE signOut so onAuthStateChange knows this is explicit
+            explicitSignOut.current = true;
             await supabase.auth.signOut();
+            // Also clear state immediately in case onAuthStateChange fires slowly
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
             setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
