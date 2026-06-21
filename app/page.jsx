@@ -8456,8 +8456,20 @@ function MindsetTenXModule({formData, userId, isPaid, onUnlock}){
 
 
 // ── deriveStrengthsRisks ────────────────────────────────────────────────────
+// Safely coerce a report field to plain text, regardless of whether the
+// AI returned it as a string, an array, or an object (e.g. newer reports
+// store `mindset` as {pattern,reframe,emotional,practice} instead of a string).
+function asReportText(val){
+  if(val==null) return "";
+  if(typeof val==="string") return val;
+  if(Array.isArray(val)) return val.filter(v=>typeof v==="string").join(". ");
+  if(typeof val==="object") return Object.values(val).filter(v=>typeof v==="string").join(". ");
+  return String(val);
+}
+
 // For reports generated before strengths/risks fields existed,
 // derive them from the existing report text.
+
 function deriveStrengthsRisks(data){
   // ── If the saved report already has proper arrays, use them ──
   if(data?.strengths?.length>0 && data?.risks?.length>0){
@@ -8465,10 +8477,10 @@ function deriveStrengthsRisks(data){
   }
   // ── Derive from existing report text (works for all old reports) ──
   // Strengths: pull 3 clear items from the "What You Have" section
-  const strengthRaw = data?.sections?.[1]?.content || "";
-  const lifeRaw     = data?.life     || "";
-  const mindsetRaw  = data?.mindset  || "";
-  const wealthRaw   = data?.wealth   || "";
+  const strengthRaw = asReportText(data?.sections?.[1]?.content);
+  const lifeRaw     = asReportText(data?.life);
+  const mindsetRaw  = asReportText(data?.mindset);
+  const wealthRaw   = asReportText(data?.wealth);
 
   // Split full text into chunks at natural break points (commas, semicolons, dashes, newlines)
   const splitIntoItems = (text, maxItems=3) => {
@@ -8514,7 +8526,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
 
   // Auto-fix if closing is empty or contains AI confusion text
   useEffect(()=>{
-    const bad = ["i don't have",'i need more','no context','no posts','no information'];
+    const bad = ["i don't have","i need more","no context","no posts","no information"];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
     if(isBad && formData?.name) {
       setTimeout(()=>refreshClosing(), 500);
