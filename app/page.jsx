@@ -822,6 +822,7 @@ const MODULE_GROUPS=[
       {id:"online",   icon:"🌐", label:"Earn Online"},
       {id:"business", icon:"🏗️", label:"Business"},
       {id:"hacks",    icon:"💡", label:"Life Hacks"},
+      {id:"jimrohn",  icon:"📜", label:"Jim Rohn"},
     ],
   },
   {
@@ -2734,9 +2735,9 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
   const [loading,setLoading]=useState(false);const [error,setError]=useState("");
-  // Persist result across sessions — show "already checked in today" when user returns
   const todayStr = new Date().toISOString().slice(0,10);
   const ciResultKey = `diq_ci_result_${userId}_${todayStr}`;
+  // Restore result from localStorage — persists across sessions for today
   const [result,setResult]=useState(()=>{
     try{ return localStorage.getItem(ciResultKey)||null; }catch{ return null; }
   });
@@ -3503,20 +3504,22 @@ function Landing({onStart,ipLocation}){
 
           <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,maxWidth:900,margin:"0 auto"}}>
             {[
-              {icon:"◎",label:"Your Report",desc:"A full picture of where you stand right now"},
-              {icon:"⚡",label:"Daily Check-in",desc:"30 seconds to track your momentum"},
-              {icon:"🏆",label:"Win Tracker",desc:"Celebrate small wins that add up"},
-              {icon:"💡",label:"Life Hacks",desc:"Shortcuts tailored to your situation",premium:true},
+              {icon:"◎",label:"My Report",desc:"Clarity picture with scores, strengths & daily insight"},
+              {icon:"⚡",label:"Daily Check-in",desc:"30 seconds to track your real momentum"},
+              {icon:"🏆",label:"Win Tracker",desc:"Log wins + see your streak leaderboard"},
+              {icon:"📜",label:"Jim Rohn",desc:"5 money principles from the master himself"},
+              {icon:"💡",label:"Life Hacks",desc:"Shortcuts built for your exact country",premium:true},
               {icon:"💰",label:"Money Plan",desc:"Protect and grow what you have",premium:true},
               {icon:"🌐",label:"Earn Online",desc:"Real platforms, real first steps",premium:true},
-              {icon:"🏗️",label:"Start a Business",desc:"Even with zero capital",premium:true},
-              {icon:"◈",label:"Big Decisions",desc:"Think through what's next, clearly",premium:true},
+              {icon:"🏗️",label:"Business",desc:"Start something, even with zero capital",premium:true},
               {icon:"↗",label:"Weekly Pulse",desc:"Patterns in your week, explained",premium:true},
-              {icon:"⟶",label:"Your Roadmap",desc:"0-90 days to 3-5 years, mapped out"},
-              {icon:"◇",label:"Mindset",desc:"What's really holding you back"},
-              {icon:"◈",label:"Career Path",desc:"3 paths matched to your skills"},
-              {icon:"✦",label:"Relocate",desc:"Explore countries that fit you",premium:true},
-              {icon:"⬡",label:"Your Advisor",desc:"Talk it through, any time"},
+              {icon:"⟶",label:"Roadmap",desc:"Your exact next 90 days mapped out",premium:true},
+              {icon:"◈",label:"Career Path",desc:"3 real paths matched to your skills",premium:true},
+              {icon:"✦",label:"Relocate",desc:"Explore countries that fit your goals",premium:true},
+              {icon:"◈",label:"Big Decisions",desc:"Think through what's next, clearly",premium:true},
+              {icon:"⬡",label:"My Advisor",desc:"AI coach who knows your full report"},
+              {icon:"📈",label:"Score History",desc:"Track how your scores improve over time"},
+              {icon:"✏️",label:"Edit Profile",desc:"Update goals & re-generate your report"},
             ].map(m=>(
               <div key={m.label} style={{position:"relative",padding:"18px 14px",background:"var(--night)",border:"1px solid var(--line)",borderRadius:14,textAlign:"left",transition:"border-color .25s"}}>
                 {m.premium&&<div style={{position:"absolute",top:10,right:10,fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 6px"}}>PRO</div>}
@@ -3543,7 +3546,7 @@ function Landing({onStart,ipLocation}){
               <div style={{fontFamily:"var(--f-display)",fontSize:32,marginBottom:4}}>$0</div>
               <div className="small" style={{marginBottom:20}}>Forever</div>
               <ul style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:10}}>
-                {["Full personalized report","Life pillar scores & roadmap","Daily check-ins & win tracker","Life hacks & mindset insights","Career path suggestions","3 advisor messages per day"].map(f=>(
+                {["Full personalized report & pillar scores","Daily check-in & win tracker","Score history chart (tracks progress)","Jim Rohn financial wisdom (5 principles)","Inner Mindset insights","2 advisor messages per day"].map(f=>(
                   <li key={f} style={{display:"flex",gap:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--teal)"}}>✓</span>{f}</li>
                 ))}
               </ul>
@@ -3556,7 +3559,7 @@ function Landing({onStart,ipLocation}){
               <div style={{fontFamily:"var(--f-display)",fontSize:32,marginBottom:4}}>$15<span style={{fontSize:14,color:"var(--cream-40)"}}>/month</span></div>
               <div className="small" style={{marginBottom:20}}>or $99/year — save 45%</div>
               <ul style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:10}}>
-                {["Everything in Free, plus:","Unlimited advisor conversations","Refresh money, business & online income ideas anytime","Full relocation reports for any country","Weekly Pulse pattern analysis","Big Decisions thinking partner","Priority response speed"].map((f,i)=>(
+                {["Everything in Free, plus:","Unlimited advisor conversations","All module refreshes anytime","Full relocation reports for any country","Weekly Pulse pattern analysis","Career Path + Roadmap + Big Decisions","Edit profile & re-generate report","Score re-assessment when you improve","Streak leaderboard visibility"].map((f,i)=>(
                   <li key={f} style={{display:"flex",gap:8,fontSize:13,color:i===0?"var(--cream-40)":"var(--cream-60)",fontWeight:i===0?600:400}}>{i===0?"":<span style={{color:"var(--gold)"}}>✓</span>}{f}</li>
                 ))}
               </ul>
@@ -4000,6 +4003,91 @@ function getCareerLinks(career, formData){
   // Deduplicate by URL
   const seen = new Set();
   return links.filter(l=>{ if(seen.has(l.url)) return false; seen.add(l.url); return true; }).slice(0,5);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCORE HISTORY CHART
+// Shows how overall + pillar scores changed over time as user re-assesses
+// ═══════════════════════════════════════════════════════════════════════════════
+function ScoreHistoryChart({history}){
+  if(!history||history.length<2) return null;
+
+  const W=320, H=120, PAD=28;
+  const n=history.length;
+  const plotW=W-PAD*2, plotH=H-PAD*2;
+
+  const lines=[
+    {key:"overall",  color:"var(--gold)",   label:"Overall"},
+    {key:"life",     color:"var(--teal)",   label:"Life"},
+    {key:"wealth",   color:"#4ADE80",       label:"Wealth"},
+    {key:"mindset",  color:"#9b72cf",       label:"Mindset"},
+    {key:"relations",color:"var(--rose)",   label:"Relations"},
+  ];
+
+  const toX=(i)=>PAD + (i/(n-1))*plotW;
+  const toY=(v)=>PAD + plotH - (v/100)*plotH;
+
+  const pts=(key)=>history.map((h,i)=>`${toX(i)},${toY(h[key]||0)}`).join(" ");
+
+  const latest=history[history.length-1];
+  const first=history[0];
+  const overallChange=((latest.overall||0)-(first.overall||0));
+
+  return(
+    <div style={{marginBottom:20,padding:"16px 18px",background:"var(--lift)",borderRadius:16,border:"1px solid rgba(255,255,255,0.07)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".12em",marginBottom:4}}>YOUR SCORE PROGRESS</div>
+          <div style={{fontSize:13,color:"var(--cream-60)"}}>
+            {n} assessment{n!==1?"s":""} · Started {first.date} · Last updated {latest.date}
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",background:overallChange>=0?"rgba(31,168,154,0.1)":"rgba(248,113,113,0.1)",border:`1px solid ${overallChange>=0?"rgba(31,168,154,0.25)":"rgba(248,113,113,0.25)"}`,borderRadius:20}}>
+          <span style={{fontSize:14}}>{overallChange>=0?"📈":"📉"}</span>
+          <span style={{fontSize:13,fontWeight:700,color:overallChange>=0?"var(--teal)":"var(--rose)"}}>
+            {overallChange>=0?"+":""}{overallChange} overall
+          </span>
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:W,display:"block"}}>
+        {/* Grid lines */}
+        {[0,25,50,75,100].map(v=>(
+          <g key={v}>
+            <line x1={PAD} y1={toY(v)} x2={W-PAD} y2={toY(v)} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+            <text x={PAD-4} y={toY(v)+4} fontSize="7" fill="rgba(255,255,255,0.2)" textAnchor="end">{v}</text>
+          </g>
+        ))}
+        {/* Date labels */}
+        {history.map((h,i)=>(
+          i===0||i===n-1?(
+            <text key={i} x={toX(i)} y={H-6} fontSize="7" fill="rgba(255,255,255,0.3)" textAnchor={i===0?"start":"end"}>
+              {h.date?.slice(5)}
+            </text>
+          ):null
+        ))}
+        {/* Lines */}
+        {lines.map(l=>(
+          <polyline key={l.key} points={pts(l.key)} fill="none" stroke={l.color} strokeWidth="1.5" strokeLinejoin="round" opacity="0.7"/>
+        ))}
+        {/* Dots on latest */}
+        {lines.map(l=>(
+          <circle key={l.key} cx={toX(n-1)} cy={toY(latest[l.key]||0)} r="3" fill={l.color}/>
+        ))}
+      </svg>
+
+      {/* Legend */}
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
+        {lines.map(l=>(
+          <div key={l.key} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"var(--cream-40)"}}>
+            <div style={{width:12,height:2,background:l.color,borderRadius:1}}/>
+            {l.label}: <span style={{color:l.color,fontWeight:600}}>{latest[l.key]||0}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -5981,6 +6069,144 @@ function JimRohnMoneySection(){
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JIM ROHN TAB — Dedicated full-page financial wisdom section
+// Moved to its own tab in "Make Money" so it's easy to find and not buried
+// ═══════════════════════════════════════════════════════════════════════════════
+function JimRohnTab({isPaid, onUnlock}){
+  const [open, setOpen] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+
+  return(
+    <div className="fu">
+      {/* Hero header */}
+      <div style={{marginBottom:28,padding:"24px",background:"linear-gradient(135deg,rgba(210,175,90,0.1),rgba(155,114,207,0.05))",border:"1px solid rgba(210,175,90,0.25)",borderRadius:18}}>
+        <div style={{display:"flex",gap:14,alignItems:"flex-start",marginBottom:14}}>
+          <div style={{fontSize:36,flexShrink:0}}>📜</div>
+          <div>
+            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".16em",marginBottom:6}}>FINANCIAL PHILOSOPHY</div>
+            <div style={{fontSize:22,fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>Jim Rohn on Money</div>
+            <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.8,margin:0}}>
+              Broke at 25. Self-made millionaire at 31. He spent the next 40 years explaining exactly what changed.
+              These are the 5 principles he taught over and over — because they are the ones most people never apply.
+            </p>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <div style={{padding:"5px 12px",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:20,fontSize:11,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>
+            5 principles
+          </div>
+          <div style={{padding:"5px 12px",background:"rgba(31,168,154,0.08)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:20,fontSize:11,color:"var(--teal)",fontFamily:"var(--f-mono)"}}>
+            Step-by-step application
+          </div>
+          <div style={{padding:"5px 12px",background:"rgba(155,114,207,0.08)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:20,fontSize:11,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>
+            Free books & speeches
+          </div>
+        </div>
+      </div>
+
+      {/* 5 Principles — full expanded cards */}
+      <div style={{display:"flex",flexDirection:"column",gap:16,marginBottom:24}}>
+        {JIM_ROHN_PRINCIPLES.map((p,i)=>{
+          const isOpen = open===p.id;
+          return(
+            <div key={p.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?p.color+"50":"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .2s"}}>
+              {/* Principle header — always visible */}
+              <button onClick={()=>setOpen(o=>o===p.id?null:p.id)}
+                style={{width:"100%",background:isOpen?`${p.color}06`:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",gap:14,alignItems:"flex-start",textAlign:"left",transition:"background .2s"}}>
+                <div style={{width:42,height:42,borderRadius:12,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                  {p.icon}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".1em",marginBottom:4}}>
+                    PRINCIPLE {String(i+1).padStart(2,"0")}
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:isOpen?p.color:"var(--cream)",lineHeight:1.35,marginBottom:6}}>
+                    {p.title}
+                  </div>
+                  <p style={{fontSize:12,color:"var(--cream-40)",fontStyle:"italic",margin:0,lineHeight:1.5}}>
+                    &ldquo;{p.quote.length>90?p.quote.slice(0,90)+"…":p.quote}&rdquo;
+                  </p>
+                </div>
+                <span style={{color:p.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s",marginTop:2}}>⌄</span>
+              </button>
+
+              {/* Expanded content */}
+              {isOpen&&(
+                <div style={{padding:"0 20px 24px",borderTop:`1px solid ${p.color}15`}}>
+                  <div style={{height:16}}/>
+
+                  {/* The quote — prominent */}
+                  <div style={{padding:"14px 18px",background:`${p.color}08`,borderLeft:`3px solid ${p.color}`,borderRadius:"0 12px 12px 0",marginBottom:18}}>
+                    <p style={{fontSize:15,fontStyle:"italic",color:"var(--cream)",lineHeight:1.8,margin:"0 0 6px 0"}}>
+                      &ldquo;{p.quote}&rdquo;
+                    </p>
+                    <div style={{fontSize:10,color:p.color,fontFamily:"var(--f-mono)",fontWeight:600}}>— Jim Rohn</div>
+                  </div>
+
+                  {/* Deep explanation */}
+                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.9,marginBottom:18}}>{p.body}</p>
+
+                  {/* Steps */}
+                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:12}}>
+                    HOW TO APPLY IT — RIGHT NOW
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
+                    {p.steps.map((step,si)=>(
+                      <div key={si} style={{display:"flex",gap:10,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.04)"}}>
+                        <div style={{width:26,height:26,borderRadius:"50%",background:`${p.color}10`,border:`1px solid ${p.color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:10,color:p.color,fontWeight:800}}>
+                          {si+1}
+                        </div>
+                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.7}}>{step}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* In your context */}
+                  <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,marginBottom:14}}>
+                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em",marginBottom:6}}>IN YOUR CONTEXT</div>
+                    <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.75,margin:0}}>{p.application}</p>
+                  </div>
+
+                  <AudioPlayer text={`${p.title}. ${p.quote}. ${p.body.slice(0,200)}`} label="Listen" mini={false}/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Books & free resources */}
+      <div style={{padding:"18px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.18)",borderRadius:16}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".14em",marginBottom:14}}>
+          JIM ROHN — BOOKS & FREE SPEECHES
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {JIM_ROHN_BOOKS.map((lk,i)=>(
+            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
+              style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,textDecoration:"none",transition:"opacity .15s",border:"1px solid rgba(255,255,255,0.04)"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <span style={{fontSize:16,flexShrink:0}}>{lk.emoji}</span>
+              <span style={{fontSize:13,color:"var(--cream-70)",flex:1,lineHeight:1.4}}>{lk.label}</span>
+              <span style={{fontSize:10,color:"#9b72cf",fontFamily:"var(--f-mono)",flexShrink:0}}>↗</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom quote */}
+      <div style={{marginTop:20,padding:"20px 24px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:14,textAlign:"center"}}>
+        <p style={{fontFamily:"var(--f-display)",fontSize:17,fontStyle:"italic",color:"var(--gold)",lineHeight:1.7,margin:"0 0 8px 0"}}>
+          &ldquo;Work harder on yourself than you do on your job. If you work hard on your job you can make a living, but if you work hard on yourself you can make a fortune.&rdquo;
+        </p>
+        <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>— Jim Rohn</div>
+      </div>
+    </div>
+  );
+}
+
 function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
   const [mp,setMp]=useState(data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{});
   const [re,setRe]=useState(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});
@@ -6028,9 +6254,6 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
           </>
         )}
       </ModuleShell>
-
-      {/* ── JIM ROHN FINANCIAL PHILOSOPHY ─────────────────────────────────── */}
-      <JimRohnMoneySection/>
 
       {/* Money tools - universal links */}
       <div style={{marginTop:4,padding:"14px 16px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.12)",borderRadius:14}}>
@@ -6208,6 +6431,238 @@ function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // WIN TRACKER — Daily win logging with streak calendar + AI celebration
 // ═══════════════════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ONBOARDING TUTORIAL
+// Shown once to new users right after their first report is generated.
+// Explains the 5 main sections with a step-by-step swipe.
+// ═══════════════════════════════════════════════════════════════════════════════
+const TUTORIAL_KEY = "diq_tutorial_done_v1";
+
+function OnboardingTutorial({onDone}){
+  const [step, setStep] = useState(0);
+
+  const steps = [
+    {
+      icon:"◎",
+      color:"var(--gold)",
+      title:"Welcome to your DestinIQ dashboard",
+      body:"Your full report is ready. This quick tour shows you where everything lives — it takes about 30 seconds.",
+      tip:null,
+    },
+    {
+      icon:"📊",
+      color:"var(--gold)",
+      title:"Your Report — top left tab",
+      body:"This is your clarity picture. Scores, daily insight, strengths, risks, and what to carry with you. It updates every day. The score history chart shows your progress over time as you re-assess.",
+      tip:"Tap 'Refresh today\'s insight' every morning for a fresh perspective.",
+    },
+    {
+      icon:"💰",
+      color:"var(--teal)",
+      title:"Make Money — four tabs",
+      body:"Money Plan, Earn Online, Business, Life Hacks, and Jim Rohn financial wisdom. All personalised to your country and skills. Costs shown in your local currency. Earnings shown in USD.",
+      tip:"Tap any module to auto-generate. Paid users can refresh anytime for new ideas.",
+    },
+    {
+      icon:"🔥",
+      color:"#9b72cf",
+      title:"Level Up — six modules",
+      body:"Invest in You, Get Successful, Daily Discipline, 10x Mindset, Inner Mindset, and Career Path. Each one has books, tools, and direct links. Free users see the first 2 sections — upgrade for all.",
+      tip:"Inner Mindset is 100% free — it comes from your report data.",
+    },
+    {
+      icon:"⟶",
+      color:"var(--rose)",
+      title:"Plan & Decide — your advisor and tools",
+      body:"Your Roadmap (3 phases with steps), Big Decisions thinking partner, Relocate (explore any country), and My Advisor (your personal AI coach who has read your full report).",
+      tip:"My Advisor knows your name, country, goals, and scores. Ask it anything.",
+    },
+    {
+      icon:"⚡",
+      color:"var(--teal)",
+      title:"Check in daily — it matters",
+      body:"30 seconds every day. How you feel, what you did, what you avoided. Over time you'll see patterns in your own data that nothing else shows you. Your streak is your proof.",
+      tip:"The check-in result saves automatically. It shows your reflection when you come back.",
+    },
+  ];
+
+  const current = steps[step];
+  const isLast = step === steps.length - 1;
+
+  return(
+    <div style={{
+      position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:2000,
+      display:"flex",alignItems:"center",justifyContent:"center",padding:24,
+    }}>
+      <div style={{
+        background:"var(--night)",borderRadius:24,border:`1px solid ${current.color}40`,
+        width:"100%",maxWidth:440,padding:"32px 28px",position:"relative",
+        boxShadow:`0 0 60px ${current.color}15`,
+      }}>
+        {/* Progress dots */}
+        <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:28}}>
+          {steps.map((_,i)=>(
+            <div key={i} style={{
+              width:i===step?24:7,height:7,borderRadius:4,
+              background:i===step?current.color:i<step?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.07)",
+              transition:"all .3s",
+            }}/>
+          ))}
+        </div>
+
+        {/* Icon */}
+        <div style={{
+          width:64,height:64,borderRadius:20,
+          background:`${current.color}12`,border:`2px solid ${current.color}30`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:28,margin:"0 auto 20px",
+        }}>
+          {current.icon}
+        </div>
+
+        {/* Content */}
+        <h3 style={{fontSize:18,fontWeight:700,color:"var(--cream)",textAlign:"center",marginBottom:12,lineHeight:1.4}}>
+          {current.title}
+        </h3>
+        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.8,textAlign:"center",marginBottom:current.tip?16:24}}>
+          {current.body}
+        </p>
+
+        {/* Tip */}
+        {current.tip&&(
+          <div style={{padding:"10px 14px",background:`${current.color}08`,border:`1px solid ${current.color}20`,borderRadius:10,marginBottom:24}}>
+            <p style={{fontSize:12,color:current.color,margin:0,lineHeight:1.6}}>
+              💡 {current.tip}
+            </p>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div style={{display:"flex",gap:10}}>
+          {step>0&&(
+            <button onClick={()=>setStep(s=>s-1)}
+              style={{flex:1,background:"none",border:"1px solid var(--line)",borderRadius:12,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>
+              ← Back
+            </button>
+          )}
+          <button onClick={()=>{
+            if(isLast){
+              try{localStorage.setItem(TUTORIAL_KEY,"1");}catch{}
+              onDone();
+            } else {
+              setStep(s=>s+1);
+            }
+          }} style={{
+            flex:2,background:current.color,border:"none",borderRadius:12,padding:"12px",
+            color:current.color==="var(--gold)"?"#000":"#fff",
+            fontSize:13,fontWeight:700,cursor:"pointer",
+          }}>
+            {isLast?"Let's go →":"Next →"}
+          </button>
+        </div>
+
+        {/* Skip */}
+        {!isLast&&(
+          <button onClick={()=>{
+            try{localStorage.setItem(TUTORIAL_KEY,"1");}catch{}
+            onDone();
+          }} style={{width:"100%",background:"none",border:"none",color:"var(--cream-30)",fontSize:11,cursor:"pointer",marginTop:12,fontFamily:"var(--f-mono)"}}>
+            Skip tutorial
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STREAK LEADERBOARD
+// Shows top 10 streak holders — motivates users to keep their streaks alive
+// ═══════════════════════════════════════════════════════════════════════════════
+function StreakLeaderboard({userId}){
+  const [leaders,setLeaders]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [myRank,setMyRank]=useState(null);
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const{data}=await supabase
+          .from("user_profiles")
+          .select("user_id,streak,name,form_data")
+          .order("streak",{ascending:false})
+          .limit(20);
+
+        if(data){
+          const top=data
+            .filter(u=>u.streak>0)
+            .map((u,i)=>({
+              rank:i+1,
+              name: u.form_data?.name || u.name || "Anonymous",
+              country: u.form_data?.country || "",
+              streak: u.streak,
+              isMe: u.user_id===userId,
+            }))
+            .slice(0,10);
+
+          setLeaders(top);
+          const me=data.findIndex(u=>u.user_id===userId);
+          if(me>=0) setMyRank(me+1);
+        }
+      }catch(e){console.warn("Leaderboard:",e);}
+      setLoading(false);
+    })();
+  },[userId]);
+
+  if(loading) return(
+    <div style={{padding:"20px",textAlign:"center",color:"var(--cream-30)",fontSize:12,fontFamily:"var(--f-mono)"}}>
+      Loading leaderboard…
+    </div>
+  );
+
+  if(!leaders.length) return null;
+
+  return(
+    <div style={{marginTop:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em"}}>🏆 STREAK LEADERBOARD</div>
+        {myRank&&<div style={{fontSize:11,color:"var(--cream-40)"}}>You: #{myRank}</div>}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {leaders.map((l,i)=>(
+          <div key={i} style={{
+            display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
+            background:l.isMe?"rgba(210,175,90,0.08)":"var(--midnight)",
+            border:`1px solid ${l.isMe?"rgba(210,175,90,0.3)":"rgba(255,255,255,0.04)"}`,
+            borderRadius:10,
+          }}>
+            <div style={{
+              width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
+              background:i===0?"rgba(210,175,90,0.2)":i===1?"rgba(192,192,192,0.15)":i===2?"rgba(205,127,50,0.15)":"var(--lift)",
+              fontSize:i<3?14:11,fontWeight:700,color:i===0?"var(--gold)":i===1?"#C0C0C0":i===2?"#CD7F32":"var(--cream-40)",
+              fontFamily:"var(--f-mono)",flexShrink:0,
+            }}>
+              {i===0?"🥇":i===1?"🥈":i===2?"🥉":`#${l.rank}`}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:l.isMe?700:500,color:l.isMe?"var(--gold)":"var(--cream)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {l.name}{l.isMe?" (you)":""}{l.country?` · ${l.country}`:""}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <span style={{fontSize:14}}>🔥</span>
+              <span style={{fontSize:14,fontWeight:700,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>{l.streak}</span>
+              <span style={{fontSize:10,color:"var(--cream-30)"}}>days</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const WIN_STORE_KEY="destiniq_wins_v1";
 function loadWins(){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY)||"[]");}catch{return[];}}
 function saveWins(w){try{localStorage.setItem(WIN_STORE_KEY,JSON.stringify(w));}catch{}}
@@ -6406,8 +6861,11 @@ function WinTracker({profile,userId,isPremium}){
           {currentStreak===0&&totalWins>0&&<div style={{padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.6}}>You've logged {totalWins} wins total. Today is a new day — log one thing and restart your streak.</div>}
           {totalWins===0&&<div style={{textAlign:"center",padding:"20px 0",color:"rgba(255,255,255,0.25)",fontSize:13}}>Start logging wins daily. Even small ones. After 7 days you&apos;ll see something change.</div>}
 
+          {/* Streak Leaderboard */}
+          <StreakLeaderboard userId={userId}/>
+
           {/* Motivational resources — always shown in stats tab */}
-          <div style={{marginTop:24,padding:"16px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14}}>
+          <div style={{marginTop:20,padding:"16px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14}}>
             <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--teal)",letterSpacing:".12em",marginBottom:12}}>TOOLS TO TRACK YOUR JOURNEY</div>
             <div style={{display:"flex",flexDirection:"column",gap:7}}>
               {[
@@ -8145,9 +8603,29 @@ Rules:
             <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
               {isPremium&&<div className="prem-badge">✦ PREMIUM</div>}
-              {!showCheckin&&<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>}
+              {!showCheckin&&(()=>{
+                const todayKey=`diq_ci_result_${userId}_${new Date().toISOString().slice(0,10)}`;
+                const doneToday=typeof window!=="undefined"&&!!localStorage.getItem(todayKey);
+                return doneToday
+                  ?<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)} style={{opacity:0.7,fontSize:11}}>✓ Checked in · View</button>
+                  :<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>;
+              })()}
             </div>
           </div>
+          {/* Score History Chart — shows when user has 2+ assessments */}
+          <ScoreHistoryChart history={data.score_history}/>
+
+          {/* Score update notice — prompts user to re-assess if they've improved */}
+          <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(31,168,154,0.05)",border:"1px solid rgba(31,168,154,0.12)",borderRadius:10,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <p style={{fontSize:12,color:"var(--cream-40)",margin:0,flex:1,lineHeight:1.6}}>
+              📈 Got a job? Started saving? Hit a goal? Your scores can improve.
+              <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}
+                style={{background:"none",border:"none",color:"var(--teal)",cursor:"pointer",fontSize:12,padding:"0 4px",fontWeight:600}}>
+                Update your profile & re-assess →
+              </button>
+            </p>
+          </div>
+
           <div className="fu3 pillar-wrap" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
             <Ring score={
               (aScores.life||aScores.wealth||aScores.mindset||aScores.relations)
@@ -8319,6 +8797,7 @@ Rules:
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+            {mod==="jimrohn"&&<JimRohnTab isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="practices"&&<PracticesView userId={userId}/>}
@@ -8716,7 +9195,37 @@ Rules:
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
             <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
             <div style={{display:"flex",gap:8}}>
-              {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}}>Download PDF</button>}
+              {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}} onClick={async()=>{
+                // Build a printable HTML string and trigger browser print-to-PDF
+                const name=formData?.name||"User";
+                const today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+                const scores=data?.scores||{};
+                const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>DestinIQ — ${name}</title>
+                <style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#111;line-height:1.7;padding:0 20px;}
+                h1{font-size:32px;margin:0 0 4px;}h2{font-size:20px;margin:24px 0 8px;color:#333;}
+                .score{display:inline-block;padding:6px 16px;border-radius:20px;background:#f5f0e8;margin:4px;font-size:14px;font-weight:bold;}
+                .section{margin:28px 0;padding:20px;background:#fafaf8;border-left:4px solid #c8a84b;border-radius:0 12px 12px 0;}
+                .tag{font-size:11px;font-family:monospace;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;}
+                .footer{margin-top:48px;text-align:center;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:16px;}
+                @media print{body{margin:20px;}}</style></head><body>
+                <div style="text-align:center;margin-bottom:32px">
+                  <h1>${name}</h1>
+                  <p style="color:#888;margin:0">Personal Clarity Report · ${today}</p>
+                  <p style="font-size:28px;font-weight:bold;color:#c8a84b;margin:8px 0">Overall: ${data?.overall||0}/100</p>
+                  <div>${["Life","Wealth","Mindset","Relations"].map(k=>`<span class="score">${k}: ${scores[k.toLowerCase()]||scores.relations||0}</span>`).join("")}</div>
+                </div>
+                ${data?.headline?`<div class="section"><div class="tag">Your Headline</div><p>${data.headline}</p></div>`:""}
+                ${data?.greeting?`<div class="section"><div class="tag">Personal Message</div><p>${data.greeting}</p></div>`:""}
+                ${data?.life?`<h2>Life</h2><p>${data.life}</p>`:""}
+                ${data?.wealth?`<h2>Wealth</h2><p>${data.wealth}</p>`:""}
+                ${data?.mindset?`<h2>Mindset</h2><p>${data.mindset}</p>`:""}
+                ${data?.relationships?`<h2>Relationships</h2><p>${data.relationships}</p>`:""}
+                ${data?.closing?`<div class="section" style="margin-top:32px"><div class="tag">Something to carry with you</div><p style="font-style:italic;font-size:18px">"${data.closing}"</p></div>`:""}
+                <div class="footer">Generated by DestinIQ · destiniq.vercel.app · ${today}</div>
+                </body></html>`;
+                const w=window.open("","_blank");
+                if(w){w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);}
+              }}>Download PDF</button>}
               {!isPaid&&<button className="btn btn-gold" onClick={onUnlock}>See the full picture</button>}
             </div>
           </div>
@@ -8730,6 +9239,118 @@ Rules:
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EDIT PROFILE — Let users update their onboarding details
+// Changes save to Supabase and optionally trigger a report re-generation
+// ═══════════════════════════════════════════════════════════════════════════════
+function EditProfileModal({formData, userId, onSave, onClose}){
+  const [f, setF] = useState({
+    name:      formData?.name      || "",
+    age:       formData?.age       || "",
+    country:   formData?.country   || "",
+    income:    formData?.income    || "",
+    goals:     formData?.goals     || "",
+    challenge: formData?.challenge || "",
+    skills:    formData?.skills    || "",
+    support:   formData?.support   || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved ] = useState(false);
+  const [regen,  setRegen ] = useState(false); // whether to also re-generate report
+
+  const upd = (k,v) => setF(p=>({...p,[k]:v}));
+
+  const save = async() => {
+    setSaving(true);
+    try{
+      const updated = {...formData, ...f};
+      await supabase.from("user_profiles").upsert({
+        user_id:    userId,
+        form_data:  updated,
+        updated_at: new Date().toISOString(),
+      },{onConflict:"user_id"});
+      onSave(updated, regen);
+      setSaved(true);
+      setTimeout(()=>onClose(), 1200);
+    }catch(e){
+      console.error("Edit profile save:", e.message);
+    }
+    setSaving(false);
+  };
+
+  const fields = [
+    {key:"name",      label:"Your name",                 type:"text",     ph:"Your full name"},
+    {key:"age",       label:"Your age",                  type:"number",   ph:"e.g. 25"},
+    {key:"country",   label:"Country you live in",       type:"text",     ph:"e.g. Ghana"},
+    {key:"income",    label:"Monthly income (approx.)",  type:"text",     ph:"e.g. Under $500 / GH₵3,000"},
+    {key:"goals",     label:"Your main goal",            type:"textarea", ph:"What are you working toward?"},
+    {key:"challenge", label:"Your biggest challenge",    type:"textarea", ph:"What's actually in the way?"},
+    {key:"skills",    label:"Your skills or work",       type:"text",     ph:"e.g. Marketing, coding, trading"},
+    {key:"support",   label:"Support system",            type:"text",     ph:"e.g. Family, solo, partner"},
+  ];
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,overflowY:"auto"}}>
+      <div style={{background:"var(--night)",borderRadius:20,border:"1px solid var(--line)",width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",padding:"28px 24px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+          <div>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--cream)",marginBottom:4}}>Update your profile</div>
+            <div style={{fontSize:12,color:"var(--cream-40)"}}>Changes you make here update your AI advisor and modules</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"var(--cream-40)",fontSize:20,cursor:"pointer",padding:4}}>✕</button>
+        </div>
+
+        {fields.map(field=>(
+          <div key={field.key} style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-40)",letterSpacing:".1em",marginBottom:6}}>
+              {field.label.toUpperCase()}
+            </label>
+            {field.type==="textarea"
+              ? <textarea
+                  value={f[field.key]} onChange={e=>upd(field.key,e.target.value)}
+                  placeholder={field.ph} rows={2}
+                  style={{width:"100%",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:10,padding:"10px 12px",color:"var(--cream)",fontSize:13,resize:"vertical",fontFamily:"inherit",lineHeight:1.6,boxSizing:"border-box"}}
+                />
+              : <input
+                  type={field.type} value={f[field.key]} onChange={e=>upd(field.key,e.target.value)}
+                  placeholder={field.ph}
+                  style={{width:"100%",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:10,padding:"10px 12px",color:"var(--cream)",fontSize:13,boxSizing:"border-box"}}
+                />
+            }
+          </div>
+        ))}
+
+        {/* Option to re-generate report */}
+        <div style={{margin:"20px 0",padding:"14px 16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12}}>
+          <label style={{display:"flex",gap:12,cursor:"pointer",alignItems:"flex-start"}}>
+            <input type="checkbox" checked={regen} onChange={e=>setRegen(e.target.checked)}
+              style={{marginTop:2,accentColor:"var(--gold)",width:16,height:16,flexShrink:0}}/>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:4}}>
+                🔄 Re-generate my report with updated details
+              </div>
+              <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>
+                This will create a new clarity report with your updated goals, income, and situation.
+                Your scores, roadmap, and all modules will reflect your current reality.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onClose} style={{flex:1,background:"none",border:"1px solid var(--line)",borderRadius:12,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>
+            Cancel
+          </button>
+          <button onClick={save} disabled={saving||saved} style={{flex:2,background:"var(--gold)",border:"none",borderRadius:12,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:saving?"not-allowed":"pointer"}}>
+            {saved?"✓ Saved!":saving?"Saving…":"Save changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ABOUT US
@@ -8823,6 +9444,49 @@ function PolicyPage({type,onBack}){
         )}
       </div>
     </div>
+  );
+}
+
+
+// ── EmailReminderToggle ───────────────────────────────────────────────────────
+function EmailReminderToggle({userId}){
+  const [on, setOn] = useState(()=>{
+    try{ return localStorage.getItem(`diq_email_reminder_${userId}`) === "1"; }
+    catch{ return false; }
+  });
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async() => {
+    const next = !on;
+    setOn(next);
+    setSaving(true);
+    try{
+      localStorage.setItem(`diq_email_reminder_${userId}`, next?"1":"0");
+      // Save preference to Supabase so the email system can read it
+      await supabase.from("user_profiles").upsert({
+        user_id: userId,
+        email_reminders: next,
+        updated_at: new Date().toISOString(),
+      },{onConflict:"user_id"});
+    }catch(e){ console.warn("Email pref:", e); }
+    setSaving(false);
+  };
+
+  return(
+    <button onClick={toggle} disabled={saving}
+      style={{
+        width:44,height:24,borderRadius:12,border:"none",cursor:"pointer",
+        background:on?"var(--teal)":"rgba(255,255,255,0.1)",
+        position:"relative",transition:"background .2s",flexShrink:0,
+      }}>
+      <div style={{
+        width:18,height:18,borderRadius:"50%",background:"#fff",
+        position:"absolute",top:3,
+        left:on?23:3,
+        transition:"left .2s",
+        boxShadow:"0 1px 4px rgba(0,0,0,0.3)",
+      }}/>
+    </button>
   );
 }
 
@@ -8958,6 +9622,18 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
             await saveUserProfile(user.id,{is_paid:false,is_premium:false});
             alert("Subscription cancelled. Contact support for refunds.");
           }} style={{width:"100%",background:"none",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"12px",color:"#F87171",fontSize:13,cursor:"pointer",marginBottom:10}}>Cancel subscription</button>}
+          <button onClick={()=>{window.dispatchEvent(new CustomEvent("showEditProfile"));}} style={{width:"100%",background:"none",border:"1px solid rgba(210,175,90,0.3)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,cursor:"pointer",marginBottom:8,fontWeight:600}}>✏️ Edit my profile & goals</button>
+          {/* Email reminders toggle */}
+          <div style={{marginBottom:8,padding:"12px 14px",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:13,color:"var(--cream)",marginBottom:2}}>🔔 Daily reminder email</div>
+                <div style={{fontSize:11,color:"var(--cream-40)"}}>Nudge at 8am if you haven't checked in</div>
+              </div>
+              <EmailReminderToggle userId={user?.id}/>
+            </div>
+          </div>
+
           <button onClick={()=>{window.dispatchEvent(new CustomEvent("showAbout"));}} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>About DestinIQ</button>
           <button onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"terms"}))} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>Terms of Service</button>
           <button onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Privacy Policy</button>
@@ -9444,7 +10120,8 @@ export default function DestinIQ(){
   const [showProfile, setShowProfile]=useState(false);
   const [showAdmin,   setShowAdmin  ]=useState(false);
   const [showPolicy,  setShowPolicy ]=useState(null); // "privacy"|"terms"|null
-  const [showAbout,   setShowAbout  ]=useState(false);
+  const [showAbout,      setShowAbout     ]=useState(false);
+  const [showEditProfile,setShowEditProfile]=useState(false);
   const [showShare,   setShowShare  ]=useState(false);
   const [showReferral,setShowReferral]=useState(false);
   const [navPhotoURL, setNavPhotoURL]=useState(null);
@@ -9452,6 +10129,7 @@ export default function DestinIQ(){
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
   const [showTracker,  setShowTracker  ]=useState(false);
+  const [showTutorial, setShowTutorial ]=useState(false);
   // Tracks whether sign-out was explicitly triggered by the user.
   // Supabase fires SIGNED_OUT on every token refresh — we ignore those.
   const explicitSignOut = useRef(false);
@@ -9792,6 +10470,12 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         parsed.overall=computed;
       }
       setScreen("results");
+      // Show tutorial to first-time users
+      try{
+        if(!localStorage.getItem(TUTORIAL_KEY)){
+          setTimeout(()=>setShowTutorial(true), 1800);
+        }
+      }catch{}
       // Save profile + report to Supabase
       try{
         const reportToSave = {
@@ -9805,6 +10489,17 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           closing:       parsed.closing,
           strengths:     parsed.strengths||[],
           risks:         parsed.risks||[],
+          score_history: [
+            ...(Array.isArray(report?.score_history)?report.score_history:[]),
+            {
+              date: new Date().toISOString().slice(0,10),
+              overall: parsed.overall||0,
+              life:    parsed.scores?.life||0,
+              wealth:  parsed.scores?.wealth||0,
+              mindset: parsed.scores?.mindset||0,
+              relations: parsed.scores?.relations||0,
+            }
+          ].slice(-12), // keep last 12 entries (1 year of monthly)
           daily_insight: parsed.daily_insight,
           life:          parsed.life,
           wealth:        parsed.wealth,
@@ -9969,6 +10664,25 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                     </div>
                   </nav>
                   {showAbout &&<AboutUsPage onBack={()=>setShowAbout(false)}/>}
+      {showTutorial&&<OnboardingTutorial onDone={()=>setShowTutorial(false)}/>}
+      {showEditProfile&&<EditProfileModal
+        formData={formData}
+        userId={userId}
+        onClose={()=>setShowEditProfile(false)}
+        onSave={(updatedFormData, shouldRegen)=>{
+          setFormData(updatedFormData);
+          setShowEditProfile(false);
+          if(shouldRegen){
+            // Trigger report re-generation with updated profile
+            setScreen("loading");
+            setTimeout(()=>{
+              // handleSubmit will re-generate report with new formData
+              // We call it with the updated form data
+              handleSubmit(updatedFormData);
+            }, 100);
+          }
+        }}
+      />}
       {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
                   {!showPolicy&&<Landing onStart={()=>setScreen("auth")} ipLocation={ipLocation}/>}
                 </>
