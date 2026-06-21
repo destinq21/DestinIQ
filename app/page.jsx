@@ -300,9 +300,10 @@ const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; 
 // in the world are accepted and settle automatically. We just SHOW the price
 // converted to the user's local currency so it feels native to them.
 const PLANS = {
-  basic:  { name:"Essential", amount:9,   label:"$9/month",  currency:"USD" },
-  pro:    { name:"Premium",   amount:15,  label:"$15/month", currency:"USD" },
-  annual: { name:"Annual Pro",amount:99,  label:"$99/year",  currency:"USD" },
+  pro:          { name:"Pro",          amount:9,   label:"$9/month",    currency:"USD", tier:"pro"    },
+  promax:       { name:"Pro Max",      amount:19,  label:"$19/month",   currency:"USD", tier:"promax" },
+  pro_annual:   { name:"Pro Annual",   amount:79,  label:"$79/year",    currency:"USD", tier:"pro"    },
+  promax_annual:{ name:"Pro Max Annual",amount:149, label:"$149/year",  currency:"USD", tier:"promax" },
 };
 
 // Approximate USD exchange rates for display purposes only — actual charge
@@ -2179,13 +2180,25 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
     if(log.length<3){setError("Log at least 3 days of momentum to generate your weekly pulse.");return;}
     setLoading(true);setError("");
     try{
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:"You are DestinIQ's weekly pattern analyst. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.",userId,isPremium});
-      const r={weekOf:weekLabel(),text:txt,ts:Date.now()};
+      const name=sanitize(profile?.name)||"there";
+      const country=sanitize(profile?.country)||"your country";
+      const goal=sanitize(profile?.goals)||"your goal";
+      const challenge=sanitize(profile?.challenge)||"your challenge";
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium});
+
+      // Guard against the AI declining to answer / asking for more info
+      const badPhrases=["i don't have","i need more","could you share","no context","please tell","can you provide","i don't have enough","no information"];
+      const isBad = !txt || txt.length<60 || badPhrases.some(p=>txt.toLowerCase().includes(p));
+      const finalText = isBad
+        ? `${name}, here's what this week's check-ins show: you logged in ${log.length} time${log.length!==1?"s":""}, which is itself a sign you're staying with "${goal}" instead of dropping it. The honest next step is the same one that's probably been waiting — make space for "${challenge}" this week instead of working around it. Keep checking in daily; the clearer your log gets, the sharper these reflections become.`
+        : txt;
+
+      const r={weekOf:weekLabel(),text:finalText,ts:Date.now()};
       const existing=_weeklyReports.get(userId)||[];
       existing.unshift(r);if(existing.length>4)existing.pop();
       _weeklyReports.set(userId,existing);setReport(r);
       saveWeeklyReport(userId,r); // persist to Supabase
-      pushToMemory(userId,"assistant","Weekly pulse: "+txt.slice(0,300));
+      pushToMemory(userId,"assistant","Weekly pulse: "+finalText.slice(0,300));
     }catch(e){
       console.error("Decision error:",e);
       setError(e.message==="API_KEY_MISSING"
@@ -2813,7 +2826,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
   // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
-  const FREE_DAILY_LIMIT=2; // Free users: 2 advisor messages per day
+  const FREE_DAILY_LIMIT=1; // Free: 1 advisor msg/dayers: 2 advisor messages per day
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [usedToday,setUsedToday]=useState(()=>{
     if(typeof window==="undefined") return 0;
@@ -3522,7 +3535,11 @@ function Landing({onStart,ipLocation}){
               {icon:"✏️",label:"Edit Profile",desc:"Update goals & re-generate your report"},
             ].map(m=>(
               <div key={m.label} style={{position:"relative",padding:"18px 14px",background:"var(--night)",border:"1px solid var(--line)",borderRadius:14,textAlign:"left",transition:"border-color .25s"}}>
-                {m.premium&&<div style={{position:"absolute",top:10,right:10,fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:6,padding:"2px 6px"}}>PRO</div>}
+                {(m.premium||m.promax)&&<div style={{position:"absolute",top:10,right:10,fontSize:9,fontFamily:"var(--f-mono)",
+  color:m.promax?"#9b72cf":"var(--gold)",
+  background:m.promax?"rgba(155,114,207,0.1)":"var(--gold-dim)",
+  border:`1px solid ${m.promax?"rgba(155,114,207,0.3)":"var(--line-gold)"}`,
+  borderRadius:6,padding:"2px 6px"}}>{m.promax?"PRO MAX":"PRO"}</div>}
                 <div style={{fontSize:22,marginBottom:8}}>{m.icon}</div>
                 <div style={{fontWeight:600,fontSize:13,marginBottom:4,color:"var(--cream)"}}>{m.label}</div>
                 <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.5}}>{m.desc}</div>
@@ -3537,36 +3554,141 @@ function Landing({onStart,ipLocation}){
         <div className="cx-md" style={{textAlign:"center"}}>
           <div className="mono fu" style={{marginBottom:16}}>Simple Pricing</div>
           <h2 className="d2 fu1" style={{marginBottom:16}}>Start free.<br/><span className="em">Go deeper when you're ready.</span></h2>
-          <p className="body-lg fu2" style={{maxWidth:480,margin:"0 auto 48px"}}>Your free clarity report shows your scores, strengths, and exactly where to focus. Upgrade to unlock your roadmap, career paths, Jim Rohn financial philosophy, weekly pulse, relocation reports, and unlimited personal advisor.</p>
+          <p className="body-lg fu2" style={{maxWidth:500,margin:"0 auto 16px"}}>
+            Free gives you your scores and the taste. Pro gives you everything to act on them. Pro Max gives you the full AI depth and tools for people who are serious.
+          </p>
+          <p className="small fu2" style={{color:"var(--cream-30)",marginBottom:48}}>All prices in USD. Billed monthly or annually. Cancel anytime.</p>
 
-          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:20,maxWidth:760,margin:"0 auto"}}>
-            {/* Free plan */}
+          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16,maxWidth:900,margin:"0 auto",alignItems:"start"}}>
+
+            {/* FREE */}
             <div className="card" style={{textAlign:"left"}}>
-              <div className="mono" style={{color:"var(--cream-30)",marginBottom:8}}>FREE</div>
-              <div style={{fontFamily:"var(--f-display)",fontSize:32,marginBottom:4}}>$0</div>
-              <div className="small" style={{marginBottom:20}}>Forever</div>
-              <ul style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:10}}>
-                {["Full personalized report & pillar scores","Daily check-in & win tracker","Score history chart (tracks progress)","Jim Rohn financial wisdom (5 principles)","Inner Mindset insights","2 advisor messages per day"].map(f=>(
-                  <li key={f} style={{display:"flex",gap:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--teal)"}}>✓</span>{f}</li>
-                ))}
-              </ul>
+              <div className="mono" style={{color:"var(--cream-30)",marginBottom:8,letterSpacing:".14em"}}>FREE</div>
+              <div style={{fontFamily:"var(--f-display)",fontSize:36,marginBottom:2,color:"var(--cream)"}}>$0</div>
+              <div className="small" style={{marginBottom:24,color:"var(--cream-40)"}}>No card required · forever free</div>
+              <div style={{height:1,background:"var(--line)",marginBottom:18}}/>
+              {[
+                {t:"Your clarity picture (scores + headline)", ok:true},
+                {t:"Personal message from the AI", ok:true},
+                {t:"Daily Check-in", ok:true},
+                {t:"Win Tracker (up to 10 wins)", ok:true},
+                {t:"Jim Rohn — 5 money principles", ok:true},
+                {t:"Inner Mindset (from your report)", ok:true},
+                {t:"1 advisor message per day", ok:true},
+                {t:"First section of each Level Up module", ok:true},
+                {t:"Full deep-dive report sections", ok:false},
+                {t:"Roadmap, Career Path, Decisions", ok:false},
+                {t:"Weekly Pulse", ok:false},
+                {t:"Module refreshes", ok:false},
+              ].map(({t,ok})=>(
+                <div key={t} style={{display:"flex",gap:8,marginBottom:9,fontSize:13,color:ok?"var(--cream-60)":"var(--cream-25)",alignItems:"flex-start"}}>
+                  <span style={{color:ok?"var(--teal)":"rgba(255,255,255,0.12)",flexShrink:0,marginTop:1}}>{ok?"✓":"—"}</span>{t}
+                </div>
+              ))}
+              <button className="btn btn-ghost" style={{width:"100%",marginTop:20,fontSize:13}} onClick={onStart}>
+                Start for free →
+              </button>
             </div>
 
-            {/* Premium plan */}
-            <div className="card" style={{textAlign:"left",borderColor:"var(--line-gold)",position:"relative",background:"var(--gold-glow)"}}>
-              <div style={{position:"absolute",top:-12,right:20,background:"var(--gold)",color:"#000",fontSize:10,fontWeight:700,padding:"4px 12px",borderRadius:20,fontFamily:"var(--f-mono)"}}>MOST POPULAR</div>
-              <div className="mono" style={{color:"var(--gold)",marginBottom:8}}>PREMIUM</div>
-              <div style={{fontFamily:"var(--f-display)",fontSize:32,marginBottom:4}}>$15<span style={{fontSize:14,color:"var(--cream-40)"}}>/month</span></div>
-              <div className="small" style={{marginBottom:20}}>or $99/year — save 45%</div>
-              <ul style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:10}}>
-                {["Everything in Free, plus:","Unlimited advisor conversations","All module refreshes anytime","Full relocation reports for any country","Weekly Pulse pattern analysis","Career Path + Roadmap + Big Decisions","Edit profile & re-generate report","Score re-assessment when you improve","Streak leaderboard visibility"].map((f,i)=>(
-                  <li key={f} style={{display:"flex",gap:8,fontSize:13,color:i===0?"var(--cream-40)":"var(--cream-60)",fontWeight:i===0?600:400}}>{i===0?"":<span style={{color:"var(--gold)"}}>✓</span>}{f}</li>
-                ))}
-              </ul>
+            {/* PRO */}
+            <div className="card" style={{textAlign:"left",borderColor:"var(--line-gold)",position:"relative",background:"rgba(210,175,90,0.04)"}}>
+              <div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"#000",fontSize:10,fontWeight:800,padding:"5px 16px",borderRadius:20,fontFamily:"var(--f-mono)",whiteSpace:"nowrap"}}>
+                MOST POPULAR
+              </div>
+              <div className="mono" style={{color:"var(--gold)",marginBottom:8,letterSpacing:".14em"}}>PRO</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:2}}>
+                <span style={{fontFamily:"var(--f-display)",fontSize:36,color:"var(--gold)"}}>$9</span>
+                <span style={{fontSize:13,color:"var(--cream-40)"}}>/month</span>
+              </div>
+              <div className="small" style={{marginBottom:8,color:"var(--cream-40)"}}>or <strong style={{color:"var(--gold)"}}>$79/year</strong> — save $29 (27% off)</div>
+              <div style={{padding:"6px 12px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:8,fontSize:11,color:"var(--gold)",marginBottom:18,display:"inline-block"}}>
+                = $6.58/month billed annually
+              </div>
+              <div style={{height:1,background:"rgba(210,175,90,0.2)",marginBottom:18}}/>
+              {[
+                {t:"Everything in Free, plus:", ok:"head"},
+                {t:"Full deep-dive report — all 3 sections", ok:true},
+                {t:"Your Strengths + Watch-outs", ok:true},
+                {t:"Something personal to carry with you", ok:true},
+                {t:"My Roadmap (3-phase plan)", ok:true},
+                {t:"Career Path (3 matched paths)", ok:true},
+                {t:"Big Decisions thinking partner", ok:true},
+                {t:"Weekly Pulse — pattern analysis", ok:true},
+                {t:"Relocate — explore any country", ok:true},
+                {t:"All module refreshes (anytime)", ok:true},
+                {t:"My Progress — unlimited updates", ok:true},
+                {t:"Win Tracker — unlimited", ok:true},
+                {t:"My Advisor — 10 messages/day", ok:true},
+                {t:"Edit profile & re-generate report", ok:true},
+                {t:"Score History chart", ok:true},
+                {t:"Full Level Up modules (all sections)", ok:true},
+              ].map(({t,ok},i)=>(
+                <div key={t} style={{display:"flex",gap:8,marginBottom:9,fontSize:13,
+                  color:ok==="head"?"var(--cream-40)":ok?"var(--cream-70)":"var(--cream-25)",
+                  fontWeight:ok==="head"?600:400,alignItems:"flex-start"}}>
+                  {ok==="head"?<span/>:<span style={{color:"var(--gold)",flexShrink:0,marginTop:1}}>✓</span>}{t}
+                </div>
+              ))}
+              <button className="btn btn-gold" style={{width:"100%",marginTop:20,fontSize:14,padding:"14px"}} onClick={onStart}>
+                Start free → Upgrade to Pro
+              </button>
+              <p style={{fontSize:11,color:"var(--cream-30)",textAlign:"center",marginTop:8,fontFamily:"var(--f-mono)"}}>Cancel anytime · No hidden fees</p>
+            </div>
+
+            {/* PRO MAX */}
+            <div className="card" style={{textAlign:"left",borderColor:"rgba(155,114,207,0.4)",position:"relative",background:"rgba(155,114,207,0.04)"}}>
+              <div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"#9b72cf",color:"#fff",fontSize:10,fontWeight:800,padding:"5px 16px",borderRadius:20,fontFamily:"var(--f-mono)",whiteSpace:"nowrap"}}>
+                FOR SERIOUS USERS
+              </div>
+              <div className="mono" style={{color:"#9b72cf",marginBottom:8,letterSpacing:".14em"}}>PRO MAX</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:2}}>
+                <span style={{fontFamily:"var(--f-display)",fontSize:36,color:"#9b72cf"}}>$19</span>
+                <span style={{fontSize:13,color:"var(--cream-40)"}}>/month</span>
+              </div>
+              <div className="small" style={{marginBottom:8,color:"var(--cream-40)"}}>or <strong style={{color:"#9b72cf"}}>$149/year</strong> — save $79 (35% off)</div>
+              <div style={{padding:"6px 12px",background:"rgba(155,114,207,0.08)",border:"1px solid rgba(155,114,207,0.2)",borderRadius:8,fontSize:11,color:"#9b72cf",marginBottom:18,display:"inline-block"}}>
+                = $12.42/month billed annually
+              </div>
+              <div style={{height:1,background:"rgba(155,114,207,0.2)",marginBottom:18}}/>
+              {[
+                {t:"Everything in Pro, plus:", ok:"head"},
+                {t:"Unlimited advisor — no daily limit", ok:true},
+                {t:"Deep AI responses (2.5× more detailed)", ok:true},
+                {t:"PDF download — full branded report", ok:true},
+                {t:"Priority AI speed", ok:true},
+                {t:"✦ Pro Max badge in your dashboard", ok:true},
+              ].map(({t,ok})=>(
+                <div key={t} style={{display:"flex",gap:8,marginBottom:9,fontSize:13,
+                  color:ok==="head"?"var(--cream-40)":"var(--cream-70)",
+                  fontWeight:ok==="head"?600:400,alignItems:"flex-start"}}>
+                  {ok==="head"?<span/>:<span style={{color:"#9b72cf",flexShrink:0,marginTop:1}}>✓</span>}{t}
+                </div>
+              ))}
+              <div style={{marginTop:16,padding:"12px 14px",background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:10,marginBottom:16}}>
+                <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:0}}>
+                  <strong style={{color:"#9b72cf"}}>Who is Pro Max for?</strong> Someone who uses the advisor daily, wants the deepest AI insights possible, and wants a polished PDF report to review or share.
+                </p>
+              </div>
+              <button className="btn" style={{width:"100%",marginTop:4,fontSize:14,padding:"14px",background:"#9b72cf",border:"none",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer"}} onClick={onStart}>
+                Start free → Upgrade to Pro Max
+              </button>
+              <p style={{fontSize:11,color:"var(--cream-30)",textAlign:"center",marginTop:8,fontFamily:"var(--f-mono)"}}>Cancel anytime · No hidden fees</p>
             </div>
           </div>
 
-          <button className="btn btn-gold btn-lg fu4" onClick={onStart} style={{marginTop:32}}>Start free — upgrade anytime</button>
+          <div style={{marginTop:40,padding:"20px 24px",background:"var(--lift)",borderRadius:14,display:"inline-flex",gap:24,flexWrap:"wrap",justifyContent:"center"}}>
+            {[
+              {icon:"🔒",t:"Your data is private"},
+              {icon:"💳",t:"No card to start"},
+              {icon:"↩",t:"Cancel anytime"},
+              {icon:"🌍",t:"Works for any country"},
+              {icon:"💬",t:"Prices in your local currency"},
+            ].map(({icon,t})=>(
+              <span key={t} style={{fontSize:12,color:"var(--cream-40)",display:"flex",gap:6,alignItems:"center"}}>
+                <span>{icon}</span>{t}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -4913,6 +5035,7 @@ function HabitButton({itemKey, userId, compact=false}){
   const status = entry?.status || "active";
   const [showNote, setShowNote] = useState(false);
   const [noteVal, setNoteVal] = useState(entry?.notes||"");
+  const [noteSaved, setNoteSaved] = useState(false);
 
   if(!item) return null;
 
@@ -4997,11 +5120,12 @@ function HabitButton({itemKey, userId, compact=false}){
               <textarea
                 value={noteVal}
                 onChange={e=>setNoteVal(e.target.value)}
-                onBlur={()=>ht.addNote(itemKey,noteVal)}
+                onBlur={()=>{ht.addNote(itemKey,noteVal);setNoteSaved(true);setTimeout(()=>setNoteSaved(false),1500);}}
                 placeholder="Add a note — how is this going? What have you noticed?"
                 rows={2}
                 style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
               />
+              {noteSaved&&<div style={{fontSize:10,color:sm.color,marginTop:4,fontFamily:"var(--f-mono)"}}>✓ Saved</div>}
             </div>
           )}
         </div>
@@ -5207,12 +5331,21 @@ function HabitTrackerPanel({userId, onClose, onNavigate}){
 // Note editor extracted so it has its own stable state
 function NoteEditor({itemKey, ht}){
   const [val, setVal] = useState(ht.data[itemKey]?.notes||"");
+  const [saved, setSaved] = useState(false);
+  const handleBlur = () => {
+    ht.addNote(itemKey,val);
+    setSaved(true);
+    setTimeout(()=>setSaved(false),1500);
+  };
   return(
-    <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={()=>ht.addNote(itemKey,val)}
-      placeholder="How is this going? What have you noticed? What's hard?"
-      rows={2}
-      style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
-    />
+    <div>
+      <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={handleBlur}
+        placeholder="How is this going? What have you noticed? What's hard?"
+        rows={2}
+        style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
+      />
+      {saved&&<div style={{fontSize:10,color:"var(--teal)",marginTop:4,fontFamily:"var(--f-mono)"}}>✓ Saved</div>}
+    </div>
   );
 }
 
@@ -6667,7 +6800,7 @@ const WIN_STORE_KEY="destiniq_wins_v1";
 function loadWins(){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY)||"[]");}catch{return[];}}
 function saveWins(w){try{localStorage.setItem(WIN_STORE_KEY,JSON.stringify(w));}catch{}}
 
-function WinTracker({profile,userId,isPremium}){
+function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const [wins,setWins]=useState(()=>loadWins());
   const [input,setInput]=useState("");
   const [mood,setMood]=useState(null);
@@ -6680,8 +6813,10 @@ function WinTracker({profile,userId,isPremium}){
   const streakDays=[...new Set(wins.map(w=>w.date))].sort().reverse();
   const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
 
+  const FREE_WIN_LIMIT=10;
   const addWin=async()=>{
     if(!input.trim()) return;
+    if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
     const win={id:Date.now(),text:input.trim(),date:todayKey,mood,ts:new Date().toISOString()};
     const updated=[win,...wins];
     setWins(updated);saveWins(updated);setInput("");setMood(null);
@@ -6713,6 +6848,9 @@ function WinTracker({profile,userId,isPremium}){
         <div>
           <div className="d3" style={{marginBottom:4}}>Win Tracker</div>
           <p style={{fontSize:13,color:"rgba(255,255,255,0.4)"}}>Every small win builds the bigger one. Log what you did today.</p>
+          {!isPaid&&<p style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",marginTop:4}}>
+            {wins.length}/{FREE_WIN_LIMIT} free wins · <button onClick={()=>onUnlock&&onUnlock()} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11,padding:0,fontFamily:"var(--f-mono)"}}>Upgrade for unlimited →</button>
+          </p>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10}}>
@@ -6924,7 +7062,7 @@ function ProgressFeed({profile,reportData,userId,isPremium,isPaid,onUnlock}){
   const [expandedId,setExpandedId]=useState(null);
   const [filter,setFilter]=useState("all");
 
-  const FREE_PROGRESS_LIMIT = 3;
+  const FREE_PROGRESS_LIMIT = 2; // Free: 2 progress updates total
   const canPost = isPaid || entries.length < FREE_PROGRESS_LIMIT;
 
   const submit=async()=>{
@@ -7537,7 +7675,7 @@ function DailyDisciplineModule({formData, userId, isPaid, onUnlock}){
 
       {/* Sections — first 2 free, rest need paid */}
       {/* Free: first 2 sections. Paid: all sections */}
-      {(isPaid ? DISCIPLINE_SECTIONS : DISCIPLINE_SECTIONS.slice(0,2)).map(s=>{
+      {(isPaid ? DISCIPLINE_SECTIONS : DISCIPLINE_SECTIONS.slice(0,1)).map(s=>{
           const isOpen=open===s.id;
           return(
             <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:10}}>
@@ -7670,7 +7808,7 @@ function DailyDisciplineModule({formData, userId, isPaid, onUnlock}){
             </div>
           );
         })}
-      <FreeGate total={DISCIPLINE_SECTIONS.length} freeCount={2} isPaid={isPaid} onUnlock={onUnlock} label="discipline sections"/>
+      <FreeGate total={DISCIPLINE_SECTIONS.length} freeCount={1} isPaid={isPaid} onUnlock={onUnlock} label="discipline sections"/>
 
       {/* Bottom CTA */}
       <div style={{marginTop:28,padding:"22px 20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
@@ -7929,7 +8067,7 @@ function InvestInYourselfModule({formData, userId, isPaid, onUnlock}){
         )}
       </div>
 
-      {(isPaid ? INVEST_SECTIONS : INVEST_SECTIONS.slice(0,2)).map(s=>{
+      {(isPaid ? INVEST_SECTIONS : INVEST_SECTIONS.slice(0,1)).map(s=>{
           const isOpen=open===s.id;
           return(
             <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:12}}>
@@ -7975,7 +8113,7 @@ function InvestInYourselfModule({formData, userId, isPaid, onUnlock}){
             </div>
           );
         })}
-      <FreeGate total={INVEST_SECTIONS.length} freeCount={2} isPaid={isPaid} onUnlock={onUnlock} label="invest sections"/>
+      <FreeGate total={INVEST_SECTIONS.length} freeCount={1} isPaid={isPaid} onUnlock={onUnlock} label="invest sections"/>
 
       {/* Bottom quote */}
       <div style={{marginTop:32,padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
@@ -8119,7 +8257,7 @@ function DisgustinglySuccessfulModule({formData, userId, isPaid, onUnlock}){
 
       {/* Rules — first 2 free */}
       <div style={{marginBottom:32}}>
-      {(isPaid ? SUCCESS_RULES : SUCCESS_RULES.slice(0,2)).map(r=>{
+      {(isPaid ? SUCCESS_RULES : SUCCESS_RULES.slice(0,1)).map(r=>{
           const isOpen=open===r.number;
           return(
             <div key={r.number} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?r.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:12}}>
@@ -8152,7 +8290,7 @@ function DisgustinglySuccessfulModule({formData, userId, isPaid, onUnlock}){
             </div>
           );
         })}
-      <FreeGate total={SUCCESS_RULES.length} freeCount={2} isPaid={isPaid} onUnlock={onUnlock} label="success rules"/>
+      <FreeGate total={SUCCESS_RULES.length} freeCount={1} isPaid={isPaid} onUnlock={onUnlock} label="success rules"/>
       </div>
 
       {/* Final Truth */}
@@ -8813,7 +8951,9 @@ Rules:
                 </div>
                 <p className="body">{refreshingInsight?"Getting your fresh insight for today…":dailyInsight}</p>
               </div>
-              {(()=>{
+              {isPaid
+                ? /* Pro / Pro Max — full report */
+                (()=>{
                 const derived=deriveStrengthsRisks(data);
                 const strengths=derived.strengths;
                 const risks=derived.risks;
@@ -8859,7 +8999,7 @@ Rules:
                   </div>
                 </div>
                 );
-              })()}
+              })() :
               <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
                   <div className="mono" style={{fontSize:"9px"}}>Something to carry with you</div>
@@ -8870,18 +9010,37 @@ Rules:
                 <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>&ldquo;{refreshingClosing?"Thinking…":closingLine}&rdquo;</p>
                 <AudioPlayer text={closingLine} label="Listen"/>
               </div>
-              {!isPaid&&(
-                <div style={{marginTop:24,padding:"20px 24px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(31,168,154,0.05))",border:"1px solid var(--line-gold)",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-                  <div><div className="mono" style={{marginBottom:4,fontSize:"9px"}}>We noticed something important</div><p style={{fontSize:14,fontStyle:"italic",color:"var(--cream-60)",lineHeight:1.7}}>"{data.teaser}"</p></div>
-                  <button className="btn btn-gold" style={{flexShrink:0}} onClick={onUnlock}>See the full picture</button>
+              })() : /* Free users — show teaser + upgrade CTA */
+                <div style={{marginTop:24}}>
+                  {/* Blurred preview of what they're missing */}
+                  <div style={{position:"relative",overflow:"hidden",borderRadius:16,marginBottom:16}}>
+                    <div style={{padding:"20px",background:"var(--lift)",border:"1px solid rgba(255,255,255,0.06)",filter:"blur(4px)",userSelect:"none",pointerEvents:"none",lineHeight:1.8,fontSize:13,color:"var(--cream-50)"}}>
+                      {data.sections?.[0]?.content?.slice(0,220)||"Your clarity report goes much deeper than the scores above. There are three full sections — The Real Picture, What You Have That You're Not Using, and Your Next 30 Days — written specifically about your situation in your country..."}...
+                    </div>
+                    <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,var(--night) 80%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:24}}>
+                      <div style={{fontSize:22,marginBottom:8}}>🔒</div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:6,textAlign:"center"}}>Your full report is waiting</div>
+                      <p style={{fontSize:13,color:"var(--cream-40)",textAlign:"center",maxWidth:320,lineHeight:1.65,marginBottom:20}}>
+                        Deep dives into Life, Wealth, Mindset, and Relationships. What you bring to this. What to watch out for. Your 3 most important next steps. Something personal to carry with you.
+                      </p>
+                      <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:15,padding:"14px 32px"}}>
+                        Unlock full report — $9/month
+                      </button>
+                      <p style={{fontSize:11,color:"var(--cream-30)",marginTop:10,fontFamily:"var(--f-mono)"}}>Pro plan · Cancel anytime · No hidden fees</p>
+                    </div>
+                  </div>
+                  {/* Still show the teaser quote if available */}
+                  {data.teaser&&<div style={{padding:"16px 20px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:12}}>
+                    <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>We noticed something important</div>
+                    <p style={{fontSize:14,fontStyle:"italic",color:"var(--cream-60)",lineHeight:1.7,margin:0}}>"{data.teaser}"</p>
+                  </div>}
                 </div>
-              )}
             </div>
           )}
 
           {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
-            {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium}/>}
+            {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -9283,7 +9442,7 @@ Rules:
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
             <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
             <div style={{display:"flex",gap:8}}>
-              {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>{
+              {isPremium&&<button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>{
                 const name   = formData?.name    || "User";
                 const country= formData?.country || "";
                 const today  = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
@@ -9460,7 +9619,7 @@ Rules:
                 const w=window.open("","_blank");
                 if(w){w.document.write(html);w.document.close();setTimeout(()=>w.print(),600);}
               }}>📄 Download PDF</button>}
-              {!isPaid&&<button className="btn btn-gold" onClick={onUnlock}>See the full picture</button>}
+              {!isPremium&&<button className="btn btn-ghost" style={{fontSize:11,opacity:.6}} onClick={onUnlock}>🔒 PDF — Pro Max only</button>}
             </div>
           </div>
         </div>
@@ -9792,7 +9951,7 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
     setLoading(false);
   };
 
-  const planLabel = isPaid&&isPremium?"Premium":isPaid?"Essential":"Free";
+  const planLabel = isPaid?"Premium":"Free";
   const planColor = isPaid?"var(--gold)":"var(--cream-30)";
 
   return(
@@ -10256,7 +10415,7 @@ function SubscriptionCard({isPaid,isPremium,userId,onManageSubscription}){
   const [cancelling,setCancelling]=useState(false);
   const [cancelled,setCancelled]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
-  const planLabel=isPaid&&isPremium?"Premium":isPaid?"Essential":"Free";
+  const planLabel=isPaid?"Premium":"Free";
   const planColor=isPaid?"var(--gold)":"var(--cream-30)";
 
   const handleCancel=async()=>{
@@ -10592,13 +10751,22 @@ export default function DestinIQ(){
     return()=>clearTimeout(timer);
   },[userId]);
 
+  // Paid users are always Premium in this app — there is no separate paid-but-
+  // not-premium tier in practice. Self-correct instantly if these ever drift
+  // out of sync (e.g. stale localStorage), instead of requiring a manual toggle.
+  useEffect(()=>{
+    if(isPaid && !isPremium) setIsPremium(true);
+  },[isPaid,isPremium]);
+
   // Listen for policy events from auth screen footer links
   useEffect(()=>{
     const handler=(e)=>setShowPolicy(e.detail);
     const handleAbout=()=>setShowAbout(true);
+    const handleEditProfile=()=>setShowEditProfile(true);
     window.addEventListener("showPolicy",handler);
     window.addEventListener("showAbout",handleAbout);
-    return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);};
+    window.addEventListener("showEditProfile",handleEditProfile);
+    return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);};
   },[]);
 
   // ── BROWSER BACK BUTTON ──────────────────────────────────────────────
@@ -10899,24 +11067,6 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                   </nav>
                   {showAbout &&<AboutUsPage onBack={()=>setShowAbout(false)}/>}
       {showTutorial&&<OnboardingTutorial onDone={()=>setShowTutorial(false)}/>}
-      {showEditProfile&&<EditProfileModal
-        formData={formData}
-        userId={userId}
-        onClose={()=>setShowEditProfile(false)}
-        onSave={(updatedFormData, shouldRegen)=>{
-          setFormData(updatedFormData);
-          setShowEditProfile(false);
-          if(shouldRegen){
-            // Trigger report re-generation with updated profile
-            setScreen("loading");
-            setTimeout(()=>{
-              // handleSubmit will re-generate report with new formData
-              // We call it with the updated form data
-              handleSubmit(updatedFormData);
-            }, 100);
-          }
-        }}
-      />}
       {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
                   {!showPolicy&&<Landing onStart={()=>setScreen("auth")} ipLocation={ipLocation}/>}
                 </>
@@ -10938,7 +11088,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             else setScreen("intake");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
-            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}else{setIsPremium(p=>!p);}}} title={isPaid?(isPremium?"Premium mode on":"Switch to Premium"):"Upgrade to Premium"}>
+            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isPaid?"Premium":"Upgrade to Premium"}>
               <div className="prem-toggle-dot"/>
               <span className="prem-toggle-label">{isPaid&&isPremium?"PREMIUM":"UPGRADE"}</span>
             </div>
@@ -11054,6 +11204,24 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showTracker&&(
           <HabitTrackerPanel userId={userId} onClose={()=>setShowTracker(false)}/>
         )}
+        {showEditProfile&&<EditProfileModal
+          formData={formData}
+          userId={userId}
+          onClose={()=>setShowEditProfile(false)}
+          onSave={(updatedFormData, shouldRegen)=>{
+            setFormData(updatedFormData);
+            setShowEditProfile(false);
+            if(shouldRegen){
+              // Trigger report re-generation with updated profile
+              setScreen("loading");
+              setTimeout(()=>{
+                // handleSubmit will re-generate report with new formData
+                // We call it with the updated form data
+                handleSubmit(updatedFormData);
+              }, 100);
+            }
+          }}
+        />}
         </>}
 
         </>}
