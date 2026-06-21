@@ -8013,7 +8013,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
 
   // Auto-fix if closing is empty or contains AI confusion text
   useEffect(()=>{
-    const bad = ['i don't have','i need more','no context','no posts','no information'];
+    const bad = ["i don't have","i need more","no context","no posts","no information"];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
     if(isBad && formData?.name) {
       setTimeout(()=>refreshClosing(), 500);
