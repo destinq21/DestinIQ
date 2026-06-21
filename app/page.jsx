@@ -3388,9 +3388,6 @@ function Landing({onStart,ipLocation}){
     ALL_TESTIMONIALS[(testimIdx+offset)%ALL_TESTIMONIALS.length]
   );
 
-  // Derive strengths/risks once before render — avoids IIFE in JSX
-  const {strengths:_strengths, risks:_risks} = isPaid ? deriveStrengthsRisks(data) : {strengths:[],risks:[]};
-
   return(
     <div style={{paddingTop:60}}>
       <section style={{minHeight:"92vh",display:"flex",alignItems:"center",borderBottom:"1px solid var(--line)",padding:"clamp(48px,10vw,80px) 0"}}>
@@ -8893,6 +8890,11 @@ Rules:
     }
     setRefreshingClosing(false);
   };
+
+  // Pre-compute strengths/risks before render (avoids IIFE in JSX)
+  const _derived = isPaid ? deriveStrengthsRisks(data) : {strengths:[],risks:[]};
+  const _strengths = _derived.strengths;
+  const _risks = _derived.risks;
 
   return(
     <div style={{paddingTop:60}}>
