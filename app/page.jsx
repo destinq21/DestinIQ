@@ -8621,41 +8621,42 @@ function asReportText(val){
 // derive them from the existing report text.
 
 function deriveStrengthsRisks(data){
-  // ── If the saved report already has proper arrays, use them ──
+  // ── Already have proper arrays ──
   if(data?.strengths?.length>0 && data?.risks?.length>0){
     return {strengths:data.strengths, risks:data.risks};
   }
-  // ── Derive from existing report text (works for all old reports) ──
-  // Strengths: pull 3 clear items from the "What You Have" section
-  const strengthRaw = asReportText(data?.sections?.[1]?.content);
-  const lifeRaw     = asReportText(data?.life);
-  const mindsetRaw  = asReportText(data?.mindset);
-  const wealthRaw   = asReportText(data?.wealth);
 
-  // Split full text into chunks at natural break points (commas, semicolons, dashes, newlines)
-  const splitIntoItems = (text, maxItems=3) => {
-    if(!text) return [];
-    // First try: numbered list items
-    const numbered = text.match(/\d+\.\s+[^.]+[.?!]?/g);
-    if(numbered&&numbered.length>=2) return numbered.slice(0,maxItems).map(s=>s.replace(/^\d+\.\s+/,"").trim());
-    // Second try: split by ". " and take short-to-medium sentences
-    const parts = text.split(/\.\s+/).map(s=>s.trim()).filter(s=>s.length>30&&s.length<300);
-    return parts.slice(0,maxItems).map(s=>s.endsWith(".")?s:s+".");
-  };
+  // ── Extract from any available report text ──
+  const allText = [
+    asReportText(data?.sections?.[1]?.content),
+    asReportText(data?.life),
+    asReportText(data?.sections?.[0]?.content),
+    asReportText(data?.greeting),
+  ].filter(Boolean).join(" ");
 
-  const strengths = splitIntoItems(strengthRaw||lifeRaw, 3);
+  const mindsetText = asReportText(data?.mindset)||asReportText(data?.wealth)||"";
 
-  // Risks: look for warning-language in mindset/wealth, else just take first 3 sentences
-  const riskRaw   = mindsetRaw || wealthRaw;
-  const riskParts = riskRaw.split(/\.\s+/).map(s=>s.trim()).filter(s=>s.length>30&&s.length<300);
-  // Prefer sentences that sound like warnings, else fall back to first 3
-  const warnWords = ["pattern","habit","trap","avoid","stuck","stop","careful","watch","miss","risk","danger","tend","block","fear","procrastinate","distract","excuse","comfort zone","unless","if you don"];
-  let risks = riskParts.filter(s=>warnWords.some(w=>s.toLowerCase().includes(w))).slice(0,3);
-  if(risks.length<2) risks = riskParts.slice(0,3);
+  // Split into sentences — accept anything 20-400 chars
+  const toSentences = (text) =>
+    (text.match(/[^.!?]+[.!?]+/g)||[])
+      .map(s=>s.trim())
+      .filter(s=>s.length>20 && s.length<400);
+
+  const allSentences  = toSentences(allText);
+  const mindSentences = toSentences(mindsetText);
+
+  // Strengths = first 3 sentences from the "what you have" text
+  const strengths = allSentences.slice(0,3);
+
+  // Risks = sentences with warning language, else last 3 from mindset
+  const warnWords = ["pattern","habit","trap","avoid","stuck","stop","careful","watch","miss","risk","danger","tend","block","fear","procrastinate","distract","excuse","comfort zone","unless","if you don","without"];
+  let risks = mindSentences.filter(s=>warnWords.some(w=>s.toLowerCase().includes(w))).slice(0,3);
+  if(risks.length<2) risks = mindSentences.slice(-3);
+  if(risks.length<1) risks = allSentences.slice(3,6); // absolute fallback
 
   return {
-    strengths: strengths.map(s=>s.endsWith(".")?s:s+"."),
-    risks:     risks.map(s=>s.endsWith(".")?s:s+"."),
+    strengths: strengths.length ? strengths : [],
+    risks:     risks.length     ? risks     : [],
   };
 }
 
@@ -8797,7 +8798,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
     const bad = ["i don't have","i need more","no context","no posts","no information","placeholder","there, their"];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
     // Require ALL key fields to be real values before calling AI
-    const hasRealData = formData?.name && formData?.country && formData?.goals && formData?.challenge;
+    const hasRealData = formData?.name && formData?.country && (formData?.goals||formData?.bigGoal) && formData?.challenge;
     if(isBad && hasRealData) setTimeout(()=>refreshClosing(), 800);
   // eslint-disable-next-line
   },[formData?.name]);  // re-run when formData loads
@@ -8858,18 +8859,18 @@ Do NOT use generic motivational language. Do NOT ask for more information — wo
     setRefreshingClosing(true);
     try{
       // Guard — if real profile data isn't loaded yet, don't call the AI
-    const name     = sanitize(formData?.name)    ||"";
-    const country  = sanitize(formData?.country) ||"";
-    const goal     = sanitize(formData?.goals)   ||"";
-    const challenge= sanitize(formData?.challenge)||"";
-    const skill    = sanitize(formData?.skills)  ||"";
+    const name     = sanitize(formData?.name)                              ||"";
+    const country  = sanitize(formData?.country)                           ||"";
+    const goal     = sanitize(formData?.goals||formData?.bigGoal)          ||"";
+    const challenge= sanitize(formData?.challenge)                         ||"";
+    const skill    = sanitize(formData?.skills||formData?.career)          ||"";
     const age      = formData?.age||"";
     if(!name||!country||!goal){ setRefreshingClosing(false); return; } // wait for real data
 
       const prompt=`Write ONE powerful sentence for ${name}${age?" (age "+age+")":""} from ${country}.
-Goal: "${goal}"
-Challenge: "${challenge}"
-Skills: "${skill}"
+Goal: "${goal||"building a better life"}"
+Challenge: "${challenge||"getting started"}"
+Skills: "${skill||"various skills"}"
 
 Rules:
 - Use ${name}'s name
@@ -9132,7 +9133,14 @@ Rules:
                         {refreshingClosing?"…":"↺"}
                       </button>
                     </div>
-                    <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>&ldquo;{refreshingClosing?"Thinking…":closingLine}&rdquo;</p>
+                    <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>
+                    {refreshingClosing
+                      ? <span>&ldquo;Thinking…&rdquo;</span>
+                      : closingLine
+                        ? <>&ldquo;{closingLine}&rdquo;</>
+                        : <span style={{fontSize:13,color:"var(--cream-30)"}}>Click ↺ to generate your personal sentence</span>
+                    }
+                  </p>
                     <AudioPlayer text={closingLine} label="Listen"/>
                   </div>
                 </>
