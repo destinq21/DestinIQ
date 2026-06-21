@@ -2805,7 +2805,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
 function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
-  const openingMessage = `Hey ${profile.name}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
+  const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
@@ -2874,7 +2874,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
         <div className="chat-scroll" ref={scrollRef}>
           {msgs.map((m,i)=>(
             <div key={i} className={`chat-msg msg-in ${m.role==="user"?"me":""}`}>
-              <div className={`av ${m.role==="user"?"av-u":"av-d"}`}>{m.role==="user"?profile.name[0]?.toUpperCase():"IQ"}</div>
+              <div className={`av ${m.role==="user"?"av-u":"av-d"}`}>{m.role==="user"?(profile?.name?.[0]?.toUpperCase()||"U"):"IQ"}</div>
               <div className={`bubble ${m.role==="user"?"bubble-u":"bubble-d"}`}>
                 {m.role==="user"
                   ?<span style={{whiteSpace:"pre-wrap"}}>{m.content}</span>
@@ -8013,7 +8013,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
 
   // Auto-fix if closing is empty or contains AI confusion text
   useEffect(()=>{
-    const bad = ["i don't have","i need more","no context","no posts","no information"];
+    const bad = ['i don't have','i need more','no context','no posts','no information'];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
     if(isBad && formData?.name) {
       setTimeout(()=>refreshClosing(), 500);
