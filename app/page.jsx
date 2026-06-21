@@ -294,7 +294,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -3387,6 +3387,9 @@ function Landing({onStart,ipLocation}){
   const visibleTestimonials = [0,1,2].map(offset=>
     ALL_TESTIMONIALS[(testimIdx+offset)%ALL_TESTIMONIALS.length]
   );
+
+  // Derive strengths/risks once before render — avoids IIFE in JSX
+  const {strengths:_strengths, risks:_risks} = isPaid ? deriveStrengthsRisks(data) : {strengths:[],risks:[]};
 
   return(
     <div style={{paddingTop:60}}>
@@ -8647,12 +8650,128 @@ function deriveStrengthsRisks(data){
   };
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STREAK CELEBRATION — TikTok-style milestone pop when streak increases
+// Triggers on: 3, 7, 10, 14, 21, 30, 50, 75, 100, 150, 200, 365 days
+// ═══════════════════════════════════════════════════════════════════════════════
+const STREAK_MILESTONES = {
+  3:   { emoji:"🔥",    title:"3-Day Streak!",    msg:"You showed up 3 days in a row. That's the beginning of something real.",      color:"var(--gold)"    },
+  7:   { emoji:"⚡",    title:"7-Day Streak!",    msg:"One full week. Most people quit before this. You didn't.",                    color:"var(--teal)"    },
+  10:  { emoji:"🏆",    title:"10-Day Streak!",   msg:"10 days of showing up. The discipline is becoming part of who you are.",     color:"var(--gold)"    },
+  14:  { emoji:"🔥🔥",  title:"2-Week Streak!",   msg:"Two weeks straight. You're building something most people only talk about.", color:"var(--rose)"    },
+  21:  { emoji:"💎",    title:"21-Day Streak!",   msg:"21 days. Science says this is where habits start forming. You're there.",    color:"#9b72cf"        },
+  30:  { emoji:"🚀",    title:"30-Day Streak!",   msg:"One full month of daily check-ins. This is elite-level consistency.",        color:"var(--gold)"    },
+  50:  { emoji:"⭐",    title:"50-Day Streak!",   msg:"50 days. You are in the top 1% of people who start self-improvement tools.", color:"var(--teal)"    },
+  75:  { emoji:"💪",    title:"75-Day Streak!",   msg:"75 days. Uncommon discipline. Not many people even reach this.",             color:"var(--rose)"    },
+  100: { emoji:"👑",    title:"100-Day Streak!",  msg:"ONE HUNDRED DAYS. You have earned the right to say you are serious about your life.", color:"var(--gold)" },
+  150: { emoji:"🌟",    title:"150-Day Streak!",  msg:"150 days. Half a year of daily commitment. Extraordinary.",                  color:"#9b72cf"        },
+  200: { emoji:"🏅",    title:"200-Day Streak!",  msg:"200 days. If consistency were a currency, you'd be rich.",                  color:"var(--teal)"    },
+  365: { emoji:"🎯",    title:"365-Day Streak!",  msg:"ONE FULL YEAR. A complete revolution around the sun with DestinIQ. Legendary.", color:"var(--gold)" },
+};
+
+function StreakCelebration({streak, onClose}){
+  const [animIn, setAnimIn] = useState(false);
+  const milestone = STREAK_MILESTONES[streak];
+  if(!milestone) return null;
+
+  useEffect(()=>{
+    // Animate in
+    setTimeout(()=>setAnimIn(true), 50);
+    // Auto-close after 5 seconds
+    const t = setTimeout(onClose, 5000);
+    return ()=>clearTimeout(t);
+  },[]);
+
+  return(
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, zIndex:3000,
+      background:"rgba(0,0,0,0.85)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      cursor:"pointer",
+      transition:"opacity .3s",
+      opacity: animIn ? 1 : 0,
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        textAlign:"center", padding:"40px 32px",
+        maxWidth:380, width:"100%",
+        transform: animIn ? "scale(1) translateY(0)" : "scale(0.8) translateY(40px)",
+        transition:"transform .4s cubic-bezier(0.175,0.885,0.32,1.275)",
+      }}>
+        {/* Emoji */}
+        <div style={{
+          fontSize:80, lineHeight:1,
+          marginBottom:20,
+          filter:"drop-shadow(0 0 30px "+milestone.color+")",
+          animation:"streakBounce 0.6s ease infinite alternate",
+        }}>
+          {milestone.emoji}
+        </div>
+
+        {/* Streak number */}
+        <div style={{
+          fontSize:96, fontWeight:900, lineHeight:1,
+          color: milestone.color,
+          fontFamily:"var(--f-display)",
+          marginBottom:4,
+          textShadow:`0 0 40px ${milestone.color}60`,
+        }}>
+          {streak}
+        </div>
+        <div style={{
+          fontSize:14, fontFamily:"var(--f-mono)", letterSpacing:".2em",
+          color:"var(--cream-40)", marginBottom:24, textTransform:"uppercase",
+        }}>
+          day streak 🔥
+        </div>
+
+        {/* Title */}
+        <div style={{
+          fontSize:28, fontWeight:800, color:"var(--cream)",
+          marginBottom:12, lineHeight:1.25,
+        }}>
+          {milestone.title}
+        </div>
+
+        {/* Message */}
+        <p style={{
+          fontSize:16, color:"var(--cream-60)", lineHeight:1.75,
+          marginBottom:32,
+        }}>
+          {milestone.msg}
+        </p>
+
+        {/* CTA */}
+        <button onClick={onClose} style={{
+          background: milestone.color, border:"none", borderRadius:14,
+          padding:"14px 40px", fontSize:15, fontWeight:700,
+          color: milestone.color === "var(--gold)" ? "#000" : "#fff",
+          cursor:"pointer", letterSpacing:".03em",
+        }}>
+          Keep going 🔥
+        </button>
+        <p style={{fontSize:11,color:"var(--cream-30)",marginTop:12,fontFamily:"var(--f-mono)"}}>
+          Tap anywhere to dismiss
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes streakBounce {
+          from { transform: scale(1) rotate(-5deg); }
+          to   { transform: scale(1.15) rotate(5deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation,showTracker,setShowTracker}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
     return localStorage.getItem("diq_active_tab")||"today";
   });
+  const [streakCelebration,setStreakCelebration]=useState(null);
   useEffect(()=>{
     try{ localStorage.setItem("diq_active_tab",mod); }catch{}
   },[mod]);
@@ -8871,6 +8990,16 @@ Rules:
               try{ localStorage.setItem(lastKey, today); }catch{}
               const newStreak = streak + 1;
               setStreak(newStreak); // update UI immediately
+              // Celebrate milestones — check if this streak hits one
+              if(STREAK_MILESTONES[newStreak]){
+                const celebKey=`diq_celebrated_${userId}_${newStreak}`;
+                try{
+                  if(!localStorage.getItem(celebKey)){
+                    localStorage.setItem(celebKey,"1");
+                    setTimeout(()=>setStreakCelebration(newStreak), 1200); // delay so check-in closes first
+                  }
+                }catch{}
+              }
               if(userId){
                 // Persist to Supabase — this is the authoritative source
                 supabase.from("user_profiles").upsert({
@@ -8951,77 +9080,66 @@ Rules:
                 </div>
                 <p className="body">{refreshingInsight?"Getting your fresh insight for today…":dailyInsight}</p>
               </div>
-              {isPaid
-                ? /* Pro / Pro Max — full report */
-                (()=>{
-                const derived=deriveStrengthsRisks(data);
-                const strengths=derived.strengths;
-                const risks=derived.risks;
-                // Debug (remove after confirming):
-                if(typeof window!=="undefined"&&process.env.NODE_ENV==="development"){
-                  console.log("Strengths:",strengths,"Risks:",risks,"sections[1]:",data?.sections?.[1]?.content?.slice(0,80));
-                }
-                return(
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
-                  <div className="card card-sm">
-                    <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--teal)"}}>◎ What you bring to this</div>
-                    {strengths.length>0
-                      ? strengths.map((s,i)=>(
-                          <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
-                            <span style={{color:"var(--teal)",flexShrink:0,marginTop:3,fontSize:10}}>◎</span>
-                            <span>{s}</span>
+              {isPaid ? (
+                <>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
+                    <div className="card card-sm">
+                      <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--teal)"}}>◎ What you bring to this</div>
+                      {_strengths.length>0
+                        ? _strengths.map((s,i)=>(
+                            <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
+                              <span style={{color:"var(--teal)",flexShrink:0,marginTop:3,fontSize:10}}>◎</span>
+                              <span>{s}</span>
+                            </div>
+                          ))
+                        : <div>
+                            <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Re-generate your report to see your strengths.</p>
+                            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
+                              Update profile & re-generate →
+                            </button>
                           </div>
-                        ))
-                      : <div>
-                          <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Your strengths will appear here after you re-generate your report.</p>
-                          <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
-                            Update profile & re-generate →
-                          </button>
-                        </div>
-                    }
-                  </div>
-                  <div className="card card-sm">
-                    <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--rose)"}}>◇ What to watch out for</div>
-                    {risks.length>0
-                      ? risks.map((r,i)=>(
-                          <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
-                            <span style={{color:"var(--rose)",flexShrink:0,marginTop:3,fontSize:10}}>◇</span>
-                            <span>{r}</span>
+                      }
+                    </div>
+                    <div className="card card-sm">
+                      <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--rose)"}}>◇ What to watch out for</div>
+                      {_risks.length>0
+                        ? _risks.map((r,i)=>(
+                            <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
+                              <span style={{color:"var(--rose)",flexShrink:0,marginTop:3,fontSize:10}}>◇</span>
+                              <span>{r}</span>
+                            </div>
+                          ))
+                        : <div>
+                            <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Re-generate your report to see your watch-outs.</p>
+                            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
+                              Update profile & re-generate →
+                            </button>
                           </div>
-                        ))
-                      : <div>
-                          <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Your watch-outs will appear here after you re-generate your report.</p>
-                          <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
-                            Update profile & re-generate →
-                          </button>
-                        </div>
-                    }
+                      }
+                    </div>
                   </div>
-                </div>
-                );
-              })() :
-              <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
-                  <div className="mono" style={{fontSize:"9px"}}>Something to carry with you</div>
-                  <button onClick={refreshClosing} disabled={refreshingClosing} title="Get a new one" style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"2px 10px",color:"var(--cream-40)",fontSize:10,cursor:refreshingClosing?"not-allowed":"pointer",fontFamily:"var(--f-mono)"}}>
-                    {refreshingClosing?"…":"↺"}
-                  </button>
-                </div>
-                <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>&ldquo;{refreshingClosing?"Thinking…":closingLine}&rdquo;</p>
-                <AudioPlayer text={closingLine} label="Listen"/>
-              </div>
-              })() : /* Free users — show teaser + upgrade CTA */
+                  <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
+                      <div className="mono" style={{fontSize:"9px"}}>Something to carry with you</div>
+                      <button onClick={refreshClosing} disabled={refreshingClosing} title="Get a new one" style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"2px 10px",color:"var(--cream-40)",fontSize:10,cursor:refreshingClosing?"not-allowed":"pointer",fontFamily:"var(--f-mono)"}}>
+                        {refreshingClosing?"…":"↺"}
+                      </button>
+                    </div>
+                    <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>&ldquo;{refreshingClosing?"Thinking…":closingLine}&rdquo;</p>
+                    <AudioPlayer text={closingLine} label="Listen"/>
+                  </div>
+                </>
+              ) : (
                 <div style={{marginTop:24}}>
-                  {/* Blurred preview of what they're missing */}
                   <div style={{position:"relative",overflow:"hidden",borderRadius:16,marginBottom:16}}>
                     <div style={{padding:"20px",background:"var(--lift)",border:"1px solid rgba(255,255,255,0.06)",filter:"blur(4px)",userSelect:"none",pointerEvents:"none",lineHeight:1.8,fontSize:13,color:"var(--cream-50)"}}>
-                      {data.sections?.[0]?.content?.slice(0,220)||"Your clarity report goes much deeper than the scores above. There are three full sections — The Real Picture, What You Have That You're Not Using, and Your Next 30 Days — written specifically about your situation in your country..."}...
+                      {data.sections?.[0]?.content?.slice(0,220)||"Your clarity report goes much deeper than the scores above..."}...
                     </div>
                     <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,var(--night) 80%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:24}}>
                       <div style={{fontSize:22,marginBottom:8}}>🔒</div>
                       <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:6,textAlign:"center"}}>Your full report is waiting</div>
                       <p style={{fontSize:13,color:"var(--cream-40)",textAlign:"center",maxWidth:320,lineHeight:1.65,marginBottom:20}}>
-                        Deep dives into Life, Wealth, Mindset, and Relationships. What you bring to this. What to watch out for. Your 3 most important next steps. Something personal to carry with you.
+                        Deep dives into Life, Wealth, Mindset and Relationships. Your strengths, your watch-outs, your next 30 days.
                       </p>
                       <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:15,padding:"14px 32px"}}>
                         Unlock full report — $9/month
@@ -9029,12 +9147,14 @@ Rules:
                       <p style={{fontSize:11,color:"var(--cream-30)",marginTop:10,fontFamily:"var(--f-mono)"}}>Pro plan · Cancel anytime · No hidden fees</p>
                     </div>
                   </div>
-                  {/* Still show the teaser quote if available */}
-                  {data.teaser&&<div style={{padding:"16px 20px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:12}}>
-                    <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>We noticed something important</div>
-                    <p style={{fontSize:14,fontStyle:"italic",color:"var(--cream-60)",lineHeight:1.7,margin:0}}>"{data.teaser}"</p>
-                  </div>}
+                  {data.teaser&&(
+                    <div style={{padding:"16px 20px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:12}}>
+                      <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>We noticed something important</div>
+                      <p style={{fontSize:14,fontStyle:"italic",color:"var(--cream-60)",lineHeight:1.7,margin:0}}>"{data.teaser}"</p>
+                    </div>
+                  )}
                 </div>
+              )}
             </div>
           )}
 
@@ -9836,6 +9956,9 @@ function PolicyPage({type,onBack}){
           </div>
         )}
       </div>
+      {streakCelebration&&STREAK_MILESTONES[streakCelebration]&&(
+        <StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>
+      )}
     </div>
   );
 }
@@ -10522,7 +10645,7 @@ export default function DestinIQ(){
   const [isOffline,   setIsOffline  ]=useState(false);
   const [profileLoading,setProfileLoading]=useState(false); // true while loading saved profile after login
   const [showTracker,  setShowTracker  ]=useState(false);
-  const [showTutorial, setShowTutorial ]=useState(false);
+  const [showTutorial, setShowTutorial]=useState(false);
   // Tracks whether sign-out was explicitly triggered by the user.
   // Supabase fires SIGNED_OUT on every token refresh — we ignore those.
   const explicitSignOut = useRef(false);
