@@ -8454,6 +8454,49 @@ function MindsetTenXModule({formData, userId, isPaid, onUnlock}){
 }
 
 
+
+// ── deriveStrengthsRisks ────────────────────────────────────────────────────
+// For reports generated before strengths/risks fields existed,
+// derive them from the existing report text.
+function deriveStrengthsRisks(data){
+  // ── If the saved report already has proper arrays, use them ──
+  if(data?.strengths?.length>0 && data?.risks?.length>0){
+    return {strengths:data.strengths, risks:data.risks};
+  }
+  // ── Derive from existing report text (works for all old reports) ──
+  // Strengths: pull 3 clear items from the "What You Have" section
+  const strengthRaw = data?.sections?.[1]?.content || "";
+  const lifeRaw     = data?.life     || "";
+  const mindsetRaw  = data?.mindset  || "";
+  const wealthRaw   = data?.wealth   || "";
+
+  // Split full text into chunks at natural break points (commas, semicolons, dashes, newlines)
+  const splitIntoItems = (text, maxItems=3) => {
+    if(!text) return [];
+    // First try: numbered list items
+    const numbered = text.match(/\d+\.\s+[^.]+[.?!]?/g);
+    if(numbered&&numbered.length>=2) return numbered.slice(0,maxItems).map(s=>s.replace(/^\d+\.\s+/,"").trim());
+    // Second try: split by ". " and take short-to-medium sentences
+    const parts = text.split(/\.\s+/).map(s=>s.trim()).filter(s=>s.length>30&&s.length<300);
+    return parts.slice(0,maxItems).map(s=>s.endsWith(".")?s:s+".");
+  };
+
+  const strengths = splitIntoItems(strengthRaw||lifeRaw, 3);
+
+  // Risks: look for warning-language in mindset/wealth, else just take first 3 sentences
+  const riskRaw   = mindsetRaw || wealthRaw;
+  const riskParts = riskRaw.split(/\.\s+/).map(s=>s.trim()).filter(s=>s.length>30&&s.length<300);
+  // Prefer sentences that sound like warnings, else fall back to first 3
+  const warnWords = ["pattern","habit","trap","avoid","stuck","stop","careful","watch","miss","risk","danger","tend","block","fear","procrastinate","distract","excuse","comfort zone","unless","if you don"];
+  let risks = riskParts.filter(s=>warnWords.some(w=>s.toLowerCase().includes(w))).slice(0,3);
+  if(risks.length<2) risks = riskParts.slice(0,3);
+
+  return {
+    strengths: strengths.map(s=>s.endsWith(".")?s:s+"."),
+    risks:     risks.map(s=>s.endsWith(".")?s:s+"."),
+  };
+}
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation,showTracker,setShowTracker}){
 
   const [mod,setMod]=useState(()=>{
@@ -8471,7 +8514,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
 
   // Auto-fix if closing is empty or contains AI confusion text
   useEffect(()=>{
-    const bad = ["i don't have","i need more","no context","no posts","no information"];
+    const bad = ["i don't have",'i need more','no context','no posts','no information'];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
     if(isBad && formData?.name) {
       setTimeout(()=>refreshClosing(), 500);
@@ -8758,20 +8801,53 @@ Rules:
                 </div>
                 <p className="body">{refreshingInsight?"Getting your fresh insight for today…":dailyInsight}</p>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
-                <div className="card card-sm"><div className="mono" style={{marginBottom:10,fontSize:"9px"}}>What you bring to this</div>
-                  {(data.strengths?.length>0
-                    ? data.strengths
-                    : data.sections?.[1]?.content ? [data.sections[1].content] : []
-                  ).map((s,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--teal)",flexShrink:0}}>◎</span>{s}</div>)}
+              {(()=>{
+                const derived=deriveStrengthsRisks(data);
+                const strengths=derived.strengths;
+                const risks=derived.risks;
+                // Debug (remove after confirming):
+                if(typeof window!=="undefined"&&process.env.NODE_ENV==="development"){
+                  console.log("Strengths:",strengths,"Risks:",risks,"sections[1]:",data?.sections?.[1]?.content?.slice(0,80));
+                }
+                return(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
+                  <div className="card card-sm">
+                    <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--teal)"}}>◎ What you bring to this</div>
+                    {strengths.length>0
+                      ? strengths.map((s,i)=>(
+                          <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
+                            <span style={{color:"var(--teal)",flexShrink:0,marginTop:3,fontSize:10}}>◎</span>
+                            <span>{s}</span>
+                          </div>
+                        ))
+                      : <div>
+                          <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Your strengths will appear here after you re-generate your report.</p>
+                          <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
+                            Update profile & re-generate →
+                          </button>
+                        </div>
+                    }
+                  </div>
+                  <div className="card card-sm">
+                    <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--rose)"}}>◇ What to watch out for</div>
+                    {risks.length>0
+                      ? risks.map((r,i)=>(
+                          <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
+                            <span style={{color:"var(--rose)",flexShrink:0,marginTop:3,fontSize:10}}>◇</span>
+                            <span>{r}</span>
+                          </div>
+                        ))
+                      : <div>
+                          <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Your watch-outs will appear here after you re-generate your report.</p>
+                          <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
+                            Update profile & re-generate →
+                          </button>
+                        </div>
+                    }
+                  </div>
                 </div>
-                <div className="card card-sm"><div className="mono" style={{marginBottom:10,fontSize:"9px"}}>What to watch out for</div>
-                  {(data.risks?.length>0
-                    ? data.risks
-                    : data.pillar_detail?.mindset ? [data.pillar_detail.mindset] : []
-                  ).map((r,i)=><div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)"}}><span style={{color:"var(--rose)",flexShrink:0}}>◇</span>{r}</div>)}
-                </div>
-              </div>
+                );
+              })()}
               <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
                   <div className="mono" style={{fontSize:"9px"}}>Something to carry with you</div>
@@ -9195,37 +9271,183 @@ Rules:
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
             <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
             <div style={{display:"flex",gap:8}}>
-              {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}} onClick={async()=>{
-                // Build a printable HTML string and trigger browser print-to-PDF
-                const name=formData?.name||"User";
-                const today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-                const scores=data?.scores||{};
-                const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>DestinIQ — ${name}</title>
-                <style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;color:#111;line-height:1.7;padding:0 20px;}
-                h1{font-size:32px;margin:0 0 4px;}h2{font-size:20px;margin:24px 0 8px;color:#333;}
-                .score{display:inline-block;padding:6px 16px;border-radius:20px;background:#f5f0e8;margin:4px;font-size:14px;font-weight:bold;}
-                .section{margin:28px 0;padding:20px;background:#fafaf8;border-left:4px solid #c8a84b;border-radius:0 12px 12px 0;}
-                .tag{font-size:11px;font-family:monospace;color:#888;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;}
-                .footer{margin-top:48px;text-align:center;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:16px;}
-                @media print{body{margin:20px;}}</style></head><body>
-                <div style="text-align:center;margin-bottom:32px">
+              {isPaid&&<button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>{
+                const name   = formData?.name    || "User";
+                const country= formData?.country || "";
+                const today  = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+                const scores = data?.scores || {};
+                const overall= data?.overall || 0;
+
+                const sec=(tag,title,body,accent="#c8a84b")=>body?`
+                  <div class="sec">
+                    <div class="tag" style="color:${accent}">${tag}</div>
+                    <h3>${title}</h3>
+                    <p>${body}</p>
+                  </div>`:""
+
+                const pillarRow=(label,score,exp,color)=>`
+                  <div class="pillar">
+                    <div class="pillar-head">
+                      <span class="pillar-label">${label}</span>
+                      <span class="pillar-score" style="color:${color}">${score}/100</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${score}%;background:${color}"></div></div>
+                    ${exp?`<p class="pillar-exp">${exp}</p>`:""}
+                  </div>`
+
+                const roadmapSection=()=>{
+                  if(!data?.roadmap?.length) return "";
+                  return `<div class="sec"><div class="tag" style="color:#4ab8a0">PREMIUM CONTENT</div><h3>Your Roadmap</h3>${
+                    data.roadmap.map((r,i)=>`<div class="roadmap-phase">
+                      <div class="phase-label">${r.phase}</div>
+                      <strong>${r.title}</strong>
+                      <p>${r.desc}</p>
+                      ${r.steps?.length?`<ol>${r.steps.map(s=>`<li>${s}</li>`).join("")}</ol>`:""}
+                      ${r.win?`<div class="win">🎯 ${r.win}</div>`:""}
+                    </div>`).join("")
+                  }</div>`
+                }
+
+                const careerSection=()=>{
+                  if(!data?.career?.length) return "";
+                  return `<div class="sec"><div class="tag" style="color:#9b72cf">CAREER PATHS</div><h3>Your 3 Career Paths</h3>${
+                    data.career.map((c,i)=>`<div class="career-card">
+                      <strong>${i+1}. ${c.title}</strong> <span class="badge">${c.type}</span>
+                      <div class="income">💰 ${c.income}</div>
+                      ${c.why?`<p>${c.why}</p>`:""}
+                      ${c.how?.length?`<ul>${c.how.map(s=>`<li>${s}</li>`).join("")}</ul>`:""}
+                    </div>`).join("")
+                  }</div>`
+                }
+
+                const scoreHistorySection=()=>{
+                  if(!data?.score_history||data.score_history.length<2) return "";
+                  const first=data.score_history[0];
+                  const last=data.score_history[data.score_history.length-1];
+                  const diff=last.overall-first.overall;
+                  return `<div class="sec"><div class="tag">SCORE HISTORY</div><h3>Your Progress Over Time</h3>
+                    <p>Since your first assessment on ${first.date}, your overall score has ${diff>=0?"increased by":"changed by"} <strong style="color:${diff>=0?"#4ab8a0":"#f87171"}">${diff>=0?"+":""}${diff} points</strong>.</p>
+                    <table class="history-table">
+                      <tr><th>Date</th><th>Overall</th><th>Life</th><th>Wealth</th><th>Mindset</th><th>Relations</th></tr>
+                      ${data.score_history.map(h=>`<tr><td>${h.date}</td><td><strong>${h.overall}</strong></td><td>${h.life}</td><td>${h.wealth}</td><td>${h.mindset}</td><td>${h.relations}</td></tr>`).join("")}
+                    </table>
+                  </div>`
+                }
+
+                const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+                <title>DestinIQ Report — ${name}</title>
+                <style>
+                  *{box-sizing:border-box;}
+                  body{font-family:Georgia,serif;max-width:740px;margin:0 auto;color:#1a1a1a;line-height:1.75;padding:32px 24px;font-size:14px;}
+                  .cover{text-align:center;padding:48px 0 40px;border-bottom:3px solid #c8a84b;margin-bottom:40px;}
+                  .cover h1{font-size:36px;margin:0 0 4px;letter-spacing:-.5px;}
+                  .cover .subtitle{color:#888;font-size:13px;margin-bottom:20px;}
+                  .overall{font-size:52px;font-weight:900;color:#c8a84b;line-height:1;margin:12px 0 4px;}
+                  .overall-label{font-size:11px;font-family:monospace;color:#888;letter-spacing:.15em;text-transform:uppercase;}
+                  .pillars{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0;}
+                  .pillar{background:#fafaf8;border-radius:8px;padding:14px 16px;}
+                  .pillar-head{display:flex;justify-content:space-between;margin-bottom:6px;}
+                  .pillar-label{font-weight:600;font-size:13px;}
+                  .pillar-score{font-weight:800;font-size:15px;}
+                  .bar-track{background:#eee;border-radius:4px;height:6px;}
+                  .bar-fill{height:6px;border-radius:4px;}
+                  .pillar-exp{font-size:12px;color:#666;margin:8px 0 0;line-height:1.6;}
+                  .sec{margin:32px 0;padding:22px 24px;background:#fafaf8;border-left:4px solid #c8a84b;border-radius:0 12px 12px 0;}
+                  .sec h3{margin:0 0 10px;font-size:17px;}
+                  .sec p{margin:0;color:#333;}
+                  .tag{font-size:9px;font-family:monospace;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;font-weight:700;}
+                  .strengths-risks{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:32px 0;}
+                  .sr-box{background:#fafaf8;border-radius:10px;padding:16px;}
+                  .sr-box h4{margin:0 0 10px;font-size:14px;}
+                  .sr-item{display:flex;gap:8px;margin-bottom:7px;font-size:13px;color:#444;line-height:1.5;}
+                  .roadmap-phase{margin:16px 0;padding:16px;background:#fff;border:1px solid #e8e0d0;border-radius:8px;}
+                  .phase-label{font-size:10px;font-family:monospace;color:#c8a84b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+                  .roadmap-phase ol{margin:10px 0;padding-left:18px;}
+                  .roadmap-phase li{margin-bottom:5px;font-size:13px;color:#444;}
+                  .win{background:#f0faf5;border-left:3px solid #4ab8a0;padding:8px 12px;margin-top:10px;border-radius:0 6px 6px 0;font-size:13px;}
+                  .career-card{margin:14px 0;padding:14px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;}
+                  .badge{display:inline-block;padding:2px 8px;background:#f0eaf8;color:#9b72cf;border-radius:10px;font-size:10px;font-family:monospace;margin-left:6px;}
+                  .income{color:#c8a84b;font-size:12px;margin:4px 0 8px;font-weight:600;}
+                  .career-card ul{margin:6px 0;padding-left:18px;}
+                  .career-card li{font-size:12px;color:#555;margin-bottom:4px;}
+                  .history-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;}
+                  .history-table th{background:#f0ece4;padding:7px 10px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:.05em;}
+                  .history-table td{padding:6px 10px;border-bottom:1px solid #eee;}
+                  .closing-quote{text-align:center;padding:32px 24px;margin:40px 0;border-top:2px solid #e8e0d0;border-bottom:2px solid #e8e0d0;}
+                  .closing-quote p{font-size:20px;font-style:italic;color:#c8a84b;line-height:1.6;margin:0;}
+                  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #eee;text-align:center;font-size:11px;color:#aaa;font-family:monospace;}
+                  @media print{
+                    body{padding:16px;}
+                    .pillars,.strengths-risks{break-inside:avoid;}
+                    .roadmap-phase,.career-card,.sec{break-inside:avoid;}
+                  }
+                </style></head><body>
+
+                <!-- COVER -->
+                <div class="cover">
+                  <div class="tag" style="color:#c8a84b">DestinIQ · Personal Clarity Report</div>
                   <h1>${name}</h1>
-                  <p style="color:#888;margin:0">Personal Clarity Report · ${today}</p>
-                  <p style="font-size:28px;font-weight:bold;color:#c8a84b;margin:8px 0">Overall: ${data?.overall||0}/100</p>
-                  <div>${["Life","Wealth","Mindset","Relations"].map(k=>`<span class="score">${k}: ${scores[k.toLowerCase()]||scores.relations||0}</span>`).join("")}</div>
+                  <div class="subtitle">${country?country+" · ":""}<em>${today}</em></div>
+                  <div class="overall">${overall}</div>
+                  <div class="overall-label">Overall Score · /100</div>
                 </div>
-                ${data?.headline?`<div class="section"><div class="tag">Your Headline</div><p>${data.headline}</p></div>`:""}
-                ${data?.greeting?`<div class="section"><div class="tag">Personal Message</div><p>${data.greeting}</p></div>`:""}
-                ${data?.life?`<h2>Life</h2><p>${data.life}</p>`:""}
-                ${data?.wealth?`<h2>Wealth</h2><p>${data.wealth}</p>`:""}
-                ${data?.mindset?`<h2>Mindset</h2><p>${data.mindset}</p>`:""}
-                ${data?.relationships?`<h2>Relationships</h2><p>${data.relationships}</p>`:""}
-                ${data?.closing?`<div class="section" style="margin-top:32px"><div class="tag">Something to carry with you</div><p style="font-style:italic;font-size:18px">"${data.closing}"</p></div>`:""}
-                <div class="footer">Generated by DestinIQ · destiniq.vercel.app · ${today}</div>
+
+                <!-- PILLAR SCORES -->
+                <div class="tag" style="color:#888">Your Four Pillars</div>
+                <div class="pillars">
+                  ${pillarRow("Life",   scores.life||0,   data?.score_explanations?.life,    "#c8a84b")}
+                  ${pillarRow("Wealth", scores.wealth||0, data?.score_explanations?.wealth,  "#4ab8a0")}
+                  ${pillarRow("Mindset",scores.mindset||0,data?.score_explanations?.mindset, "#9b72cf")}
+                  ${pillarRow("Relations",scores.relations||0,data?.score_explanations?.relations,"#f87171")}
+                </div>
+
+                <!-- HEADLINE & GREETING -->
+                ${sec("Your Clarity Picture","What This All Means",data?.headline)}
+                ${sec("Personal Message","We Read Everything You Shared",data?.greeting,"#4ab8a0")}
+
+                <!-- DEEP PILLARS -->
+                ${data?.life       ?sec("Deep Dive","Life",    data.life   ):""}
+                ${data?.wealth     ?sec("Deep Dive","Wealth",  data.wealth ,"#4ab8a0"):""}
+                ${data?.mindset    ?sec("Deep Dive","Mindset", data.mindset,"#9b72cf"):""}
+                ${data?.relationships?sec("Deep Dive","Relationships",data.relationships,"#f87171"):""}
+
+                <!-- STRENGTHS & RISKS -->
+                ${(data?.strengths?.length||data?.risks?.length)?`
+                <div class="strengths-risks">
+                  ${data?.strengths?.length?`<div class="sr-box">
+                    <h4 style="color:#4ab8a0">What You Bring ✓</h4>
+                    ${data.strengths.map(s=>`<div class="sr-item"><span style="color:#4ab8a0">◎</span>${s}</div>`).join("")}
+                  </div>`:""}
+                  ${data?.risks?.length?`<div class="sr-box">
+                    <h4 style="color:#f87171">What to Watch Out For ◇</h4>
+                    ${data.risks.map(r=>`<div class="sr-item"><span style="color:#f87171">◇</span>${r}</div>`).join("")}
+                  </div>`:""}
+                </div>`:""}
+
+                <!-- REPORT SECTIONS -->
+                ${(data?.sections||[]).map(s=>sec("Your Report",s.title,s.content)).join("")}
+
+                <!-- ROADMAP -->
+                ${roadmapSection()}
+
+                <!-- CAREER PATHS -->
+                ${careerSection()}
+
+                <!-- SCORE HISTORY -->
+                ${scoreHistorySection()}
+
+                <!-- CLOSING -->
+                ${data?.closing?`<div class="closing-quote"><p>"${data.closing}"</p></div>`:""}
+
+                <div class="footer">
+                  Generated by DestinIQ · destiniq.vercel.app · ${today}
+                  <br/>This report is personal and confidential. Regenerate anytime as your situation changes.
+                </div>
                 </body></html>`;
+
                 const w=window.open("","_blank");
-                if(w){w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);}
-              }}>Download PDF</button>}
+                if(w){w.document.write(html);w.document.close();setTimeout(()=>w.print(),600);}
+              }}>📄 Download PDF</button>}
               {!isPaid&&<button className="btn btn-gold" onClick={onUnlock}>See the full picture</button>}
             </div>
           </div>
