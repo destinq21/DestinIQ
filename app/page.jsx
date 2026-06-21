@@ -5855,7 +5855,9 @@ EARNINGS FROM ONLINE WORK = USD only — add local equivalent in brackets e.g. "
   const todayPlatforms=platformSets[dayIndex];
 
   const prompts={
-    life_hacks:`Generate 7 REAL life hacks for ${name} living in ${country} earning ${income} with goal "${goals}".
+    life_hacks:`${currencyNote}
+
+Generate 7 REAL life hacks for ${name} living in ${country} earning ${income} with goal "${goals}".
 
 WHAT A REAL LIFE HACK IS:
 - A specific shortcut that saves real time or real money
@@ -5878,12 +5880,24 @@ CATEGORIES TO COVER (one hack per category):
 7. NETWORK: A specific place or method to meet better people in ${country}. Name real venues, groups, or events.
 
 Return ONLY a valid JSON array of 7 strings. Each string = 2-3 sentences. Start with the category in caps. No markdown. No code fences.`,
-    emotional_strength:`Write 4 emotional strength practices for ${name} facing: "${challenge}". Each must be specific not generic. Include WHEN, HOW, and WHY for their specific situation. Return ONLY a JSON array of 4 strings (each 2-3 sentences).`,
-    money_protection:`Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
-    online_income:`Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
-    zero_income_business:`Generate business ideas for ${name} in ${country} that need zero capital. Think about daily needs in ${country}: food, drinks, transport, mobile data, cleaning, laundry, hair, barbering, phone repair, clothing, event services. Also bars and food joints. ${currencyNote} Return ONLY JSON: {"idea":"Best zero-capital idea for ${country}","why_zero":"Why zero capital needed","day_one":"Exact Day 1 action in ${country}","first_revenue":"When and how much in local currency","scale":"How to grow to employ others","alternatives":["5 more zero-capital ideas for ${country} covering food/drinks, services, trading, digital, creative"]}`,
-    product_business:`Give 4 physical product business ideas for ${name} in ${country}. Focus on what people in ${country} buy daily or weekly. Include fashion, food/drinks, electronics accessories, and household items. ${currencyNote} Return ONLY JSON array: [{"product":"Product name","why":"Why this sells in ${country} — specific demand","startup_cost":"Cost in local currency","profit_margin":"Realistic margin percent","supplier_links":["https://www.alibaba.com","https://www.dhgate.com"]}]`,
-    real_estate_hack:`How can ${name} in ${country} earn from real estate with little money? Cover: property listing agent earning commission, short-let management, property finding service, rental arbitrage. Name real platforms in ${country}. ${currencyNote} Return ONLY JSON: {"method":"Best method for ${country}","how_it_works":"Step by step","platform":"Real platform or channel in ${country}","first_deal":"How to get first deal with specific steps and local currency amounts"}`,
+    emotional_strength:`${currencyNote}
+
+Write 4 emotional strength practices for ${name} facing: "${challenge}". Each must be specific not generic. Include WHEN, HOW, and WHY for their specific situation. Return ONLY a JSON array of 4 strings (each 2-3 sentences).`,
+    money_protection:`${currencyNote}
+
+Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
+    online_income:`${currencyNote}
+
+Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
+    zero_income_business:`${currencyNote}
+
+Generate business ideas for ${name} in ${country} that need zero capital. Think about daily needs in ${country}: food, drinks, transport, mobile data, cleaning, laundry, hair, barbering, phone repair, clothing, event services. Also bars and food joints. ${currencyNote} Return ONLY JSON: {"idea":"Best zero-capital idea for ${country}","why_zero":"Why zero capital needed","day_one":"Exact Day 1 action in ${country}","first_revenue":"When and how much in local currency","scale":"How to grow to employ others","alternatives":["5 more zero-capital ideas for ${country} covering food/drinks, services, trading, digital, creative"]}`,
+    product_business:`${currencyNote}
+
+Give 4 physical product business ideas for ${name} in ${country}. Focus on what people in ${country} buy daily or weekly. Include fashion, food/drinks, electronics accessories, and household items. ${currencyNote} Return ONLY JSON array: [{"product":"Product name","why":"Why this sells in ${country} — specific demand","startup_cost":"Cost in local currency","profit_margin":"Realistic margin percent","supplier_links":["https://www.alibaba.com","https://www.dhgate.com"]}]`,
+    real_estate_hack:`${currencyNote}
+
+How can ${name} in ${country} earn from real estate with little money? Cover: property listing agent earning commission, short-let management, property finding service, rental arbitrage. Name real platforms in ${country}. ${currencyNote} Return ONLY JSON: {"method":"Best method for ${country}","how_it_works":"Step by step","platform":"Real platform or channel in ${country}","first_deal":"How to get first deal with specific steps and local currency amounts"}`,
   };
 
   const sys="Return ONLY valid JSON. No markdown. No code fences. No explanation. Start with { or [.";
@@ -5946,7 +5960,6 @@ function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     const e=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
     setHacks(h);
     setEmotional(e);
-    // Auto-generate if no data from saved report
     if(!h.length && formData) setTimeout(()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr),300);
     if(!e.length && formData) setTimeout(()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr),1800);
   },[]);
@@ -6349,7 +6362,6 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     const mp0=data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{};
     const re0=data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{};
     setMp(mp0); setRe(re0);
-    // Auto-generate if no saved data
     if(!mp0.rule&&formData) setTimeout(()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE),300);
     if(!re0.method&&formData) setTimeout(()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE),2500);
   },[]);
@@ -8653,6 +8665,8 @@ function deriveStrengthsRisks(data){
 // Triggers on: 3, 7, 10, 14, 21, 30, 50, 75, 100, 150, 200, 365 days
 // ═══════════════════════════════════════════════════════════════════════════════
 const STREAK_MILESTONES = {
+  1:   { emoji:"⚡",    title:"First Check-in!",  msg:"Day one. Most people never even start. You just did something they won't.",   color:"var(--teal)"    },
+  2:   { emoji:"✌️",   title:"2 Days Running!",  msg:"Back again. Two days in a row already puts you ahead of most people.",        color:"var(--teal)"    },
   3:   { emoji:"🔥",    title:"3-Day Streak!",    msg:"You showed up 3 days in a row. That's the beginning of something real.",      color:"var(--gold)"    },
   7:   { emoji:"⚡",    title:"7-Day Streak!",    msg:"One full week. Most people quit before this. You didn't.",                    color:"var(--teal)"    },
   10:  { emoji:"🏆",    title:"10-Day Streak!",   msg:"10 days of showing up. The discipline is becoming part of who you are.",     color:"var(--gold)"    },
@@ -8778,28 +8792,27 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
   const [closingLine,setClosingLine]=useState(data.closing||"");
   const [refreshingClosing,setRefreshingClosing]=useState(false);
 
-  // Auto-fix if closing is empty or contains AI confusion text
+  // Auto-fill closing — runs when formData loads so placeholder values never get sent
   useEffect(()=>{
-    const bad = ["i don't have","i need more","no context","no posts","no information"];
+    const bad = ["i don't have","i need more","no context","no posts","no information","placeholder","there, their"];
     const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
-    if(isBad && formData?.name) {
-      setTimeout(()=>refreshClosing(), 500);
-    }
+    // Require ALL key fields to be real values before calling AI
+    const hasRealData = formData?.name && formData?.country && formData?.goals && formData?.challenge;
+    if(isBad && hasRealData) setTimeout(()=>refreshClosing(), 800);
   // eslint-disable-next-line
-  },[]);
+  },[formData?.name]);  // re-run when formData loads
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
 
-  // Auto-generate fresh insight if missing, generic, or from a previous day
+  // Auto-fill daily insight if missing — wait for formData to load from Supabase
   useEffect(()=>{
     const saved = data.daily_insight||"";
-    const todayLabel = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
-    const isOld = saved && !saved.includes(todayLabel.split(",")[0]); // check if today's day name is in insight
     const isGeneric = !saved || saved.includes("I need more information") || saved.length < 40;
-    if((isGeneric || isOld) && formData?.challenge && formData?.goals && userId){
-      refreshDailyInsight();
+    const hasRealData = formData?.country && formData?.challenge && formData?.goals && userId;
+    if(isGeneric && hasRealData){
+      setTimeout(()=>refreshDailyInsight(), 800);
     }
   // eslint-disable-next-line
-  },[]);
+  },[formData?.name]);  // re-run when formData loads
 
   const refreshDailyInsight=async()=>{
     if(refreshingInsight) return;
@@ -8844,12 +8857,14 @@ Do NOT use generic motivational language. Do NOT ask for more information — wo
     if(refreshingClosing) return;
     setRefreshingClosing(true);
     try{
-      const name    = sanitize(formData?.name)    ||"there";
-      const country = sanitize(formData?.country) ||"their country";
-      const goal    = sanitize(formData?.goals)   ||"their goal";
-      const challenge=sanitize(formData?.challenge)||"their challenge";
-      const skill   = sanitize(formData?.skills)  ||"their skills";
-      const age     = formData?.age||"";
+      // Guard — if real profile data isn't loaded yet, don't call the AI
+    const name     = sanitize(formData?.name)    ||"";
+    const country  = sanitize(formData?.country) ||"";
+    const goal     = sanitize(formData?.goals)   ||"";
+    const challenge= sanitize(formData?.challenge)||"";
+    const skill    = sanitize(formData?.skills)  ||"";
+    const age      = formData?.age||"";
+    if(!name||!country||!goal){ setRefreshingClosing(false); return; } // wait for real data
 
       const prompt=`Write ONE powerful sentence for ${name}${age?" (age "+age+")":""} from ${country}.
 Goal: "${goal}"
@@ -9094,12 +9109,7 @@ Rules:
                               <span>{s}</span>
                             </div>
                           ))
-                        : <div>
-                            <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Re-generate your report to see your strengths.</p>
-                            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
-                              Update profile & re-generate →
-                            </button>
-                          </div>
+                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Re-generate your report to see your strengths.</p>
                       }
                     </div>
                     <div className="card card-sm">
@@ -9111,12 +9121,7 @@ Rules:
                               <span>{r}</span>
                             </div>
                           ))
-                        : <div>
-                            <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic",marginBottom:10}}>Re-generate your report to see your watch-outs.</p>
-                            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}>
-                              Update profile & re-generate →
-                            </button>
-                          </div>
+                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Re-generate your report to see your watch-outs.</p>
                       }
                     </div>
                   </div>
