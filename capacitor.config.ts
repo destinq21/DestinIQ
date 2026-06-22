@@ -1,12 +1,13 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.destiniq.app',
   appName: 'DestinIQ',
-  webDir: 'public',
+  webDir: 'www',
   server: {
     url: 'https://destiniq.vercel.app',
     cleartext: true,
+    androidScheme: 'https',
   },
   plugins: {
     App: {
@@ -14,3 +15,5 @@ const config: CapacitorConfig = {
     },
   },
 };
+
+export default config;
