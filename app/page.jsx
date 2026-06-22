@@ -10712,27 +10712,7 @@ async function triggerWelcomeEmail(user){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// OFFLINE BANNER
-// Shows a banner when the user loses internet connection.
-// ═══════════════════════════════════════════════════════════════════════════════
-function OfflineBanner(){
-  const [offline,setOffline]=useState(false);
-  useEffect(()=>{
-    const on=()=>setOffline(false);
-    const off=()=>setOffline(true);
-    window.addEventListener("online",on);
-    window.addEventListener("offline",off);
-    return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
-  },[]);
-  if(!offline) return null;
-  return(
-    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"rgba(196,100,90,0.95)",backdropFilter:"blur(8px)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-      <span style={{fontSize:16}}>📡</span>
-      <span style={{fontSize:13,color:"#fff",fontWeight:500}}>You're offline — check your connection. Your data is saved.</span>
-    </div>
-  );
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOADING SKELETON
