@@ -294,7 +294,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -704,6 +704,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 /* Mobile: ≤640px */
 @media(max-width:640px){
   .cx,.cx-sm,.cx-md{padding:0 14px!important;}
+  body{overflow-x:hidden!important;max-width:100vw!important;}
   .nav{padding:0 14px!important;}
   .card{padding:14px!important;border-radius:14px!important;}
   .fu{padding:0 0 40px!important;}
@@ -752,7 +753,9 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 }
 /* Very small screens: ≤360px */
 @media(max-width:360px){
-  .cx,.cx-sm,.cx-md{padding:0 10px!important;}
+  .cx,.cx-sm,.cx-md{padding:0 16px!important;}
+  body,html{overflow-x:hidden!important;width:100%!important;}
+  p,h1,h2,h3{word-wrap:break-word!important;overflow-wrap:break-word!important;}
   .d1{font-size:22px!important;}
   .tab{font-size:8.5px!important;padding:5px 6px!important;min-width:44px!important;}
   .card{padding:10px!important;}
@@ -3405,7 +3408,7 @@ function Landing({onStart,ipLocation}){
               )}
             </div>
             <h1 className="d1 fu1" style={{marginBottom:28}}>The system<br/>that knows<br/><span className="em">your next move</span></h1>
-            <p className="body-lg fu2" style={{marginBottom:36,maxWidth:420}}>Most people spend years trying things in the wrong order. DestinIQ helps you finally see your situation clearly — where you are, what's actually blocking you, and the exact sequence of moves that changes things.</p>
+            <p className="body-lg fu2" style={{marginBottom:36,maxWidth:420,wordWrap:"break-word",overflowWrap:"break-word"}}>Most people spend years trying things in the wrong order. DestinIQ helps you finally see your situation clearly — where you are, what's actually blocking you, and the exact sequence of moves that changes things.</p>
             <div className="fu3" style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
               <button className="btn btn-gold btn-lg" onClick={onStart}>Start — it's free</button>
               <span className="small">Free to start. Takes about 60 seconds.</span>
