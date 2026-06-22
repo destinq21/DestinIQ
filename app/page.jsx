@@ -10542,42 +10542,7 @@ Discover your own clarity score at destiniq.vercel.app`;
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4. REFERRAL SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════════
-function ReferralWidget({user,isPaid}){
-  const [copied,setCopied]=useState(false);
-  const [referrals,setReferrals]=useState(0);
-  const refLink = `https://destiniq.vercel.app?ref=${user?.id||""}`;
 
-  useEffect(()=>{
-    if(!user?.id) return;
-    supabase.from("referrals").select("id",{count:"exact"}).eq("referrer_id",user.id).then(({count})=>setReferrals(count||0));
-  },[user?.id]);
-
-  const copy=()=>{ navigator.clipboard.writeText(refLink); setCopied(true); setTimeout(()=>setCopied(false),2000); };
-
-  return(
-    <div className="card" style={{marginBottom:24}}>
-      <div style={{fontSize:11,color:"var(--gold)",fontWeight:600,letterSpacing:".06em",marginBottom:4,fontFamily:"var(--f-mono)"}}>INVITE A FRIEND</div>
-      <div style={{fontSize:18,fontWeight:700,color:"var(--cream)",marginBottom:6}}>Give 1 month free. Get 1 month free.</div>
-      <p style={{fontSize:13,color:"var(--cream-50)",marginBottom:16,lineHeight:1.6}}>Share your link. When a friend signs up and subscribes, you both get a free month added.</p>
-
-      <div style={{display:"flex",gap:8,marginBottom:14}}>
-        <div style={{flex:1,background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",fontSize:12,color:"var(--cream-40)",fontFamily:"var(--f-mono)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{refLink}</div>
-        <button onClick={copy} style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"11px 18px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>{copied?"✓":"Copy"}</button>
-      </div>
-
-      <div style={{display:"flex",gap:12}}>
-        <div style={{flex:1,textAlign:"center",padding:"12px",background:"var(--midnight)",borderRadius:10}}>
-          <div style={{fontSize:24,fontWeight:800,color:"var(--gold)"}}>{referrals}</div>
-          <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>FRIENDS REFERRED</div>
-        </div>
-        <div style={{flex:1,textAlign:"center",padding:"12px",background:"var(--midnight)",borderRadius:10}}>
-          <div style={{fontSize:24,fontWeight:800,color:"var(--teal)"}}>{referrals}</div>
-          <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>FREE MONTHS EARNED</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 5. ADMIN DASHBOARD
