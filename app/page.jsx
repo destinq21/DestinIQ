@@ -301,7 +301,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -3806,6 +3806,123 @@ function Landing({onStart,ipLocation}){
   );
 }
 
+
+// ── COUNTRIES with currency codes for onboarding ─────────────────────────────
+const COUNTRIES_LIST = [
+  {name:"Afghanistan",currency:"AFN",symbol:"؋"},
+  {name:"Albania",currency:"ALL",symbol:"L"},
+  {name:"Algeria",currency:"DZD",symbol:"DZD"},
+  {name:"Angola",currency:"AOA",symbol:"Kz"},
+  {name:"Argentina",currency:"ARS",symbol:"$"},
+  {name:"Australia",currency:"AUD",symbol:"A$"},
+  {name:"Austria",currency:"EUR",symbol:"€"},
+  {name:"Bangladesh",currency:"BDT",symbol:"৳"},
+  {name:"Belgium",currency:"EUR",symbol:"€"},
+  {name:"Benin",currency:"XOF",symbol:"CFA"},
+  {name:"Bolivia",currency:"BOB",symbol:"Bs"},
+  {name:"Brazil",currency:"BRL",symbol:"R$"},
+  {name:"Burkina Faso",currency:"XOF",symbol:"CFA"},
+  {name:"Cameroon",currency:"XAF",symbol:"FCFA"},
+  {name:"Canada",currency:"CAD",symbol:"C$"},
+  {name:"Chile",currency:"CLP",symbol:"$"},
+  {name:"China",currency:"CNY",symbol:"¥"},
+  {name:"Colombia",currency:"COP",symbol:"$"},
+  {name:"Congo (DRC)",currency:"CDF",symbol:"FC"},
+  {name:"Côte d'Ivoire",currency:"XOF",symbol:"CFA"},
+  {name:"Denmark",currency:"DKK",symbol:"kr"},
+  {name:"Ecuador",currency:"USD",symbol:"$"},
+  {name:"Egypt",currency:"EGP",symbol:"EE"},
+  {name:"Ethiopia",currency:"ETB",symbol:"Br"},
+  {name:"France",currency:"EUR",symbol:"€"},
+  {name:"Gambia",currency:"GMD",symbol:"D"},
+  {name:"Germany",currency:"EUR",symbol:"€"},
+  {name:"Ghana",currency:"GHS",symbol:"GH₵"},
+  {name:"Guinea",currency:"GNF",symbol:"FG"},
+  {name:"India",currency:"INR",symbol:"₹"},
+  {name:"Indonesia",currency:"IDR",symbol:"Rp"},
+  {name:"Italy",currency:"EUR",symbol:"€"},
+  {name:"Japan",currency:"JPY",symbol:"¥"},
+  {name:"Jordan",currency:"JOD",symbol:"JD"},
+  {name:"Kenya",currency:"KES",symbol:"KSh"},
+  {name:"Kuwait",currency:"KWD",symbol:"KD"},
+  {name:"Lebanon",currency:"LBP",symbol:"LL"},
+  {name:"Liberia",currency:"LRD",symbol:"L$"},
+  {name:"Libya",currency:"LYD",symbol:"LD"},
+  {name:"Madagascar",currency:"MGA",symbol:"Ar"},
+  {name:"Malawi",currency:"MWK",symbol:"MK"},
+  {name:"Malaysia",currency:"MYR",symbol:"RM"},
+  {name:"Mali",currency:"XOF",symbol:"CFA"},
+  {name:"Mauritius",currency:"MUR",symbol:"Rs"},
+  {name:"Mexico",currency:"MXN",symbol:"MX$"},
+  {name:"Morocco",currency:"MAD",symbol:"MAD"},
+  {name:"Mozambique",currency:"MZN",symbol:"MT"},
+  {name:"Myanmar",currency:"MMK",symbol:"K"},
+  {name:"Namibia",currency:"NAD",symbol:"N$"},
+  {name:"Netherlands",currency:"EUR",symbol:"€"},
+  {name:"New Zealand",currency:"NZD",symbol:"NZ$"},
+  {name:"Niger",currency:"XOF",symbol:"CFA"},
+  {name:"Nigeria",currency:"NGN",symbol:"₦"},
+  {name:"Norway",currency:"NOK",symbol:"kr"},
+  {name:"Pakistan",currency:"PKR",symbol:"₨"},
+  {name:"Peru",currency:"PEN",symbol:"S/"},
+  {name:"Philippines",currency:"PHP",symbol:"₱"},
+  {name:"Poland",currency:"PLN",symbol:"zł"},
+  {name:"Portugal",currency:"EUR",symbol:"€"},
+  {name:"Qatar",currency:"QAR",symbol:"QR"},
+  {name:"Romania",currency:"RON",symbol:"lei"},
+  {name:"Rwanda",currency:"RWF",symbol:"RF"},
+  {name:"Saudi Arabia",currency:"SAR",symbol:"SR"},
+  {name:"Senegal",currency:"XOF",symbol:"CFA"},
+  {name:"Sierra Leone",currency:"SLL",symbol:"Le"},
+  {name:"Singapore",currency:"SGD",symbol:"S$"},
+  {name:"Somalia",currency:"SOS",symbol:"Sh"},
+  {name:"South Africa",currency:"ZAR",symbol:"R"},
+  {name:"South Korea",currency:"KRW",symbol:"₩"},
+  {name:"Spain",currency:"EUR",symbol:"€"},
+  {name:"Sri Lanka",currency:"LKR",symbol:"Rs"},
+  {name:"Sudan",currency:"SDG",symbol:"SDG"},
+  {name:"Sweden",currency:"SEK",symbol:"kr"},
+  {name:"Switzerland",currency:"CHF",symbol:"CHF"},
+  {name:"Tanzania",currency:"TZS",symbol:"TSh"},
+  {name:"Thailand",currency:"THB",symbol:"฿"},
+  {name:"Togo",currency:"XOF",symbol:"CFA"},
+  {name:"Tunisia",currency:"TND",symbol:"DT"},
+  {name:"Turkey",currency:"TRY",symbol:"₺"},
+  {name:"Uganda",currency:"UGX",symbol:"USh"},
+  {name:"Ukraine",currency:"UAH",symbol:"₴"},
+  {name:"United Arab Emirates",currency:"AED",symbol:"AED"},
+  {name:"United Kingdom",currency:"GBP",symbol:"£"},
+  {name:"United States",currency:"USD",symbol:"$"},
+  {name:"Venezuela",currency:"VES",symbol:"Bs"},
+  {name:"Vietnam",currency:"VND",symbol:"₫"},
+  {name:"Zambia",currency:"ZMW",symbol:"ZK"},
+  {name:"Zimbabwe",currency:"ZWL",symbol:"Z$"},
+];
+
+// Get currency info for a country name
+function getCurrencyForCountry(countryName){
+  const found = COUNTRIES_LIST.find(c=>c.name.toLowerCase()===countryName?.toLowerCase());
+  return found || {currency:"USD",symbol:"$"};
+}
+
+// Get income ranges in local currency
+function getIncomeRanges(currencySymbol){
+  const s = currencySymbol||"$";
+  if(s==="GH₵") return ["Under GH₵3,000","GH₵3,000–GH₵8,000","GH₵8,000–GH₵25,000","GH₵25,000–GH₵60,000","GH₵60,000+"];
+  if(s==="₦")   return ["Under ₦150,000","₦150,000–₦500,000","₦500,000–₦1,500,000","₦1,500,000–₦5,000,000","₦5,000,000+"];
+  if(s==="KSh")  return ["Under KSh15,000","KSh15,000–KSh50,000","KSh50,000–KSh150,000","KSh150,000–KSh400,000","KSh400,000+"];
+  if(s==="R")    return ["Under R5,000","R5,000–R15,000","R15,000–R40,000","R40,000–R100,000","R100,000+"];
+  if(s==="KD")   return ["Under KD200","KD200–KD600","KD600–KD1,500","KD1,500–KD4,000","KD4,000+"];
+  if(s==="AED")  return ["Under AED2,000","AED2,000–AED6,000","AED6,000–AED15,000","AED15,000–AED40,000","AED40,000+"];
+  if(s==="£")    return ["Under £800","£800–£2,500","£2,500–£6,000","£6,000–£15,000","£15,000+"];
+  if(s==="€")    return ["Under €800","€800–€2,500","€2,500–€6,000","€6,000–€15,000","€15,000+"];
+  if(s==="₹")    return ["Under ₹20,000","₹20,000–₹60,000","₹60,000–₹150,000","₹150,000–₹400,000","₹400,000+"];
+  if(s==="UGX"||(s==="USh"))  return ["Under USh500,000","USh500,000–USh2,000,000","USh2,000,000–USh5,000,000","USh5,000,000–USh15,000,000","USh15,000,000+"];
+  if(s==="TSh")  return ["Under TSh200,000","TSh200,000–TSh800,000","TSh800,000–TSh2,000,000","TSh2,000,000–TSh5,000,000","TSh5,000,000+"];
+  // Default USD
+  return ["Under $500","$500–$1,500","$1,500–$4,000","$4,000–$10,000","$10,000+"];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTAKE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3949,12 +4066,55 @@ function Intake({onSubmit, savedFormData}){
             </div>
           )}
 
-          {/* STEP 2 — Age, Country, Gender */}
-          {step===2&&(
+          {/* STEP 2 — Age, Country, Currency, Gender */}
+          {step===2&&(()=>{
+            const [countrySearch,setCountrySearch]=useState(f.country||"");
+            const [showDropdown,setShowDropdown]=useState(false);
+            const filtered=COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(countrySearch.toLowerCase())).slice(0,8);
+            const selectedCurrency=getCurrencyForCountry(f.country);
+            const incomeRanges=getIncomeRanges(selectedCurrency.symbol);
+            return(
             <div>
               <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>{greeting.toUpperCase()}, {f.name.toUpperCase()}!</div>
-              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>Tell us a little about yourself.</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>Where you are right now shapes where you can go.</p>
+              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>Tell us about yourself.</h2>
+              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>Where you are shapes everything we build for you.</p>
+
+              {/* Country — searchable dropdown */}
+              <div style={{marginBottom:14,position:"relative"}}>
+                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>COUNTRY</label>
+                <div style={{position:"relative"}}>
+                  <input
+                    style={{width:"100%",background:"var(--midnight)",border:`1px solid ${f.country?"var(--gold)":"var(--cream-15)"}`,borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:15,outline:"none",boxSizing:"border-box",paddingRight:36}}
+                    placeholder="Search your country…"
+                    value={countrySearch}
+                    onChange={e=>{setCountrySearch(e.target.value);setShowDropdown(true);if(!e.target.value){set("country","");}}}
+                    onFocus={()=>setShowDropdown(true)}
+                    onBlur={()=>setTimeout(()=>setShowDropdown(false),200)}
+                  />
+                  {f.country&&<span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:14}}>
+                    {selectedCurrency.symbol} <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{selectedCurrency.currency}</span>
+                  </span>}
+                </div>
+                {showDropdown&&countrySearch&&filtered.length>0&&(
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:12,zIndex:100,maxHeight:220,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}>
+                    {filtered.map(c=>(
+                      <div key={c.name} onMouseDown={()=>{
+                        set("country",c.name);
+                        set("currency",c.currency);
+                        set("currencySymbol",c.symbol);
+                        setCountrySearch(c.name);
+                        setShowDropdown(false);
+                      }} style={{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(210,175,90,0.08)"}
+                      onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                        <span style={{fontSize:14,color:"var(--cream)"}}>{c.name}</span>
+                        <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{c.symbol} {c.currency}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
                 <div>
                   <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>AGE</label>
@@ -3967,10 +4127,7 @@ function Intake({onSubmit, savedFormData}){
                   </select>
                 </div>
               </div>
-              <div style={{marginBottom:14}}>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>COUNTRY</label>
-                <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:15,outline:"none",boxSizing:"border-box"}} placeholder="e.g. Ghana" value={f.country} onChange={e=>set("country",e.target.value)} maxLength={60}/>
-              </div>
+
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
                 <div>
                   <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>RELATIONSHIP</label>
@@ -3979,18 +4136,23 @@ function Intake({onSubmit, savedFormData}){
                   </select>
                 </div>
                 <div>
-                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>MONTHLY INCOME</label>
-                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.income?"var(--cream)":"var(--cream-30)",fontSize:14,outline:"none",boxSizing:"border-box"}} value={f.income} onChange={e=>set("income",e.target.value)}>
-                    <option value="">Select…</option><option>Under $500</option><option>$500–$1,500</option><option>$1,500–$4,000</option><option>$4,000–$10,000</option><option>$10,000+</option>
+                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>
+                    MONTHLY INCOME {f.country&&<span style={{color:"var(--gold)",fontWeight:400}}>({selectedCurrency.symbol})</span>}
+                  </label>
+                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.income?"var(--cream)":"var(--cream-30)",fontSize:13,outline:"none",boxSizing:"border-box"}} value={f.income} onChange={e=>set("income",e.target.value)}>
+                    <option value="">Select…</option>
+                    {incomeRanges.map(r=><option key={r}>{r}</option>)}
                   </select>
                 </div>
               </div>
+
               <div style={{marginTop:14}}>
                 <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>YOUR SKILLS</label>
                 <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box"}} placeholder="e.g. graphic design, driving, cooking, coding, sales…" value={f.skills} onChange={e=>set("skills",e.target.value)} maxLength={200}/>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* STEP 3 — Current situation */}
           {step===3&&(
@@ -8756,50 +8918,58 @@ function asReportText(val){
 // derive them from the existing report text.
 
 function deriveStrengthsRisks(data){
-  // ── Already have proper arrays ──
+  // ── Already have proper arrays from new reports ──
   if(data?.strengths?.length>0 && data?.risks?.length>0){
     return {strengths:data.strengths, risks:data.risks};
   }
 
-  // ── Extract from any available report text ──
-  // Try sections first, then fall back to life/mindset/greeting paragraphs
-  const s1 = asReportText(data?.sections?.[1]?.content); // "What You Have"
-  const s0 = asReportText(data?.sections?.[0]?.content); // "The Real Picture"
-  const s2 = asReportText(data?.sections?.[2]?.content); // "Next 30 Days"
-  const lifeText    = asReportText(data?.life)||"";
-  const mindsetText = asReportText(data?.mindset)||"";
-  const wealthText  = asReportText(data?.wealth)||"";
-  const greetText   = asReportText(data?.greeting)||"";
-
-  // Split any text into bite-sized chunks (split at ". " or "," for long sentences)
-  const toItems = (text, max=3) => {
-    if(!text||text.length<10) return [];
-    // Try sentence split first
-    let parts = text.split(/\.\s+/).map(s=>s.trim()).filter(s=>s.length>15);
-    if(parts.length<2){
-      // Try comma split
-      parts = text.split(/,\s+/).map(s=>s.trim()).filter(s=>s.length>15);
-    }
-    // Cap length so bullets aren't too long
-    return parts.slice(0,max).map(s=>{
-      s = s.endsWith(".")||s.endsWith("!")||s.endsWith("?") ? s : s+".";
-      return s.length>200 ? s.slice(0,200)+"…" : s;
-    });
+  // ── Get all available text from any report format ──
+  const getText = (val) => {
+    if(!val) return "";
+    if(typeof val === "string") return val;
+    if(val?.content) return String(val.content);
+    if(Array.isArray(val)) return val.map(v=>typeof v==="string"?v:v?.content||"").join(" ");
+    return String(val);
   };
 
-  // Strengths: use s1 (What You Have), fall back to life, then greeting
-  let strengths = toItems(s1,3);
-  if(strengths.length<1) strengths = toItems(lifeText,3);
-  if(strengths.length<1) strengths = toItems(greetText,3);
-  if(strengths.length<1) strengths = toItems(s0,3);
+  // Collect all text sources
+  const sources = {
+    s0: getText(data?.sections?.[0]?.content||data?.sections?.[0]),
+    s1: getText(data?.sections?.[1]?.content||data?.sections?.[1]),
+    s2: getText(data?.sections?.[2]?.content||data?.sections?.[2]),
+    life: getText(data?.life),
+    wealth: getText(data?.wealth),
+    mindset: getText(data?.mindset),
+    relations: getText(data?.relationships),
+    greeting: getText(data?.greeting),
+  };
 
-  // Risks: use mindset, fall back to wealth, then s0
-  const warnWords = ["pattern","habit","trap","avoid","stuck","stop","careful","watch","miss","risk","danger","tend","block","fear","procrastinate","distract","excuse","comfort zone","unless","without","but"];
-  const mindParts = toItems(mindsetText,6);
-  let risks = mindParts.filter(s=>warnWords.some(w=>s.toLowerCase().includes(w))).slice(0,3);
-  if(risks.length<2) risks = mindParts.slice(-3);
-  if(risks.length<1) risks = toItems(wealthText,3);
-  if(risks.length<1) risks = toItems(s0,3);
+  // Simple chunker — split long text into 1-2 sentence pieces
+  const chunk = (text, max=3) => {
+    if(!text || text.trim().length < 20) return [];
+    // Split by period+space or newline
+    const raw = text.split(/(?<=\.)\s+|\r?\n+/).map(s=>s.trim()).filter(s=>s.length>20);
+    if(raw.length >= 2) return raw.slice(0,max).map(s=>s.length>220?s.slice(0,220)+"…":s);
+    // If no good splits, just truncate the whole thing into 2 chunks
+    const mid = Math.floor(text.length/2);
+    const split = text.indexOf('. ', mid-50);
+    if(split>0) return [text.slice(0,split+1).trim(), text.slice(split+2).trim()].filter(s=>s.length>20).slice(0,max);
+    return [text.slice(0,200).trim()+"…"].filter(s=>s.length>20);
+  };
+
+  // Strengths — "What You Have" section is the best source
+  let strengths = chunk(sources.s1, 3);
+  if(strengths.length<1) strengths = chunk(sources.life, 3);
+  if(strengths.length<1) strengths = chunk(sources.greeting, 3);
+  if(strengths.length<1) strengths = chunk(sources.s0, 3);
+
+  // Risks — mindset/wealth sections
+  const riskText = sources.mindset || sources.wealth || sources.s0;
+  const riskChunks = chunk(riskText, 6);
+  const warnWords = ["avoid","stuck","stop","watch","miss","risk","fear","distract","unless","but","however","challenge","careful","pattern","habit"];
+  let risks = riskChunks.filter(s=>warnWords.some(w=>s.toLowerCase().includes(w))).slice(0,3);
+  if(risks.length<2) risks = riskChunks.slice(-3).filter(s=>s.length>20);
+  if(risks.length<1) risks = chunk(riskText, 3);
 
   return {
     strengths: strengths.slice(0,3),
@@ -8941,14 +9111,14 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
   const [closingLine,setClosingLine]=useState(data.closing||"");
   const [refreshingClosing,setRefreshingClosing]=useState(false);
 
-  // Auto-fill closing — runs when formData loads. Needs name + country minimum.
+  // Auto-fill closing — runs when formData loads
   useEffect(()=>{
-    if(!formData?.name||!formData?.country) return; // not loaded yet
-    const bad = ["i don't have","i need more","no context","no posts","no information","placeholder","there, their","click"];
-    const isBad = !closingLine || closingLine.length < 15 || bad.some(p=>closingLine.toLowerCase().includes(p));
-    if(isBad) setTimeout(()=>refreshClosing(), 1000);
+    if(!formData?.name) return; // not loaded yet
+    const bad = ["i don't have","i need more","no context","no posts","generating","click","placeholder","there, their"];
+    const isBad = !closingLine || closingLine.length < 10 || bad.some(p=>closingLine.toLowerCase().includes(p));
+    if(isBad) setTimeout(()=>refreshClosing(), 1200);
   // eslint-disable-next-line
-  },[formData?.name, formData?.country]);
+  },[formData?.name]);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
 
   // Auto-fill daily insight if missing — wait for formData to load from Supabase
@@ -10011,7 +10181,38 @@ function EditProfileModal({formData, userId, onSave, onClose}){
             <label style={{display:"block",fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-40)",letterSpacing:".1em",marginBottom:6}}>
               {field.label.toUpperCase()}
             </label>
-            {field.type==="textarea"
+            {field.key==="country"
+              ? (()=>{
+                  const [csearch,setCsearch]=useState(f.country||"");
+                  const [showDrop,setShowDrop]=useState(false);
+                  const filt=COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(csearch.toLowerCase())).slice(0,6);
+                  return(
+                    <div style={{position:"relative"}}>
+                      <input
+                        value={csearch}
+                        onChange={e=>{setCsearch(e.target.value);setShowDrop(true);if(!e.target.value)upd("country","");}}
+                        onFocus={()=>setShowDrop(true)}
+                        onBlur={()=>setTimeout(()=>setShowDrop(false),200)}
+                        placeholder="Search country…"
+                        style={{width:"100%",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:10,padding:"10px 12px",color:"var(--cream)",fontSize:13,boxSizing:"border-box"}}
+                      />
+                      {showDrop&&csearch&&filt.length>0&&(
+                        <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:10,zIndex:200,maxHeight:180,overflowY:"auto",marginTop:2}}>
+                          {filt.map(c=>(
+                            <div key={c.name} onMouseDown={()=>{upd("country",c.name);setCsearch(c.name);setShowDrop(false);}}
+                              style={{padding:"9px 12px",cursor:"pointer",fontSize:13,color:"var(--cream)",display:"flex",justifyContent:"space-between"}}
+                              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}
+                              onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                              <span>{c.name}</span>
+                              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{c.symbol}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              : field.type==="textarea"
               ? <textarea
                   value={f[field.key]} onChange={e=>upd(field.key,e.target.value)}
                   placeholder={field.ph} rows={2}
