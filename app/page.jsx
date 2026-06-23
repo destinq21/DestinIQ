@@ -182,13 +182,7 @@ class ErrorBoundary extends React.Component {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
-// ═══════════════════════════════════════════════════════════════════════════════
-// Load Capacitor Browser for in-app OAuth on mobile
-if(typeof window !== "undefined"){
-  import("@capacitor/browser").then(m=>{
-    window.CapacitorBrowser = m.Browser;
-  }).catch(()=>{});
-}
+// Capacitor plugins accessed via window.Capacitor.Plugins (no imports needed)
 
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
@@ -490,7 +484,8 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
   const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
   if(isNative){
     try{
-      const { LocalNotifications } = await import("@capacitor/local-notifications");
+      const LocalNotifications = window?.Capacitor?.Plugins?.LocalNotifications;
+      if(!LocalNotifications) throw new Error("LocalNotifications not available");
       const perm = await LocalNotifications.requestPermissions();
       if(perm.display !== "granted"){
         console.warn("Notification permission denied");
@@ -4639,12 +4634,18 @@ function AuthScreen({onAuth, onBack}){
         const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
         if(isNative && window?.CapacitorBrowser){
           // Use in-app browser — stays inside the app, no Chrome
-          const {Browser} = await import("@capacitor/browser");
-          await Browser.open({
-            url: data.url,
-            presentationStyle: "popover",  // shows as sheet, easy to dismiss
-            toolbarColor: "#0a0a0f",
-          });
+          // Use Capacitor Browser via global plugin — no import needed
+          const CapBrowser = window?.Capacitor?.Plugins?.Browser;
+          if(CapBrowser){
+            await CapBrowser.open({
+              url: data.url,
+              presentationStyle: "popover",
+              toolbarColor: "#0a0a0f",
+            });
+          } else {
+            // Fallback — open in system browser
+            window.open(data.url, "_blank");
+          }
         } else {
           // Web — normal redirect
           window.location.href = data.url;
@@ -11380,31 +11381,29 @@ export default function DestinIQ(){
   };
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
-  // After Google sign-in, Android fires appUrlOpen with com.destiniq.app://#access_token=...
-  // We extract the tokens and set the Supabase session — browser closes, user lands in app
+  // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
   useEffect(()=>{
-    const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
+    if(typeof window==="undefined") return;
+    const isNative = window?.Capacitor?.isNativePlatform?.();
     if(!isNative) return;
+    // Access Capacitor plugins via global (no import needed — avoids build errors)
+    const CapApp = window?.Capacitor?.Plugins?.App;
+    if(!CapApp) return;
     let listener = null;
-    import("@capacitor/app").then(({App})=>{
-      App.addListener("appUrlOpen",async({url})=>{
-        if(!url) return;
-        // Tokens are in the URL hash: com.destiniq.app://#access_token=XXX&refresh_token=YYY
-        const hash = url.includes("#") ? url.split("#")[1] : url.split("?")[1]||"";
-        const p = new URLSearchParams(hash);
-        const access_token  = p.get("access_token");
-        const refresh_token = p.get("refresh_token");
-        if(access_token && refresh_token){
-          const{error}=await supabase.auth.setSession({access_token,refresh_token});
-          if(error) console.warn("Deep link auth:",error.message);
-          try{
-            const{Browser}=await import("@capacitor/browser");
-            await Browser.close();
-          }catch{}
-        }
-      }).then(l=>{listener=l;});
-    }).catch(()=>{});
-    return()=>{listener?.remove?.();};
+    CapApp.addListener("appUrlOpen",async({url})=>{
+      if(!url) return;
+      const hash = url.includes("#") ? url.split("#")[1] : url.split("?")[1]||"";
+      const p = new URLSearchParams(hash);
+      const access_token  = p.get("access_token");
+      const refresh_token = p.get("refresh_token");
+      if(access_token && refresh_token){
+        const{error}=await supabase.auth.setSession({access_token,refresh_token});
+        if(error) console.warn("Deep link auth:",error.message);
+        // Close in-app browser via global plugin
+        try{ window?.Capacitor?.Plugins?.Browser?.close?.(); }catch{}
+      }
+    }).then(l=>{listener=l;}).catch(()=>{});
+    return()=>{ try{listener?.remove?.();}catch{} };
   },[]);
 
   useEffect(()=>{
