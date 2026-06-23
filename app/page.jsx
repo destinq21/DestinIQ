@@ -7121,12 +7121,29 @@ function StreakLeaderboard({userId}){
   );
 }
 
-const WIN_STORE_KEY="destiniq_wins_v1";
-function loadWins(){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY)||"[]");}catch{return[];}}
-function saveWins(w){try{localStorage.setItem(WIN_STORE_KEY,JSON.stringify(w));}catch{}}
+// Wins: user-specific localStorage key + Supabase backup
+const WIN_STORE_KEY=(uid)=>`diq_wins_${uid||"guest"}`;
+function loadWins(uid){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");}catch{return[];}}
+function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(w));}catch{}}
 
 function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
-  const [wins,setWins]=useState(()=>loadWins());
+  const [wins,setWins]=useState(()=>loadWins(userId));
+  // Load wins from Supabase on mount (in case localStorage was cleared)
+  useEffect(()=>{
+    if(!userId) return;
+    supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
+      .then(({data})=>{
+        if(data?.form_data?._wins?.length){
+          const serverWins = data.form_data._wins;
+          const localWins  = loadWins(userId);
+          // Merge — take whichever has more wins
+          if(serverWins.length > localWins.length){
+            setWins(serverWins);
+            saveWins(serverWins, userId);
+          }
+        }
+      }).catch(()=>{});
+  },[userId]);
   const [input,setInput]=useState("");
   const [mood,setMood]=useState(null);
   const [celebrate,setCelebrate]=useState("");
@@ -7144,7 +7161,20 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
     if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
     const win={id:Date.now(),text:input.trim(),date:todayKey,mood,ts:new Date().toISOString()};
     const updated=[win,...wins];
-    setWins(updated);saveWins(updated);setInput("");setMood(null);
+    setWins(updated);
+    saveWins(updated, userId); // localStorage (instant)
+    // Supabase backup — save wins inside form_data._wins
+    if(userId){
+      supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
+        .then(({data})=>{
+          const existing = data?.form_data||{};
+          return supabase.from("user_profiles").upsert({
+            user_id: userId,
+            form_data: {...existing, _wins: updated.slice(0,200)}, // cap at 200
+          },{onConflict:"user_id"});
+        }).catch(()=>{});
+    }
+    setInput("");setMood(null);
     // AI celebration
     setLoading(true);
     try{
@@ -7236,7 +7266,9 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
                     <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",margin:0,lineHeight:1.6}}>{w.text}</p>
                     {w.mood&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{w.mood}</span>}
                   </div>
-                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);
+                    if(userId) supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
+                      .then(({data})=>{ const ex=data?.form_data||{}; return supabase.from("user_profiles").upsert({user_id:userId,form_data:{...ex,_wins:u}},{onConflict:"user_id"}); }).catch(()=>{});}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
@@ -9388,21 +9420,25 @@ Rules:
                 setTimeout(()=>setMiniStreak(newStreak), 800);
               }
               if(userId){
-                // Persist to Supabase
-                supabase.from("user_profiles").upsert({
-                  user_id: userId,
-                  streak: newStreak,
-                  last_checkin_date: today,
-                  updated_at: new Date().toISOString(),
-                },{onConflict:"user_id"})
-                .then(({error})=>{
-                  if(error) console.warn("Streak save:", error.message);
-                  else {
-                    // Update formData so next check uses correct last_checkin_date
-                    setFormData(prev=>prev?{...prev, last_checkin_date:today}:prev);
-                  }
-                })
-                .catch(e=>console.warn("Streak save:", e.message));
+                // Save streak — use form_data JSONB as reliable fallback
+                // Works even if dedicated streak/last_checkin_date columns don't exist
+                supabase.from("user_profiles").select("form_data")
+                  .eq("user_id", userId).single()
+                  .then(({data:pd})=>{
+                    const fd = pd?.form_data||{};
+                    return supabase.from("user_profiles").upsert({
+                      user_id: userId,
+                      streak: newStreak,              // dedicated col (may not exist)
+                      last_checkin_date: today,        // dedicated col (may not exist)
+                      updated_at: new Date().toISOString(),
+                      form_data: {...fd, _streak:newStreak, _last_checkin:today}, // always works
+                    },{onConflict:"user_id"});
+                  })
+                  .then(({error})=>{
+                    if(error) console.warn("Streak save:", error.message);
+                    else setFormData(prev=>prev?{...prev, last_checkin_date:today, _streak:newStreak}:prev);
+                  })
+                  .catch(e=>console.warn("Streak save:", e.message));
               }
             }
             // else: already checked in today — don't increment again
@@ -10531,7 +10567,7 @@ function EmailReminderToggle({userId}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // 2. PROFILE PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onManageSubscription,onPhotoUpdate}){
+function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSignOut,onManageSubscription,onPhotoUpdate}){
   const [name,setName]=useState(user?.name||"");
   const [saved,setSaved]=useState(false);
   const [loading,setLoading]=useState(false);
@@ -11191,23 +11227,29 @@ export default function DestinIQ(){
         // A streak is valid if the user checked in today OR yesterday.
         // If the last check-in was 2+ days ago, the streak resets to 1.
         {
-          const savedStreak = profile.streak || 1;
+          // Use form_data._streak as reliable fallback (always saved)
+          const fdStreak  = profile.form_data?._streak;
+          const fdLast    = profile.form_data?._last_checkin || "";
+          const savedStreak = profile.streak || fdStreak || 1;
           const today     = new Date().toISOString().slice(0,10);
           const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
-          // Use the most recent of DB date and localStorage date (handles timing gaps)
-          const dbLast    = profile.last_checkin_date || "";
+          // Check all sources — DB column, form_data fallback, localStorage
+          const dbLast    = profile.last_checkin_date || fdLast;
           const localLast = (() => { try{ return localStorage.getItem(`destiniq_checkin_${u.id}`)||""; }catch{return "";} })();
-          const lastSeen  = [dbLast, localLast].filter(Boolean).sort().pop() || "";
+          const localStreak = (() => { try{ const s=localStorage.getItem(`diq_streak_${u.id}`); return s?parseInt(s):0; }catch{return 0;} })();
+          const lastSeen  = [dbLast, localLast, fdLast].filter(Boolean).sort().pop() || "";
+          // Take highest streak from all sources (most reliable)
+          const bestStreak = Math.max(savedStreak, localStreak, 1);
 
           if (!lastSeen) {
             // Never checked in before — keep whatever streak DB has (could be 1 from signup)
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else if (lastSeen === today) {
             // Already checked in today — show current streak as-is
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else if (lastSeen === yesterday) {
             // Checked in yesterday — streak is still alive
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
@@ -11219,10 +11261,20 @@ export default function DestinIQ(){
             try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
           }
         }
-        if (profile.form_data)  setFormData({
-          ...profile.form_data,
-          last_checkin_date: profile.last_checkin_date||"",
-        });
+        if (profile.form_data){
+          setFormData({
+            ...profile.form_data,
+            last_checkin_date: profile.last_checkin_date||profile.form_data?._last_checkin||"",
+          });
+          // Restore wins from Supabase if localStorage was cleared
+          if(profile.form_data._wins?.length){
+            const serverWins = profile.form_data._wins;
+            const localWins  = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${u.id}`)||"[]"); }catch{ return []; } })();
+            if(serverWins.length > localWins.length){
+              try{ localStorage.setItem(`diq_wins_${u.id}`, JSON.stringify(serverWins)); }catch{}
+            }
+          }
+        }
         if (profile.report)     setReport(profile.report);
         // ── CRITICAL: Always restore exactly where they left off ──
         // Signed-in users must NEVER see the marketing landing page — only
