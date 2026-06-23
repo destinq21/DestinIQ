@@ -301,7 +301,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -889,7 +889,7 @@ function sanitize(s){
 // ═══════════════════════════════════════════════════════════════════════════════
 // API
 // ═══════════════════════════════════════════════════════════════════════════════
-async function callAPI({messages,system,userId,isPremium,maxTokens}){
+async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
   // Get the current session token so the server can verify this is a real logged-in user
   const{data:{session}}=await supabase.auth.getSession();
@@ -899,7 +899,7 @@ async function callAPI({messages,system,userId,isPremium,maxTokens}){
       "Content-Type":"application/json",
       ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
     },
-    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isPremium?4000:1800)}),
+    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isProMax?6000:isPremium?4000:1800)}),
   });
   if(!res.ok){
     const e=await res.json().catch(()=>({}));
@@ -1980,7 +1980,7 @@ function ContentSlice({children, totalCount, freeCount=3, isPaid, onUnlock, what
 // ═══════════════════════════════════════════════════════════════════════════════
 // MOMENTUM MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
-function MomentumModule({profile,userId,isPremium,streak}){
+function MomentumModule({profile,userId,isPremium,isProMax,streak}){
   const log=getMomentumLog(userId);
   const today=new Date().toDateString();
   const todayEntry=log.find(e=>e.date===today);
@@ -2180,7 +2180,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY PULSE
 // ═══════════════════════════════════════════════════════════════════════════════
-function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
+function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
   const log=getMomentumLog(userId);
   const [loading,setLoading]=useState(false);
   const [report,setReport]=useState((_weeklyReports.get(userId)||[])[0]||null);
@@ -2203,7 +2203,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
       const country=sanitize(profile?.country)||"your country";
       const goal=sanitize(profile?.goals)||"your goal";
       const challenge=sanitize(profile?.challenge)||"your challenge";
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium});
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],isProMax,system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium});
 
       // Guard against the AI declining to answer / asking for more info
       const badPhrases=["i don't have","i need more","could you share","no context","please tell","can you provide","i don't have enough","no information"];
@@ -2232,7 +2232,15 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Your week, honestly reflected back</div><p className="small">We look at what you've been carrying this week and tell you what we see.</p></div>
-          {isPremium&&<div className="prem-badge">✦ PREMIUM</div>}
+          {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2299,7 +2307,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // DECISION INBOX
 // ═══════════════════════════════════════════════════════════════════════════════
-function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
+function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
   const [question,setQuestion]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
@@ -2333,7 +2341,15 @@ function DecisionModule({profile,userId,isPremium,isPaid,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Help me think this through</div><p className="small">You're not alone in this decision. Drop it here and we'll think it through with you — honestly.</p></div>
-          {isPremium&&<div className="prem-badge">✦ PREMIUM</div>}
+          {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2536,7 +2552,9 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
           if(userId){
             try{
               localStorage.setItem(`diq_paid_${userId}`, "1");
-              localStorage.setItem(`diq_prem_${userId}`, "1");
+              // Only set premium flag for Pro Max tier
+              if(tier==="promax") localStorage.setItem(`diq_prem_${userId}`, "1");
+              else localStorage.removeItem(`diq_prem_${userId}`);
               localStorage.setItem(`diq_paystack_ref_${userId}`, response.reference);
             }catch(_){}
           }
@@ -2548,7 +2566,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
             await supabase.from("user_profiles").upsert({
               user_id:    uid,
               is_paid:    true,
-              is_premium: true,
+              is_premium: (tier==="promax"||tier==="promax_annual"),
               paystack_ref: response.reference,
               paid_plan:  planKey,
               paid_at:    new Date().toISOString(),
@@ -2569,7 +2587,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
           }
 
           setLoading(false);
-          onUnlock(response.reference);
+          onUnlock(response.reference, planKey);
         },
         onClose:()=>{
           setLoading(false);
@@ -2613,7 +2631,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
     {text:"Weekly Pulse — your week, analyzed",inc:true},
     {text:"Relocate — explore any country",inc:true},
     {text:"All module refreshes anytime",inc:true},
-    {text:"My Advisor — 10 messages/day",inc:true},
+    {text:"My Advisor — 10 messages/day",inc:true}, // Pro limit
     {text:"Edit profile & re-generate report",inc:true},
   ];
 
@@ -2887,7 +2905,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
+function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
   const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
@@ -2895,14 +2913,17 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
   // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
-  const FREE_DAILY_LIMIT=1; // Free: 1 advisor msg/dayers: 2 advisor messages per day
+  const FREE_DAILY_LIMIT = 1;  // Free: 1 message/day
+  const PRO_DAILY_LIMIT  = 10; // Pro: 10 messages/day (Pro Max = unlimited)ers: 2 advisor messages per day
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [usedToday,setUsedToday]=useState(()=>{
     if(typeof window==="undefined") return 0;
     return parseInt(localStorage.getItem(limitKey)||"0");
   });
-  const remaining=Math.max(0,FREE_DAILY_LIMIT-usedToday);
-  const limitReached=!isPaid&&remaining<=0;
+  // Tier-based limits: Free=1/day, Pro=10/day, ProMax=unlimited
+  const dailyLimit    = isPremium ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const remaining     = Math.max(0, dailyLimit === Infinity ? 999 : dailyLimit - usedToday);
+  const limitReached  = dailyLimit !== Infinity && remaining <= 0;
 
   const send=async()=>{
     if(!input.trim()||loading) return;
@@ -2922,7 +2943,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
         .filter((_,i)=>!(i===0&&updated[0].role==="assistant"))
         .map(m=>({role:m.role,content:m.content}));
       if(!apiMsgs.length||apiMsgs[0].role!=="user") throw new Error("No user message");
-      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId)),userId,isPremium});
+      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId)),userId,isPremium,isProMax});
       pushToMemory(userId,"assistant",reply);setMsgs(p=>[...p,{role:"assistant",content:reply}]);
     }catch(e){
       console.error("Advisor error:",e.message,e);
@@ -2951,7 +2972,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
     <div className="fu">
       <div style={{marginBottom:20}}>
         <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPaid&&<span style={{color:"var(--gold)"}}>✦ You have unlimited access.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} messages today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade for unlimited →</button></span>}</p>
+        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPremium&&<span style={{color:"var(--gold)"}}>✦ Unlimited access — Pro Max.</span>}{isPaid&&!isPremium&&<span style={{color:"var(--cream-40)"}}> {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}</p>
       </div>
       <div className="card">
         <div className="chat-scroll" ref={scrollRef}>
@@ -2978,7 +2999,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,onUnlock}){
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
         {limitReached?(
           <div style={{textAlign:"center",padding:"16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,marginTop:10}}>
-            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>You've used your {FREE_DAILY_LIMIT} free messages for today. Upgrade for unlimited conversations with your advisor.</p>
+            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>{isPaid?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`:`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade to Pro for 10/day.`}</p>
             <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:13,padding:"8px 20px"}}>Upgrade now</button>
           </div>
         ):(
@@ -3939,6 +3960,8 @@ function Intake({onSubmit, savedFormData}){
     ...(savedFormData||{}),
   }));
   const [err,setErr]=useState("");
+  const [countrySearch,setCountrySearch]=useState(()=>savedFormData?.country||"");
+  const [showDropdown,setShowDropdown]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
   const SITUATIONS=[
@@ -4068,8 +4091,6 @@ function Intake({onSubmit, savedFormData}){
 
           {/* STEP 2 — Age, Country, Currency, Gender */}
           {step===2&&(()=>{
-            const [countrySearch,setCountrySearch]=useState(f.country||"");
-            const [showDropdown,setShowDropdown]=useState(false);
             const filtered=COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(countrySearch.toLowerCase())).slice(0,8);
             const selectedCurrency=getCurrencyForCountry(f.country);
             const incomeRanges=getIncomeRanges(selectedCurrency.symbol);
@@ -8948,7 +8969,7 @@ function deriveStrengthsRisks(data){
   const chunk = (text, max=3) => {
     if(!text || text.trim().length < 20) return [];
     // Split by period+space or newline
-    const raw = text.split(/(?<=\.)\s+|\r?\n+/).map(s=>s.trim()).filter(s=>s.length>20);
+    const raw = text.split(/(?<=\.)\s+|\n+/).map(s=>s.trim()).filter(s=>s.length>20);
     if(raw.length >= 2) return raw.slice(0,max).map(s=>s.length>220?s.slice(0,220)+"…":s);
     // If no good splits, just truncate the whole thing into 2 chunks
     const mid = Math.floor(text.length/2);
@@ -9094,7 +9115,7 @@ function StreakCelebration({streak, onClose}){
   );
 }
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,ipLocation,showTracker,setShowTracker}){
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -9249,7 +9270,15 @@ Rules:
             </div>
             <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-              {isPremium&&<div className="prem-badge">✦ PREMIUM</div>}
+              {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
               {!showCheckin&&(()=>{
                 const todayStr = new Date().toISOString().slice(0,10);
                 const todayKey = `diq_ci_result_${userId}_${todayStr}`;
@@ -9519,7 +9548,7 @@ Rules:
             </div>
           )}
 
-          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
+          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -9533,8 +9562,8 @@ Rules:
             {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
 
 
 
@@ -9917,7 +9946,7 @@ Rules:
             />
           )}
           {mod==="advisor"&&(
-            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
+            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
           )}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
@@ -10133,6 +10162,8 @@ function EditProfileModal({formData, userId, onSave, onClose}){
   const [saving, setSaving] = useState(false);
   const [saved,  setSaved ] = useState(false);
   const [regen,  setRegen ] = useState(false); // whether to also re-generate report
+  const [csearch, setCsearch] = useState(formData?.country||"");
+  const [showDrop, setShowDrop] = useState(false);
 
   const upd = (k,v) => setF(p=>({...p,[k]:v}));
 
@@ -10183,8 +10214,6 @@ function EditProfileModal({formData, userId, onSave, onClose}){
             </label>
             {field.key==="country"
               ? (()=>{
-                  const [csearch,setCsearch]=useState(f.country||"");
-                  const [showDrop,setShowDrop]=useState(false);
                   const filt=COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(csearch.toLowerCase())).slice(0,6);
                   return(
                     <div style={{position:"relative"}}>
@@ -10567,7 +10596,7 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
     setLoading(false);
   };
 
-  const planLabel = isPaid?"Premium":"Free";
+  const planLabel = isProMax?"Pro Max":isPaid?"Pro":"Free";
   const planColor = isPaid?"var(--gold)":"var(--cream-30)";
 
   return(
@@ -10622,7 +10651,7 @@ function ProfilePage({user,formData,isPaid,isPremium,streak,onBack,onSignOut,onM
         </div>
 
         {/* Subscription */}
-        <SubscriptionCard isPaid={isPaid} isPremium={isPremium} userId={user?.id} onManageSubscription={onManageSubscription}/>
+        <SubscriptionCard isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={user?.id} onManageSubscription={onManageSubscription}/>
 
         {/* Sign out & delete */}
         <div className="card">
@@ -10977,11 +11006,11 @@ function isRateLimited(isPaid){
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUBSCRIPTION CARD (replaces the old "contact support" manage button)
 // ═══════════════════════════════════════════════════════════════════════════════
-function SubscriptionCard({isPaid,isPremium,userId,onManageSubscription}){
+function SubscriptionCard({isPaid,isPremium,isProMax,userId,onManageSubscription}){
   const [cancelling,setCancelling]=useState(false);
   const [cancelled,setCancelled]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
-  const planLabel=isPaid?"Premium":"Free";
+  const planLabel=isProMax?"Pro Max":isPaid?"Pro":"Free";
   const planColor=isPaid?"var(--gold)":"var(--cream-30)";
 
   const handleCancel=async()=>{
@@ -11068,6 +11097,7 @@ export default function DestinIQ(){
   const [report,    setReport   ]=useState(null);
   const [isPaid,    setIsPaid   ]=useState(false);
   const [isPremium, setIsPremium]=useState(false);
+  const [isProMax,  setIsProMax ]=useState(false);
   const [streak,    setStreak   ]=useState(1);
   const [showCI,    setShowCI   ]=useState(false);
   const [apiError,  setApiError ]=useState("");
@@ -11148,6 +11178,13 @@ export default function DestinIQ(){
           try { localStorage.setItem(`diq_prem_${u.id}`, "1"); } catch(_){}
         } else {
           try { localStorage.removeItem(`diq_prem_${u.id}`); } catch(_){}
+        }
+        // Restore Pro Max tier — read paid_plan from DB
+        if (profile.paid_plan==="promax" || profile.paid_plan==="promax_annual") {
+          setIsProMax(true);
+          try { localStorage.setItem(`diq_promax_${u.id}`, "1"); } catch(_){}
+        } else {
+          try { localStorage.removeItem(`diq_promax_${u.id}`); } catch(_){}
         }
         // ── STREAK RESTORATION ──────────────────────────────────────────────
         // Single source of truth: Supabase last_checkin_date + localStorage backup
@@ -11324,7 +11361,7 @@ export default function DestinIQ(){
   // not-premium tier in practice. Self-correct instantly if these ever drift
   // out of sync (e.g. stale localStorage), instead of requiring a manual toggle.
   useEffect(()=>{
-    if(isPaid && !isPremium) setIsPremium(true);
+    // isPremium = Pro Max ONLY — do not force it for all paid users
   },[isPaid,isPremium]);
 
   // Listen for policy events from auth screen footer links
@@ -11548,19 +11585,21 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
     }
   },[userId,isPremium,ipLocation]);
 
-  const restart=()=>{setScreen("intake");setFormData(null);setReport(null);setIsPaid(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
+  const restart=()=>{setScreen("intake");setFormData(null);setReport(null);setIsPaid(false);setIsPremium(false);setIsProMax(false);setStreak(1);setShowCI(false);setApiError("");setNudge(false);};
   const handleUnlock=()=>{setScreen("paywall");};
   // handlePay: called after Paystack confirms payment in the Paywall component.
   // We write is_paid:true to Supabase immediately so it survives any refresh.
-  const handlePay=async(paystackRef)=>{
+  const handlePay=async(paystackRef, planKey)=>{
+    const isMax = planKey==="promax" || planKey==="promax_annual";
     setIsPaid(true);
-    setIsPremium(true);
+    if(isMax){ setIsPremium(true); setIsProMax(true); }
     // Belt-and-suspenders: write to localStorage here too in case the
     // Paywall's callback missed it (e.g. userId was null at payment time)
     if(userId){
       try{
         localStorage.setItem(`diq_paid_${userId}`, "1");
         localStorage.setItem(`diq_prem_${userId}`, "1");
+        if(isMax) localStorage.setItem(`diq_promax_${userId}`, "1");
         if(paystackRef) localStorage.setItem(`diq_paystack_ref_${userId}`, paystackRef);
       }catch(_){}
     }
@@ -11569,6 +11608,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
       try{
         await saveUserProfile(userId,{
           is_paid:true,
+          is_premium:true,
+          paid_plan:planKey||"pro",
           paystack_ref:paystackRef||null,
           paid_at:new Date().toISOString(),
           form_data:formData,
@@ -11717,7 +11758,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
 
         {/* Profile page */}
-        {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} streak={streak}
+        {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak}
           onPhotoUpdate={(url)=>setNavPhotoURL(url)}
           onBack={()=>setShowProfile(false)}
           onSignOut={async()=>{
@@ -11762,7 +11803,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
-              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} ipLocation={ipLocation}
+              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
               showTracker={showTracker} setShowTracker={setShowTracker}/>
         )}
         {screen==="results"  &&formData&&!report&&(
