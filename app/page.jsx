@@ -2009,8 +2009,16 @@ function MomentumModule({profile,userId,isPremium,streak}){
     setSaved(true);rerender(n=>n+1);
   };
 
+  const defaultTasks = [
+    {text:"Complete today's check-in", done:false},
+    {text:"Review your report goals",  done:false},
+    {text:"Make one decision using the Decision module", done:false},
+  ];
+
   const toggleTask=(i)=>{
-    const next=tasks.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
+    // If tasks haven't been persisted yet, seed from the visible defaults first
+    const base = tasks.length ? tasks : defaultTasks;
+    const next=base.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
     setTasks(next);
     try{ localStorage.setItem("diq_tasks_"+userId,JSON.stringify(next)); }catch{}
   };
@@ -2025,12 +2033,10 @@ function MomentumModule({profile,userId,isPremium,streak}){
   const allAvg=log.length?Math.round(log.reduce((s,e)=>s+avgOf(e),0)/log.length):0;
   const trend=log.length>=2?avgOf(log[log.length-1])-avgOf(log[log.length-2]):0;
 
-  // Default tasks if none set yet
-  const displayTasks = tasks.length ? tasks : [
-    {text:"Complete today's check-in",done:saved},
-    {text:"Review your report goals",done:false},
-    {text:"Make one decision using the Decision module",done:false},
-  ];
+  // Default tasks if none set yet — also correct check-in state live
+  const displayTasks = tasks.length
+    ? tasks.map((t,i)=>i===0?{...t,done:saved||t.done}:t)
+    : defaultTasks.map((t,i)=>i===0?{...t,done:saved}:t);
 
   return(
     <div className="fu">
