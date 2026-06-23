@@ -100,7 +100,6 @@
  *   is_paid     boolean default false,
  *   is_premium  boolean default false,
  *   streak      int default 1,
- *   wins        text,                                -- JSON array of win objects (added for cross-device persistence)
  *   paystack_ref text,
  *   paid_plan   text,
  *   paid_at     timestamptz,
@@ -571,6 +570,9 @@ const CSS = `
 }
 html{scroll-behavior:smooth;}
 body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+/* Safe area for notched phones (iPhone X+, Android notch) */
+.nav{padding-top:max(12px,env(safe-area-inset-top))!important;padding-left:max(16px,env(safe-area-inset-left))!important;padding-right:max(16px,env(safe-area-inset-right))!important;}
+.fu{padding-bottom:max(80px,env(safe-area-inset-bottom))!important;}
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
 .bg-mesh{background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(31,168,154,0.07) 0%,transparent 55%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(210,175,90,0.08) 0%,transparent 55%),radial-gradient(ellipse 50% 40% at 80% 20%,rgba(124,92,191,0.05) 0%,transparent 50%),var(--void);}
 .bg-noise{opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:128px;}
@@ -716,25 +718,63 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 }
 /* Mobile: ≤640px */
 @media(max-width:640px){
-  .body-lg{font-size:14px!important;max-width:100%!important;}
-  p{max-width:100%!important;padding-right:0!important;}
-  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
-  body{overflow-x:hidden!important;max-width:100vw!important;}
-  .nav{padding:0 14px!important;}
-  .card{padding:14px!important;border-radius:14px!important;}
-  .fu{padding:0 0 40px!important;}
-  .d1{font-size:clamp(26px,8vw,48px)!important;line-height:1.1!important;}
-  .d2{font-size:clamp(20px,6vw,34px)!important;}
-  .d3{font-size:clamp(17px,5vw,24px)!important;}
-  .tabs{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px;padding:4px;grid-template-columns:unset;}
-  .tabs::-webkit-scrollbar{display:none;}
-  .tab{flex-shrink:0;font-size:9.5px;padding:7px 10px;min-width:58px;}
-  .tab span:first-child{font-size:13px;}
-  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  .tab-bar::-webkit-scrollbar{display:none;}
-  .tab-bar button{font-size:10px!important;padding:7px 10px!important;white-space:nowrap;}
+  /* ── Base ── */
+  html,body{overflow-x:hidden!important;max-width:100vw!important;-webkit-text-size-adjust:100%;}
+  *{box-sizing:border-box!important;}
+  p,h1,h2,h3,h4,span,div{word-wrap:break-word!important;overflow-wrap:break-word!important;}
+
+  /* ── Layout ── */
+  .cx,.cx-sm,.cx-md{padding:0 16px!important;}
+  .fu{padding:0 0 80px!important;}/* extra bottom for thumb zone */
+
+  /* ── Typography — readable at arm's length ── */
+  .body-lg{font-size:15px!important;line-height:1.75!important;max-width:100%!important;}
+  p{max-width:100%!important;padding-right:0!important;font-size:14px!important;line-height:1.7!important;}
+  .d1{font-size:clamp(28px,8vw,46px)!important;line-height:1.1!important;}
+  .d2{font-size:clamp(22px,6vw,34px)!important;line-height:1.2!important;}
+  .d3{font-size:clamp(18px,5vw,26px)!important;line-height:1.3!important;}
+  .small,.mono{font-size:12px!important;}
+
+  /* ── Nav bar ── */
+  .nav{padding:0 16px!important;height:56px!important;}
+  .nav-r{gap:8px!important;}
+  .prem-badge{font-size:9px!important;padding:4px 10px!important;border-radius:20px!important;}
+  .streak-badge{padding:6px 12px!important;font-size:10px!important;}
+  .streak-fire{font-size:14px!important;}
+
+  /* ── Cards ── */
+  .card{padding:16px!important;border-radius:16px!important;margin-bottom:12px!important;}
+  .card-sm{padding:14px!important;border-radius:14px!important;}
+  .lock-gate{padding:20px 16px!important;}
+  .insight{padding:14px 16px!important;}
+
+  /* ── Tabs — module groups ── */
+  .tabs{display:flex!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
+    scrollbar-width:none!important;gap:6px!important;padding:6px 2px!important;
+    grid-template-columns:unset!important;}
+  .tabs::-webkit-scrollbar{display:none!important;}
+  .tab{flex-shrink:0!important;font-size:11px!important;padding:9px 12px!important;
+    min-width:64px!important;min-height:44px!important;border-radius:12px!important;
+    display:flex!important;flex-direction:column!important;align-items:center!important;gap:4px!important;}
+  .tab span:first-child{font-size:15px!important;}/* icon bigger */
+  .tab span:last-child{font-size:10px!important;white-space:nowrap!important;}
+
+  /* ── Tab bar (sub-tabs) ── */
+  .tab-bar{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
+    scrollbar-width:none!important;padding-bottom:4px!important;}
+  .tab-bar::-webkit-scrollbar{display:none!important;}
+  .tab-bar button{font-size:11px!important;padding:9px 14px!important;
+    white-space:nowrap!important;min-height:40px!important;}
+
+  /* ── Buttons — 44px min tap target ── */
+  .btn{min-height:44px!important;font-size:14px!important;padding:12px 20px!important;border-radius:12px!important;}
+  .btn-lg{min-height:52px!important;font-size:15px!important;padding:14px 24px!important;}
+  .btn-sm{min-height:36px!important;font-size:12px!important;padding:8px 14px!important;}
+  button{min-height:36px!important;}
+
+  /* ── Grids → single column on mobile ── */
   .results-grid{grid-template-columns:1fr!important;}
-  .hero-grid{grid-template-columns:1fr!important;gap:28px!important;}
+  .hero-grid{grid-template-columns:1fr!important;gap:24px!important;}
   .row2{grid-template-columns:1fr!important;}
   .plan-cards-grid{grid-template-columns:1fr!important;}
   .paywall-faq{grid-template-columns:1fr!important;}
@@ -742,40 +782,52 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .reloc-grid{grid-template-columns:1fr!important;}
   .score-explain-grid{grid-template-columns:1fr!important;}
   .score-grid{grid-template-columns:1fr 1fr!important;}
-  .reloc-stats{grid-template-columns:repeat(3,1fr)!important;}
-  .mom-stat-grid{grid-template-columns:repeat(3,1fr)!important;}
+  .reloc-stats{grid-template-columns:repeat(2,1fr)!important;}
+  .mom-stat-grid{grid-template-columns:repeat(2,1fr)!important;}
+
+  /* ── Misc layout fixes ── */
   .pillar-wrap{flex-direction:column!important;align-items:stretch!important;}
   .pillar-wrap>div:last-child{min-width:unset!important;}
-  .nav-r{gap:5px!important;}
-  .streak-badge{padding:5px 10px!important;font-size:9px!important;}
-  .streak-fire{font-size:13px!important;}
   .pbar-wrap{width:100%!important;max-width:100%!important;}
-  .lock-gate{padding:16px!important;}
-  .insight{padding:12px 14px!important;}
-  .reloc-header{padding:14px 16px 12px!important;}
-  .reloc-body{padding:14px 16px!important;}
-  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:8px!important;}
+  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:10px!important;}
+  .reloc-header{padding:16px!important;}
+  .reloc-body{padding:16px!important;}
+
+  /* ── Module group section labels ── */
+  .module-group-label{font-size:9px!important;letter-spacing:.15em!important;padding:6px 4px 4px!important;}
+
+  /* ── Score cards bigger on mobile ── */
+  .score-card{padding:16px!important;min-height:80px!important;}
+  .score-num{font-size:36px!important;}
+
+  /* ── Inputs ── */
+  input,select,textarea{font-size:16px!important;min-height:48px!important;}/* 16px prevents iOS zoom */
+  textarea{min-height:80px!important;}
 }
 /* Small phones: ≤420px */
 @media(max-width:420px){
-  .body-lg{font-size:13px!important;}
-  p{max-width:100%!important;}
-  .cx,.cx-sm,.cx-md{padding:0 12px!important;}
-  .d1{font-size:clamp(22px,7.5vw,40px)!important;}
-  .d2{font-size:clamp(18px,5.5vw,28px)!important;}
-  .card{padding:12px!important;}
+  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
+  .d1{font-size:clamp(24px,7.5vw,40px)!important;}
+  .d2{font-size:clamp(20px,6vw,30px)!important;}
+  .d3{font-size:clamp(17px,5vw,24px)!important;}
+  .card{padding:14px!important;}
+  .body-lg{font-size:14px!important;}
+  p{font-size:13px!important;}
+  .tab{font-size:10px!important;padding:8px 10px!important;min-width:56px!important;}
+  .tab span:first-child{font-size:14px!important;}
   .nav-logo{font-size:15px!important;}
-  .tab{font-size:9px!important;padding:6px 8px!important;min-width:50px!important;}
-  .plan-cards-grid{grid-template-columns:1fr!important;}
+  input,select,textarea{font-size:16px!important;}/* prevent iOS zoom */
 }
 /* Very small screens: ≤360px */
 @media(max-width:360px){
-  .cx,.cx-sm,.cx-md{padding:0 20px!important;box-sizing:border-box!important;}
+  .cx,.cx-sm,.cx-md{padding:0 12px!important;box-sizing:border-box!important;}
   body,html{overflow-x:hidden!important;width:100%!important;}
   p,h1,h2,h3{word-wrap:break-word!important;overflow-wrap:break-word!important;max-width:100%!important;}
-  .d1{font-size:22px!important;}
-  .tab{font-size:8.5px!important;padding:5px 6px!important;min-width:44px!important;}
-  .card{padding:10px!important;}
+  .d1{font-size:24px!important;}
+  .d2{font-size:19px!important;}
+  .tab{font-size:9.5px!important;padding:7px 8px!important;min-width:52px!important;}
+  .card{padding:12px!important;}
+  input,select{font-size:16px!important;}
 }
 /* Notch / safe area (iPhone X+, modern Android) */
 @supports(padding:max(0px)){
@@ -894,14 +946,13 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
   // Get the current session token so the server can verify this is a real logged-in user
   const{data:{session}}=await supabase.auth.getSession();
-  const autoTokens = isProMax?6000:isPremium?4000:1800;
   const res=await fetch("/api/analyze",{
     method:"POST",
     headers:{
       "Content-Type":"application/json",
       ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
     },
-    body:JSON.stringify({system,messages,max_tokens:maxTokens||autoTokens}),
+    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isProMax?6000:isPremium?4000:1800)}),
   });
   if(!res.ok){
     const e=await res.json().catch(()=>({}));
@@ -1982,7 +2033,7 @@ function ContentSlice({children, totalCount, freeCount=3, isPaid, onUnlock, what
 // ═══════════════════════════════════════════════════════════════════════════════
 // MOMENTUM MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
-function MomentumModule({profile,userId,isPremium,streak}){
+function MomentumModule({profile,userId,isPremium,isProMax,streak}){
   const log=getMomentumLog(userId);
   const today=new Date().toDateString();
   const todayEntry=log.find(e=>e.date===today);
@@ -2009,16 +2060,8 @@ function MomentumModule({profile,userId,isPremium,streak}){
     setSaved(true);rerender(n=>n+1);
   };
 
-  const defaultTasks = [
-    {text:"Complete today's check-in", done:false},
-    {text:"Review your report goals",  done:false},
-    {text:"Make one decision using the Decision module", done:false},
-  ];
-
   const toggleTask=(i)=>{
-    // If tasks haven't been persisted yet, seed from the visible defaults first
-    const base = tasks.length ? tasks : defaultTasks;
-    const next=base.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
+    const next=tasks.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
     setTasks(next);
     try{ localStorage.setItem("diq_tasks_"+userId,JSON.stringify(next)); }catch{}
   };
@@ -2033,10 +2076,12 @@ function MomentumModule({profile,userId,isPremium,streak}){
   const allAvg=log.length?Math.round(log.reduce((s,e)=>s+avgOf(e),0)/log.length):0;
   const trend=log.length>=2?avgOf(log[log.length-1])-avgOf(log[log.length-2]):0;
 
-  // Default tasks if none set yet — also correct check-in state live
-  const displayTasks = tasks.length
-    ? tasks.map((t,i)=>i===0?{...t,done:saved||t.done}:t)
-    : defaultTasks.map((t,i)=>i===0?{...t,done:saved}:t);
+  // Default tasks if none set yet
+  const displayTasks = tasks.length ? tasks : [
+    {text:"Complete today's check-in",done:saved},
+    {text:"Review your report goals",done:false},
+    {text:"Make one decision using the Decision module",done:false},
+  ];
 
   return(
     <div className="fu">
@@ -2188,7 +2233,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY PULSE
 // ═══════════════════════════════════════════════════════════════════════════════
-function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
+function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
   const log=getMomentumLog(userId);
   const [loading,setLoading]=useState(false);
   const [report,setReport]=useState((_weeklyReports.get(userId)||[])[0]||null);
@@ -2211,7 +2256,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
       const country=sanitize(profile?.country)||"your country";
       const goal=sanitize(profile?.goals)||"your goal";
       const challenge=sanitize(profile?.challenge)||"your challenge";
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium,isProMax});
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],isProMax,system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium});
 
       // Guard against the AI declining to answer / asking for more info
       const badPhrases=["i don't have","i need more","could you share","no context","please tell","can you provide","i don't have enough","no information"];
@@ -2240,7 +2285,15 @@ function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Your week, honestly reflected back</div><p className="small">We look at what you've been carrying this week and tell you what we see.</p></div>
-          {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
+          {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2307,7 +2360,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // DECISION INBOX
 // ═══════════════════════════════════════════════════════════════════════════════
-function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
+function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
   const [question,setQuestion]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
@@ -2327,8 +2380,7 @@ function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
         messages:[{role:"user",content:buildDecisionPrompt(profile,q,isPremium,"")}],
         system:decisionSys,
         userId,
-        isPremium,
-        isProMax
+        isPremium
       });
       addDecision(userId,{id:Date.now(),question:q,framework:fw,date:new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short"})});
       setDecisions(getDecisions(userId));setQuestion("");
@@ -2342,7 +2394,15 @@ function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Help me think this through</div><p className="small">You're not alone in this decision. Drop it here and we'll think it through with you — honestly.</p></div>
-          {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
+          {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2545,7 +2605,9 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
           if(userId){
             try{
               localStorage.setItem(`diq_paid_${userId}`, "1");
-              localStorage.setItem(`diq_prem_${userId}`, "1");
+              // Only set premium flag for Pro Max tier
+              if(tier==="promax") localStorage.setItem(`diq_prem_${userId}`, "1");
+              else localStorage.removeItem(`diq_prem_${userId}`);
               localStorage.setItem(`diq_paystack_ref_${userId}`, response.reference);
             }catch(_){}
           }
@@ -2557,7 +2619,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
             await supabase.from("user_profiles").upsert({
               user_id:    uid,
               is_paid:    true,
-              is_premium: true,
+              is_premium: (tier==="promax"||tier==="promax_annual"),
               paystack_ref: response.reference,
               paid_plan:  planKey,
               paid_at:    new Date().toISOString(),
@@ -2622,7 +2684,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
     {text:"Weekly Pulse — your week, analyzed",inc:true},
     {text:"Relocate — explore any country",inc:true},
     {text:"All module refreshes anytime",inc:true},
-    {text:"My Advisor — 10 messages/day",inc:true},
+    {text:"My Advisor — 10 messages/day",inc:true}, // Pro limit
     {text:"Edit profile & re-generate report",inc:true},
   ];
 
@@ -2896,31 +2958,31 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlock}){
+function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
   const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
-  // ── MESSAGE LIMITS BY TIER ────────────────────────────────────────────────
-  // Free: 1/day · Pro: 10/day · Pro Max: unlimited
-  const FREE_DAILY_LIMIT=1;
-  const PRO_DAILY_LIMIT=10;
+  // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
+  const FREE_DAILY_LIMIT = 1;  // Free: 1 message/day
+  const PRO_DAILY_LIMIT  = 10; // Pro: 10 messages/day (Pro Max = unlimited)ers: 2 advisor messages per day
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [usedToday,setUsedToday]=useState(()=>{
     if(typeof window==="undefined") return 0;
     return parseInt(localStorage.getItem(limitKey)||"0");
   });
-  const dailyLimit = isProMax ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
-  const remaining=Math.max(0,dailyLimit===Infinity?999:dailyLimit-usedToday);
-  const limitReached = dailyLimit!==Infinity && usedToday>=dailyLimit;
+  // Tier-based limits: Free=1/day, Pro=10/day, ProMax=unlimited
+  const dailyLimit    = isPremium ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const remaining     = Math.max(0, dailyLimit === Infinity ? 999 : dailyLimit - usedToday);
+  const limitReached  = dailyLimit !== Infinity && remaining <= 0;
 
   const send=async()=>{
     if(!input.trim()||loading) return;
     if(limitReached){ onUnlock&&onUnlock(); return; }
     const msg=sanitize(input.trim());setInput("");setError("");
-    if(!isProMax){
+    if(!isPaid){
       const next=usedToday+1;
       setUsedToday(next);
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
@@ -2963,11 +3025,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlo
     <div className="fu">
       <div style={{marginBottom:20}}>
         <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version.{" "}
-          {isProMax&&<span style={{color:"var(--teal)"}}>✦ Pro Max — unlimited messages.</span>}
-          {isPaid&&!isProMax&&<span style={{color:"var(--gold)"}}>✦ Pro — {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}
-          {!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}
-        </p>
+        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPremium&&<span style={{color:"var(--gold)"}}>✦ Unlimited access — Pro Max.</span>}{isPaid&&!isPremium&&<span style={{color:"var(--cream-40)"}}> {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}</p>
       </div>
       <div className="card">
         <div className="chat-scroll" ref={scrollRef}>
@@ -2994,11 +3052,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlo
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
         {limitReached?(
           <div style={{textAlign:"center",padding:"16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,marginTop:10}}>
-            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>
-              {isPaid&&!isProMax
-                ?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`
-                :`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade for more.`}
-            </p>
+            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>{isPaid?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`:`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade to Pro for 10/day.`}</p>
             <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:13,padding:"8px 20px"}}>Upgrade now</button>
           </div>
         ):(
@@ -4571,9 +4625,12 @@ function AuthScreen({onAuth, onBack}){
       const{data,error:err}=await supabase.auth.signInWithOAuth({
         provider:"google",
         options:{
-          redirectTo:"https://destiniq.vercel.app",
+          // Use deep link scheme so Android hands control back to the app
+          redirectTo: window?.Capacitor?.isNativePlatform?.()
+            ? "com.destiniq.app://"
+            : window.location.origin,
           queryParams:{prompt:"select_account"},
-          skipBrowserRedirect:true, // Don't auto-redirect — we handle it
+          skipBrowserRedirect:true,
         },
       });
       if(err){setError(err.message);setLoading(false);return;}
@@ -4582,10 +4639,11 @@ function AuthScreen({onAuth, onBack}){
         const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
         if(isNative && window?.CapacitorBrowser){
           // Use in-app browser — stays inside the app, no Chrome
-          await window.CapacitorBrowser.open({
+          const {Browser} = await import("@capacitor/browser");
+          await Browser.open({
             url: data.url,
-            windowName: "_self",
-            presentationStyle: "fullscreen",
+            presentationStyle: "popover",  // shows as sheet, easy to dismiss
+            toolbarColor: "#0a0a0f",
           });
         } else {
           // Web — normal redirect
@@ -7120,25 +7178,36 @@ function StreakLeaderboard({userId}){
   );
 }
 
-function winsKey(userId){ return `destiniq_wins_${userId||"anon"}_v1`; }
-function loadWins(userId){
-  try{ return JSON.parse(localStorage.getItem(winsKey(userId))||"[]"); }catch{ return []; }
-}
-function saveWins(w, userId){
-  try{ localStorage.setItem(winsKey(userId), JSON.stringify(w)); }catch{}
-}
-async function saveWinsToSupabase(userId, wins){
-  if(!userId) return;
-  try{
-    await supabase.from("user_profiles").upsert(
-      {user_id:userId, wins:JSON.stringify(wins), updated_at:new Date().toISOString()},
-      {onConflict:"user_id"}
-    );
-  }catch(e){ console.warn("wins save:",e.message); }
-}
+// Wins: user-specific localStorage key + Supabase backup
+const WIN_STORE_KEY=(uid)=>`diq_wins_${uid||"guest"}`;
+function loadWins(uid){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");}catch{return[];}}
+function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(w));}catch{}}
 
 function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const [wins,setWins]=useState(()=>loadWins(userId));
+  // Load wins from Supabase on mount (in case localStorage was cleared)
+  useEffect(()=>{
+    if(!userId) return;
+    supabase.from("user_profiles").select("form_data,wins").eq("user_id",userId).single()
+      .then(({data})=>{
+        const rawWins = data?.wins?.length ? data.wins
+          : (()=>{
+              try{
+                const fd=typeof data?.form_data==="string"?JSON.parse(data.form_data):data?.form_data;
+                return fd?._wins||[];
+              }catch{return[];}
+            })();
+        if(rawWins?.length){
+          const serverWins = rawWins;
+          const localWins  = loadWins(userId);
+          // Merge — take whichever has more wins
+          if(serverWins.length > localWins.length){
+            setWins(serverWins);
+            saveWins(serverWins, userId);
+          }
+        }
+      }).catch(()=>{});
+  },[userId]);
   const [input,setInput]=useState("");
   const [mood,setMood]=useState(null);
   const [celebrate,setCelebrate]=useState("");
@@ -7150,32 +7219,30 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const streakDays=[...new Set(wins.map(w=>w.date))].sort().reverse();
   const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
 
-  // On mount — load wins from Supabase in case localStorage was cleared (sign-out wipe etc.)
-  useEffect(()=>{
-    if(!userId) return;
-    supabase.from("user_profiles").select("wins").eq("user_id",userId).single()
-      .then(({data})=>{
-        if(!data?.wins) return;
-        try{
-          const remote=JSON.parse(data.wins);
-          if(!Array.isArray(remote)||remote.length===0) return;
-          const local=loadWins(userId);
-          // Merge: take the longer list (most data), then deduplicate by id
-          const merged=[...remote,...local].filter((v,i,a)=>a.findIndex(x=>x.id===v.id)===i)
-            .sort((a,b)=>b.ts?.localeCompare(a.ts||"")||0);
-          setWins(merged);
-          saveWins(merged,userId);
-        }catch(_){}
-      }).catch(()=>{});
-  },[userId]);
-
   const FREE_WIN_LIMIT=10;
   const addWin=async()=>{
     if(!input.trim()) return;
     if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
     const win={id:Date.now(),text:input.trim(),date:todayKey,mood,ts:new Date().toISOString()};
     const updated=[win,...wins];
-    setWins(updated);saveWins(updated,userId);saveWinsToSupabase(userId,updated);setInput("");setMood(null);
+    setWins(updated);
+    saveWins(updated, userId); // localStorage (instant)
+    // Supabase backup — save wins inside form_data._wins
+    if(userId){
+      supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
+        .then(({data})=>{
+          // form_data is TEXT — parse first
+          const fd2 = typeof data?.form_data==="string"
+            ? (()=>{try{return JSON.parse(data.form_data);}catch{return{};}})()
+            : (data?.form_data||{});
+          return supabase.from("user_profiles").upsert({
+            user_id: userId,
+            wins: updated.slice(0,200), // dedicated wins column (jsonb)
+            form_data: JSON.stringify({...fd2, _wins: updated.slice(0,200)}), // fallback
+          },{onConflict:"user_id"});
+        }).catch(()=>{});
+    }
+    setInput("");setMood(null);
     // AI celebration
     setLoading(true);
     try{
@@ -7267,7 +7334,8 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
                     <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",margin:0,lineHeight:1.6}}>{w.text}</p>
                     {w.mood&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{w.mood}</span>}
                   </div>
-                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);saveWinsToSupabase(userId,u);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);
+                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).catch(()=>{});}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
@@ -9146,7 +9214,7 @@ function StreakCelebration({streak, onClose}){
   );
 }
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,setStreak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -9301,7 +9369,15 @@ Rules:
             </div>
             <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-              {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
+              {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
               {!showCheckin&&(()=>{
                 const todayStr = new Date().toISOString().slice(0,10);
                 const todayKey = `diq_ci_result_${userId}_${todayStr}`;
@@ -9411,21 +9487,28 @@ Rules:
                 setTimeout(()=>setMiniStreak(newStreak), 800);
               }
               if(userId){
-                // Persist to Supabase
-                supabase.from("user_profiles").upsert({
-                  user_id: userId,
-                  streak: newStreak,
-                  last_checkin_date: today,
-                  updated_at: new Date().toISOString(),
-                },{onConflict:"user_id"})
-                .then(({error})=>{
-                  if(error) console.warn("Streak save:", error.message);
-                  else {
-                    // Update formData so next check uses correct last_checkin_date
-                    setFormData(prev=>prev?{...prev, last_checkin_date:today}:prev);
-                  }
-                })
-                .catch(e=>console.warn("Streak save:", e.message));
+                // Save streak — use form_data JSONB as reliable fallback
+                // Works even if dedicated streak/last_checkin_date columns don't exist
+                supabase.from("user_profiles").select("form_data")
+                  .eq("user_id", userId).single()
+                  .then(({data:pd})=>{
+                    // form_data is TEXT in Supabase — must parse before merging
+                    const fd = typeof pd?.form_data==="string"
+                      ? (()=>{try{return JSON.parse(pd.form_data);}catch{return{};}})()
+                      : (pd?.form_data||{});
+                    return supabase.from("user_profiles").upsert({
+                      user_id: userId,
+                      streak: newStreak,
+                      last_checkin_date: today,
+                      updated_at: new Date().toISOString(),
+                      form_data: JSON.stringify({...fd, _streak:newStreak, _last_checkin:today}),
+                    },{onConflict:"user_id"});
+                  })
+                  .then(({error})=>{
+                    if(error) console.warn("Streak save:", error.message);
+                    else setFormData(prev=>prev?{...prev, last_checkin_date:today, _streak:newStreak}:prev);
+                  })
+                  .catch(e=>console.warn("Streak save:", e.message));
               }
             }
             // else: already checked in today — don't increment again
@@ -9571,7 +9654,7 @@ Rules:
             </div>
           )}
 
-          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
+          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -9585,8 +9668,8 @@ Rules:
             {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>}
-          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>}
+          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
 
 
 
@@ -9969,7 +10052,7 @@ Rules:
             />
           )}
           {mod==="advisor"&&(
-            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>
+            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
           )}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
@@ -10620,7 +10703,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
   };
 
   const planLabel = isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor = isProMax?"#a78bfa":isPaid?"var(--gold)":"var(--cream-30)";
+  const planColor = isPaid?"var(--gold)":"var(--cream-30)";
 
   return(
     <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
@@ -11034,7 +11117,7 @@ function SubscriptionCard({isPaid,isPremium,isProMax,userId,onManageSubscription
   const [cancelled,setCancelled]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
   const planLabel=isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor=isProMax?"#a78bfa":isPaid?"var(--gold)":"var(--cream-30)";
+  const planColor=isPaid?"var(--gold)":"var(--cream-30)";
 
   const handleCancel=async()=>{
     setCancelling(true);
@@ -11214,23 +11297,33 @@ export default function DestinIQ(){
         // A streak is valid if the user checked in today OR yesterday.
         // If the last check-in was 2+ days ago, the streak resets to 1.
         {
-          const savedStreak = profile.streak || 1;
+          // Use form_data._streak as reliable fallback (always saved)
+          // form_data is TEXT in Supabase — parse it
+          const _fd = typeof profile.form_data==="string"
+            ? (()=>{try{return JSON.parse(profile.form_data);}catch{return{};}})()
+            : (profile.form_data||{});
+          const fdStreak  = _fd?._streak;
+          const fdLast    = _fd?._last_checkin || "";
+          const savedStreak = profile.streak || fdStreak || 1;
           const today     = new Date().toISOString().slice(0,10);
           const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
-          // Use the most recent of DB date and localStorage date (handles timing gaps)
-          const dbLast    = profile.last_checkin_date || "";
+          // Check all sources — DB column, form_data fallback, localStorage
+          const dbLast    = profile.last_checkin_date || fdLast;
           const localLast = (() => { try{ return localStorage.getItem(`destiniq_checkin_${u.id}`)||""; }catch{return "";} })();
-          const lastSeen  = [dbLast, localLast].filter(Boolean).sort().pop() || "";
+          const localStreak = (() => { try{ const s=localStorage.getItem(`diq_streak_${u.id}`); return s?parseInt(s):0; }catch{return 0;} })();
+          const lastSeen  = [dbLast, localLast, fdLast].filter(Boolean).sort().pop() || "";
+          // Take highest streak from all sources (most reliable)
+          const bestStreak = Math.max(savedStreak, localStreak, 1);
 
           if (!lastSeen) {
             // Never checked in before — keep whatever streak DB has (could be 1 from signup)
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else if (lastSeen === today) {
             // Already checked in today — show current streak as-is
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else if (lastSeen === yesterday) {
             // Checked in yesterday — streak is still alive
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
@@ -11242,10 +11335,22 @@ export default function DestinIQ(){
             try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
           }
         }
-        if (profile.form_data)  setFormData({
-          ...profile.form_data,
-          last_checkin_date: profile.last_checkin_date||"",
-        });
+        if (profile.form_data){
+          setFormData({
+            ...profile.form_data,
+            last_checkin_date: profile.last_checkin_date||profile.form_data?._last_checkin||"",
+          });
+          // Restore wins from Supabase if localStorage was cleared
+          const _winsFromDB = profile.wins?.length ? profile.wins
+            : (_fd?._wins||[]);
+          if(_winsFromDB?.length){
+            const serverWins = _winsFromDB;
+            const localWins  = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${u.id}`)||"[]"); }catch{ return []; } })();
+            if(serverWins.length > localWins.length){
+              try{ localStorage.setItem(`diq_wins_${u.id}`, JSON.stringify(serverWins)); }catch{}
+            }
+          }
+        }
         if (profile.report)     setReport(profile.report);
         // ── CRITICAL: Always restore exactly where they left off ──
         // Signed-in users must NEVER see the marketing landing page — only
@@ -11273,6 +11378,34 @@ export default function DestinIQ(){
       setProfileLoading(false);
     }
   };
+
+  // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
+  // After Google sign-in, Android fires appUrlOpen with com.destiniq.app://#access_token=...
+  // We extract the tokens and set the Supabase session — browser closes, user lands in app
+  useEffect(()=>{
+    const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
+    if(!isNative) return;
+    let listener = null;
+    import("@capacitor/app").then(({App})=>{
+      App.addListener("appUrlOpen",async({url})=>{
+        if(!url) return;
+        // Tokens are in the URL hash: com.destiniq.app://#access_token=XXX&refresh_token=YYY
+        const hash = url.includes("#") ? url.split("#")[1] : url.split("?")[1]||"";
+        const p = new URLSearchParams(hash);
+        const access_token  = p.get("access_token");
+        const refresh_token = p.get("refresh_token");
+        if(access_token && refresh_token){
+          const{error}=await supabase.auth.setSession({access_token,refresh_token});
+          if(error) console.warn("Deep link auth:",error.message);
+          try{
+            const{Browser}=await import("@capacitor/browser");
+            await Browser.close();
+          }catch{}
+        }
+      }).then(l=>{listener=l;});
+    }).catch(()=>{});
+    return()=>{listener?.remove?.();};
+  },[]);
 
   useEffect(()=>{
     // mountRestored: ref (not state) so it never triggers a re-render.
@@ -11324,7 +11457,6 @@ export default function DestinIQ(){
           setReport(null);
           setIsPaid(false);
           setIsPremium(false);
-          setIsProMax(false);
           setStreak(1);
           setScreen("landing");
           // Clear localStorage only on explicit sign-out
@@ -11381,16 +11513,12 @@ export default function DestinIQ(){
     return()=>clearTimeout(timer);
   },[userId]);
 
-  // Paid users are always Premium — self-correct if state ever drifts out of sync.
-  // Also restore isProMax from localStorage as a secondary safeguard.
+  // Paid users are always Premium in this app — there is no separate paid-but-
+  // not-premium tier in practice. Self-correct instantly if these ever drift
+  // out of sync (e.g. stale localStorage), instead of requiring a manual toggle.
   useEffect(()=>{
-    if(isPaid && !isPremium) setIsPremium(true);
-    if(userId && !isProMax){
-      try{
-        if(localStorage.getItem(`diq_promax_${userId}`)==="1") setIsProMax(true);
-      }catch(_){}
-    }
-  },[isPaid,isPremium,isProMax,userId]);
+    // isPremium = Pro Max ONLY — do not force it for all paid users
+  },[isPaid,isPremium]);
 
   // Listen for policy events from auth screen footer links
   useEffect(()=>{
@@ -11620,8 +11748,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
   const handlePay=async(paystackRef, planKey)=>{
     const isMax = planKey==="promax" || planKey==="promax_annual";
     setIsPaid(true);
-    setIsPremium(true);
-    if(isMax) setIsProMax(true);
+    if(isMax){ setIsPremium(true); setIsProMax(true); }
     // Belt-and-suspenders: write to localStorage here too in case the
     // Paywall's callback missed it (e.g. userId was null at payment time)
     if(userId){
@@ -11739,9 +11866,9 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             else setScreen("intake");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
-            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isProMax?"Pro Max":isPaid?"Pro":"Upgrade"}>
-              <div className="prem-toggle-dot" style={isProMax?{background:"#a78bfa",boxShadow:"0 0 8px rgba(167,139,250,0.5)"}:{}}/>
-              <span className="prem-toggle-label" style={isProMax?{color:"#a78bfa"}:{}}>{isProMax?"PRO MAX":isPaid&&isPremium?"PRO":"UPGRADE"}</span>
+            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isPaid?"Premium":"Upgrade to Premium"}>
+              <div className="prem-toggle-dot"/>
+              <span className="prem-toggle-label">{isPaid&&isPremium?"PREMIUM":"UPGRADE"}</span>
             </div>
             <button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
@@ -11796,7 +11923,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             await supabase.auth.signOut();
             // Also clear state immediately in case onAuthStateChange fires slowly
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
-            setIsPaid(false);setIsPremium(false);setIsProMax(false);setNavPhotoURL(null);setStreak(1);
+            setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
             try{
               Object.keys(localStorage).forEach(k=>{
@@ -11832,7 +11959,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
-              streak={streak} setStreak={setStreak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
+              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
               showTracker={showTracker} setShowTracker={setShowTracker}/>
         )}
         {screen==="results"  &&formData&&!report&&(
