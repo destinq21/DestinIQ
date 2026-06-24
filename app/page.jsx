@@ -100,6 +100,7 @@
  *   is_paid     boolean default false,
  *   is_premium  boolean default false,
  *   streak      int default 1,
+ *   wins        text,                                -- JSON array of win objects (added for cross-device persistence)
  *   paystack_ref text,
  *   paid_plan   text,
  *   paid_at     timestamptz,
@@ -182,7 +183,13 @@ class ErrorBoundary extends React.Component {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
-// Capacitor plugins accessed via window.Capacitor.Plugins (no imports needed)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Load Capacitor Browser for in-app OAuth on mobile
+if(typeof window !== "undefined"){
+  import("@capacitor/browser").then(m=>{
+    window.CapacitorBrowser = m.Browser;
+  }).catch(()=>{});
+}
 
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
@@ -295,7 +302,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -484,8 +491,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
   const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
   if(isNative){
     try{
-      const LocalNotifications = window?.Capacitor?.Plugins?.LocalNotifications;
-      if(!LocalNotifications) throw new Error("LocalNotifications not available");
+      const { LocalNotifications } = await import("@capacitor/local-notifications");
       const perm = await LocalNotifications.requestPermissions();
       if(perm.display !== "granted"){
         console.warn("Notification permission denied");
@@ -565,9 +571,6 @@ const CSS = `
 }
 html{scroll-behavior:smooth;}
 body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
-/* Safe area for notched phones (iPhone X+, Android notch) */
-.nav{padding-top:max(12px,env(safe-area-inset-top))!important;padding-left:max(16px,env(safe-area-inset-left))!important;padding-right:max(16px,env(safe-area-inset-right))!important;}
-.fu{padding-bottom:max(80px,env(safe-area-inset-bottom))!important;}
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
 .bg-mesh{background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(31,168,154,0.07) 0%,transparent 55%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(210,175,90,0.08) 0%,transparent 55%),radial-gradient(ellipse 50% 40% at 80% 20%,rgba(124,92,191,0.05) 0%,transparent 50%),var(--void);}
 .bg-noise{opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:128px;}
@@ -713,63 +716,25 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 }
 /* Mobile: ≤640px */
 @media(max-width:640px){
-  /* ── Base ── */
-  html,body{overflow-x:hidden!important;max-width:100vw!important;-webkit-text-size-adjust:100%;}
-  *{box-sizing:border-box!important;}
-  p,h1,h2,h3,h4,span,div{word-wrap:break-word!important;overflow-wrap:break-word!important;}
-
-  /* ── Layout ── */
-  .cx,.cx-sm,.cx-md{padding:0 16px!important;}
-  .fu{padding:0 0 80px!important;}/* extra bottom for thumb zone */
-
-  /* ── Typography — readable at arm's length ── */
-  .body-lg{font-size:15px!important;line-height:1.75!important;max-width:100%!important;}
-  p{max-width:100%!important;padding-right:0!important;font-size:14px!important;line-height:1.7!important;}
-  .d1{font-size:clamp(28px,8vw,46px)!important;line-height:1.1!important;}
-  .d2{font-size:clamp(22px,6vw,34px)!important;line-height:1.2!important;}
-  .d3{font-size:clamp(18px,5vw,26px)!important;line-height:1.3!important;}
-  .small,.mono{font-size:12px!important;}
-
-  /* ── Nav bar ── */
-  .nav{padding:0 16px!important;height:56px!important;}
-  .nav-r{gap:8px!important;}
-  .prem-badge{font-size:9px!important;padding:4px 10px!important;border-radius:20px!important;}
-  .streak-badge{padding:6px 12px!important;font-size:10px!important;}
-  .streak-fire{font-size:14px!important;}
-
-  /* ── Cards ── */
-  .card{padding:16px!important;border-radius:16px!important;margin-bottom:12px!important;}
-  .card-sm{padding:14px!important;border-radius:14px!important;}
-  .lock-gate{padding:20px 16px!important;}
-  .insight{padding:14px 16px!important;}
-
-  /* ── Tabs — module groups ── */
-  .tabs{display:flex!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
-    scrollbar-width:none!important;gap:6px!important;padding:6px 2px!important;
-    grid-template-columns:unset!important;}
-  .tabs::-webkit-scrollbar{display:none!important;}
-  .tab{flex-shrink:0!important;font-size:11px!important;padding:9px 12px!important;
-    min-width:64px!important;min-height:44px!important;border-radius:12px!important;
-    display:flex!important;flex-direction:column!important;align-items:center!important;gap:4px!important;}
-  .tab span:first-child{font-size:15px!important;}/* icon bigger */
-  .tab span:last-child{font-size:10px!important;white-space:nowrap!important;}
-
-  /* ── Tab bar (sub-tabs) ── */
-  .tab-bar{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
-    scrollbar-width:none!important;padding-bottom:4px!important;}
-  .tab-bar::-webkit-scrollbar{display:none!important;}
-  .tab-bar button{font-size:11px!important;padding:9px 14px!important;
-    white-space:nowrap!important;min-height:40px!important;}
-
-  /* ── Buttons — 44px min tap target ── */
-  .btn{min-height:44px!important;font-size:14px!important;padding:12px 20px!important;border-radius:12px!important;}
-  .btn-lg{min-height:52px!important;font-size:15px!important;padding:14px 24px!important;}
-  .btn-sm{min-height:36px!important;font-size:12px!important;padding:8px 14px!important;}
-  button{min-height:36px!important;}
-
-  /* ── Grids → single column on mobile ── */
+  .body-lg{font-size:14px!important;max-width:100%!important;}
+  p{max-width:100%!important;padding-right:0!important;}
+  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
+  body{overflow-x:hidden!important;max-width:100vw!important;}
+  .nav{padding:0 14px!important;}
+  .card{padding:14px!important;border-radius:14px!important;}
+  .fu{padding:0 0 40px!important;}
+  .d1{font-size:clamp(26px,8vw,48px)!important;line-height:1.1!important;}
+  .d2{font-size:clamp(20px,6vw,34px)!important;}
+  .d3{font-size:clamp(17px,5vw,24px)!important;}
+  .tabs{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px;padding:4px;grid-template-columns:unset;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex-shrink:0;font-size:9.5px;padding:7px 10px;min-width:58px;}
+  .tab span:first-child{font-size:13px;}
+  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tab-bar::-webkit-scrollbar{display:none;}
+  .tab-bar button{font-size:10px!important;padding:7px 10px!important;white-space:nowrap;}
   .results-grid{grid-template-columns:1fr!important;}
-  .hero-grid{grid-template-columns:1fr!important;gap:24px!important;}
+  .hero-grid{grid-template-columns:1fr!important;gap:28px!important;}
   .row2{grid-template-columns:1fr!important;}
   .plan-cards-grid{grid-template-columns:1fr!important;}
   .paywall-faq{grid-template-columns:1fr!important;}
@@ -777,52 +742,40 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .reloc-grid{grid-template-columns:1fr!important;}
   .score-explain-grid{grid-template-columns:1fr!important;}
   .score-grid{grid-template-columns:1fr 1fr!important;}
-  .reloc-stats{grid-template-columns:repeat(2,1fr)!important;}
-  .mom-stat-grid{grid-template-columns:repeat(2,1fr)!important;}
-
-  /* ── Misc layout fixes ── */
+  .reloc-stats{grid-template-columns:repeat(3,1fr)!important;}
+  .mom-stat-grid{grid-template-columns:repeat(3,1fr)!important;}
   .pillar-wrap{flex-direction:column!important;align-items:stretch!important;}
   .pillar-wrap>div:last-child{min-width:unset!important;}
+  .nav-r{gap:5px!important;}
+  .streak-badge{padding:5px 10px!important;font-size:9px!important;}
+  .streak-fire{font-size:13px!important;}
   .pbar-wrap{width:100%!important;max-width:100%!important;}
-  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:10px!important;}
-  .reloc-header{padding:16px!important;}
-  .reloc-body{padding:16px!important;}
-
-  /* ── Module group section labels ── */
-  .module-group-label{font-size:9px!important;letter-spacing:.15em!important;padding:6px 4px 4px!important;}
-
-  /* ── Score cards bigger on mobile ── */
-  .score-card{padding:16px!important;min-height:80px!important;}
-  .score-num{font-size:36px!important;}
-
-  /* ── Inputs ── */
-  input,select,textarea{font-size:16px!important;min-height:48px!important;}/* 16px prevents iOS zoom */
-  textarea{min-height:80px!important;}
+  .lock-gate{padding:16px!important;}
+  .insight{padding:12px 14px!important;}
+  .reloc-header{padding:14px 16px 12px!important;}
+  .reloc-body{padding:14px 16px!important;}
+  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:8px!important;}
 }
 /* Small phones: ≤420px */
 @media(max-width:420px){
-  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
-  .d1{font-size:clamp(24px,7.5vw,40px)!important;}
-  .d2{font-size:clamp(20px,6vw,30px)!important;}
-  .d3{font-size:clamp(17px,5vw,24px)!important;}
-  .card{padding:14px!important;}
-  .body-lg{font-size:14px!important;}
-  p{font-size:13px!important;}
-  .tab{font-size:10px!important;padding:8px 10px!important;min-width:56px!important;}
-  .tab span:first-child{font-size:14px!important;}
+  .body-lg{font-size:13px!important;}
+  p{max-width:100%!important;}
+  .cx,.cx-sm,.cx-md{padding:0 12px!important;}
+  .d1{font-size:clamp(22px,7.5vw,40px)!important;}
+  .d2{font-size:clamp(18px,5.5vw,28px)!important;}
+  .card{padding:12px!important;}
   .nav-logo{font-size:15px!important;}
-  input,select,textarea{font-size:16px!important;}/* prevent iOS zoom */
+  .tab{font-size:9px!important;padding:6px 8px!important;min-width:50px!important;}
+  .plan-cards-grid{grid-template-columns:1fr!important;}
 }
 /* Very small screens: ≤360px */
 @media(max-width:360px){
-  .cx,.cx-sm,.cx-md{padding:0 12px!important;box-sizing:border-box!important;}
+  .cx,.cx-sm,.cx-md{padding:0 20px!important;box-sizing:border-box!important;}
   body,html{overflow-x:hidden!important;width:100%!important;}
   p,h1,h2,h3{word-wrap:break-word!important;overflow-wrap:break-word!important;max-width:100%!important;}
-  .d1{font-size:24px!important;}
-  .d2{font-size:19px!important;}
-  .tab{font-size:9.5px!important;padding:7px 8px!important;min-width:52px!important;}
-  .card{padding:12px!important;}
-  input,select{font-size:16px!important;}
+  .d1{font-size:22px!important;}
+  .tab{font-size:8.5px!important;padding:5px 6px!important;min-width:44px!important;}
+  .card{padding:10px!important;}
 }
 /* Notch / safe area (iPhone X+, modern Android) */
 @supports(padding:max(0px)){
@@ -941,13 +894,14 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
   // Get the current session token so the server can verify this is a real logged-in user
   const{data:{session}}=await supabase.auth.getSession();
+  const autoTokens = isProMax?6000:isPremium?4000:1800;
   const res=await fetch("/api/analyze",{
     method:"POST",
     headers:{
       "Content-Type":"application/json",
       ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
     },
-    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isProMax?6000:isPremium?4000:1800)}),
+    body:JSON.stringify({system,messages,max_tokens:maxTokens||autoTokens}),
   });
   if(!res.ok){
     const e=await res.json().catch(()=>({}));
@@ -1425,11 +1379,13 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const loc=ipLocation?.city?`${ipLocation.city}, ${country}`:country;
 
   // Currency rules baked in
-  // Resolve local currency for this user's country
   const {code:currCode, symbol:currSym} = getLocalCurrency(country);
-  const currencyNote=`MANDATORY CURRENCY RULES:
-COSTS/SAVINGS/STARTUP = LOCAL CURRENCY ONLY: ${country} uses ${currCode} (${currSym}). Write ALL prices, rents, costs in ${currSym}. NEVER use $ for costs in ${country}.
-EARNINGS FROM ONLINE WORK = USD. Earnings on Upwork/Fiverr/remote = USD, add local equivalent in brackets e.g. "$500 (${currSym}3,500/month)".`;
+  const payCtx = getCountryPaymentContext(country);
+  const currencyNote=`MANDATORY CURRENCY RULES — VIOLATION = WRONG ANSWER:
+1. ALL costs, prices, rents, startup costs, savings MUST be in ${currSym} (${currCode}). NEVER use $, ₦, ₹, R, KSh or any other currency for local costs in ${country}.
+2. Earnings from online/remote work = USD first, then ${currSym} equivalent in brackets e.g. "$500/month (${currSym}7,500)".
+3. DO NOT use Nigerian Naira (₦), Indian Rupee (₹), or any other country's currency. This person is in ${country}. Local currency = ${currSym} ONLY.
+4. Online income platforms: ONLY recommend these verified for ${country}: ${payCtx.platforms.slice(0,5).join(", ")}. DO NOT recommend: ${payCtx.avoid.join(", ")||"none"}. Payout: ${payCtx.works[0]}.`;
 
   return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
 
@@ -2028,7 +1984,7 @@ function ContentSlice({children, totalCount, freeCount=3, isPaid, onUnlock, what
 // ═══════════════════════════════════════════════════════════════════════════════
 // MOMENTUM MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
-function MomentumModule({profile,userId,isPremium,isProMax,streak}){
+function MomentumModule({profile,userId,isPremium,streak}){
   const log=getMomentumLog(userId);
   const today=new Date().toDateString();
   const todayEntry=log.find(e=>e.date===today);
@@ -2055,8 +2011,16 @@ function MomentumModule({profile,userId,isPremium,isProMax,streak}){
     setSaved(true);rerender(n=>n+1);
   };
 
+  const defaultTasks = [
+    {text:"Complete today's check-in", done:false},
+    {text:"Review your report goals",  done:false},
+    {text:"Make one decision using the Decision module", done:false},
+  ];
+
   const toggleTask=(i)=>{
-    const next=tasks.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
+    // If tasks haven't been persisted yet, seed from the visible defaults first
+    const base = tasks.length ? tasks : defaultTasks;
+    const next=base.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
     setTasks(next);
     try{ localStorage.setItem("diq_tasks_"+userId,JSON.stringify(next)); }catch{}
   };
@@ -2071,12 +2035,10 @@ function MomentumModule({profile,userId,isPremium,isProMax,streak}){
   const allAvg=log.length?Math.round(log.reduce((s,e)=>s+avgOf(e),0)/log.length):0;
   const trend=log.length>=2?avgOf(log[log.length-1])-avgOf(log[log.length-2]):0;
 
-  // Default tasks if none set yet
-  const displayTasks = tasks.length ? tasks : [
-    {text:"Complete today's check-in",done:saved},
-    {text:"Review your report goals",done:false},
-    {text:"Make one decision using the Decision module",done:false},
-  ];
+  // Default tasks if none set yet — also correct check-in state live
+  const displayTasks = tasks.length
+    ? tasks.map((t,i)=>i===0?{...t,done:saved||t.done}:t)
+    : defaultTasks.map((t,i)=>i===0?{...t,done:saved}:t);
 
   return(
     <div className="fu">
@@ -2228,7 +2190,7 @@ function MomentumModule({profile,userId,isPremium,isProMax,streak}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY PULSE
 // ═══════════════════════════════════════════════════════════════════════════════
-function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
+function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
   const log=getMomentumLog(userId);
   const [loading,setLoading]=useState(false);
   const [report,setReport]=useState((_weeklyReports.get(userId)||[])[0]||null);
@@ -2251,7 +2213,7 @@ function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
       const country=sanitize(profile?.country)||"your country";
       const goal=sanitize(profile?.goals)||"your goal";
       const challenge=sanitize(profile?.challenge)||"your challenge";
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],isProMax,system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium});
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium,isProMax});
 
       // Guard against the AI declining to answer / asking for more info
       const badPhrases=["i don't have","i need more","could you share","no context","please tell","can you provide","i don't have enough","no information"];
@@ -2280,15 +2242,7 @@ function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Your week, honestly reflected back</div><p className="small">We look at what you've been carrying this week and tell you what we see.</p></div>
-          {isPaid&&(
-  <div className="prem-badge" style={{
-    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
-    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
-    color:isPremium?"#9b72cf":"var(--gold-bright)",
-  }}>
-    {isPremium?"✦ PRO MAX":"◆ PRO"}
-  </div>
-)}
+          {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2355,7 +2309,7 @@ function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // DECISION INBOX
 // ═══════════════════════════════════════════════════════════════════════════════
-function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
+function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
   const [question,setQuestion]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
@@ -2375,7 +2329,8 @@ function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
         messages:[{role:"user",content:buildDecisionPrompt(profile,q,isPremium,"")}],
         system:decisionSys,
         userId,
-        isPremium
+        isPremium,
+        isProMax
       });
       addDecision(userId,{id:Date.now(),question:q,framework:fw,date:new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short"})});
       setDecisions(getDecisions(userId));setQuestion("");
@@ -2389,15 +2344,7 @@ function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Help me think this through</div><p className="small">You're not alone in this decision. Drop it here and we'll think it through with you — honestly.</p></div>
-          {isPaid&&(
-  <div className="prem-badge" style={{
-    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
-    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
-    color:isPremium?"#9b72cf":"var(--gold-bright)",
-  }}>
-    {isPremium?"✦ PRO MAX":"◆ PRO"}
-  </div>
-)}
+          {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2600,9 +2547,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
           if(userId){
             try{
               localStorage.setItem(`diq_paid_${userId}`, "1");
-              // Only set premium flag for Pro Max tier
-              if(tier==="promax") localStorage.setItem(`diq_prem_${userId}`, "1");
-              else localStorage.removeItem(`diq_prem_${userId}`);
+              localStorage.setItem(`diq_prem_${userId}`, "1");
               localStorage.setItem(`diq_paystack_ref_${userId}`, response.reference);
             }catch(_){}
           }
@@ -2614,7 +2559,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
             await supabase.from("user_profiles").upsert({
               user_id:    uid,
               is_paid:    true,
-              is_premium: (tier==="promax"||tier==="promax_annual"),
+              is_premium: true,
               paystack_ref: response.reference,
               paid_plan:  planKey,
               paid_at:    new Date().toISOString(),
@@ -2679,7 +2624,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
     {text:"Weekly Pulse — your week, analyzed",inc:true},
     {text:"Relocate — explore any country",inc:true},
     {text:"All module refreshes anytime",inc:true},
-    {text:"My Advisor — 10 messages/day",inc:true}, // Pro limit
+    {text:"My Advisor — 10 messages/day",inc:true},
     {text:"Edit profile & re-generate report",inc:true},
   ];
 
@@ -2953,31 +2898,31 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
+function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlock}){
   const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
-  // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
-  const FREE_DAILY_LIMIT = 1;  // Free: 1 message/day
-  const PRO_DAILY_LIMIT  = 10; // Pro: 10 messages/day (Pro Max = unlimited)ers: 2 advisor messages per day
+  // ── MESSAGE LIMITS BY TIER ────────────────────────────────────────────────
+  // Free: 1/day · Pro: 10/day · Pro Max: unlimited
+  const FREE_DAILY_LIMIT=1;
+  const PRO_DAILY_LIMIT=10;
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [usedToday,setUsedToday]=useState(()=>{
     if(typeof window==="undefined") return 0;
     return parseInt(localStorage.getItem(limitKey)||"0");
   });
-  // Tier-based limits: Free=1/day, Pro=10/day, ProMax=unlimited
-  const dailyLimit    = isPremium ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
-  const remaining     = Math.max(0, dailyLimit === Infinity ? 999 : dailyLimit - usedToday);
-  const limitReached  = dailyLimit !== Infinity && remaining <= 0;
+  const dailyLimit = isProMax ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const remaining=Math.max(0,dailyLimit===Infinity?999:dailyLimit-usedToday);
+  const limitReached = dailyLimit!==Infinity && usedToday>=dailyLimit;
 
   const send=async()=>{
     if(!input.trim()||loading) return;
     if(limitReached){ onUnlock&&onUnlock(); return; }
     const msg=sanitize(input.trim());setInput("");setError("");
-    if(!isPaid){
+    if(!isProMax){
       const next=usedToday+1;
       setUsedToday(next);
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
@@ -3020,7 +2965,11 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
     <div className="fu">
       <div style={{marginBottom:20}}>
         <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPremium&&<span style={{color:"var(--gold)"}}>✦ Unlimited access — Pro Max.</span>}{isPaid&&!isPremium&&<span style={{color:"var(--cream-40)"}}> {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}</p>
+        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version.{" "}
+          {isProMax&&<span style={{color:"var(--teal)"}}>✦ Pro Max — unlimited messages.</span>}
+          {isPaid&&!isProMax&&<span style={{color:"var(--gold)"}}>✦ Pro — {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}
+          {!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}
+        </p>
       </div>
       <div className="card">
         <div className="chat-scroll" ref={scrollRef}>
@@ -3047,7 +2996,11 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
         {limitReached?(
           <div style={{textAlign:"center",padding:"16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,marginTop:10}}>
-            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>{isPaid?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`:`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade to Pro for 10/day.`}</p>
+            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>
+              {isPaid&&!isProMax
+                ?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`
+                :`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade for more.`}
+            </p>
             <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:13,padding:"8px 20px"}}>Upgrade now</button>
           </div>
         ):(
@@ -4620,12 +4573,9 @@ function AuthScreen({onAuth, onBack}){
       const{data,error:err}=await supabase.auth.signInWithOAuth({
         provider:"google",
         options:{
-          // Use deep link scheme so Android hands control back to the app
-          redirectTo: window?.Capacitor?.isNativePlatform?.()
-            ? "com.destiniq.app://"
-            : window.location.origin,
+          redirectTo:"https://destiniq.vercel.app",
           queryParams:{prompt:"select_account"},
-          skipBrowserRedirect:true,
+          skipBrowserRedirect:true, // Don't auto-redirect — we handle it
         },
       });
       if(err){setError(err.message);setLoading(false);return;}
@@ -4634,18 +4584,11 @@ function AuthScreen({onAuth, onBack}){
         const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
         if(isNative && window?.CapacitorBrowser){
           // Use in-app browser — stays inside the app, no Chrome
-          // Use Capacitor Browser via global plugin — no import needed
-          const CapBrowser = window?.Capacitor?.Plugins?.Browser;
-          if(CapBrowser){
-            await CapBrowser.open({
-              url: data.url,
-              presentationStyle: "popover",
-              toolbarColor: "#0a0a0f",
-            });
-          } else {
-            // Fallback — open in system browser
-            window.open(data.url, "_blank");
-          }
+          await window.CapacitorBrowser.open({
+            url: data.url,
+            windowName: "_self",
+            presentationStyle: "fullscreen",
+          });
         } else {
           // Web — normal redirect
           window.location.href = data.url;
@@ -6140,6 +6083,65 @@ function VoiceInput({value,onChange,rows=4,maxLength=600,placeholder=""}){
 
 
 // ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
+// Returns payment platform accessibility per country so online income
+// recommendations are always actionable for the user's actual location.
+function getCountryPaymentContext(country){
+  const c=(country||"").toLowerCase();
+  if(c.includes("ghana")) return {
+    works:["Payoneer (most reliable for Ghana)","Wise","Flutterwave","MTN Mobile Money","Vodafone Cash","AirtelTigo Money","direct bank wire"],
+    limited:["PayPal (receive only — cannot easily withdraw to GH bank)"],
+    broken:["Stripe (not available for Ghana businesses)","Zelle","Venmo","Cash App"],
+    platforms:["Upwork (Payoneer/Wise payout — works)","Fiverr (Payoneer/bank — works)","Toptal","Remotasks (Payoneer)","Contra","Deel","PeoplePerHour","Lemon.io"],
+    avoid:["Appen (PayPal payments — problematic)","Rev.com (PayPal)","UserTesting (PayPal required)"],
+    note:"Ghana has strong mobile money. Payoneer is the #1 choice for Ghanaian freelancers receiving USD."
+  };
+  if(c.includes("nigeria")) return {
+    works:["Payoneer","Wise","Flutterwave","Paystack","Chipper Cash","GTBank domiciliary account"],
+    limited:["PayPal (severely restricted in Nigeria)"],
+    broken:["Stripe","Zelle","Venmo","Cash App"],
+    platforms:["Upwork","Fiverr","Toptal","Andela","Remotasks","Contra","Deel","PeoplePerHour"],
+    avoid:["Rev.com (PayPal)","Appen (PayPal)","UserTesting (PayPal)"],
+    note:"Payoneer is the safest choice for Nigerian freelancers. Always verify payout method before starting."
+  };
+  if(c.includes("kenya")) return {
+    works:["M-Pesa","Payoneer","Wise","Flutterwave","direct bank transfer"],
+    limited:["PayPal (functional but with limits)"],
+    broken:["Stripe (not for KE businesses)"],
+    platforms:["Upwork","Fiverr","Toptal","Remotasks","Appen","Rev.com","Prolific","Contra"],
+    avoid:[],
+    note:"Kenya has excellent mobile money via M-Pesa. Most platforms work here."
+  };
+  if(c.includes("south africa")) return {
+    works:["PayPal","Payoneer","Wise","direct EFT","Capitec","FNB"],
+    limited:[],
+    broken:["Stripe (not for SA businesses)"],
+    platforms:["Upwork","Fiverr","Toptal","Remotasks","Appen","Rev.com","UserTesting","Prolific"],
+    avoid:[],
+    note:"South Africa has the most accessible payment infrastructure on the continent."
+  };
+  if(c.includes("india")) return {
+    works:["PayPal","Payoneer","Wise","Razorpay","UPI","direct SWIFT"],
+    limited:[],broken:[],
+    platforms:["Upwork","Fiverr","Toptal","Freelancer","99designs","Appen","Rev.com","UserTesting","Prolific"],
+    avoid:[],
+    note:"India has excellent payment infrastructure. All major platforms available."
+  };
+  if(c.includes("philippines")) return {
+    works:["PayPal","Payoneer","Wise","GCash","Maya","direct wire"],
+    limited:[],broken:[],
+    platforms:["Upwork","Fiverr","Freelancer","OnlineJobs.ph","Appen","Rev.com","Remotasks","Prolific"],
+    avoid:[],
+    note:"Philippines has a mature freelance ecosystem. GCash and PayPal are the most common payout methods."
+  };
+  return {
+    works:["Payoneer","Wise","PayPal (verify availability)","direct bank wire"],
+    limited:["Stripe (check local availability)"],broken:[],
+    platforms:["Upwork","Fiverr","Toptal","Remotasks","Contra","Deel","PeoplePerHour"],
+    avoid:[],
+    note:`Always verify payment withdrawal options work in ${country} before committing to a platform.`
+  };
+}
+
 // Detects the correct local currency from the user's country name.
 function getLocalCurrency(country){
   if(!country) return {code:"USD",symbol:"$"};
@@ -6183,14 +6185,21 @@ async function regenerateModule(key, profile, userId, isPremium, setData, setLoa
   const name     = profile?.name     || "the user";
   const income   = profile?.income   || "Under $500";
   const challenge= profile?.challenge|| "getting started";
-  // Resolve local currency — MUST happen before currencyNote is built
+  // Resolve local currency and payment accessibility — MUST happen before prompts are built
   const {code:currCode, symbol:currSym} = getLocalCurrency(country);
-  const currencyNote = `MANDATORY CURRENCY RULES:
-COSTS/STARTUP/SAVINGS = LOCAL CURRENCY: ${country} uses ${currCode} (${currSym}). All prices, startup costs, rents, savings must be in ${currSym}. NEVER use $ for costs in ${country}.
-EARNINGS FROM ONLINE WORK = USD only — add local equivalent in brackets e.g. "$800/month (${currSym}12,000)".`;
-  const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
-  const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
-  const todayPlatforms=platformSets[dayIndex];
+  const payCtx = getCountryPaymentContext(country);
+  const currencyNote = `MANDATORY CURRENCY RULES — VIOLATION = WRONG ANSWER:
+1. ALL costs, prices, startup costs, rents, savings MUST be in ${currSym} (${currCode}). NEVER use $, ₦, ₹, R, KSh or any other symbol for local costs in ${country}.
+2. Earnings from online/remote work = USD first, then ${currSym} in brackets e.g. "$500/month (${currSym}7,500)".
+3. DO NOT use Nigerian Naira (₦), Indian Rupee (₹), South African Rand (R), Kenyan Shilling, or any other country's currency. This user is in ${country}. Local currency = ${currSym} only.`;
+  const paymentNote = `PAYMENT PLATFORMS — ${country.toUpperCase()} SPECIFIC (CRITICAL — ONLY RECOMMEND WHAT WORKS HERE):
+✅ PAYMENT METHODS THAT WORK IN ${country}: ${payCtx.works.join(", ")}
+⚠️ LIMITED/AVOID: ${[...payCtx.limited,...payCtx.broken].join(", ")||"none"}
+✅ FREELANCE PLATFORMS THAT PAY IN ${country}: ${payCtx.platforms.join(", ")}
+❌ DO NOT RECOMMEND (payment issues for ${country} users): ${payCtx.avoid.join(", ")||"none"}
+${payCtx.note}`;
+  // Use country-verified platforms instead of a blind rotation
+  const todayPlatforms = payCtx.platforms.slice(0,3).join(", ");
 
   const prompts={
     life_hacks:`${currencyNote}
@@ -6226,7 +6235,9 @@ Write 4 emotional strength practices for ${name} facing: "${challenge}". Each mu
 Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
     online_income:`${currencyNote}
 
-Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
+${paymentNote}
+
+Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. ONLY recommend platforms from the verified list above that work in ${country}. NEVER recommend platforms in the DO NOT RECOMMEND list. Return ONLY JSON array: [{"method":"Platform name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences mentioning how they get paid","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"${currSym} equivalent e.g. GH₵ X,XXX/month","how_to_get_paid":"Exact payout method for ${country} users"}]`,
     zero_income_business:`${currencyNote}
 
 Generate business ideas for ${name} in ${country} that need zero capital. Think about daily needs in ${country}: food, drinks, transport, mobile data, cleaning, laundry, hair, barbering, phone repair, clothing, event services. Also bars and food joints. ${currencyNote} Return ONLY JSON: {"idea":"Best zero-capital idea for ${country}","why_zero":"Why zero capital needed","day_one":"Exact Day 1 action in ${country}","first_revenue":"When and how much in local currency","scale":"How to grow to employ others","alternatives":["5 more zero-capital ideas for ${country} covering food/drinks, services, trading, digital, creative"]}`,
@@ -6300,7 +6311,7 @@ function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     setEmotional(e);
     if(!h.length && formData) setTimeout(()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr),300);
     if(!e.length && formData) setTimeout(()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr),1800);
-  },[]);
+  },[formData?.country]);
 
   return(
     <div className="fu">
@@ -6702,7 +6713,7 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     setMp(mp0); setRe(re0);
     if(!mp0.rule&&formData) setTimeout(()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE),300);
     if(!re0.method&&formData) setTimeout(()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE),2500);
-  },[]);
+  },[formData?.country]);
   const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Save: ${mp.savings_target}`,mp.avoid&&`Stop spending on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
   const reAudio=[re.method&&`Method: ${re.method}`,re.how_it_works,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
   return(
@@ -6772,7 +6783,7 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     const saved=Array.isArray(data?.online_income)?data.online_income:[];
     setOnline(saved);
     if(!saved.length&&formData) setTimeout(()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr),300);
-  },[]);
+  },[formData?.country]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
   return(
@@ -6804,6 +6815,11 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
                 <b style={{color:"var(--teal)"}}>Start in 48 hours: </b>{o.first_step}
               </div>
             )}
+            {o.how_to_get_paid&&(
+              <div style={{padding:"8px 12px",background:"rgba(210,175,90,0.04)",borderRadius:8,fontSize:12,color:"rgba(255,255,255,0.45)",borderLeft:"2px solid rgba(210,175,90,0.3)",lineHeight:1.6}}>
+                <b style={{color:"var(--gold)"}}>How you get paid: </b>{o.how_to_get_paid}
+              </div>
+            )}
             <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
           </div>
         ))}
@@ -6824,7 +6840,7 @@ function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     setZb(zb0); setPb(pb0);
     if(!zb0.idea&&formData) setTimeout(()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE),300);
     if(!pb0.length&&formData) setTimeout(()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE),2500);
-  },[]);
+  },[formData?.country]);
   const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
@@ -7179,36 +7195,25 @@ function StreakLeaderboard({userId}){
   );
 }
 
-// Wins: user-specific localStorage key + Supabase backup
-const WIN_STORE_KEY=(uid)=>`diq_wins_${uid||"guest"}`;
-function loadWins(uid){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");}catch{return[];}}
-function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(w));}catch{}}
+function winsKey(userId){ return `destiniq_wins_${userId||"anon"}_v1`; }
+function loadWins(userId){
+  try{ return JSON.parse(localStorage.getItem(winsKey(userId))||"[]"); }catch{ return []; }
+}
+function saveWins(w, userId){
+  try{ localStorage.setItem(winsKey(userId), JSON.stringify(w)); }catch{}
+}
+async function saveWinsToSupabase(userId, wins){
+  if(!userId) return;
+  try{
+    await supabase.from("user_profiles").upsert(
+      {user_id:userId, wins:JSON.stringify(wins), updated_at:new Date().toISOString()},
+      {onConflict:"user_id"}
+    );
+  }catch(e){ console.warn("wins save:",e.message); }
+}
 
 function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const [wins,setWins]=useState(()=>loadWins(userId));
-  // Load wins from Supabase on mount (in case localStorage was cleared)
-  useEffect(()=>{
-    if(!userId) return;
-    supabase.from("user_profiles").select("form_data,wins").eq("user_id",userId).single()
-      .then(({data})=>{
-        const rawWins = data?.wins?.length ? data.wins
-          : (()=>{
-              try{
-                const fd=typeof data?.form_data==="string"?JSON.parse(data.form_data):data?.form_data;
-                return fd?._wins||[];
-              }catch{return[];}
-            })();
-        if(rawWins?.length){
-          const serverWins = rawWins;
-          const localWins  = loadWins(userId);
-          // Merge — take whichever has more wins
-          if(serverWins.length > localWins.length){
-            setWins(serverWins);
-            saveWins(serverWins, userId);
-          }
-        }
-      }).catch(()=>{});
-  },[userId]);
   const [input,setInput]=useState("");
   const [mood,setMood]=useState(null);
   const [celebrate,setCelebrate]=useState("");
@@ -7220,30 +7225,32 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const streakDays=[...new Set(wins.map(w=>w.date))].sort().reverse();
   const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
 
+  // On mount — load wins from Supabase in case localStorage was cleared (sign-out wipe etc.)
+  useEffect(()=>{
+    if(!userId) return;
+    supabase.from("user_profiles").select("wins").eq("user_id",userId).single()
+      .then(({data})=>{
+        if(!data?.wins) return;
+        try{
+          const remote=JSON.parse(data.wins);
+          if(!Array.isArray(remote)||remote.length===0) return;
+          const local=loadWins(userId);
+          // Merge: take the longer list (most data), then deduplicate by id
+          const merged=[...remote,...local].filter((v,i,a)=>a.findIndex(x=>x.id===v.id)===i)
+            .sort((a,b)=>b.ts?.localeCompare(a.ts||"")||0);
+          setWins(merged);
+          saveWins(merged,userId);
+        }catch(_){}
+      }).catch(()=>{});
+  },[userId]);
+
   const FREE_WIN_LIMIT=10;
   const addWin=async()=>{
     if(!input.trim()) return;
     if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
     const win={id:Date.now(),text:input.trim(),date:todayKey,mood,ts:new Date().toISOString()};
     const updated=[win,...wins];
-    setWins(updated);
-    saveWins(updated, userId); // localStorage (instant)
-    // Supabase backup — save wins inside form_data._wins
-    if(userId){
-      supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
-        .then(({data})=>{
-          // form_data is TEXT — parse first
-          const fd2 = typeof data?.form_data==="string"
-            ? (()=>{try{return JSON.parse(data.form_data);}catch{return{};}})()
-            : (data?.form_data||{});
-          return supabase.from("user_profiles").upsert({
-            user_id: userId,
-            wins: updated.slice(0,200), // dedicated wins column (jsonb)
-            form_data: JSON.stringify({...fd2, _wins: updated.slice(0,200)}), // fallback
-          },{onConflict:"user_id"});
-        }).catch(()=>{});
-    }
-    setInput("");setMood(null);
+    setWins(updated);saveWins(updated,userId);saveWinsToSupabase(userId,updated);setInput("");setMood(null);
     // AI celebration
     setLoading(true);
     try{
@@ -7335,8 +7342,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
                     <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",margin:0,lineHeight:1.6}}>{w.text}</p>
                     {w.mood&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{w.mood}</span>}
                   </div>
-                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);
-                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).catch(()=>{});}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);saveWinsToSupabase(userId,u);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
@@ -9215,7 +9221,7 @@ function StreakCelebration({streak, onClose}){
   );
 }
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
+function Dashboard({data,formData,isPaid,onUnlock,streak,setStreak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -9234,10 +9240,17 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
 
   // Auto-fill closing — runs when formData loads
   useEffect(()=>{
-    if(!formData?.name) return; // not loaded yet
+    if(!formData?.name) return;
     const bad = ["i don't have","i need more","no context","no posts","generating","click","placeholder","there, their"];
     const isBad = !closingLine || closingLine.length < 10 || bad.some(p=>closingLine.toLowerCase().includes(p));
-    if(isBad) setTimeout(()=>refreshClosing(), 1200);
+    if(isBad){
+      // Set an immediate local fallback so the UI is never stuck indefinitely
+      const n = sanitize(formData?.name)||"";
+      const g = sanitize(formData?.goals||formData?.bigGoal)||"what you're building";
+      if(n) setClosingLine(`${n}, the distance between where you are and where you want to be is smaller than it feels right now — it just requires the next honest step toward "${g.slice(0,50)}${g.length>50?"...":""}".`);
+      // Then try to get a better AI-generated one
+      setTimeout(()=>refreshClosing(), 1200);
+    }
   // eslint-disable-next-line
   },[formData?.name]);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
@@ -9296,14 +9309,14 @@ Do NOT use generic motivational language. Do NOT ask for more information — wo
     if(refreshingClosing) return;
     setRefreshingClosing(true);
     try{
-      // Guard — if real profile data isn't loaded yet, don't call the AI
-    const name     = sanitize(formData?.name)                              ||"";
-    const country  = sanitize(formData?.country)                           ||"";
-    const goal     = sanitize(formData?.goals||formData?.bigGoal)          ||"";
-    const challenge= sanitize(formData?.challenge)                         ||"";
-    const skill    = sanitize(formData?.skills||formData?.career)          ||"";
-    const age      = formData?.age||"";
-    if(!name||!country||!goal){ setRefreshingClosing(false); return; } // wait for real data
+      const name     = sanitize(formData?.name)||"";
+      const country  = sanitize(formData?.country)||"your country";
+      const goal     = sanitize(formData?.goals||formData?.bigGoal)||"building a better life";
+      const challenge= sanitize(formData?.challenge)||"getting started";
+      const skill    = sanitize(formData?.skills||formData?.career)||"their skills";
+      const age      = formData?.age||"";
+      // Only block if we truly have no name at all — everything else has a default
+      if(!name){ setRefreshingClosing(false); return; }
 
       const prompt=`Write ONE powerful sentence for ${name}${age?" (age "+age+")":""} from ${country}.
 Goal: "${goal||"building a better life"}"
@@ -9370,15 +9383,7 @@ Rules:
             </div>
             <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-              {isPaid&&(
-  <div className="prem-badge" style={{
-    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
-    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
-    color:isPremium?"#9b72cf":"var(--gold-bright)",
-  }}>
-    {isPremium?"✦ PRO MAX":"◆ PRO"}
-  </div>
-)}
+              {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
               {!showCheckin&&(()=>{
                 const todayStr = new Date().toISOString().slice(0,10);
                 const todayKey = `diq_ci_result_${userId}_${todayStr}`;
@@ -9488,28 +9493,21 @@ Rules:
                 setTimeout(()=>setMiniStreak(newStreak), 800);
               }
               if(userId){
-                // Save streak — use form_data JSONB as reliable fallback
-                // Works even if dedicated streak/last_checkin_date columns don't exist
-                supabase.from("user_profiles").select("form_data")
-                  .eq("user_id", userId).single()
-                  .then(({data:pd})=>{
-                    // form_data is TEXT in Supabase — must parse before merging
-                    const fd = typeof pd?.form_data==="string"
-                      ? (()=>{try{return JSON.parse(pd.form_data);}catch{return{};}})()
-                      : (pd?.form_data||{});
-                    return supabase.from("user_profiles").upsert({
-                      user_id: userId,
-                      streak: newStreak,
-                      last_checkin_date: today,
-                      updated_at: new Date().toISOString(),
-                      form_data: JSON.stringify({...fd, _streak:newStreak, _last_checkin:today}),
-                    },{onConflict:"user_id"});
-                  })
-                  .then(({error})=>{
-                    if(error) console.warn("Streak save:", error.message);
-                    else setFormData(prev=>prev?{...prev, last_checkin_date:today, _streak:newStreak}:prev);
-                  })
-                  .catch(e=>console.warn("Streak save:", e.message));
+                // Persist to Supabase
+                supabase.from("user_profiles").upsert({
+                  user_id: userId,
+                  streak: newStreak,
+                  last_checkin_date: today,
+                  updated_at: new Date().toISOString(),
+                },{onConflict:"user_id"})
+                .then(({error})=>{
+                  if(error) console.warn("Streak save:", error.message);
+                  else {
+                    // Update formData so next check uses correct last_checkin_date
+                    setFormData(prev=>prev?{...prev, last_checkin_date:today}:prev);
+                  }
+                })
+                .catch(e=>console.warn("Streak save:", e.message));
               }
             }
             // else: already checked in today — don't increment again
@@ -9592,7 +9590,9 @@ Rules:
                               <span>{s}</span>
                             </div>
                           ))
-                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Your strengths are being extracted from your report…</p>
+                        : isPaid
+                          ? <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Refresh your report to extract your strengths. <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0}}>Update profile →</button></p>
+                          : <div style={{padding:"10px 0"}}><span style={{fontSize:11,color:"var(--cream-30)"}}>🔒 </span><button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0,textDecoration:"underline"}}>Upgrade to unlock your strengths</button></div>
                       }
                     </div>
                     <div className="card card-sm">
@@ -9604,7 +9604,9 @@ Rules:
                               <span>{r}</span>
                             </div>
                           ))
-                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Your watch-outs are being extracted from your report…</p>
+                        : isPaid
+                          ? <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Refresh your report to see your watch-outs. <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0}}>Update profile →</button></p>
+                          : <div style={{padding:"10px 0"}}><span style={{fontSize:11,color:"var(--cream-30)"}}>🔒 </span><button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0,textDecoration:"underline"}}>Upgrade to unlock your watch-outs</button></div>
                       }
                     </div>
                   </div>
@@ -9655,7 +9657,7 @@ Rules:
             </div>
           )}
 
-          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
+          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -9669,8 +9671,8 @@ Rules:
             {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>}
+          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>}
 
 
 
@@ -10053,7 +10055,7 @@ Rules:
             />
           )}
           {mod==="advisor"&&(
-            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
+            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>
           )}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
@@ -10704,7 +10706,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
   };
 
   const planLabel = isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor = isPaid?"var(--gold)":"var(--cream-30)";
+  const planColor = isProMax?"#a78bfa":isPaid?"var(--gold)":"var(--cream-30)";
 
   return(
     <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
@@ -11118,7 +11120,7 @@ function SubscriptionCard({isPaid,isPremium,isProMax,userId,onManageSubscription
   const [cancelled,setCancelled]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
   const planLabel=isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor=isPaid?"var(--gold)":"var(--cream-30)";
+  const planColor=isProMax?"#a78bfa":isPaid?"var(--gold)":"var(--cream-30)";
 
   const handleCancel=async()=>{
     setCancelling(true);
@@ -11298,33 +11300,23 @@ export default function DestinIQ(){
         // A streak is valid if the user checked in today OR yesterday.
         // If the last check-in was 2+ days ago, the streak resets to 1.
         {
-          // Use form_data._streak as reliable fallback (always saved)
-          // form_data is TEXT in Supabase — parse it
-          const _fd = typeof profile.form_data==="string"
-            ? (()=>{try{return JSON.parse(profile.form_data);}catch{return{};}})()
-            : (profile.form_data||{});
-          const fdStreak  = _fd?._streak;
-          const fdLast    = _fd?._last_checkin || "";
-          const savedStreak = profile.streak || fdStreak || 1;
+          const savedStreak = profile.streak || 1;
           const today     = new Date().toISOString().slice(0,10);
           const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
-          // Check all sources — DB column, form_data fallback, localStorage
-          const dbLast    = profile.last_checkin_date || fdLast;
+          // Use the most recent of DB date and localStorage date (handles timing gaps)
+          const dbLast    = profile.last_checkin_date || "";
           const localLast = (() => { try{ return localStorage.getItem(`destiniq_checkin_${u.id}`)||""; }catch{return "";} })();
-          const localStreak = (() => { try{ const s=localStorage.getItem(`diq_streak_${u.id}`); return s?parseInt(s):0; }catch{return 0;} })();
-          const lastSeen  = [dbLast, localLast, fdLast].filter(Boolean).sort().pop() || "";
-          // Take highest streak from all sources (most reliable)
-          const bestStreak = Math.max(savedStreak, localStreak, 1);
+          const lastSeen  = [dbLast, localLast].filter(Boolean).sort().pop() || "";
 
           if (!lastSeen) {
             // Never checked in before — keep whatever streak DB has (could be 1 from signup)
-            setStreak(bestStreak);
+            setStreak(savedStreak);
           } else if (lastSeen === today) {
             // Already checked in today — show current streak as-is
-            setStreak(bestStreak);
+            setStreak(savedStreak);
           } else if (lastSeen === yesterday) {
             // Checked in yesterday — streak is still alive
-            setStreak(bestStreak);
+            setStreak(savedStreak);
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
@@ -11336,22 +11328,10 @@ export default function DestinIQ(){
             try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
           }
         }
-        if (profile.form_data){
-          setFormData({
-            ...profile.form_data,
-            last_checkin_date: profile.last_checkin_date||profile.form_data?._last_checkin||"",
-          });
-          // Restore wins from Supabase if localStorage was cleared
-          const _winsFromDB = profile.wins?.length ? profile.wins
-            : (_fd?._wins||[]);
-          if(_winsFromDB?.length){
-            const serverWins = _winsFromDB;
-            const localWins  = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${u.id}`)||"[]"); }catch{ return []; } })();
-            if(serverWins.length > localWins.length){
-              try{ localStorage.setItem(`diq_wins_${u.id}`, JSON.stringify(serverWins)); }catch{}
-            }
-          }
-        }
+        if (profile.form_data)  setFormData({
+          ...profile.form_data,
+          last_checkin_date: profile.last_checkin_date||"",
+        });
         if (profile.report)     setReport(profile.report);
         // ── CRITICAL: Always restore exactly where they left off ──
         // Signed-in users must NEVER see the marketing landing page — only
@@ -11362,10 +11342,13 @@ export default function DestinIQ(){
         if (profile.form_data && profile.report) {
           // Has both — go straight to the dashboard
           setScreen("results");
+        } else if (profile.form_data) {
+          // Has onboarding data but report is missing — still go to dashboard.
+          // Dashboard handles the missing report with a regenerate prompt.
+          // NEVER send an old user back through onboarding.
+          setScreen("results");
         } else {
-          // Either no onboarding data yet, or it exists but report generation
-          // was interrupted — either way, send to intake (it pre-fills from
-          // savedFormData, so nothing is lost) instead of the landing page.
+          // No onboarding data at all — brand-new user, show intake form.
           setScreen("intake");
         }
       } else {
@@ -11379,32 +11362,6 @@ export default function DestinIQ(){
       setProfileLoading(false);
     }
   };
-
-  // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
-  // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
-  useEffect(()=>{
-    if(typeof window==="undefined") return;
-    const isNative = window?.Capacitor?.isNativePlatform?.();
-    if(!isNative) return;
-    // Access Capacitor plugins via global (no import needed — avoids build errors)
-    const CapApp = window?.Capacitor?.Plugins?.App;
-    if(!CapApp) return;
-    let listener = null;
-    CapApp.addListener("appUrlOpen",async({url})=>{
-      if(!url) return;
-      const hash = url.includes("#") ? url.split("#")[1] : url.split("?")[1]||"";
-      const p = new URLSearchParams(hash);
-      const access_token  = p.get("access_token");
-      const refresh_token = p.get("refresh_token");
-      if(access_token && refresh_token){
-        const{error}=await supabase.auth.setSession({access_token,refresh_token});
-        if(error) console.warn("Deep link auth:",error.message);
-        // Close in-app browser via global plugin
-        try{ window?.Capacitor?.Plugins?.Browser?.close?.(); }catch{}
-      }
-    }).then(l=>{listener=l;}).catch(()=>{});
-    return()=>{ try{listener?.remove?.();}catch{} };
-  },[]);
 
   useEffect(()=>{
     // mountRestored: ref (not state) so it never triggers a re-render.
@@ -11456,6 +11413,7 @@ export default function DestinIQ(){
           setReport(null);
           setIsPaid(false);
           setIsPremium(false);
+          setIsProMax(false);
           setStreak(1);
           setScreen("landing");
           // Clear localStorage only on explicit sign-out
@@ -11512,12 +11470,16 @@ export default function DestinIQ(){
     return()=>clearTimeout(timer);
   },[userId]);
 
-  // Paid users are always Premium in this app — there is no separate paid-but-
-  // not-premium tier in practice. Self-correct instantly if these ever drift
-  // out of sync (e.g. stale localStorage), instead of requiring a manual toggle.
+  // Paid users are always Premium — self-correct if state ever drifts out of sync.
+  // Also restore isProMax from localStorage as a secondary safeguard.
   useEffect(()=>{
-    // isPremium = Pro Max ONLY — do not force it for all paid users
-  },[isPaid,isPremium]);
+    if(isPaid && !isPremium) setIsPremium(true);
+    if(userId && !isProMax){
+      try{
+        if(localStorage.getItem(`diq_promax_${userId}`)==="1") setIsProMax(true);
+      }catch(_){}
+    }
+  },[isPaid,isPremium,isProMax,userId]);
 
   // Listen for policy events from auth screen footer links
   useEffect(()=>{
@@ -11747,7 +11709,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
   const handlePay=async(paystackRef, planKey)=>{
     const isMax = planKey==="promax" || planKey==="promax_annual";
     setIsPaid(true);
-    if(isMax){ setIsPremium(true); setIsProMax(true); }
+    setIsPremium(true);
+    if(isMax) setIsProMax(true);
     // Belt-and-suspenders: write to localStorage here too in case the
     // Paywall's callback missed it (e.g. userId was null at payment time)
     if(userId){
@@ -11865,9 +11828,9 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             else setScreen("intake");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
-            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isPaid?"Premium":"Upgrade to Premium"}>
-              <div className="prem-toggle-dot"/>
-              <span className="prem-toggle-label">{isPaid&&isPremium?"PREMIUM":"UPGRADE"}</span>
+            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isProMax?"Pro Max":isPaid?"Pro":"Upgrade"}>
+              <div className="prem-toggle-dot" style={isProMax?{background:"#a78bfa",boxShadow:"0 0 8px rgba(167,139,250,0.5)"}:{}}/>
+              <span className="prem-toggle-label" style={isProMax?{color:"#a78bfa"}:{}}>{isProMax?"PRO MAX":isPaid&&isPremium?"PRO":"UPGRADE"}</span>
             </div>
             <button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
@@ -11922,7 +11885,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             await supabase.auth.signOut();
             // Also clear state immediately in case onAuthStateChange fires slowly
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
-            setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
+            setIsPaid(false);setIsPremium(false);setIsProMax(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
             try{
               Object.keys(localStorage).forEach(k=>{
@@ -11958,14 +11921,16 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
-              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
+              streak={streak} setStreak={setStreak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
               showTracker={showTracker} setShowTracker={setShowTracker}/>
         )}
         {screen==="results"  &&formData&&!report&&(
-          <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em",marginBottom:16}}>Loading your report…</div>
-              <div style={{width:40,height:40,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto"}}/>
+          <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
+            <div style={{textAlign:"center",maxWidth:360}}>
+              <div style={{fontSize:32,marginBottom:16}}>📋</div>
+              <div style={{fontFamily:"var(--f-mono)",fontSize:13,color:"var(--gold)",letterSpacing:".08em",marginBottom:8}}>Your report needs regenerating</div>
+              <p style={{fontSize:14,color:"var(--cream-40)",lineHeight:1.7,marginBottom:24}}>Your profile is saved but we couldn't find your report. This usually happens after a sign-in on a new device. Tap below to regenerate it — takes about 60 seconds.</p>
+              <button className="btn btn-gold" onClick={()=>handleSubmit(formData)} style={{padding:"12px 28px",fontSize:14}}>Regenerate my report</button>
             </div>
           </div>
         )}
