@@ -9,6 +9,7 @@
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
  *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
  *    - Phone / OTP (requires Twilio integration in Supabase → Auth → Providers → Phone)
@@ -1093,7 +1094,23 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
       "Content-Type":"application/json",
       ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
     },
-    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isProMax?6000:isPremium?4000:1800)}),
+    body:JSON.stringify({
+      system: (system||"") + `
+
+CRITICAL WRITING RULES — FOLLOW EXACTLY:
+1. Write like a brilliant, warm friend who has studied this person deeply — not a consultant, coach or therapist
+2. Use their name naturally once or twice where it feels right — not every sentence
+3. ZERO markdown: no # headers, no ** bold, no * bullets, no numbered lists, no --- dividers
+4. Write in flowing paragraphs only. Use line breaks to separate thoughts naturally
+5. Be honest and direct, even when uncomfortable — but always kind and never clinical
+6. Reference their specific country, situation, income level, and goals directly
+7. Never end with "I hope this helps" or "feel free to reach out" or any generic closer
+8. End with ONE clear specific action — not a list, just one thing
+9. Speak to them like they are intelligent — no over-explaining
+10. If you don't have a detail, work with what you have — NEVER ask them to update their profile` + langPrompt(),
+      messages,
+      max_tokens: maxTokens||(isProMax?6000:isPremium?4000:1800)
+    }),
   });
   if(!res.ok){
     const e=await res.json().catch(()=>({}));
@@ -1409,43 +1426,24 @@ function buildOriginFacts(f){
 // ADVISOR SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
-  const name    = profile?.name    ||"the user";
+  const name    = profile?.name    ||"there";
   const country = profile?.country ||"their country";
-  const goals   = profile?.goals   ||profile?.bigGoal||"personal growth";
-  const challenge=profile?.challenge||"navigating life";
-  const career  = profile?.career  ||"their work";
-  const income  = profile?.income  ||"unknown";
   const scores  = reportData?.scores;
-  const scoreStr= scores?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`:"scores not yet available";
+  const scoreStr= scores
+    ?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`
+    :"not yet generated";
   const {code:currCode,symbol:currSym} = getLocalCurrency(country);
+  return `You are ${name}'s personal advisor at DestinIQ. You know everything about them.
 
-  return `You are ${name}'s personal life advisor at DestinIQ. You have read their full report and know them deeply.
+FULL PROFILE:
+${buildProfileContext(profile)}
 
-WHAT YOU KNOW ABOUT THEM:
-- Name: ${name}
-- Country: ${country}
-- Income: ${income}
-- Career/skills: ${career}
-- Main goal: ${goals}
-- Current challenge: ${challenge}
-- Their scores: ${scoreStr}
-${memCtx?`
-Previous conversation context:
-${memCtx}`:""}
+THEIR SCORES: ${scoreStr}
+${memCtx?`\nPREVIOUS CONVERSATION:\n${memCtx}`:""}
 
-CURRENCY RULE — NON-NEGOTIABLE:
-- Any cost, price, savings amount, budget, or expense = ${currCode} (${currSym}) — NEVER USD for ${country} costs.
-- Any earnings from online work, freelancing, or remote jobs = USD + local equivalent e.g. "$500/month (${currSym}7,500)".
-- Example: If ${name} asks how much to save, say "${currSym}500/month" NOT "$50/month".
+CURRENCY: All local costs/prices = ${currSym} (${currCode}). Online/international income = USD + ${currSym} equivalent.
 
-HOW YOU RESPOND:
-- Speak directly to ${name} by name occasionally — make it personal
-- Be warm but honest. Never generic. Never fluffy.
-- Give specific, actionable advice that fits their country, income level, and situation
-- When they share problems, acknowledge the feeling before advising
-- Keep responses focused: 2-4 sentences for simple questions, more for complex ones
-- Plain text only — no markdown headers or bullet points unless listing steps
-- You are not a chatbot. You are their personal advisor who knows their story.${isPremium?" Give your fullest, most detailed guidance — they have premium access.":""}`
+You are a brilliant, warm, honest friend who has studied ${name}'s life deeply. You remember everything they shared. You speak directly to them, use their name naturally, give advice specific to ${country}, and never give generic responses.${isPremium?` Give your deepest most detailed guidance.`:""}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4254,6 +4252,28 @@ const UI_STRINGS = {
 // Translation helper — falls back to English
 function t(lang, key){ return UI_STRINGS[lang]?.[key] || UI_STRINGS.en[key] || key; }
 
+// Build a rich profile context string from ALL onboarding fields
+// Used to ensure every AI call has the full picture of who the user is
+function buildProfileContext(p){
+  if(!p) return "User profile not yet available.";
+  const parts = [];
+  if(p.name)         parts.push(`Name: ${p.name}`);
+  if(p.age)          parts.push(`Age: ${p.age}`);
+  if(p.gender)       parts.push(`Gender: ${p.gender}`);
+  if(p.country)      parts.push(`Country: ${p.country}`);
+  if(p.relationship) parts.push(`Relationship: ${p.relationship}`);
+  if(p.income)       parts.push(`Monthly income: ${p.income}`);
+  if(p.education)    parts.push(`Education: ${p.education}`);
+  if(p.career)       parts.push(`Career/Job: ${p.career}`);
+  if(p.skills)       parts.push(`Skills: ${p.skills}`);
+  if(p.habits)       parts.push(`Current habits: ${p.habits}`);
+  if(p.situation)    parts.push(`Current situation: ${p.situation}`);
+  if(p.challenge)    parts.push(`Biggest challenge: ${p.challenge}`);
+  if(p.goals||p.bigGoal) parts.push(`Main goal: ${p.goals||p.bigGoal}`);
+  if(p.wantFrom)     parts.push(`What they want from DestinIQ: ${p.wantFrom}`);
+  return parts.join("\n");
+}
+
 // Language instruction for AI prompts
 function langPrompt(langCode){
   // Read from localStorage if no code passed (works in standalone functions)
@@ -5351,7 +5371,7 @@ function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, o
   const [error2,   setError2]   = useState("");
 
   const generate = async() => {
-    if(!profile?.name && !profile?.country){ setError2("Complete your profile first to get personalized content."); return; }
+    // Never force profile updates — use whatever data is available from onboarding
     setLoading2(true); setError2("");
     try{
       const currencyInfo = getLocalCurrency(profile?.country||"");
@@ -5364,7 +5384,12 @@ function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, o
       const prompt = cfg.prompt(profile, currencyInfo) + currencyNote;
       const result = await callAPI({
         messages:[{role:"user", content: prompt}],
-        system: `You are DestinIQ's specialist for ${cfg.title}. Be specific to the user's country (${profile?.country||"their country"}), age, and situation. No generic advice. When mentioning money amounts, use ${getLocalCurrency(profile?.country||"")?.symbol||""} (local currency), NOT $USD — unless it's international online income, then show USD + local equivalent.${langPrompt(lang||"en")}`,
+        system: `You are DestinIQ — a personal intelligence platform that knows this user deeply.
+Here is everything known about this user:
+${buildProfileContext(profile)}
+
+You are generating their ${cfg.title} module.
+Currency rule: use ${currencySymbol} (${currencyName}) for local costs and prices. For international/online income show USD and add the ${currencySymbol} equivalent in brackets.`,
         userId, isPremium, isProMax,
       });
       const txt = result?.content?.[0]?.text||result||"";
