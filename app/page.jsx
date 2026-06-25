@@ -100,7 +100,6 @@
  *   is_paid     boolean default false,
  *   is_premium  boolean default false,
  *   streak      int default 1,
- *   wins        text,                                -- JSON array of win objects (added for cross-device persistence)
  *   paystack_ref text,
  *   paid_plan   text,
  *   paid_at     timestamptz,
@@ -183,13 +182,7 @@ class ErrorBoundary extends React.Component {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPABASE CLIENT
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
-// ═══════════════════════════════════════════════════════════════════════════════
-// Load Capacitor Browser for in-app OAuth on mobile
-if(typeof window !== "undefined"){
-  import("@capacitor/browser").then(m=>{
-    window.CapacitorBrowser = m.Browser;
-  }).catch(()=>{});
-}
+// Capacitor plugins accessed via window.Capacitor.Plugins (no imports needed)
 
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
@@ -302,7 +295,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -483,60 +476,144 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
   if(!uid||!times) return;
   const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
 
-  // Persist preferences
+  // Persist preferences so notifications survive app restarts
   try{ localStorage.setItem(NOTIF_SCHED_KEY,JSON.stringify({uid,name,goal,streak,times,set:Date.now()})); }catch(_){}
 
-  // ── NATIVE MOBILE: @capacitor/local-notifications ─────────────────────
-  // These fire even when app is CLOSED — proper mobile notifications
+  // ── NATIVE MOBILE: Capacitor LocalNotifications ────────────────────────
   const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
   if(isNative){
     try{
-      const { LocalNotifications } = await import("@capacitor/local-notifications");
-      const perm = await LocalNotifications.requestPermissions();
-      if(perm.display !== "granted"){
-        console.warn("Notification permission denied");
-      } else {
-        // Cancel old scheduled notifications
-        const pending = await LocalNotifications.getPending();
-        if(pending.notifications?.length > 0){
-          await LocalNotifications.cancel({notifications: pending.notifications});
-        }
-        // Build daily repeating notifications
-        const mkDate=(h,m)=>{ const d=new Date(); d.setHours(h,m,0,0); if(d<=new Date()) d.setDate(d.getDate()+1); return d; };
-        const notifs = [];
-        if(times.morning)   notifs.push({id:1001,title:"DestinIQ",body:pick(NOTIF_MSGS.morning)(name,goal),   schedule:{at:mkDate(...times.morning.split(":").map(Number)),  repeats:true,every:"day"},sound:"default"});
-        if(times.afternoon) notifs.push({id:1002,title:"DestinIQ",body:pick(NOTIF_MSGS.afternoon)(name),      schedule:{at:mkDate(...times.afternoon.split(":").map(Number)),repeats:true,every:"day"},sound:"default"});
-        if(times.evening)   notifs.push({id:1003,title:"DestinIQ",body:pick(NOTIF_MSGS.evening)(name,streak), schedule:{at:mkDate(...times.evening.split(":").map(Number)),  repeats:true,every:"day"},sound:"default"});
-        // Streak protection at 9pm
-        notifs.push({id:1004,title:"DestinIQ — Streak Alert",body:pick(NOTIF_MSGS.streak)(name,streak),schedule:{at:mkDate(21,0),repeats:true,every:"day"},sound:"default"});
-        // Monday motivation at 8am
-        const nextMon=new Date(); nextMon.setDate(nextMon.getDate()+((1-nextMon.getDay()+7)%7||7)); nextMon.setHours(8,0,0,0);
-        notifs.push({id:1005,title:"DestinIQ — New Week",body:pick(NOTIF_MSGS.weekly)(name),schedule:{at:nextMon},sound:"default"});
-        await LocalNotifications.schedule({notifications:notifs});
-        return; // Native done — skip setTimeout
+      // Access plugin via global bridge (no import needed)
+      const LN = window?.Capacitor?.Plugins?.LocalNotifications;
+      if(!LN){ console.warn("LocalNotifications plugin not found — rebuild APK with @capacitor/local-notifications"); return; }
+
+      // Request permission (shows system dialog on first call)
+      const perm = await LN.requestPermissions();
+      if(perm?.display !== "granted" && perm?.notifications !== "granted"){
+        console.warn("Notification permission not granted:", perm);
+        return;
       }
-    }catch(e){ console.warn("LocalNotifications error:",e.message); }
+
+      // Cancel existing DestinIQ notifications before rescheduling
+      try{
+        const pending = await LN.getPending();
+        const destiniQNotifs = (pending?.notifications||[]).filter(n=>n.id>=1001&&n.id<=1010);
+        if(destiniQNotifs.length>0) await LN.cancel({notifications:destiniQNotifs});
+      }catch(e){}
+
+      // Helper: next occurrence of a time (today if not passed, tomorrow if passed)
+      const nextAt=(h,m)=>{
+        const d=new Date();
+        d.setSeconds(0); d.setMilliseconds(0);
+        d.setHours(h,m);
+        if(d<=new Date()) d.setDate(d.getDate()+1);
+        return d;
+      };
+
+      const notifications = [];
+
+      if(times.morning){
+        const [h,m]=times.morning.split(":").map(Number);
+        notifications.push({
+          id:1001, title:"DestinIQ", channelId:"destiniq-daily",
+          body:pick(NOTIF_MSGS.morning)(name,goal),
+          schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
+          smallIcon:"ic_stat_notify", sound:"default",
+        });
+      }
+      if(times.afternoon){
+        const [h,m]=times.afternoon.split(":").map(Number);
+        notifications.push({
+          id:1002, title:"DestinIQ", channelId:"destiniq-daily",
+          body:pick(NOTIF_MSGS.afternoon)(name),
+          schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
+          smallIcon:"ic_stat_notify", sound:"default",
+        });
+      }
+      if(times.evening){
+        const [h,m]=times.evening.split(":").map(Number);
+        notifications.push({
+          id:1003, title:"DestinIQ", channelId:"destiniq-daily",
+          body:pick(NOTIF_MSGS.evening)(name,streak),
+          schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
+          smallIcon:"ic_stat_notify", sound:"default",
+        });
+      }
+      // 9pm streak protection
+      notifications.push({
+        id:1004, title:"DestinIQ 🔥", channelId:"destiniq-daily",
+        body:pick(NOTIF_MSGS.streak)(name,streak),
+        schedule:{at:nextAt(21,0), repeats:true, allowWhileIdle:true},
+        smallIcon:"ic_stat_notify", sound:"default",
+      });
+
+      await LN.schedule({notifications});
+      console.log(`✅ ${notifications.length} notifications scheduled`);
+      return;
+    }catch(e){
+      console.warn("LocalNotifications scheduling failed:", e?.message||e);
+      // Fall through to web fallback
+    }
   }
 
-  // ── WEB FALLBACK: setTimeout (only works while tab is open) ──────────
+  // ── WEB: setTimeout fallback (only works while tab is open) ────────────
+  // NOTE: This is a browser limitation — real push needs a service worker
   const existing=_notifTimers.get(uid)||[];
   existing.forEach(t=>clearTimeout(t));
   const newTimers=[];
+
   const scheduleAt=(timeStr, msgFn, tag)=>{
     if(!timeStr) return;
     const [h,m]=timeStr.split(":").map(Number);
     const now=new Date(), next=new Date();
     next.setHours(h,m,0,0);
     if(next<=now) next.setDate(next.getDate()+1);
-    const tid=setTimeout(()=>{ fireNotification("DestinIQ",msgFn(),tag); onFire&&onFire(tag); scheduleNotification(uid,name,goal,streak,times,onFire); },next-now);
+    const delay=next-now;
+    const tid=setTimeout(()=>{
+      fireNotification("DestinIQ", msgFn(), tag);
+      onFire&&onFire(tag);
+      scheduleNotification(uid,name,goal,streak,times,onFire);
+    }, delay);
     newTimers.push(tid);
   };
-  scheduleAt(times.morning,   ()=>pick(NOTIF_MSGS.morning)(name,goal),    "morning");
-  scheduleAt(times.afternoon, ()=>pick(NOTIF_MSGS.afternoon)(name),        "afternoon");
-  scheduleAt(times.evening,   ()=>pick(NOTIF_MSGS.evening)(name,streak),   "evening");
-  const now=new Date(), midnight=new Date(); midnight.setHours(21,0,0,0);
-  if(midnight>now) newTimers.push(setTimeout(()=>fireNotification("DestinIQ",pick(NOTIF_MSGS.streak)(name,streak),"streak"),midnight-now));
-  _notifTimers.set(uid,newTimers);
+
+  scheduleAt(times.morning,   ()=>pick(NOTIF_MSGS.morning)(name,goal),   "morning");
+  scheduleAt(times.afternoon, ()=>pick(NOTIF_MSGS.afternoon)(name),       "afternoon");
+  scheduleAt(times.evening,   ()=>pick(NOTIF_MSGS.evening)(name,streak),  "evening");
+
+  const now2=new Date(), nine=new Date();
+  nine.setHours(21,0,0,0);
+  if(nine>now2) newTimers.push(setTimeout(()=>{
+    fireNotification("DestinIQ 🔥", pick(NOTIF_MSGS.streak)(name,streak), "streak");
+  }, nine-now2));
+
+  _notifTimers.set(uid, newTimers);
+}
+
+// Test notification — fires in 5 seconds (to confirm notifications work)
+async function testNotification(name){
+  const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
+  if(isNative){
+    try{
+      const LN = window?.Capacitor?.Plugins?.LocalNotifications;
+      if(!LN) return false;
+      const perm = await LN.requestPermissions();
+      if(perm?.display!=="granted"&&perm?.notifications!=="granted") return false;
+      await LN.schedule({notifications:[{
+        id:9999, title:"DestinIQ ✅", channelId:"destiniq-daily",
+        body:`${name||"Hey"}, notifications are working! You'll get daily check-ins from now on.`,
+        schedule:{at:new Date(Date.now()+5000)}, // 5 seconds from now
+        smallIcon:"ic_stat_notify", sound:"default",
+      }]});
+      return true;
+    }catch(e){ return false; }
+  }
+  // Web fallback
+  if(typeof Notification!=="undefined" && Notification.permission==="granted"){
+    setTimeout(()=>{ new Notification("DestinIQ ✅",{body:`${name||"Hey"}, notifications are working!`}); }, 5000);
+    return true;
+  }
+  return false;
 }
 
 // Restore notification schedule on page load
@@ -571,6 +648,9 @@ const CSS = `
 }
 html{scroll-behavior:smooth;}
 body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+/* Safe area for notched phones (iPhone X+, Android notch) */
+.nav{padding-top:max(12px,env(safe-area-inset-top))!important;padding-left:max(16px,env(safe-area-inset-left))!important;padding-right:max(16px,env(safe-area-inset-right))!important;}
+.fu{padding-bottom:max(80px,env(safe-area-inset-bottom))!important;}
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;}
 .bg-mesh{background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(31,168,154,0.07) 0%,transparent 55%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(210,175,90,0.08) 0%,transparent 55%),radial-gradient(ellipse 50% 40% at 80% 20%,rgba(124,92,191,0.05) 0%,transparent 50%),var(--void);}
 .bg-noise{opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:128px;}
@@ -716,25 +796,63 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 }
 /* Mobile: ≤640px */
 @media(max-width:640px){
-  .body-lg{font-size:14px!important;max-width:100%!important;}
-  p{max-width:100%!important;padding-right:0!important;}
-  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
-  body{overflow-x:hidden!important;max-width:100vw!important;}
-  .nav{padding:0 14px!important;}
-  .card{padding:14px!important;border-radius:14px!important;}
-  .fu{padding:0 0 40px!important;}
-  .d1{font-size:clamp(26px,8vw,48px)!important;line-height:1.1!important;}
-  .d2{font-size:clamp(20px,6vw,34px)!important;}
-  .d3{font-size:clamp(17px,5vw,24px)!important;}
-  .tabs{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px;padding:4px;grid-template-columns:unset;}
-  .tabs::-webkit-scrollbar{display:none;}
-  .tab{flex-shrink:0;font-size:9.5px;padding:7px 10px;min-width:58px;}
-  .tab span:first-child{font-size:13px;}
-  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  .tab-bar::-webkit-scrollbar{display:none;}
-  .tab-bar button{font-size:10px!important;padding:7px 10px!important;white-space:nowrap;}
+  /* ── Base ── */
+  html,body{overflow-x:hidden!important;max-width:100vw!important;-webkit-text-size-adjust:100%;}
+  *{box-sizing:border-box!important;}
+  p,h1,h2,h3,h4,span,div{word-wrap:break-word!important;overflow-wrap:break-word!important;}
+
+  /* ── Layout ── */
+  .cx,.cx-sm,.cx-md{padding:0 16px!important;}
+  .fu{padding:0 0 80px!important;}/* extra bottom for thumb zone */
+
+  /* ── Typography — readable at arm's length ── */
+  .body-lg{font-size:15px!important;line-height:1.75!important;max-width:100%!important;}
+  p{max-width:100%!important;padding-right:0!important;font-size:14px!important;line-height:1.7!important;}
+  .d1{font-size:clamp(28px,8vw,46px)!important;line-height:1.1!important;}
+  .d2{font-size:clamp(22px,6vw,34px)!important;line-height:1.2!important;}
+  .d3{font-size:clamp(18px,5vw,26px)!important;line-height:1.3!important;}
+  .small,.mono{font-size:12px!important;}
+
+  /* ── Nav bar ── */
+  .nav{padding:0 16px!important;height:56px!important;}
+  .nav-r{gap:8px!important;}
+  .prem-badge{font-size:9px!important;padding:4px 10px!important;border-radius:20px!important;}
+  .streak-badge{padding:6px 12px!important;font-size:10px!important;}
+  .streak-fire{font-size:14px!important;}
+
+  /* ── Cards ── */
+  .card{padding:16px!important;border-radius:16px!important;margin-bottom:12px!important;}
+  .card-sm{padding:14px!important;border-radius:14px!important;}
+  .lock-gate{padding:20px 16px!important;}
+  .insight{padding:14px 16px!important;}
+
+  /* ── Tabs — module groups ── */
+  .tabs{display:flex!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
+    scrollbar-width:none!important;gap:6px!important;padding:6px 2px!important;
+    grid-template-columns:unset!important;}
+  .tabs::-webkit-scrollbar{display:none!important;}
+  .tab{flex-shrink:0!important;font-size:11px!important;padding:9px 12px!important;
+    min-width:64px!important;min-height:44px!important;border-radius:12px!important;
+    display:flex!important;flex-direction:column!important;align-items:center!important;gap:4px!important;}
+  .tab span:first-child{font-size:15px!important;}/* icon bigger */
+  .tab span:last-child{font-size:10px!important;white-space:nowrap!important;}
+
+  /* ── Tab bar (sub-tabs) ── */
+  .tab-bar{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
+    scrollbar-width:none!important;padding-bottom:4px!important;}
+  .tab-bar::-webkit-scrollbar{display:none!important;}
+  .tab-bar button{font-size:11px!important;padding:9px 14px!important;
+    white-space:nowrap!important;min-height:40px!important;}
+
+  /* ── Buttons — 44px min tap target ── */
+  .btn{min-height:44px!important;font-size:14px!important;padding:12px 20px!important;border-radius:12px!important;}
+  .btn-lg{min-height:52px!important;font-size:15px!important;padding:14px 24px!important;}
+  .btn-sm{min-height:36px!important;font-size:12px!important;padding:8px 14px!important;}
+  button{min-height:36px!important;}
+
+  /* ── Grids → single column on mobile ── */
   .results-grid{grid-template-columns:1fr!important;}
-  .hero-grid{grid-template-columns:1fr!important;gap:28px!important;}
+  .hero-grid{grid-template-columns:1fr!important;gap:24px!important;}
   .row2{grid-template-columns:1fr!important;}
   .plan-cards-grid{grid-template-columns:1fr!important;}
   .paywall-faq{grid-template-columns:1fr!important;}
@@ -742,40 +860,52 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
   .reloc-grid{grid-template-columns:1fr!important;}
   .score-explain-grid{grid-template-columns:1fr!important;}
   .score-grid{grid-template-columns:1fr 1fr!important;}
-  .reloc-stats{grid-template-columns:repeat(3,1fr)!important;}
-  .mom-stat-grid{grid-template-columns:repeat(3,1fr)!important;}
+  .reloc-stats{grid-template-columns:repeat(2,1fr)!important;}
+  .mom-stat-grid{grid-template-columns:repeat(2,1fr)!important;}
+
+  /* ── Misc layout fixes ── */
   .pillar-wrap{flex-direction:column!important;align-items:stretch!important;}
   .pillar-wrap>div:last-child{min-width:unset!important;}
-  .nav-r{gap:5px!important;}
-  .streak-badge{padding:5px 10px!important;font-size:9px!important;}
-  .streak-fire{font-size:13px!important;}
   .pbar-wrap{width:100%!important;max-width:100%!important;}
-  .lock-gate{padding:16px!important;}
-  .insight{padding:12px 14px!important;}
-  .reloc-header{padding:14px 16px 12px!important;}
-  .reloc-body{padding:14px 16px!important;}
-  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:8px!important;}
+  .section-header-row{flex-direction:column!important;align-items:flex-start!important;gap:10px!important;}
+  .reloc-header{padding:16px!important;}
+  .reloc-body{padding:16px!important;}
+
+  /* ── Module group section labels ── */
+  .module-group-label{font-size:9px!important;letter-spacing:.15em!important;padding:6px 4px 4px!important;}
+
+  /* ── Score cards bigger on mobile ── */
+  .score-card{padding:16px!important;min-height:80px!important;}
+  .score-num{font-size:36px!important;}
+
+  /* ── Inputs ── */
+  input,select,textarea{font-size:16px!important;min-height:48px!important;}/* 16px prevents iOS zoom */
+  textarea{min-height:80px!important;}
 }
 /* Small phones: ≤420px */
 @media(max-width:420px){
-  .body-lg{font-size:13px!important;}
-  p{max-width:100%!important;}
-  .cx,.cx-sm,.cx-md{padding:0 12px!important;}
-  .d1{font-size:clamp(22px,7.5vw,40px)!important;}
-  .d2{font-size:clamp(18px,5.5vw,28px)!important;}
-  .card{padding:12px!important;}
+  .cx,.cx-sm,.cx-md{padding:0 14px!important;}
+  .d1{font-size:clamp(24px,7.5vw,40px)!important;}
+  .d2{font-size:clamp(20px,6vw,30px)!important;}
+  .d3{font-size:clamp(17px,5vw,24px)!important;}
+  .card{padding:14px!important;}
+  .body-lg{font-size:14px!important;}
+  p{font-size:13px!important;}
+  .tab{font-size:10px!important;padding:8px 10px!important;min-width:56px!important;}
+  .tab span:first-child{font-size:14px!important;}
   .nav-logo{font-size:15px!important;}
-  .tab{font-size:9px!important;padding:6px 8px!important;min-width:50px!important;}
-  .plan-cards-grid{grid-template-columns:1fr!important;}
+  input,select,textarea{font-size:16px!important;}/* prevent iOS zoom */
 }
 /* Very small screens: ≤360px */
 @media(max-width:360px){
-  .cx,.cx-sm,.cx-md{padding:0 20px!important;box-sizing:border-box!important;}
+  .cx,.cx-sm,.cx-md{padding:0 12px!important;box-sizing:border-box!important;}
   body,html{overflow-x:hidden!important;width:100%!important;}
   p,h1,h2,h3{word-wrap:break-word!important;overflow-wrap:break-word!important;max-width:100%!important;}
-  .d1{font-size:22px!important;}
-  .tab{font-size:8.5px!important;padding:5px 6px!important;min-width:44px!important;}
-  .card{padding:10px!important;}
+  .d1{font-size:24px!important;}
+  .d2{font-size:19px!important;}
+  .tab{font-size:9.5px!important;padding:7px 8px!important;min-width:52px!important;}
+  .card{padding:12px!important;}
+  input,select{font-size:16px!important;}
 }
 /* Notch / safe area (iPhone X+, modern Android) */
 @supports(padding:max(0px)){
@@ -868,6 +998,70 @@ const MODULE_GROUPS=[
       {id:"advisor",  icon:"⬡", label:"My Advisor"},
     ],
   },
+  {
+    group:"Wellbeing",
+    color:"#4db6ac",
+    items:[
+      {id:"innerpeace",  icon:"🕊️", label:"Inner Peace"},
+      {id:"angerstress",  icon:"🌊", label:"Anger & Stress"},
+      {id:"sleepcoach",  icon:"🌙", label:"Sleep Coach"},
+      {id:"anxietytool", icon:"🛡️", label:"Anxiety Toolkit"},
+      {id:"griefloss",   icon:"🌱", label:"Grief & Loss"},
+    ],
+  },
+  {
+    group:"Body & Style",
+    color:"#f06292",
+    items:[
+      {id:"glowup",    icon:"✨", label:"Glow Up"},
+      {id:"nogym",     icon:"💪", label:"No-Gym Workout"},
+      {id:"posture",   icon:"⚡", label:"Posture & Energy"},
+      {id:"bodyfuel",  icon:"🥗", label:"Body Fuel"},
+    ],
+  },
+  {
+    group:"Social & Life",
+    color:"#64b5f6",
+    items:[
+      {id:"confidencelab",  icon:"🦁", label:"Confidence Lab"},
+      {id:"relationshipiq", icon:"🤝", label:"Relationship IQ"},
+      {id:"smalltalk",      icon:"💬", label:"Small Talk"},
+      {id:"negotiation",    icon:"🎯", label:"Negotiation"},
+      {id:"digitallife",    icon:"📱", label:"Digital Life"},
+      {id:"parenting",      icon:"👨‍👧", label:"Parenting Corner"},
+    ],
+  },
+  {
+    group:"Money Deep Dives",
+    color:"#ffd54f",
+    items:[
+      {id:"debtfreedom",    icon:"⛓️", label:"Debt Freedom"},
+      {id:"sidehustle",     icon:"📊", label:"Side Hustle"},
+      {id:"investment101",  icon:"📈", label:"Investment 101"},
+    ],
+  },
+  {
+    group:"Purpose",
+    color:"#ce93d8",
+    items:[
+      {id:"visionboard",    icon:"🗺️", label:"Vision Board"},
+      {id:"legacyletter",   icon:"📜", label:"Legacy Letter"},
+      {id:"fearaudit",      icon:"🔍", label:"Fear Audit"},
+      {id:"morningritual",  icon:"🌅", label:"Morning Ritual"},
+      {id:"dailywisdom",    icon:"💎", label:"Daily Wisdom"},
+      {id:"lettertoself",   icon:"✉️", label:"Letter to Self"},
+    ],
+  },
+  {
+    group:"Discover",
+    color:"#80cbc4",
+    items:[
+      {id:"dreaminterp",   icon:"🌙", label:"Dream Interpreter"},
+      {id:"peopledecoder", icon:"🧩", label:"People Decoder"},
+      {id:"hardconvo",     icon:"🗣️", label:"Hard Conversation"},
+      {id:"weeklychallenge",icon:"🎲",label:"Weekly Challenge"},
+    ],
+  },
 ];
 // Flat list kept for backward compatibility (tab persistence, etc.)
 const MODULES = MODULE_GROUPS.flatMap(g=>g.items);
@@ -894,14 +1088,13 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
   if(!messages?.length||!system) throw new Error("Invalid payload");
   // Get the current session token so the server can verify this is a real logged-in user
   const{data:{session}}=await supabase.auth.getSession();
-  const autoTokens = isProMax?6000:isPremium?4000:1800;
   const res=await fetch("/api/analyze",{
     method:"POST",
     headers:{
       "Content-Type":"application/json",
       ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
     },
-    body:JSON.stringify({system,messages,max_tokens:maxTokens||autoTokens}),
+    body:JSON.stringify({system,messages,max_tokens:maxTokens||(isProMax?6000:isPremium?4000:1800)}),
   });
   if(!res.ok){
     const e=await res.json().catch(()=>({}));
@@ -1379,13 +1572,11 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const loc=ipLocation?.city?`${ipLocation.city}, ${country}`:country;
 
   // Currency rules baked in
+  // Resolve local currency for this user's country
   const {code:currCode, symbol:currSym} = getLocalCurrency(country);
-  const payCtx = getCountryPaymentContext(country);
-  const currencyNote=`MANDATORY CURRENCY RULES — VIOLATION = WRONG ANSWER:
-1. ALL costs, prices, rents, startup costs, savings MUST be in ${currSym} (${currCode}). NEVER use $, ₦, ₹, R, KSh or any other currency for local costs in ${country}.
-2. Earnings from online/remote work = USD first, then ${currSym} equivalent in brackets e.g. "$500/month (${currSym}7,500)".
-3. DO NOT use Nigerian Naira (₦), Indian Rupee (₹), or any other country's currency. This person is in ${country}. Local currency = ${currSym} ONLY.
-4. Online income platforms: ONLY recommend these verified for ${country}: ${payCtx.platforms.slice(0,5).join(", ")}. DO NOT recommend: ${payCtx.avoid.join(", ")||"none"}. Payout: ${payCtx.works[0]}.`;
+  const currencyNote=`MANDATORY CURRENCY RULES:
+COSTS/SAVINGS/STARTUP = LOCAL CURRENCY ONLY: ${country} uses ${currCode} (${currSym}). Write ALL prices, rents, costs in ${currSym}. NEVER use $ for costs in ${country}.
+EARNINGS FROM ONLINE WORK = USD. Earnings on Upwork/Fiverr/remote = USD, add local equivalent in brackets e.g. "$500 (${currSym}3,500/month)".`;
 
   return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
 
@@ -1984,7 +2175,7 @@ function ContentSlice({children, totalCount, freeCount=3, isPaid, onUnlock, what
 // ═══════════════════════════════════════════════════════════════════════════════
 // MOMENTUM MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
-function MomentumModule({profile,userId,isPremium,streak}){
+function MomentumModule({profile,userId,isPremium,isProMax,streak}){
   const log=getMomentumLog(userId);
   const today=new Date().toDateString();
   const todayEntry=log.find(e=>e.date===today);
@@ -2011,16 +2202,8 @@ function MomentumModule({profile,userId,isPremium,streak}){
     setSaved(true);rerender(n=>n+1);
   };
 
-  const defaultTasks = [
-    {text:"Complete today's check-in", done:false},
-    {text:"Review your report goals",  done:false},
-    {text:"Make one decision using the Decision module", done:false},
-  ];
-
   const toggleTask=(i)=>{
-    // If tasks haven't been persisted yet, seed from the visible defaults first
-    const base = tasks.length ? tasks : defaultTasks;
-    const next=base.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
+    const next=tasks.map((t,idx)=>idx===i?{...t,done:!t.done}:t);
     setTasks(next);
     try{ localStorage.setItem("diq_tasks_"+userId,JSON.stringify(next)); }catch{}
   };
@@ -2035,10 +2218,12 @@ function MomentumModule({profile,userId,isPremium,streak}){
   const allAvg=log.length?Math.round(log.reduce((s,e)=>s+avgOf(e),0)/log.length):0;
   const trend=log.length>=2?avgOf(log[log.length-1])-avgOf(log[log.length-2]):0;
 
-  // Default tasks if none set yet — also correct check-in state live
-  const displayTasks = tasks.length
-    ? tasks.map((t,i)=>i===0?{...t,done:saved||t.done}:t)
-    : defaultTasks.map((t,i)=>i===0?{...t,done:saved}:t);
+  // Default tasks if none set yet
+  const displayTasks = tasks.length ? tasks : [
+    {text:"Complete today's check-in",done:saved},
+    {text:"Review your report goals",done:false},
+    {text:"Make one decision using the Decision module",done:false},
+  ];
 
   return(
     <div className="fu">
@@ -2190,7 +2375,7 @@ function MomentumModule({profile,userId,isPremium,streak}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY PULSE
 // ═══════════════════════════════════════════════════════════════════════════════
-function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
+function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
   const log=getMomentumLog(userId);
   const [loading,setLoading]=useState(false);
   const [report,setReport]=useState((_weeklyReports.get(userId)||[])[0]||null);
@@ -2213,7 +2398,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
       const country=sanitize(profile?.country)||"your country";
       const goal=sanitize(profile?.goals)||"your goal";
       const challenge=sanitize(profile?.challenge)||"your challenge";
-      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium,isProMax});
+      const txt=await callAPI({messages:[{role:"user",content:buildWeeklyPrompt(profile,log,isPremium,buildMemoryContext(userId))}],isProMax,system:`You are DestinIQ's weekly pattern analyst. ${name} from ${country} is working toward "${goal}" and dealing with "${challenge}". Use that — never ask for more information or say you lack context, even if some details are brief. Be direct, specific, insightful. Never generic. Write in clean plain sentences. For action steps use numbered lists (1. 2. 3.). For patterns use bullet points (- pattern). No **bold** or # headers.`,userId,isPremium});
 
       // Guard against the AI declining to answer / asking for more info
       const badPhrases=["i don't have","i need more","could you share","no context","please tell","can you provide","i don't have enough","no information"];
@@ -2242,7 +2427,15 @@ function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Your week, honestly reflected back</div><p className="small">We look at what you've been carrying this week and tell you what we see.</p></div>
-          {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
+          {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2309,7 +2502,7 @@ function WeeklyModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // DECISION INBOX
 // ═══════════════════════════════════════════════════════════════════════════════
-function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
+function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
   const [question,setQuestion]=useState("");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
@@ -2329,8 +2522,7 @@ function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
         messages:[{role:"user",content:buildDecisionPrompt(profile,q,isPremium,"")}],
         system:decisionSys,
         userId,
-        isPremium,
-        isProMax
+        isPremium
       });
       addDecision(userId,{id:Date.now(),question:q,framework:fw,date:new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short"})});
       setDecisions(getDecisions(userId));setQuestion("");
@@ -2344,7 +2536,15 @@ function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
       <div className="fu">
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:24}}>
           <div><div className="d3" style={{marginBottom:4}}>Help me think this through</div><p className="small">You're not alone in this decision. Drop it here and we'll think it through with you — honestly.</p></div>
-          {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
+          {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
         </div>
 
         <div className="card" style={{marginBottom:24}}>
@@ -2394,79 +2594,123 @@ function DecisionModule({profile,userId,isPremium,isPaid,isProMax,onUnlock}){
 // NOTIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function NotificationPanel({profile,userId,streak,onClose}){
-  const [perm,  setPerm  ]=useState(typeof Notification!=="undefined"?Notification.permission:"unsupported");
-  const [times, setTimes ]=useState({morning:"07:00",afternoon:"13:00",evening:"20:00"});
-  const [enabled,setEnabled]=useState(false);
-  const [sched, setSched ]=useState(null);
-  const [tested,setTested]=useState(false);
+  const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
+  const [times,   setTimes  ]=useState({morning:"07:00",afternoon:"13:00",evening:"20:00"});
+  const [status,  setStatus ]=useState("idle"); // idle | scheduling | done | error
+  const [tested,  setTested ]=useState(false);
+  const [testMsg, setTestMsg]=useState("");
 
-  const enable=async()=>{
-    const p=await requestNotifPermission();setPerm(p);
-    if(p==="granted"){
-      scheduleNotification(userId,profile?.name||"",profile?.goals||"",streak||1,times,()=>{});
-      setSched("Morning, afternoon, evening + midnight streak guard all scheduled ✓");
-      setEnabled(true);
+  const schedule=async()=>{
+    setStatus("scheduling");
+    try{
+      await scheduleNotification(userId,profile?.name||"",profile?.goals||"",streak||1,times,null);
+      setStatus("done");
+    }catch(e){
+      setStatus("error");
     }
   };
-  const disable=()=>{
-    const timers=_notifTimers.get(userId)||[];
-    timers.forEach(t=>clearTimeout(t));
-    _notifTimers.delete(userId);
-    try{localStorage.removeItem("destiniq_notif_v2");}catch(_){}
-    setEnabled(false);setSched(null);
-  };
-  const test=()=>{
-    if(Notification.permission!=="granted") return;
-    fireNotification("DestinIQ",`${profile?.name||"Hey"} — this is a test. Your daily notifications are working! 🎉`,"test");
-    setTested(true);setTimeout(()=>setTested(false),3000);
+
+  const sendTest=async()=>{
+    setTested(true);
+    setTestMsg("Sending…");
+    const ok = await testNotification(profile?.name||"");
+    setTestMsg(ok
+      ? isNative
+        ? "✅ Check your notifications in 5 seconds!"
+        : "✅ Check your browser notifications in 5 seconds!"
+      : "❌ Failed. Make sure you allowed notifications and rebuilt the APK."
+    );
+    setTimeout(()=>{ setTested(false); setTestMsg(""); }, 6000);
   };
 
   return(
-    <div style={{position:"fixed",inset:0,zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center",background:"rgba(5,6,15,0.75)",backdropFilter:"blur(8px)"}}
+    <div style={{position:"fixed",inset:0,zIndex:400,display:"flex",alignItems:"flex-end",
+      justifyContent:"center",background:"rgba(5,6,15,0.75)",backdropFilter:"blur(8px)"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:"100%",maxWidth:500,background:"var(--raised)",borderRadius:"20px 20px 0 0",border:"1px solid var(--line-gold)",padding:28,animation:"slideIn .3s ease"}}>
+      <div style={{width:"100%",maxWidth:500,background:"var(--raised)",
+        borderRadius:"20px 20px 0 0",border:"1px solid var(--line-gold)",
+        padding:28,animation:"slideIn .3s ease",maxHeight:"85vh",overflowY:"auto"}}>
+
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-          <div><div className="mono" style={{marginBottom:4}}>🔔 Daily Notifications</div><p className="small">Get nudged at the right time every day.</p></div>
+          <div>
+            <div className="mono" style={{marginBottom:4}}>🔔 Daily Notifications</div>
+            <p className="small">{isNative
+              ? "Native notifications — fire even when app is closed ✅"
+              : "Browser notifications — only work while tab is open"
+            }</p>
+          </div>
           <button className="btn-text" onClick={onClose} style={{fontSize:18}}>✕</button>
         </div>
 
-        {perm==="unsupported"&&<div className="err-box">Your browser doesn't support notifications. Try Chrome or Edge.</div>}
-        {perm==="denied"&&<div className="err-box" style={{flexDirection:"column",alignItems:"flex-start",gap:8}}><strong>Notifications blocked.</strong><span>Go to browser settings → site permissions → allow notifications, then come back.</span></div>}
-
-        {perm!=="denied"&&perm!=="unsupported"&&(
-          <>
-            <div className="notif-panel">
-              <div className="notif-3col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-                {[
-                  {key:"morning",label:"🌅 Wake-up",hint:"Best: 6–8 AM"},
-                  {key:"afternoon",label:"☀️ Afternoon",hint:"Best: 1–3 PM"},
-                  {key:"evening",label:"🌆 Evening",hint:"Best: 7–9 PM"},
-                ].map(slot=>(
-                  <div key={slot.key}>
-                    <label className="fl" style={{marginBottom:6}}>{slot.label}</label>
-                    <input type="time" className="notif-time" value={times[slot.key]} onChange={e=>setTimes(t=>({...t,[slot.key]:e.target.value}))}/>
-                    <p style={{fontSize:10,color:"rgba(255,255,255,0.25)",marginTop:4}}>{slot.hint}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="small" style={{marginBottom:12,lineHeight:1.6}}>Morning gets you out of bed and focused. Afternoon re-engages you after the lunch dip. Evening protects your streak and helps you reflect. Midnight streak alert fires automatically.</p>
-              {sched&&<div className="insight" style={{marginTop:4,marginBottom:16}}><p style={{fontSize:13,color:"var(--cream-60)"}}>✓ Scheduled — {sched}</p></div>}
-              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                {!enabled
-                  ?<button className="btn btn-gold" onClick={enable}>{perm==="granted"?"Schedule Notifications":"Enable & Schedule"}</button>
-                  :<><button className="btn btn-gold" onClick={enable}>↺ Reschedule</button><button className="btn btn-ghost" onClick={disable}>Disable</button></>
-                }
-                {perm==="granted"&&<button className="btn btn-ghost" onClick={test} disabled={tested}>{tested?"Sent ✓":"Send Test"}</button>}
-              </div>
-            </div>
-
-            <div className="insight" style={{marginTop:16,marginBottom:0}}>
-              <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.75}}>
-                <strong style={{color:"var(--gold)"}}>Note:</strong> Browser notifications fire while the tab is open or recently active. For delivery when app is fully closed, a service worker + Web Push setup is needed (a separate one-day build).
-              </p>
-            </div>
-          </>
+        {/* Status banner */}
+        {isNative ? (
+          <div style={{padding:"10px 14px",background:"rgba(77,182,172,0.1)",
+            border:"1px solid rgba(77,182,172,0.3)",borderRadius:10,marginBottom:16,
+            fontSize:12,color:"#4db6ac"}}>
+            ✅ You're on the mobile app — notifications will fire even when the app is closed.
+          </div>
+        ):(
+          <div style={{padding:"10px 14px",background:"rgba(251,191,36,0.08)",
+            border:"1px solid rgba(251,191,36,0.2)",borderRadius:10,marginBottom:16,
+            fontSize:12,color:"#fbbf24"}}>
+            ⚠️ Web notifications only work while the tab is open. Install the Android app for real daily notifications.
+          </div>
         )}
+
+        {/* Time pickers */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+          {[
+            {key:"morning",   label:"🌅 Morning",   hint:"6–8 AM"},
+            {key:"afternoon", label:"☀️ Afternoon", hint:"1–3 PM"},
+            {key:"evening",   label:"🌆 Evening",   hint:"7–9 PM"},
+          ].map(slot=>(
+            <div key={slot.key}>
+              <label style={{fontSize:11,color:"var(--cream-40)",display:"block",marginBottom:6}}>
+                {slot.label}
+              </label>
+              <input type="time" value={times[slot.key]}
+                onChange={e=>setTimes(t=>({...t,[slot.key]:e.target.value}))}
+                style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--line)",
+                  borderRadius:8,padding:"8px",color:"var(--cream)",fontSize:13,outline:"none"}}/>
+              <p style={{fontSize:10,color:"var(--cream-20)",marginTop:3}}>{slot.hint}</p>
+            </div>
+          ))}
+        </div>
+
+        <p style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.7,marginBottom:16}}>
+          You'll also get a <strong style={{color:"var(--gold)"}}>9pm streak alert</strong> automatically every day.
+        </p>
+
+        {/* Result messages */}
+        {status==="done"&&(
+          <div style={{padding:"10px 14px",background:"rgba(77,182,172,0.1)",borderRadius:10,
+            marginBottom:12,fontSize:13,color:"#4db6ac"}}>
+            ✅ Notifications scheduled! Morning, afternoon, evening + 9pm streak alert.
+          </div>
+        )}
+        {status==="error"&&(
+          <div style={{padding:"10px 14px",background:"rgba(248,113,113,0.1)",borderRadius:10,
+            marginBottom:12,fontSize:13,color:"var(--rose)"}}>
+            ❌ Scheduling failed. Make sure you allowed notifications when prompted.
+          </div>
+        )}
+        {testMsg&&(
+          <div style={{padding:"10px 14px",background:"rgba(210,175,90,0.08)",borderRadius:10,
+            marginBottom:12,fontSize:13,color:"var(--gold)"}}>
+            {testMsg}
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <button className="btn btn-gold" style={{flex:1}} onClick={schedule}
+            disabled={status==="scheduling"}>
+            {status==="scheduling"?"Scheduling…":"Schedule Notifications"}
+          </button>
+          <button className="btn btn-ghost" onClick={sendTest} disabled={tested}>
+            🔔 Test
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -2547,7 +2791,9 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
           if(userId){
             try{
               localStorage.setItem(`diq_paid_${userId}`, "1");
-              localStorage.setItem(`diq_prem_${userId}`, "1");
+              // Only set premium flag for Pro Max tier
+              if(tier==="promax") localStorage.setItem(`diq_prem_${userId}`, "1");
+              else localStorage.removeItem(`diq_prem_${userId}`);
               localStorage.setItem(`diq_paystack_ref_${userId}`, response.reference);
             }catch(_){}
           }
@@ -2559,7 +2805,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
             await supabase.from("user_profiles").upsert({
               user_id:    uid,
               is_paid:    true,
-              is_premium: true,
+              is_premium: (tier==="promax"||tier==="promax_annual"),
               paystack_ref: response.reference,
               paid_plan:  planKey,
               paid_at:    new Date().toISOString(),
@@ -2624,7 +2870,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
     {text:"Weekly Pulse — your week, analyzed",inc:true},
     {text:"Relocate — explore any country",inc:true},
     {text:"All module refreshes anytime",inc:true},
-    {text:"My Advisor — 10 messages/day",inc:true},
+    {text:"My Advisor — 10 messages/day",inc:true}, // Pro limit
     {text:"Edit profile & re-generate report",inc:true},
   ];
 
@@ -2898,31 +3144,31 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR CHAT — Warm, emotionally intelligent human coach tone
 // ═══════════════════════════════════════════════════════════════════════════════
-function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlock}){
+function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
   const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
-  // ── MESSAGE LIMITS BY TIER ────────────────────────────────────────────────
-  // Free: 1/day · Pro: 10/day · Pro Max: unlimited
-  const FREE_DAILY_LIMIT=1;
-  const PRO_DAILY_LIMIT=10;
+  // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
+  const FREE_DAILY_LIMIT = 1;  // Free: 1 message/day
+  const PRO_DAILY_LIMIT  = 10; // Pro: 10 messages/day (Pro Max = unlimited)ers: 2 advisor messages per day
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [usedToday,setUsedToday]=useState(()=>{
     if(typeof window==="undefined") return 0;
     return parseInt(localStorage.getItem(limitKey)||"0");
   });
-  const dailyLimit = isProMax ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
-  const remaining=Math.max(0,dailyLimit===Infinity?999:dailyLimit-usedToday);
-  const limitReached = dailyLimit!==Infinity && usedToday>=dailyLimit;
+  // Tier-based limits: Free=1/day, Pro=10/day, ProMax=unlimited
+  const dailyLimit    = isPremium ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const remaining     = Math.max(0, dailyLimit === Infinity ? 999 : dailyLimit - usedToday);
+  const limitReached  = dailyLimit !== Infinity && remaining <= 0;
 
   const send=async()=>{
     if(!input.trim()||loading) return;
     if(limitReached){ onUnlock&&onUnlock(); return; }
     const msg=sanitize(input.trim());setInput("");setError("");
-    if(!isProMax){
+    if(!isPaid){
       const next=usedToday+1;
       setUsedToday(next);
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
@@ -2965,11 +3211,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlo
     <div className="fu">
       <div style={{marginBottom:20}}>
         <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version.{" "}
-          {isProMax&&<span style={{color:"var(--teal)"}}>✦ Pro Max — unlimited messages.</span>}
-          {isPaid&&!isProMax&&<span style={{color:"var(--gold)"}}>✦ Pro — {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}
-          {!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}
-        </p>
+        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPremium&&<span style={{color:"var(--gold)"}}>✦ Unlimited access — Pro Max.</span>}{isPaid&&!isPremium&&<span style={{color:"var(--cream-40)"}}> {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}</p>
       </div>
       <div className="card">
         <div className="chat-scroll" ref={scrollRef}>
@@ -2996,11 +3238,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isPaid,isProMax,onUnlo
         {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
         {limitReached?(
           <div style={{textAlign:"center",padding:"16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,marginTop:10}}>
-            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>
-              {isPaid&&!isProMax
-                ?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`
-                :`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade for more.`}
-            </p>
+            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>{isPaid?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`:`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade to Pro for 10/day.`}</p>
             <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:13,padding:"8px 20px"}}>Upgrade now</button>
           </div>
         ):(
@@ -3829,6 +4067,202 @@ function Landing({onStart,ipLocation}){
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MULTI-LANGUAGE SUPPORT
+// AI content: language injected into every prompt automatically
+// UI strings: translated via t() helper function
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const LANGUAGES = [
+  {code:"en", label:"English",      flag:"🇬🇧", native:"English"},
+  {code:"zh", label:"Chinese",      flag:"🇨🇳", native:"中文"},
+  {code:"hi", label:"Hindi",        flag:"🇮🇳", native:"हिन्दी"},
+  {code:"es", label:"Spanish",      flag:"🇪🇸", native:"Español"},
+  {code:"fr", label:"French",       flag:"🇫🇷", native:"Français"},
+  {code:"ar", label:"Arabic",       flag:"🇸🇦", native:"العربية", rtl:true},
+  {code:"bn", label:"Bengali",      flag:"🇧🇩", native:"বাংলা"},
+  {code:"pt", label:"Portuguese",   flag:"🇧🇷", native:"Português"},
+  {code:"ru", label:"Russian",      flag:"🇷🇺", native:"Русский"},
+  {code:"ur", label:"Urdu",         flag:"🇵🇰", native:"اردو", rtl:true},
+  {code:"id", label:"Indonesian",   flag:"🇮🇩", native:"Bahasa Indonesia"},
+  {code:"de", label:"German",       flag:"🇩🇪", native:"Deutsch"},
+  {code:"ja", label:"Japanese",     flag:"🇯🇵", native:"日本語"},
+  {code:"tr", label:"Turkish",      flag:"🇹🇷", native:"Türkçe"},
+  {code:"ko", label:"Korean",       flag:"🇰🇷", native:"한국어"},
+  {code:"vi", label:"Vietnamese",   flag:"🇻🇳", native:"Tiếng Việt"},
+  {code:"it", label:"Italian",      flag:"🇮🇹", native:"Italiano"},
+  {code:"th", label:"Thai",         flag:"🇹🇭", native:"ภาษาไทย"},
+  {code:"sw", label:"Swahili",      flag:"🇰🇪", native:"Kiswahili"},
+  {code:"pl", label:"Polish",       flag:"🇵🇱", native:"Polski"},
+  {code:"nl", label:"Dutch",        flag:"🇳🇱", native:"Nederlands"},
+  {code:"fa", label:"Persian",      flag:"🇮🇷", native:"فارسی", rtl:true},
+];
+
+const UI_STRINGS = {
+  en: {
+    startFree:"Start — it's free", signIn:"Sign in", getStarted:"Get started free →",
+    myReport:"My Report", checkIn:"Check-in", wins:"Wins", progress:"Progress",
+    myPractices:"My Practices", weeklyPulse:"Weekly Pulse",
+    makeMoney:"Make Money", levelUp:"Level Up", planDecide:"Plan & Decide",
+    wellbeing:"Wellbeing", bodyStyle:"Body & Style", socialLife:"Social & Life",
+    moneyDives:"Money Deep Dives", purpose:"Purpose", discover:"Discover",
+    upgrade:"Upgrade", signOut:"Sign out", settings:"Settings",
+    generate:"Generate", refresh:"Refresh", loading:"Loading…",
+    yourDashboard:"Your Dashboard", advisorMsg:"Message your advisor…",
+    logWin:"Log a Win", addProgress:"Add progress entry",
+    free:"Free", pro:"Pro", proMax:"Pro Max",
+    savePercent:"Save", perMonth:"/month", perYear:"/year",
+    unlockFull:"Unlock full report", subscribePro:"Subscribe to Pro",
+    today:"Today", yesterday:"Yesterday", daysAgo:"days ago",
+    checkInTitle:"Check In", howWasYourDay:"How was your day?",
+    writtenFor:"Written for you",
+    somethingCarry:"Something to carry with you",
+    whatBring:"What you bring to this",
+    whatWatch:"What to watch out for",
+    profile:"Profile", language:"Language", notifications:"Notifications",
+    editProfile:"Edit profile", regenerate:"Re-generate report",
+    referFriend:"Refer a friend", aboutUs:"About DestinIQ",
+  },
+  fr: {
+    startFree:"Commencer — c'est gratuit", signIn:"Connexion", getStarted:"Commencer gratuitement →",
+    myReport:"Mon Rapport", checkIn:"Enregistrement", wins:"Victoires", progress:"Progrès",
+    myPractices:"Mes Pratiques", weeklyPulse:"Pouls Hebdomadaire",
+    makeMoney:"Gagner de l'argent", levelUp:"Progresser", planDecide:"Planifier & Décider",
+    wellbeing:"Bien-être", bodyStyle:"Corps & Style", socialLife:"Social & Vie",
+    moneyDives:"Finances Approfondies", purpose:"Objectif", discover:"Découvrir",
+    upgrade:"Améliorer", signOut:"Déconnexion", settings:"Paramètres",
+    generate:"Générer", refresh:"Actualiser", loading:"Chargement…",
+    yourDashboard:"Votre Tableau de Bord", advisorMsg:"Message à votre conseiller…",
+    logWin:"Enregistrer une victoire", addProgress:"Ajouter une entrée",
+    free:"Gratuit", pro:"Pro", proMax:"Pro Max",
+    savePercent:"Économiser", perMonth:"/mois", perYear:"/an",
+    unlockFull:"Débloquer le rapport complet", subscribePro:"S'abonner à Pro",
+    today:"Aujourd'hui", yesterday:"Hier", daysAgo:"jours",
+    checkInTitle:"Enregistrement", howWasYourDay:"Comment était votre journée ?",
+    writtenFor:"Écrit pour vous",
+    somethingCarry:"Quelque chose à retenir",
+    whatBring:"Ce que vous apportez",
+    whatWatch:"Points de vigilance",
+    profile:"Profil", language:"Langue", notifications:"Notifications",
+    editProfile:"Modifier le profil", regenerate:"Régénérer le rapport",
+    referFriend:"Parrainer un ami", aboutUs:"À propos de DestinIQ",
+  },
+  ar: {
+    startFree:"ابدأ — مجاناً", signIn:"تسجيل الدخول", getStarted:"ابدأ مجاناً →",
+    myReport:"تقريري", checkIn:"تسجيل الوصول", wins:"الانتصارات", progress:"التقدم",
+    myPractices:"ممارساتي", weeklyPulse:"النبض الأسبوعي",
+    makeMoney:"كسب المال", levelUp:"ارتقِ بنفسك", planDecide:"خطط وقرر",
+    wellbeing:"العافية", bodyStyle:"الجسم والأناقة", socialLife:"الحياة الاجتماعية",
+    moneyDives:"المال بعمق", purpose:"الهدف", discover:"اكتشف",
+    upgrade:"ترقية", signOut:"تسجيل الخروج", settings:"الإعدادات",
+    generate:"توليد", refresh:"تحديث", loading:"جار التحميل…",
+    yourDashboard:"لوحتك", advisorMsg:"رسالة لمستشارك…",
+    logWin:"سجّل انتصاراً", addProgress:"أضف إدخالاً",
+    free:"مجاني", pro:"برو", proMax:"برو ماكس",
+    savePercent:"وفّر", perMonth:"/شهر", perYear:"/سنة",
+    unlockFull:"فتح التقرير الكامل", subscribePro:"اشترك في برو",
+    today:"اليوم", yesterday:"أمس", daysAgo:"أيام",
+    checkInTitle:"تسجيل الوصول", howWasYourDay:"كيف كان يومك؟",
+    writtenFor:"كُتب لك",
+    somethingCarry:"شيء تحمله معك",
+    whatBring:"ما تحضره",
+    whatWatch:"ما يجب مراقبته",
+    profile:"الملف الشخصي", language:"اللغة", notifications:"الإشعارات",
+    editProfile:"تعديل الملف", regenerate:"إعادة توليد التقرير",
+    referFriend:"دعوة صديق", aboutUs:"عن DestinIQ",
+  },
+  sw: {
+    startFree:"Anza — bila malipo", signIn:"Ingia", getStarted:"Anza bure →",
+    myReport:"Ripoti Yangu", checkIn:"Kujiandikisha", wins:"Mafanikio", progress:"Maendeleo",
+    myPractices:"Mazoea Yangu", weeklyPulse:"Mapigo ya Wiki",
+    makeMoney:"Pata Pesa", levelUp:"Jiboreshe", planDecide:"Panga & Amua",
+    wellbeing:"Afya ya Akili", bodyStyle:"Mwili & Mtindo", socialLife:"Maisha ya Kijamii",
+    moneyDives:"Fedha Kwa Kina", purpose:"Kusudi", discover:"Gundua",
+    upgrade:"Boresha", signOut:"Toka", settings:"Mipangilio",
+    generate:"Tengeneza", refresh:"Onyesha upya", loading:"Inapakia…",
+    yourDashboard:"Dashibodi Yako", advisorMsg:"Tuma ujumbe kwa mshauri wako…",
+    logWin:"Andika mafanikio", addProgress:"Ongeza rekodi",
+    free:"Bure", pro:"Pro", proMax:"Pro Max",
+    savePercent:"Okoa", perMonth:"/mwezi", perYear:"/mwaka",
+    unlockFull:"Fungua ripoti kamili", subscribePro:"Jiandikishe Pro",
+    today:"Leo", yesterday:"Jana", daysAgo:"siku zilizopita",
+    checkInTitle:"Kujiandikisha", howWasYourDay:"Siku yako ilikuwaje?",
+    writtenFor:"Imeandikwa kwako",
+    somethingCarry:"Kitu cha kubeba nawe",
+    whatBring:"Unachokuja nacho",
+    whatWatch:"Mambo ya kuangalia",
+    profile:"Wasifu", language:"Lugha", notifications:"Arifa",
+    editProfile:"Hariri wasifu", regenerate:"Tengeneza ripoti upya",
+    referFriend:"Mwalika rafiki", aboutUs:"Kuhusu DestinIQ",
+  },
+  pt: {
+    startFree:"Começar — é grátis", signIn:"Entrar", getStarted:"Começar grátis →",
+    myReport:"Meu Relatório", checkIn:"Check-in", wins:"Conquistas", progress:"Progresso",
+    myPractices:"Minhas Práticas", weeklyPulse:"Pulso Semanal",
+    makeMoney:"Ganhar Dinheiro", levelUp:"Evoluir", planDecide:"Planejar & Decidir",
+    wellbeing:"Bem-estar", bodyStyle:"Corpo & Estilo", socialLife:"Vida Social",
+    moneyDives:"Finanças a Fundo", purpose:"Propósito", discover:"Descobrir",
+    upgrade:"Atualizar", signOut:"Sair", settings:"Configurações",
+    generate:"Gerar", refresh:"Atualizar", loading:"Carregando…",
+    yourDashboard:"Seu Painel", advisorMsg:"Mensagem para seu consultor…",
+    logWin:"Registrar conquista", addProgress:"Adicionar entrada",
+    free:"Grátis", pro:"Pro", proMax:"Pro Max",
+    savePercent:"Economize", perMonth:"/mês", perYear:"/ano",
+    unlockFull:"Desbloquear relatório completo", subscribePro:"Assinar Pro",
+    today:"Hoje", yesterday:"Ontem", daysAgo:"dias atrás",
+    checkInTitle:"Check-in", howWasYourDay:"Como foi seu dia?",
+    writtenFor:"Escrito para você",
+    somethingCarry:"Algo para levar consigo",
+    whatBring:"O que você traz",
+    whatWatch:"O que observar",
+    profile:"Perfil", language:"Idioma", notifications:"Notificações",
+    editProfile:"Editar perfil", regenerate:"Gerar relatório novamente",
+    referFriend:"Indicar amigo", aboutUs:"Sobre o DestinIQ",
+  },
+  es: {
+    startFree:"Empezar — es gratis", signIn:"Iniciar sesión", getStarted:"Empezar gratis →",
+    myReport:"Mi Informe", checkIn:"Check-in", wins:"Logros", progress:"Progreso",
+    myPractices:"Mis Prácticas", weeklyPulse:"Pulso Semanal",
+    makeMoney:"Ganar Dinero", levelUp:"Superarse", planDecide:"Planear & Decidir",
+    wellbeing:"Bienestar", bodyStyle:"Cuerpo & Estilo", socialLife:"Vida Social",
+    moneyDives:"Finanzas a Fondo", purpose:"Propósito", discover:"Descubrir",
+    upgrade:"Actualizar", signOut:"Cerrar sesión", settings:"Configuración",
+    generate:"Generar", refresh:"Actualizar", loading:"Cargando…",
+    yourDashboard:"Tu Panel", advisorMsg:"Mensaje a tu asesor…",
+    logWin:"Registrar logro", addProgress:"Agregar entrada",
+    free:"Gratis", pro:"Pro", proMax:"Pro Max",
+    savePercent:"Ahorra", perMonth:"/mes", perYear:"/año",
+    unlockFull:"Desbloquear informe completo", subscribePro:"Suscribirse a Pro",
+    today:"Hoy", yesterday:"Ayer", daysAgo:"días",
+    checkInTitle:"Check-in", howWasYourDay:"¿Cómo fue tu día?",
+    writtenFor:"Escrito para ti",
+    somethingCarry:"Algo para llevar contigo",
+    whatBring:"Lo que aportas",
+    whatWatch:"Lo que debes observar",
+    profile:"Perfil", language:"Idioma", notifications:"Notificaciones",
+    editProfile:"Editar perfil", regenerate:"Regenerar informe",
+    referFriend:"Invitar amigo", aboutUs:"Sobre DestinIQ",
+  },
+};
+
+// For languages without full UI translation, AI handles content
+// UI falls back to English but ALL generated content is in chosen language
+["zh","hi","bn","ru","ur","id","de","ja","tr","ko","vi","it","th","sw","pl","nl","fa"].forEach(code=>{
+  if(!UI_STRINGS[code]) UI_STRINGS[code] = {...UI_STRINGS.en};
+});
+
+// Translation helper — falls back to English
+function t(lang, key){ return UI_STRINGS[lang]?.[key] || UI_STRINGS.en[key] || key; }
+
+// Language instruction for AI prompts
+function langPrompt(lang){
+  if(!lang||lang==="en") return "";
+  const found = LANGUAGES.find(l=>l.code===lang);
+  if(!found) return "";
+  return `\n\nIMPORTANT: Write your ENTIRE response in ${found.label} (${found.native}). All text must be in ${found.label}.`;
+}
+
 // ── COUNTRIES with currency codes for onboarding ─────────────────────────────
 const COUNTRIES_LIST = [
   {name:"Afghanistan",currency:"AFN",symbol:"؋"},
@@ -3948,20 +4382,40 @@ function getIncomeRanges(currencySymbol){
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTAKE
 // ═══════════════════════════════════════════════════════════════════════════════
-function Intake({onSubmit, savedFormData}){
+function Intake({onSubmit, savedFormData, ipLocation}){
   const TOTAL=6;
   const [step,setStep]=useState(1);
   const [animating,setAnimating]=useState(false);
   const [direction,setDirection]=useState("forward");
+  // Auto-detect country from IP if not already saved
+  const detectedCountry = savedFormData?.country || ipLocation?.country || "";
   const [f,setF]=useState(()=>({
-    name:"",age:"",gender:"",country:"",relationship:"",income:"",
+    name:"",age:"",gender:"",country:detectedCountry,relationship:"",income:"",
     education:"",career:"",skills:"",habits:"",goals:"",challenge:"",
     situation:"",bigGoal:"",wantFrom:"",
     // Pre-fill from saved data if it exists — so refresh never loses the form
     ...(savedFormData||{}),
+    // Always use best available country
+    country: savedFormData?.country || detectedCountry,
   }));
   const [err,setErr]=useState("");
-  const [countrySearch,setCountrySearch]=useState(()=>savedFormData?.country||"");
+  // When ipLocation loads (async), update country if not already filled
+  useEffect(()=>{
+    if(ipLocation?.country && !f.country){
+      const matched = COUNTRIES_LIST.find(c=>
+        c.name.toLowerCase()===ipLocation.country.toLowerCase() ||
+        c.name.toLowerCase().includes(ipLocation.country.toLowerCase())
+      );
+      if(matched){
+        setF(p=>({...p, country:matched.name, currency:matched.currency, currencySymbol:matched.symbol}));
+        setCountrySearch(matched.name);
+      } else {
+        setF(p=>({...p, country:ipLocation.country}));
+        setCountrySearch(ipLocation.country);
+      }
+    }
+  },[ipLocation?.country]);
+  const [countrySearch,setCountrySearch]=useState(()=>savedFormData?.country||detectedCountry||"");
   const [showDropdown,setShowDropdown]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
@@ -4475,6 +4929,499 @@ function ScoreHistoryChart({history}){
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GENERIC AI MODULE — powers all 28 new modules
+// Each module has its own prompt config but shares this renderer
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const MODULE_CONFIGS = {
+  // ── WELLBEING ──────────────────────────────────────────────────────────────
+  innerpeace: {
+    title: "Inner Peace",
+    icon: "🕊️",
+    subtitle: "Breathing, journaling, grounding — for when life feels heavy",
+    disclaimer: true,
+    prompt: (p) => `You are a compassionate wellbeing guide. The user is ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Their situation: "${p.situation||""}", challenge: "${p.challenge||""}".
+Write a warm, practical Inner Peace guide for them with 4 sections:
+1. What you're likely feeling right now (validate without being preachy)
+2. A 3-step breathing exercise specific to their situation (box breathing, 4-7-8, or body scan)
+3. A journaling prompt that goes deeper than surface level
+4. One grounding technique they can use anywhere in the next 10 minutes
+Be warm, real, and human. No generic wellness speak. Max 500 words.`,
+  },
+  angerstress: {
+    title: "Anger & Stress Relief",
+    icon: "🌊",
+    subtitle: "Real tools for when things get too much — not 'just calm down'",
+    disclaimer: true,
+    prompt: (p) => `You are a stress management expert. User: ${p.name||"someone"} from ${p.country||"their country"}, facing: "${p.challenge||""}".
+Give them 4 IMMEDIATE tools for anger/stress relief right now:
+1. Box breathing method (specific steps, exact counts)
+2. Cold water technique (exactly how to do it and why it works physiologically)
+3. Movement-based release (specific moves — not yoga, actual physical release)
+4. The 5-4-3-2-1 grounding method adapted to their environment
+Be direct and practical. These should work in 5 minutes. No fluff.`,
+  },
+  sleepcoach: {
+    title: "Sleep Coach",
+    icon: "🌙",
+    subtitle: "Personalized sleep routine based on your life and schedule",
+    prompt: (p) => `You are a sleep optimization coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Their situation: "${p.situation||""}". Career: "${p.career||""}".
+Build their personal sleep optimization plan:
+1. What is most likely killing their sleep based on their situation (be specific)
+2. The ideal 1-hour wind-down routine for their lifestyle (time it out: 9pm do X, 9:20pm do Y etc)
+3. 3 local herbs or natural remedies from ${p.country||"their region"} that support sleep
+4. One thing to do differently tomorrow morning that will improve tomorrow night's sleep
+Make it specific to their real life, not generic sleep hygiene advice.`,
+  },
+  anxietytool: {
+    title: "Anxiety Toolkit",
+    icon: "🛡️",
+    subtitle: "Social anxiety, financial anxiety, future anxiety — practical tools",
+    disclaimer: true,
+    prompt: (p) => `You are an anxiety specialist. User: ${p.name||"someone"} from ${p.country||"their country"}, challenge: "${p.challenge||""}".
+Identify which type of anxiety they likely experience most (social, financial, or future) based on their situation.
+Then give them:
+1. The specific thought pattern driving this anxiety (name it clearly)
+2. A cognitive reframe — not positive thinking, but a more accurate way to see it
+3. Two 5-minute exercises they can do TODAY to reduce this anxiety
+4. One long-term habit to build resilience against this specific anxiety type
+Be clinical but human. No "just believe in yourself" advice.`,
+  },
+  griefloss: {
+    title: "Grief & Loss Support",
+    icon: "🌱",
+    subtitle: "Breakups, job loss, death, failure — you're not alone in this",
+    disclaimer: true,
+    prompt: (p) => `You are a grief counselor with deep empathy. User: ${p.name||"someone"} from ${p.country||"their country"}.
+Their challenge: "${p.challenge||""}".
+Write a compassionate grief support guide:
+1. Acknowledge what they're going through without minimizing it (2-3 sentences that feel truly seen)
+2. Explain the grief stage they're likely in and why that's completely normal
+3. Three concrete things to do this week to process (not suppress) the grief
+4. What NOT to do — the common mistakes that delay healing
+5. One sentence they can say to themselves when the pain peaks
+This should feel like a wise, caring friend wrote it — not a therapist script.`,
+  },
+
+  // ── BODY & STYLE ──────────────────────────────────────────────────────────
+  glowup: {
+    title: "Glow Up",
+    icon: "✨",
+    subtitle: "Personalized grooming and style for your gender, age, and country",
+    prompt: (p) => `You are a style and grooming expert who knows ${p.country||"African"} culture well.
+User: ${p.name||"someone"}, ${p.age||""}, ${p.gender||"person"} from ${p.country||"their country"}, income: "${p.income||""}".
+Create their personal Glow Up guide:
+1. Top 3 grooming habits specific to their gender that will have the biggest impact (skin, hair, face)
+2. Style direction that fits their local culture AND looks modern and sharp (not Western copy-paste)
+3. Budget-friendly version: what to buy first with limited money in ${p.country||"their country"}
+4. One thing they're probably doing wrong that's costing them their look
+5. The 10-minute daily grooming routine they should follow
+Be specific — not vague "moisturize daily" advice. Name actual product types or local alternatives.`,
+  },
+  nogym: {
+    title: "No-Gym Workout",
+    icon: "💪",
+    subtitle: "Full body workouts — home or outside, zero equipment",
+    prompt: (p) => `You are a fitness coach specializing in bodyweight training. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Build their complete no-gym workout plan:
+1. A 20-minute full body workout they can do in their room (exercises, reps, rest time)
+2. An outdoor workout they can do in their neighborhood (park, road, open space)
+3. Weekly schedule: which days to work out, which to rest, why
+4. The 3 bodyweight exercises with highest return for their age and goals
+5. How to progress when it gets easy (no gym needed)
+Be specific with reps, sets, and form cues. Make it feel achievable for a beginner but not boring for someone active.`,
+  },
+  posture: {
+    title: "Posture & Energy",
+    icon: "⚡",
+    subtitle: "How you hold yourself affects your confidence and energy all day",
+    prompt: (p) => `You are a posture and movement specialist. User: ${p.name||"someone"}, ${p.age||""}, career: "${p.career||""}".
+Create their personal posture and energy guide:
+1. The most likely posture problem they have based on their job/lifestyle (be specific about what's happening in their body)
+2. 5 simple corrections they can make TODAY that will feel different immediately
+3. A 5-minute morning movement sequence to set their posture for the day
+4. The posture-confidence connection: what good posture signals to their own brain (not just others)
+5. One awareness exercise to catch themselves slouching throughout the day
+Make it practical — things they can check and fix in the next 5 minutes.`,
+  },
+  bodyfuel: {
+    title: "Body Fuel",
+    icon: "🥗",
+    subtitle: "Nutrition on a budget using local food from your country",
+    prompt: (p) => `You are a nutritionist who knows ${p.country||"African"} food deeply.
+User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}, income: "${p.income||""}".
+Build their local nutrition plan:
+1. The 5 most nutritious affordable foods in ${p.country||"their region"} they should eat more of
+2. What they're probably not eating enough of (specific nutrient gap for their age/gender)
+3. A simple daily eating structure using local foods (breakfast, lunch, dinner examples)
+4. 3 cheap local meal combinations that are actually high performance fuel
+5. What to avoid or limit that's common in their culture but quietly draining their energy
+Name actual local foods, not generic "protein" and "vegetables". Be specific to ${p.country||"their country"}.`,
+  },
+
+  // ── SOCIAL & LIFE ─────────────────────────────────────────────────────────
+  confidencelab: {
+    title: "Confidence Lab",
+    icon: "🦁",
+    subtitle: "Real daily actions that build confidence — not affirmations",
+    prompt: (p) => `You are a confidence and performance coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Challenge: "${p.challenge||""}".
+Build their Confidence Lab — real actions, not affirmations:
+1. The root of their confidence issue (based on their situation — be honest and specific)
+2. Three confidence actions to do THIS WEEK (specific, uncomfortable, measurable)
+3. The "small wins" framework: daily micro-challenges to build their confidence muscle
+4. One social experiment to run this week that will surprise them
+5. How to recover when confidence breaks — the exact reset routine
+No "believe in yourself" advice. Only actions that create evidence that they are capable.`,
+  },
+  relationshipiq: {
+    title: "Relationship IQ",
+    icon: "🤝",
+    subtitle: "Friendships, conflict, communication — your social operating system",
+    prompt: (p) => `You are a relationship and social intelligence expert. User: ${p.name||"someone"} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
+Build their Relationship IQ guide:
+1. Their likely social pattern (people pleaser, avoider, over-sharer, withdrawn) — be honest
+2. The one relationship skill that will change everything for them right now
+3. How to handle conflict without losing the relationship (3-step framework)
+4. How to be a better friend/colleague starting today (3 specific behaviors)
+5. The relationship they should invest in more — and the one they may need to reconsider
+Be direct but kind. People need honest mirrors, not validation.`,
+  },
+  smalltalk: {
+    title: "Small Talk Master",
+    icon: "💬",
+    subtitle: "Start, keep, and end conversations — adapted to your culture",
+    prompt: (p) => `You are a communication coach who understands ${p.country||"African"} social culture.
+User: ${p.name||"someone"} from ${p.country||"their country"}.
+Build their Small Talk Mastery guide:
+1. 5 conversation starters that work in ${p.country||"their culture"} (not generic Western ones)
+2. How to keep a conversation going when it stalls (3 techniques with exact scripts)
+3. How to exit a conversation gracefully without being rude (cultural context matters here)
+4. How to remember names and details (specific memory trick)
+5. The one thing that makes people want to talk to you again (it's not what you say)
+Give real scripts, not just theory. Adapt everything to ${p.country||"their cultural context"}.`,
+  },
+  negotiation: {
+    title: "Negotiation Skills",
+    icon: "🎯",
+    subtitle: "Salary, market prices, business deals — with real scripts for your country",
+    prompt: (p) => `You are a negotiation expert who knows ${p.country||"African"} business culture deeply.
+User: ${p.name||"someone"} from ${p.country||"their country"}, career: "${p.career||""}".
+Build their Negotiation Playbook:
+1. The negotiation mindset shift most people from ${p.country||"their culture"} need to make
+2. How to negotiate a salary raise — exact script for their cultural context
+3. How to negotiate at markets and with vendors in ${p.country||"their country"} — the real tactics used
+4. The 3 most powerful negotiation phrases (in any context)
+5. What to do when they say no (the real conversation starts here)
+Give real scripts. Not "know your worth" advice — actual sentences they can use tomorrow.`,
+  },
+  digitallife: {
+    title: "Digital Life",
+    icon: "📱",
+    subtitle: "Social media anxiety, AI tools, phone addiction — take back control",
+    prompt: (p) => `You are a digital wellness and productivity expert. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Build their Digital Life reset:
+1. How social media is most likely affecting their mental state based on their age (be specific — comparison, FOMO, dopamine loop)
+2. 3 practical rules to set this week to reduce phone addiction
+3. The top 3 free AI tools available in ${p.country||"their country"} that give them an unfair advantage in their career/business
+4. How to use AI to save 2 hours per day (specific use cases for their situation)
+5. One digital audit to do tonight: what to delete, unfollow, or turn off
+Be specific. Name actual apps and tools they can use starting today.`,
+  },
+  parenting: {
+    title: "Parenting Corner",
+    icon: "👨‍👧",
+    subtitle: "Simple daily things to do with your kids — emotional intelligence for children",
+    prompt: (p) => `You are a child development and parenting expert who understands ${p.country||"African"} family culture.
+User: ${p.name||"someone"} from ${p.country||"their country"}, situation: "${p.situation||""}".
+Build their Parenting Corner guide:
+1. The one thing most parents in ${p.country||"their culture"} do that unknowingly hurts emotional development
+2. 3 simple daily activities (under 10 minutes each) to build emotional intelligence in children
+3. How to talk to children about feelings in a way that works (with example conversations)
+4. How to discipline without breaking their spirit — specific to ${p.country||"their cultural context"}
+5. What to do when you're too stressed to parent well (the reset routine for parents)
+Be culturally aware. Parenting advice needs to respect local values while introducing emotional intelligence.`,
+  },
+
+  // ── MONEY DEEP DIVES ──────────────────────────────────────────────────────
+  debtfreedom: {
+    title: "Debt Freedom Plan",
+    icon: "⛓️",
+    subtitle: "Step by step plan based on your income and country",
+    prompt: (p,cur) => `You are a debt elimination specialist. User: ${p.name||"someone"} from ${p.country||"their country"}, income: "${p.income||""}".
+Build their Debt Freedom Plan:
+1. The psychology of debt in ${p.country||"their culture"} — why people stay stuck (be honest)
+2. The debt snowball method adapted to their income level (specific steps)
+3. How to negotiate with creditors/lenders in ${p.country||"their country"} (exact approach)
+4. 3 ways to find extra money to put toward debt on their current income
+5. A realistic timeline and milestone plan (Month 1, Month 3, Month 6, Month 12)
+Use local currency context. Be realistic, not motivational-poster optimistic.`,
+  },
+  sidehustle: {
+    title: "Side Hustle Tracker",
+    icon: "📊",
+    subtitle: "Track what's working, scale what pays, drop what doesn't",
+    prompt: (p,cur) => `You are a side income strategist. User: ${p.name||"someone"} from ${p.country||"their country"}, skills: "${p.skills||""}". Career: "${p.career||""}".
+Build their Side Hustle Strategy:
+1. The 3 best side hustles for their skills and location in ${p.country||"their country"} (specific, realistic)
+2. How to start the top option this week with zero investment
+3. How to track income from multiple sources (simple system they'll actually use)
+4. The income milestones: when to scale, when to drop, when to go full-time
+5. The biggest mistake people make with side hustles in ${p.country||"their market"}
+Be specific to their country's economy and digital access. Real opportunities, not generic "freelance on Upwork" advice.`,
+  },
+  investment101: {
+    title: "Investment 101",
+    icon: "📈",
+    subtitle: "First investment steps simplified for your country",
+    prompt: (p,cur) => `You are an investment educator who knows ${p.country||"African"} financial markets.
+User: ${p.name||"someone"} from ${p.country||"their country"}, income: "${p.income||""}".
+Build their Investment 101 guide:
+1. The investment options available in ${p.country||"their country"} right now (stocks, treasury bills, mobile money savings, real estate — what's actually accessible)
+2. Where to start with small amounts in ${p.country||"their country"} (specific platforms or banks)
+3. Treasury bills / government bonds in ${p.country||"their country"} — how they work and current rates
+4. The biggest investment mistake beginners make in ${p.country||"their market"}
+5. A simple 3-step first investment plan they can start this month
+Be specific to ${p.country||"their country"}. Name actual local investment platforms and products.`,
+  },
+
+  // ── PURPOSE ────────────────────────────────────────────────────────────────
+  visionboard: {
+    title: "Vision Board",
+    icon: "🗺️",
+    subtitle: "Your AI-built life plan for 1, 3, and 5 years",
+    prompt: (p) => `You are a life design coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Goals: "${p.goals||p.bigGoal||""}". Situation: "${p.situation||""}". Skills: "${p.skills||""}".
+Build their Vision Board — a concrete life plan:
+1 YEAR FROM NOW: What their life looks like if they stay disciplined (career, money, relationships, health — be specific)
+3 YEARS FROM NOW: The realistic best version of their life if they execute (with specific numbers and milestones)
+5 YEARS FROM NOW: The life that's possible if they become the person they're capable of being
+Then: The ONE thing they need to do this week that connects to all three visions
+Make it personal and vivid. This should feel like reading their own future, not someone else's.`,
+  },
+  legacyletter: {
+    title: "Legacy Letter",
+    icon: "📜",
+    subtitle: "What do you want people to say about you? Build backward from there.",
+    prompt: (p) => `You are a legacy and purpose coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Goals: "${p.goals||p.bigGoal||""}".
+Write their Legacy Letter — in two parts:
+PART 1: The Legacy Letter itself. Write it as if people who knew them well are speaking at their memorial 30 years from now. What did they stand for? What did they build? Who did they help? How did they make people feel? (Write in third person, past tense, 150 words)
+PART 2: The Reverse Engineering. Based on that legacy, what are 5 daily habits they need to start NOW to become that person? Be specific and tied directly to the letter.
+This should move them. Make them see what's possible and what's at stake.`,
+  },
+  fearaudit: {
+    title: "Fear Audit",
+    icon: "🔍",
+    subtitle: "The fears actually running your life — identified and called out",
+    prompt: (p) => `You are a fear and mindset analyst. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Goals: "${p.goals||p.bigGoal||""}".
+Conduct their Fear Audit:
+1. The PRIMARY fear running their life right now (based on their situation — be specific and honest, not gentle)
+2. Where this fear most likely came from (childhood, culture, specific experience)
+3. How this fear is showing up in their current decisions (give 2-3 specific examples from their situation)
+4. The cost of this fear: what they've already lost or delayed because of it
+5. The one action that would directly challenge this fear this week
+Be honest and direct. Most people already know their fears — they just need someone to name it clearly.`,
+  },
+  morningritual: {
+    title: "Morning Ritual Builder",
+    icon: "🌅",
+    subtitle: "Personalized morning routine for your goals, schedule, and personality",
+    prompt: (p) => `You are a morning routine architect. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Goals: "${p.goals||p.bigGoal||""}". Career: "${p.career||""}". Situation: "${p.situation||""}".
+Build their perfect Morning Ritual:
+First, ask yourself: is this person a builder, achiever, or healer type? Identify it based on their goals.
+Then write their ritual:
+— BEFORE GETTING UP (2 minutes): what to do before their feet touch the floor
+— FIRST 10 MINUTES: exactly what to do (no phone, specific actions)  
+— MINUTES 10-30: body activation (specific to their fitness level and space)
+— MINUTES 30-45: mind preparation (specific to their goals and challenges)
+— FINAL 15 MINUTES: planning the day (specific method for their type)
+Give times. Make it feel like a rhythm, not a chore. Adapted to ${p.country||"their context"} — not everyone has a gym or green juice.`,
+  },
+  dailywisdom: {
+    title: "Daily Wisdom",
+    icon: "💎",
+    subtitle: "One powerful insight applied directly to your life today",
+    prompt: (p) => `You are a wisdom curator. User: ${p.name||"someone"} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Today's date: ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}.
+Give them today's wisdom:
+1. One powerful quote or insight from a great mind (philosopher, leader, scientist, writer — diverse sources, not just Stoics)
+2. What this person was facing when they developed this insight
+3. Exactly how this wisdom applies to ${p.name||"their"} specific situation right now (not generic — tie it directly)
+4. The one action this wisdom suggests they take today
+5. A second, contrasting perspective that challenges the first (wisdom has nuance)
+Make the connection between the wisdom and their life so specific it feels written just for them.`,
+  },
+  lettertoself: {
+    title: "Letter to Self",
+    icon: "✉️",
+    subtitle: "A personal letter written by AI based on everything it knows about you",
+    prompt: (p) => `You are writing a deeply personal letter to ${p.name||"this person"} based on everything known about them.
+They are ${p.age||""} from ${p.country||"their country"}. 
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Goals: "${p.goals||p.bigGoal||""}". Skills: "${p.skills||""}".
+Write the letter as if you are their wisest, most honest friend who knows them completely.
+The letter should:
+— Open by acknowledging exactly where they are right now (no sugarcoating)
+— Name the specific thing they are avoiding or holding back from
+— Speak directly to their fear with compassion and honesty
+— Remind them of a strength they have that they're underusing
+— Tell them what you see becoming possible for them if they make one shift
+— Close with a challenge: one thing to do before reading this letter again
+Write in second person ("you"). 300-350 words. Make it feel like it was written by someone who truly sees them.`,
+  },
+
+  // ── DISCOVER ──────────────────────────────────────────────────────────────
+  dreaminterp: {
+    title: "Dream Interpreter",
+    icon: "🌙",
+    subtitle: "Psychological and practical interpretation of your recurring dreams",
+    prompt: (p) => `You are a depth psychologist and dream analyst. User: ${p.name||"someone"} from ${p.country||"their country"}.
+Their situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
+They haven't described a specific dream yet, so give them:
+1. A brief explanation of what recurring dreams mean psychologically (the unconscious processing they represent)
+2. The 5 most common dream themes and what they typically reveal about a person's waking life
+3. Based on their situation and challenge, the type of dream they're most likely having and what it means
+4. How to start a dream journal (simple 2-minute practice)
+5. A prompt: "Describe your most recent or recurring dream in the box below, and I'll interpret it for you"
+Make this feel like an intelligent psychological tool, not mysticism.`,
+  },
+  peopledecoder: {
+    title: "People Decoder",
+    icon: "🧩",
+    subtitle: "Understand difficult people in your life and how to handle them",
+    prompt: (p) => `You are a behavioral psychologist and social intelligence expert. User: ${p.name||"someone"} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
+Build their People Decoder framework:
+1. The most likely difficult person type in their life based on their situation (narcissist, victim, passive-aggressive, controller — be specific)
+2. Why this person behaves this way (the psychology behind it — without excusing it)
+3. The exact approach to handle this person type without losing yourself or the relationship
+4. 3 phrases to use with difficult people that de-escalate without submitting
+5. When to walk away — the signs that someone is genuinely toxic vs just difficult
+Be psychologically informed but practical. Real scripts they can use this week.`,
+  },
+  hardconvo: {
+    title: "Hard Conversation Helper",
+    icon: "🗣️",
+    subtitle: "Plan and script your most difficult conversations",
+    prompt: (p) => `You are a communication and conflict resolution expert. User: ${p.name||"someone"} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
+Build their Hard Conversation toolkit:
+1. Why most people avoid hard conversations (and what it costs them)
+2. The 4-part framework for any hard conversation (Prepare → Open → Core → Close)
+3. Based on their situation, the hard conversation they most need to have
+4. An exact script for how to open that conversation (first 3 sentences matter most)
+5. How to handle the 3 most likely responses: defensiveness, denial, and shutdown
+Give real scripts. Adapted to ${p.country||"their cultural communication style"}. Directness levels vary by culture — acknowledge this.`,
+  },
+  weeklychallenge: {
+    title: "Weekly Challenge",
+    icon: "🎲",
+    subtitle: "One specific challenge that pushes you slightly outside your comfort zone",
+    prompt: (p) => `You are a growth catalyst. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Goals: "${p.goals||p.bigGoal||""}".
+Today is ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}.
+Design this week's personal growth challenge for them:
+THE CHALLENGE: One specific action to take this week. Not vague. Not easy. Slightly uncomfortable. Achievable.
+WHY THIS CHALLENGE: Why this specific challenge is exactly right for where they are right now
+THE RULES: Exact instructions for how to complete it (what to do, when, how)
+SUCCESS LOOKS LIKE: How they'll know they've done it (measurable outcome)
+WHAT THIS BUILDS: The specific capability or confidence this challenge develops
+BONUS LEVEL: A harder version for if they complete the main challenge
+Make it feel like a personal trainer designed this specifically for them. Not a generic "talk to a stranger" challenge.`,
+  },
+};
+
+// ── GenericAIModule renderer ────────────────────────────────────────────────
+function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, onUnlock, lang="en"}){
+  const cfg   = MODULE_CONFIGS[modId];
+  if(!cfg) return null;
+
+  const cacheKey = `diq_mod_${modId}_${userId||"guest"}`;
+  const [content2, setContent2] = useState(()=>{ try{return localStorage.getItem(cacheKey)||"";}catch{return "";} });
+  const [loading2, setLoading2] = useState(false);
+  const [error2,   setError2]   = useState("");
+
+  const generate = async() => {
+    if(!profile?.name && !profile?.country){ setError2("Complete your profile first to get personalized content."); return; }
+    setLoading2(true); setError2("");
+    try{
+      const currencyInfo = getLocalCurrency(profile?.country||"");
+      const prompt = cfg.prompt(profile, currencyInfo);
+      const result = await callAPI({
+        messages:[{role:"user", content: prompt}],
+        system: `You are DestinIQ's specialist for ${cfg.title}. Be specific to the user's country, age, and situation. No generic advice.${langPrompt(lang||"en")}`,
+        userId, isPremium, isProMax,
+      });
+      const txt = result?.content?.[0]?.text||result||"";
+      setContent2(txt);
+      try{ localStorage.setItem(cacheKey, txt); }catch{}
+    }catch(e){ setError2("Something went wrong. Please try again."); }
+    setLoading2(false);
+  };
+
+  // Auto-generate if no content yet
+  useEffect(()=>{ if(!content2 && profile?.name) generate(); },[profile?.name]);
+
+  const wellbeingIds = ['innerpeace','angerstress','sleepcoach','anxietytool','griefloss'];
+  const isWellbeing  = wellbeingIds.includes(modId);
+
+  return(
+    <div className="cx-md" style={{paddingTop:24,paddingBottom:40}}>
+      {/* Header */}
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:32, marginBottom:8}}>{cfg.icon}</div>
+        <h2 className="d2" style={{marginBottom:6}}>{cfg.title}</h2>
+        <p style={{fontSize:14, color:"var(--cream-40)", lineHeight:1.6}}>{cfg.subtitle}</p>
+      </div>
+
+      {/* Mental health disclaimer */}
+      {isWellbeing && cfg.disclaimer && (
+        <div style={{padding:"12px 16px",background:"rgba(77,182,172,0.08)",border:"1px solid rgba(77,182,172,0.2)",
+          borderRadius:12,marginBottom:20,fontSize:12,color:"#4db6ac",lineHeight:1.6}}>
+          💙 This module offers practical support tools. If you're in crisis or experiencing severe symptoms, please reach out to a mental health professional or crisis line in {profile?.country||"your country"}.
+        </div>
+      )}
+
+      {/* Content */}
+      {loading2 ? (
+        <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
+          <div style={{fontSize:24,marginBottom:12}}>{cfg.icon}</div>
+          <p style={{color:"var(--cream-40)",fontSize:14}}>Writing your personalized {cfg.title}…</p>
+        </div>
+      ) : error2 ? (
+        <div className="card" style={{textAlign:"center",padding:32}}>
+          <p style={{color:"var(--rose)",marginBottom:16,fontSize:14}}>{error2}</p>
+          <button className="btn btn-gold" onClick={generate}>Try Again</button>
+        </div>
+      ) : content2 ? (
+        <div>
+          <div className="card" style={{lineHeight:1.9,fontSize:14,color:"var(--cream-70)",whiteSpace:"pre-wrap"}}>
+            {content2}
+          </div>
+          <button onClick={generate} style={{background:"none",border:"1px solid var(--line)",borderRadius:10,
+            padding:"10px 20px",color:"var(--cream-40)",fontSize:12,cursor:"pointer",marginTop:16,display:"flex",
+            alignItems:"center",gap:8}}>
+            ↺ Refresh {cfg.title}
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
+          <div style={{fontSize:40,marginBottom:12}}>{cfg.icon}</div>
+          <p style={{color:"var(--cream-50)",fontSize:14,marginBottom:20}}>Your personalized {cfg.title} will be written based on your profile.</p>
+          <button className="btn btn-gold" onClick={generate}>Generate My {cfg.title}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4573,9 +5520,12 @@ function AuthScreen({onAuth, onBack}){
       const{data,error:err}=await supabase.auth.signInWithOAuth({
         provider:"google",
         options:{
-          redirectTo:"https://destiniq.vercel.app",
+          // Use deep link scheme so Android hands control back to the app
+          redirectTo: window?.Capacitor?.isNativePlatform?.()
+            ? "com.destiniq.app://"
+            : window.location.origin,
           queryParams:{prompt:"select_account"},
-          skipBrowserRedirect:true, // Don't auto-redirect — we handle it
+          skipBrowserRedirect:true,
         },
       });
       if(err){setError(err.message);setLoading(false);return;}
@@ -4584,11 +5534,18 @@ function AuthScreen({onAuth, onBack}){
         const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
         if(isNative && window?.CapacitorBrowser){
           // Use in-app browser — stays inside the app, no Chrome
-          await window.CapacitorBrowser.open({
-            url: data.url,
-            windowName: "_self",
-            presentationStyle: "fullscreen",
-          });
+          // Use Capacitor Browser via global plugin — no import needed
+          const CapBrowser = window?.Capacitor?.Plugins?.Browser;
+          if(CapBrowser){
+            await CapBrowser.open({
+              url: data.url,
+              presentationStyle: "popover",
+              toolbarColor: "#0a0a0f",
+            });
+          } else {
+            // Fallback — open in system browser
+            window.open(data.url, "_blank");
+          }
         } else {
           // Web — normal redirect
           window.location.href = data.url;
@@ -6083,65 +7040,6 @@ function VoiceInput({value,onChange,rows=4,maxLength=600,placeholder=""}){
 
 
 // ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
-// Returns payment platform accessibility per country so online income
-// recommendations are always actionable for the user's actual location.
-function getCountryPaymentContext(country){
-  const c=(country||"").toLowerCase();
-  if(c.includes("ghana")) return {
-    works:["Payoneer (most reliable for Ghana)","Wise","Flutterwave","MTN Mobile Money","Vodafone Cash","AirtelTigo Money","direct bank wire"],
-    limited:["PayPal (receive only — cannot easily withdraw to GH bank)"],
-    broken:["Stripe (not available for Ghana businesses)","Zelle","Venmo","Cash App"],
-    platforms:["Upwork (Payoneer/Wise payout — works)","Fiverr (Payoneer/bank — works)","Toptal","Remotasks (Payoneer)","Contra","Deel","PeoplePerHour","Lemon.io"],
-    avoid:["Appen (PayPal payments — problematic)","Rev.com (PayPal)","UserTesting (PayPal required)"],
-    note:"Ghana has strong mobile money. Payoneer is the #1 choice for Ghanaian freelancers receiving USD."
-  };
-  if(c.includes("nigeria")) return {
-    works:["Payoneer","Wise","Flutterwave","Paystack","Chipper Cash","GTBank domiciliary account"],
-    limited:["PayPal (severely restricted in Nigeria)"],
-    broken:["Stripe","Zelle","Venmo","Cash App"],
-    platforms:["Upwork","Fiverr","Toptal","Andela","Remotasks","Contra","Deel","PeoplePerHour"],
-    avoid:["Rev.com (PayPal)","Appen (PayPal)","UserTesting (PayPal)"],
-    note:"Payoneer is the safest choice for Nigerian freelancers. Always verify payout method before starting."
-  };
-  if(c.includes("kenya")) return {
-    works:["M-Pesa","Payoneer","Wise","Flutterwave","direct bank transfer"],
-    limited:["PayPal (functional but with limits)"],
-    broken:["Stripe (not for KE businesses)"],
-    platforms:["Upwork","Fiverr","Toptal","Remotasks","Appen","Rev.com","Prolific","Contra"],
-    avoid:[],
-    note:"Kenya has excellent mobile money via M-Pesa. Most platforms work here."
-  };
-  if(c.includes("south africa")) return {
-    works:["PayPal","Payoneer","Wise","direct EFT","Capitec","FNB"],
-    limited:[],
-    broken:["Stripe (not for SA businesses)"],
-    platforms:["Upwork","Fiverr","Toptal","Remotasks","Appen","Rev.com","UserTesting","Prolific"],
-    avoid:[],
-    note:"South Africa has the most accessible payment infrastructure on the continent."
-  };
-  if(c.includes("india")) return {
-    works:["PayPal","Payoneer","Wise","Razorpay","UPI","direct SWIFT"],
-    limited:[],broken:[],
-    platforms:["Upwork","Fiverr","Toptal","Freelancer","99designs","Appen","Rev.com","UserTesting","Prolific"],
-    avoid:[],
-    note:"India has excellent payment infrastructure. All major platforms available."
-  };
-  if(c.includes("philippines")) return {
-    works:["PayPal","Payoneer","Wise","GCash","Maya","direct wire"],
-    limited:[],broken:[],
-    platforms:["Upwork","Fiverr","Freelancer","OnlineJobs.ph","Appen","Rev.com","Remotasks","Prolific"],
-    avoid:[],
-    note:"Philippines has a mature freelance ecosystem. GCash and PayPal are the most common payout methods."
-  };
-  return {
-    works:["Payoneer","Wise","PayPal (verify availability)","direct bank wire"],
-    limited:["Stripe (check local availability)"],broken:[],
-    platforms:["Upwork","Fiverr","Toptal","Remotasks","Contra","Deel","PeoplePerHour"],
-    avoid:[],
-    note:`Always verify payment withdrawal options work in ${country} before committing to a platform.`
-  };
-}
-
 // Detects the correct local currency from the user's country name.
 function getLocalCurrency(country){
   if(!country) return {code:"USD",symbol:"$"};
@@ -6185,21 +7083,14 @@ async function regenerateModule(key, profile, userId, isPremium, setData, setLoa
   const name     = profile?.name     || "the user";
   const income   = profile?.income   || "Under $500";
   const challenge= profile?.challenge|| "getting started";
-  // Resolve local currency and payment accessibility — MUST happen before prompts are built
+  // Resolve local currency — MUST happen before currencyNote is built
   const {code:currCode, symbol:currSym} = getLocalCurrency(country);
-  const payCtx = getCountryPaymentContext(country);
-  const currencyNote = `MANDATORY CURRENCY RULES — VIOLATION = WRONG ANSWER:
-1. ALL costs, prices, startup costs, rents, savings MUST be in ${currSym} (${currCode}). NEVER use $, ₦, ₹, R, KSh or any other symbol for local costs in ${country}.
-2. Earnings from online/remote work = USD first, then ${currSym} in brackets e.g. "$500/month (${currSym}7,500)".
-3. DO NOT use Nigerian Naira (₦), Indian Rupee (₹), South African Rand (R), Kenyan Shilling, or any other country's currency. This user is in ${country}. Local currency = ${currSym} only.`;
-  const paymentNote = `PAYMENT PLATFORMS — ${country.toUpperCase()} SPECIFIC (CRITICAL — ONLY RECOMMEND WHAT WORKS HERE):
-✅ PAYMENT METHODS THAT WORK IN ${country}: ${payCtx.works.join(", ")}
-⚠️ LIMITED/AVOID: ${[...payCtx.limited,...payCtx.broken].join(", ")||"none"}
-✅ FREELANCE PLATFORMS THAT PAY IN ${country}: ${payCtx.platforms.join(", ")}
-❌ DO NOT RECOMMEND (payment issues for ${country} users): ${payCtx.avoid.join(", ")||"none"}
-${payCtx.note}`;
-  // Use country-verified platforms instead of a blind rotation
-  const todayPlatforms = payCtx.platforms.slice(0,3).join(", ");
+  const currencyNote = `MANDATORY CURRENCY RULES:
+COSTS/STARTUP/SAVINGS = LOCAL CURRENCY: ${country} uses ${currCode} (${currSym}). All prices, startup costs, rents, savings must be in ${currSym}. NEVER use $ for costs in ${country}.
+EARNINGS FROM ONLINE WORK = USD only — add local equivalent in brackets e.g. "$800/month (${currSym}12,000)".`;
+  const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
+  const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
+  const todayPlatforms=platformSets[dayIndex];
 
   const prompts={
     life_hacks:`${currencyNote}
@@ -6235,9 +7126,7 @@ Write 4 emotional strength practices for ${name} facing: "${challenge}". Each mu
 Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
     online_income:`${currencyNote}
 
-${paymentNote}
-
-Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. ONLY recommend platforms from the verified list above that work in ${country}. NEVER recommend platforms in the DO NOT RECOMMEND list. Return ONLY JSON array: [{"method":"Platform name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences mentioning how they get paid","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"${currSym} equivalent e.g. GH₵ X,XXX/month","how_to_get_paid":"Exact payout method for ${country} users"}]`,
+Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
     zero_income_business:`${currencyNote}
 
 Generate business ideas for ${name} in ${country} that need zero capital. Think about daily needs in ${country}: food, drinks, transport, mobile data, cleaning, laundry, hair, barbering, phone repair, clothing, event services. Also bars and food joints. ${currencyNote} Return ONLY JSON: {"idea":"Best zero-capital idea for ${country}","why_zero":"Why zero capital needed","day_one":"Exact Day 1 action in ${country}","first_revenue":"When and how much in local currency","scale":"How to grow to employ others","alternatives":["5 more zero-capital ideas for ${country} covering food/drinks, services, trading, digital, creative"]}`,
@@ -6311,7 +7200,7 @@ function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     setEmotional(e);
     if(!h.length && formData) setTimeout(()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr),300);
     if(!e.length && formData) setTimeout(()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr),1800);
-  },[formData?.country]);
+  },[]);
 
   return(
     <div className="fu">
@@ -6713,7 +7602,7 @@ function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     setMp(mp0); setRe(re0);
     if(!mp0.rule&&formData) setTimeout(()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE),300);
     if(!re0.method&&formData) setTimeout(()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE),2500);
-  },[formData?.country]);
+  },[]);
   const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Save: ${mp.savings_target}`,mp.avoid&&`Stop spending on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
   const reAudio=[re.method&&`Method: ${re.method}`,re.how_it_works,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
   return(
@@ -6783,7 +7672,7 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     const saved=Array.isArray(data?.online_income)?data.online_income:[];
     setOnline(saved);
     if(!saved.length&&formData) setTimeout(()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr),300);
-  },[formData?.country]);
+  },[]);
   const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
   const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
   return(
@@ -6815,11 +7704,6 @@ function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
                 <b style={{color:"var(--teal)"}}>Start in 48 hours: </b>{o.first_step}
               </div>
             )}
-            {o.how_to_get_paid&&(
-              <div style={{padding:"8px 12px",background:"rgba(210,175,90,0.04)",borderRadius:8,fontSize:12,color:"rgba(255,255,255,0.45)",borderLeft:"2px solid rgba(210,175,90,0.3)",lineHeight:1.6}}>
-                <b style={{color:"var(--gold)"}}>How you get paid: </b>{o.how_to_get_paid}
-              </div>
-            )}
             <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
           </div>
         ))}
@@ -6840,7 +7724,7 @@ function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
     setZb(zb0); setPb(pb0);
     if(!zb0.idea&&formData) setTimeout(()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE),300);
     if(!pb0.length&&formData) setTimeout(()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE),2500);
-  },[formData?.country]);
+  },[]);
   const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
   return(
     <div className="fu">
@@ -7195,25 +8079,36 @@ function StreakLeaderboard({userId}){
   );
 }
 
-function winsKey(userId){ return `destiniq_wins_${userId||"anon"}_v1`; }
-function loadWins(userId){
-  try{ return JSON.parse(localStorage.getItem(winsKey(userId))||"[]"); }catch{ return []; }
-}
-function saveWins(w, userId){
-  try{ localStorage.setItem(winsKey(userId), JSON.stringify(w)); }catch{}
-}
-async function saveWinsToSupabase(userId, wins){
-  if(!userId) return;
-  try{
-    await supabase.from("user_profiles").upsert(
-      {user_id:userId, wins:JSON.stringify(wins), updated_at:new Date().toISOString()},
-      {onConflict:"user_id"}
-    );
-  }catch(e){ console.warn("wins save:",e.message); }
-}
+// Wins: user-specific localStorage key + Supabase backup
+const WIN_STORE_KEY=(uid)=>`diq_wins_${uid||"guest"}`;
+function loadWins(uid){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");}catch{return[];}}
+function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(w));}catch{}}
 
 function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const [wins,setWins]=useState(()=>loadWins(userId));
+  // Load wins from Supabase on mount (in case localStorage was cleared)
+  useEffect(()=>{
+    if(!userId) return;
+    supabase.from("user_profiles").select("form_data,wins").eq("user_id",userId).single()
+      .then(({data})=>{
+        const rawWins = data?.wins?.length ? data.wins
+          : (()=>{
+              try{
+                const fd=typeof data?.form_data==="string"?JSON.parse(data.form_data):data?.form_data;
+                return fd?._wins||[];
+              }catch{return[];}
+            })();
+        if(rawWins?.length){
+          const serverWins = rawWins;
+          const localWins  = loadWins(userId);
+          // Merge — take whichever has more wins
+          if(serverWins.length > localWins.length){
+            setWins(serverWins);
+            saveWins(serverWins, userId);
+          }
+        }
+      }).catch(()=>{});
+  },[userId]);
   const [input,setInput]=useState("");
   const [mood,setMood]=useState(null);
   const [celebrate,setCelebrate]=useState("");
@@ -7225,32 +8120,30 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const streakDays=[...new Set(wins.map(w=>w.date))].sort().reverse();
   const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
 
-  // On mount — load wins from Supabase in case localStorage was cleared (sign-out wipe etc.)
-  useEffect(()=>{
-    if(!userId) return;
-    supabase.from("user_profiles").select("wins").eq("user_id",userId).single()
-      .then(({data})=>{
-        if(!data?.wins) return;
-        try{
-          const remote=JSON.parse(data.wins);
-          if(!Array.isArray(remote)||remote.length===0) return;
-          const local=loadWins(userId);
-          // Merge: take the longer list (most data), then deduplicate by id
-          const merged=[...remote,...local].filter((v,i,a)=>a.findIndex(x=>x.id===v.id)===i)
-            .sort((a,b)=>b.ts?.localeCompare(a.ts||"")||0);
-          setWins(merged);
-          saveWins(merged,userId);
-        }catch(_){}
-      }).catch(()=>{});
-  },[userId]);
-
   const FREE_WIN_LIMIT=10;
   const addWin=async()=>{
     if(!input.trim()) return;
     if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
     const win={id:Date.now(),text:input.trim(),date:todayKey,mood,ts:new Date().toISOString()};
     const updated=[win,...wins];
-    setWins(updated);saveWins(updated,userId);saveWinsToSupabase(userId,updated);setInput("");setMood(null);
+    setWins(updated);
+    saveWins(updated, userId); // localStorage (instant)
+    // Supabase backup — save wins inside form_data._wins
+    if(userId){
+      supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
+        .then(({data})=>{
+          // form_data is TEXT — parse first
+          const fd2 = typeof data?.form_data==="string"
+            ? (()=>{try{return JSON.parse(data.form_data);}catch{return{};}})()
+            : (data?.form_data||{});
+          return supabase.from("user_profiles").upsert({
+            user_id: userId,
+            wins: updated.slice(0,200), // dedicated wins column (jsonb)
+            form_data: JSON.stringify({...fd2, _wins: updated.slice(0,200)}), // fallback
+          },{onConflict:"user_id"});
+        }).catch(()=>{});
+    }
+    setInput("");setMood(null);
     // AI celebration
     setLoading(true);
     try{
@@ -7342,7 +8235,8 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
                     <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",margin:0,lineHeight:1.6}}>{w.text}</p>
                     {w.mood&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{w.mood}</span>}
                   </div>
-                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);saveWinsToSupabase(userId,u);}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                  <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);
+                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).catch(()=>{});}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
@@ -9221,7 +10115,7 @@ function StreakCelebration({streak, onClose}){
   );
 }
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,setStreak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -9240,17 +10134,10 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,setStreak,showCheckin,s
 
   // Auto-fill closing — runs when formData loads
   useEffect(()=>{
-    if(!formData?.name) return;
+    if(!formData?.name) return; // not loaded yet
     const bad = ["i don't have","i need more","no context","no posts","generating","click","placeholder","there, their"];
     const isBad = !closingLine || closingLine.length < 10 || bad.some(p=>closingLine.toLowerCase().includes(p));
-    if(isBad){
-      // Set an immediate local fallback so the UI is never stuck indefinitely
-      const n = sanitize(formData?.name)||"";
-      const g = sanitize(formData?.goals||formData?.bigGoal)||"what you're building";
-      if(n) setClosingLine(`${n}, the distance between where you are and where you want to be is smaller than it feels right now — it just requires the next honest step toward "${g.slice(0,50)}${g.length>50?"...":""}".`);
-      // Then try to get a better AI-generated one
-      setTimeout(()=>refreshClosing(), 1200);
-    }
+    if(isBad) setTimeout(()=>refreshClosing(), 1200);
   // eslint-disable-next-line
   },[formData?.name]);
   useEffect(()=>{const t=setTimeout(()=>setAScores(data.scores||{}),100);return()=>clearTimeout(t);},[data]);
@@ -9309,14 +10196,14 @@ Do NOT use generic motivational language. Do NOT ask for more information — wo
     if(refreshingClosing) return;
     setRefreshingClosing(true);
     try{
-      const name     = sanitize(formData?.name)||"";
-      const country  = sanitize(formData?.country)||"your country";
-      const goal     = sanitize(formData?.goals||formData?.bigGoal)||"building a better life";
-      const challenge= sanitize(formData?.challenge)||"getting started";
-      const skill    = sanitize(formData?.skills||formData?.career)||"their skills";
-      const age      = formData?.age||"";
-      // Only block if we truly have no name at all — everything else has a default
-      if(!name){ setRefreshingClosing(false); return; }
+      // Guard — if real profile data isn't loaded yet, don't call the AI
+    const name     = sanitize(formData?.name)                              ||"";
+    const country  = sanitize(formData?.country)                           ||"";
+    const goal     = sanitize(formData?.goals||formData?.bigGoal)          ||"";
+    const challenge= sanitize(formData?.challenge)                         ||"";
+    const skill    = sanitize(formData?.skills||formData?.career)          ||"";
+    const age      = formData?.age||"";
+    if(!name||!country||!goal){ setRefreshingClosing(false); return; } // wait for real data
 
       const prompt=`Write ONE powerful sentence for ${name}${age?" (age "+age+")":""} from ${country}.
 Goal: "${goal||"building a better life"}"
@@ -9383,7 +10270,15 @@ Rules:
             </div>
             <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-              {isPremium&&<div className="prem-badge" style={isProMax?{background:"linear-gradient(90deg,rgba(167,139,250,0.15),rgba(167,139,250,0.06))",borderColor:"rgba(167,139,250,0.3)",color:"#a78bfa"}:{}}>✦ {isProMax?"PRO MAX":"PRO"}</div>}
+              {isPaid&&(
+  <div className="prem-badge" style={{
+    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
+    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
+    color:isPremium?"#9b72cf":"var(--gold-bright)",
+  }}>
+    {isPremium?"✦ PRO MAX":"◆ PRO"}
+  </div>
+)}
               {!showCheckin&&(()=>{
                 const todayStr = new Date().toISOString().slice(0,10);
                 const todayKey = `diq_ci_result_${userId}_${todayStr}`;
@@ -9493,21 +10388,28 @@ Rules:
                 setTimeout(()=>setMiniStreak(newStreak), 800);
               }
               if(userId){
-                // Persist to Supabase
-                supabase.from("user_profiles").upsert({
-                  user_id: userId,
-                  streak: newStreak,
-                  last_checkin_date: today,
-                  updated_at: new Date().toISOString(),
-                },{onConflict:"user_id"})
-                .then(({error})=>{
-                  if(error) console.warn("Streak save:", error.message);
-                  else {
-                    // Update formData so next check uses correct last_checkin_date
-                    setFormData(prev=>prev?{...prev, last_checkin_date:today}:prev);
-                  }
-                })
-                .catch(e=>console.warn("Streak save:", e.message));
+                // Save streak — use form_data JSONB as reliable fallback
+                // Works even if dedicated streak/last_checkin_date columns don't exist
+                supabase.from("user_profiles").select("form_data")
+                  .eq("user_id", userId).single()
+                  .then(({data:pd})=>{
+                    // form_data is TEXT in Supabase — must parse before merging
+                    const fd = typeof pd?.form_data==="string"
+                      ? (()=>{try{return JSON.parse(pd.form_data);}catch{return{};}})()
+                      : (pd?.form_data||{});
+                    return supabase.from("user_profiles").upsert({
+                      user_id: userId,
+                      streak: newStreak,
+                      last_checkin_date: today,
+                      updated_at: new Date().toISOString(),
+                      form_data: JSON.stringify({...fd, _streak:newStreak, _last_checkin:today}),
+                    },{onConflict:"user_id"});
+                  })
+                  .then(({error})=>{
+                    if(error) console.warn("Streak save:", error.message);
+                    else setFormData(prev=>prev?{...prev, last_checkin_date:today, _streak:newStreak}:prev);
+                  })
+                  .catch(e=>console.warn("Streak save:", e.message));
               }
             }
             // else: already checked in today — don't increment again
@@ -9590,9 +10492,7 @@ Rules:
                               <span>{s}</span>
                             </div>
                           ))
-                        : isPaid
-                          ? <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Refresh your report to extract your strengths. <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0}}>Update profile →</button></p>
-                          : <div style={{padding:"10px 0"}}><span style={{fontSize:11,color:"var(--cream-30)"}}>🔒 </span><button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0,textDecoration:"underline"}}>Upgrade to unlock your strengths</button></div>
+                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Your strengths are being extracted from your report…</p>
                       }
                     </div>
                     <div className="card card-sm">
@@ -9604,9 +10504,7 @@ Rules:
                               <span>{r}</span>
                             </div>
                           ))
-                        : isPaid
-                          ? <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Refresh your report to see your watch-outs. <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0}}>Update profile →</button></p>
-                          : <div style={{padding:"10px 0"}}><span style={{fontSize:11,color:"var(--cream-30)"}}>🔒 </span><button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:12,padding:0,textDecoration:"underline"}}>Upgrade to unlock your watch-outs</button></div>
+                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Your watch-outs are being extracted from your report…</p>
                       }
                     </div>
                   </div>
@@ -9657,7 +10555,7 @@ Rules:
             </div>
           )}
 
-          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} streak={streak}/>}
+          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
             {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
             {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -9671,8 +10569,8 @@ Rules:
             {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
             {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>}
-          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>}
+          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
 
 
 
@@ -10055,8 +10953,32 @@ Rules:
             />
           )}
           {mod==="advisor"&&(
-            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} isProMax={isProMax} onUnlock={onUnlock}/>
+            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
           )}
+
+          {/* ── WELLBEING ── */}
+          {["innerpeace","angerstress","sleepcoach","anxietytool","griefloss"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+
+          {/* ── BODY & STYLE ── */}
+          {["glowup","nogym","posture","bodyfuel"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+
+          {/* ── SOCIAL & LIFE ── */}
+          {["confidencelab","relationshipiq","smalltalk","negotiation","digitallife","parenting"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+
+          {/* ── MONEY DEEP DIVES ── */}
+          {["debtfreedom","sidehustle","investment101"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+
+          {/* ── PURPOSE ── */}
+          {["visionboard","legacyletter","fearaudit","morningritual","dailywisdom","lettertoself"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+
+          {/* ── DISCOVER ── */}
+          {["dreaminterp","peopledecoder","hardconvo","weeklychallenge"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
 
           <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
             <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
@@ -10576,6 +11498,49 @@ function PolicyPage({type,onBack}){
 
 
 
+
+// ── LanguageSelector ──────────────────────────────────────────────────────────
+function LanguageSelector({lang, onChange}){
+  const [open, setOpen] = useState(false);
+  const cur = LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0];
+  return(
+    <div style={{position:"relative"}}>
+      <button onClick={()=>setOpen(o=>!o)} style={{
+        background:"var(--lift)",border:"1px solid var(--line)",borderRadius:10,
+        padding:"8px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,
+        color:"var(--cream)",fontSize:13,
+      }}>
+        <span style={{fontSize:16}}>{cur.flag}</span>
+        <span>{cur.native}</span>
+        <span style={{color:"var(--cream-30)",fontSize:10}}>▼</span>
+      </button>
+      {open&&(
+        <div style={{position:"absolute",top:"100%",right:0,background:"var(--lift)",
+          border:"1px solid var(--line)",borderRadius:12,zIndex:500,
+          width:220,maxHeight:320,overflowY:"auto",marginTop:4,
+          boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+          {LANGUAGES.map(l=>(
+            <div key={l.code} onClick={()=>{onChange(l.code);setOpen(false);}} style={{
+              padding:"10px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,
+              background:l.code===lang?"rgba(210,175,90,0.08)":"none",
+              borderBottom:"1px solid rgba(255,255,255,0.04)",
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}
+            onMouseLeave={e=>e.currentTarget.style.background=l.code===lang?"rgba(210,175,90,0.08)":"none"}>
+              <span style={{fontSize:20}}>{l.flag}</span>
+              <div>
+                <div style={{fontSize:13,color:"var(--cream)",fontWeight:l.code===lang?700:400}}>{l.native}</div>
+                <div style={{fontSize:10,color:"var(--cream-30)"}}>{l.label}</div>
+              </div>
+              {l.code===lang&&<span style={{marginLeft:"auto",color:"var(--gold)",fontSize:12}}>✓</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── OfflineBanner ─────────────────────────────────────────────────────────────
 function OfflineBanner(){
   const [offline, setOffline] = useState(false);
@@ -10640,7 +11605,7 @@ function EmailReminderToggle({userId}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // 2. PROFILE PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSignOut,onManageSubscription,onPhotoUpdate}){
+function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSignOut,onManageSubscription,onPhotoUpdate,lang,onLangChange}){
   const [name,setName]=useState(user?.name||"");
   const [saved,setSaved]=useState(false);
   const [loading,setLoading]=useState(false);
@@ -10706,7 +11671,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
   };
 
   const planLabel = isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor = isProMax?"#a78bfa":isPaid?"var(--gold)":"var(--cream-30)";
+  const planColor = isPaid?"var(--gold)":"var(--cream-30)";
 
   return(
     <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
@@ -10784,6 +11749,16 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
           {/* Referral Widget */}
           <div style={{marginBottom:16}}>
             <ReferralWidget userId={user?.id} isPaid={isPaid}/>
+          </div>
+
+          {/* Language selector */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",marginBottom:8}}>LANGUAGE</div>
+            <LanguageSelector lang={lang||"en"} onChange={(code)=>{
+              if(onLangChange) onLangChange(code);
+              try{localStorage.setItem("diq_lang",code);}catch{}
+              document.documentElement.dir = ["ar","ur","fa"].includes(code)?"rtl":"ltr";
+            }}/>
           </div>
 
           <button onClick={()=>{window.dispatchEvent(new CustomEvent("showAbout"));}} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>About DestinIQ</button>
@@ -11120,7 +12095,7 @@ function SubscriptionCard({isPaid,isPremium,isProMax,userId,onManageSubscription
   const [cancelled,setCancelled]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
   const planLabel=isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor=isProMax?"#a78bfa":isPaid?"var(--gold)":"var(--cream-30)";
+  const planColor=isPaid?"var(--gold)":"var(--cream-30)";
 
   const handleCancel=async()=>{
     setCancelling(true);
@@ -11207,6 +12182,12 @@ export default function DestinIQ(){
   const [isPaid,    setIsPaid   ]=useState(false);
   const [isPremium, setIsPremium]=useState(false);
   const [isProMax,  setIsProMax ]=useState(false);
+  const [lang, setLang] = useState(()=>{ try{return localStorage.getItem("diq_lang")||"en";}catch{return "en";} });
+  const tl = (key) => t(lang, key);
+  useEffect(()=>{
+    document.documentElement.dir  = lang==="ar"?"rtl":"ltr";
+    document.documentElement.lang = lang;
+  },[lang]);
   const [streak,    setStreak   ]=useState(1);
   const [showCI,    setShowCI   ]=useState(false);
   const [apiError,  setApiError ]=useState("");
@@ -11300,23 +12281,33 @@ export default function DestinIQ(){
         // A streak is valid if the user checked in today OR yesterday.
         // If the last check-in was 2+ days ago, the streak resets to 1.
         {
-          const savedStreak = profile.streak || 1;
+          // Use form_data._streak as reliable fallback (always saved)
+          // form_data is TEXT in Supabase — parse it
+          const _fd = typeof profile.form_data==="string"
+            ? (()=>{try{return JSON.parse(profile.form_data);}catch{return{};}})()
+            : (profile.form_data||{});
+          const fdStreak  = _fd?._streak;
+          const fdLast    = _fd?._last_checkin || "";
+          const savedStreak = profile.streak || fdStreak || 1;
           const today     = new Date().toISOString().slice(0,10);
           const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
-          // Use the most recent of DB date and localStorage date (handles timing gaps)
-          const dbLast    = profile.last_checkin_date || "";
+          // Check all sources — DB column, form_data fallback, localStorage
+          const dbLast    = profile.last_checkin_date || fdLast;
           const localLast = (() => { try{ return localStorage.getItem(`destiniq_checkin_${u.id}`)||""; }catch{return "";} })();
-          const lastSeen  = [dbLast, localLast].filter(Boolean).sort().pop() || "";
+          const localStreak = (() => { try{ const s=localStorage.getItem(`diq_streak_${u.id}`); return s?parseInt(s):0; }catch{return 0;} })();
+          const lastSeen  = [dbLast, localLast, fdLast].filter(Boolean).sort().pop() || "";
+          // Take highest streak from all sources (most reliable)
+          const bestStreak = Math.max(savedStreak, localStreak, 1);
 
           if (!lastSeen) {
             // Never checked in before — keep whatever streak DB has (could be 1 from signup)
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else if (lastSeen === today) {
             // Already checked in today — show current streak as-is
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else if (lastSeen === yesterday) {
             // Checked in yesterday — streak is still alive
-            setStreak(savedStreak);
+            setStreak(bestStreak);
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
@@ -11328,10 +12319,22 @@ export default function DestinIQ(){
             try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
           }
         }
-        if (profile.form_data)  setFormData({
-          ...profile.form_data,
-          last_checkin_date: profile.last_checkin_date||"",
-        });
+        if (profile.form_data){
+          setFormData({
+            ...profile.form_data,
+            last_checkin_date: profile.last_checkin_date||profile.form_data?._last_checkin||"",
+          });
+          // Restore wins from Supabase if localStorage was cleared
+          const _winsFromDB = profile.wins?.length ? profile.wins
+            : (_fd?._wins||[]);
+          if(_winsFromDB?.length){
+            const serverWins = _winsFromDB;
+            const localWins  = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${u.id}`)||"[]"); }catch{ return []; } })();
+            if(serverWins.length > localWins.length){
+              try{ localStorage.setItem(`diq_wins_${u.id}`, JSON.stringify(serverWins)); }catch{}
+            }
+          }
+        }
         if (profile.report)     setReport(profile.report);
         // ── CRITICAL: Always restore exactly where they left off ──
         // Signed-in users must NEVER see the marketing landing page — only
@@ -11339,16 +12342,26 @@ export default function DestinIQ(){
         // Save streak to localStorage as instant backup (so page refresh shows correct streak)
         try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
 
+        // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
+        // Users shouldn't have to configure anything — just works
+        try{
+          const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
+          const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
+          const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
+          const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
+          const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
+          setTimeout(()=>{
+            scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
+          }, 3000);
+        }catch(e){}
+
         if (profile.form_data && profile.report) {
           // Has both — go straight to the dashboard
           setScreen("results");
-        } else if (profile.form_data) {
-          // Has onboarding data but report is missing — still go to dashboard.
-          // Dashboard handles the missing report with a regenerate prompt.
-          // NEVER send an old user back through onboarding.
-          setScreen("results");
         } else {
-          // No onboarding data at all — brand-new user, show intake form.
+          // Either no onboarding data yet, or it exists but report generation
+          // was interrupted — either way, send to intake (it pre-fills from
+          // savedFormData, so nothing is lost) instead of the landing page.
           setScreen("intake");
         }
       } else {
@@ -11362,6 +12375,32 @@ export default function DestinIQ(){
       setProfileLoading(false);
     }
   };
+
+  // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
+  // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
+  useEffect(()=>{
+    if(typeof window==="undefined") return;
+    const isNative = window?.Capacitor?.isNativePlatform?.();
+    if(!isNative) return;
+    // Access Capacitor plugins via global (no import needed — avoids build errors)
+    const CapApp = window?.Capacitor?.Plugins?.App;
+    if(!CapApp) return;
+    let listener = null;
+    CapApp.addListener("appUrlOpen",async({url})=>{
+      if(!url) return;
+      const hash = url.includes("#") ? url.split("#")[1] : url.split("?")[1]||"";
+      const p = new URLSearchParams(hash);
+      const access_token  = p.get("access_token");
+      const refresh_token = p.get("refresh_token");
+      if(access_token && refresh_token){
+        const{error}=await supabase.auth.setSession({access_token,refresh_token});
+        if(error) console.warn("Deep link auth:",error.message);
+        // Close in-app browser via global plugin
+        try{ window?.Capacitor?.Plugins?.Browser?.close?.(); }catch{}
+      }
+    }).then(l=>{listener=l;}).catch(()=>{});
+    return()=>{ try{listener?.remove?.();}catch{} };
+  },[]);
 
   useEffect(()=>{
     // mountRestored: ref (not state) so it never triggers a re-render.
@@ -11413,7 +12452,6 @@ export default function DestinIQ(){
           setReport(null);
           setIsPaid(false);
           setIsPremium(false);
-          setIsProMax(false);
           setStreak(1);
           setScreen("landing");
           // Clear localStorage only on explicit sign-out
@@ -11470,16 +12508,12 @@ export default function DestinIQ(){
     return()=>clearTimeout(timer);
   },[userId]);
 
-  // Paid users are always Premium — self-correct if state ever drifts out of sync.
-  // Also restore isProMax from localStorage as a secondary safeguard.
+  // Paid users are always Premium in this app — there is no separate paid-but-
+  // not-premium tier in practice. Self-correct instantly if these ever drift
+  // out of sync (e.g. stale localStorage), instead of requiring a manual toggle.
   useEffect(()=>{
-    if(isPaid && !isPremium) setIsPremium(true);
-    if(userId && !isProMax){
-      try{
-        if(localStorage.getItem(`diq_promax_${userId}`)==="1") setIsProMax(true);
-      }catch(_){}
-    }
-  },[isPaid,isPremium,isProMax,userId]);
+    // isPremium = Pro Max ONLY — do not force it for all paid users
+  },[isPaid,isPremium]);
 
   // Listen for policy events from auth screen footer links
   useEffect(()=>{
@@ -11709,8 +12743,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
   const handlePay=async(paystackRef, planKey)=>{
     const isMax = planKey==="promax" || planKey==="promax_annual";
     setIsPaid(true);
-    setIsPremium(true);
-    if(isMax) setIsProMax(true);
+    if(isMax){ setIsPremium(true); setIsProMax(true); }
     // Belt-and-suspenders: write to localStorage here too in case the
     // Paywall's callback missed it (e.g. userId was null at payment time)
     if(userId){
@@ -11828,9 +12861,9 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             else setScreen("intake");
           }}>Destin<b>IQ</b></div>
           <div className="nav-r">
-            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isProMax?"Pro Max":isPaid?"Pro":"Upgrade"}>
-              <div className="prem-toggle-dot" style={isProMax?{background:"#a78bfa",boxShadow:"0 0 8px rgba(167,139,250,0.5)"}:{}}/>
-              <span className="prem-toggle-label" style={isProMax?{color:"#a78bfa"}:{}}>{isProMax?"PRO MAX":isPaid&&isPremium?"PRO":"UPGRADE"}</span>
+            <div className={`prem-toggle ${isPaid&&isPremium?"":"off"}`} onClick={()=>{if(!isPaid){setScreen("paywall");}}} title={isPaid?"Premium":"Upgrade to Premium"}>
+              <div className="prem-toggle-dot"/>
+              <span className="prem-toggle-label">{isPaid&&isPremium?"PREMIUM":"UPGRADE"}</span>
             </div>
             <button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
@@ -11844,6 +12877,13 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                 🔔
               </button>
             )}
+            {/* Language selector — always visible */}
+            <LanguageSelector lang={lang} onChange={(code)=>{
+              setLang(code);
+              try{localStorage.setItem("diq_lang",code);}catch{}
+              document.documentElement.dir = ["ar","ur","fa"].includes(code)?"rtl":"ltr";
+              document.documentElement.lang = code;
+            }}/>
 
             {screen==="results"&&!isPaid&&<button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={handleUnlock}>Upgrade</button>}
             {screen==="results"&&isPaid&&<div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>}
@@ -11876,7 +12916,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
 
         {/* Profile page */}
-        {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak}
+        {showProfile&&<ProfilePage user={user} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} lang={lang} onLangChange={(code)=>{setLang(code); try{localStorage.setItem("diq_lang",code);}catch{}}}
           onPhotoUpdate={(url)=>setNavPhotoURL(url)}
           onBack={()=>setShowProfile(false)}
           onSignOut={async()=>{
@@ -11885,7 +12925,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             await supabase.auth.signOut();
             // Also clear state immediately in case onAuthStateChange fires slowly
             setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
-            setIsPaid(false);setIsPremium(false);setIsProMax(false);setNavPhotoURL(null);setStreak(1);
+            setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
             setShowProfile(false);
             try{
               Object.keys(localStorage).forEach(k=>{
@@ -11916,21 +12956,19 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             <div style={{width:36,height:36,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
           </div>
         )}
-        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData}/>}
+        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData} ipLocation={ipLocation}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
-              streak={streak} setStreak={setStreak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
+              streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
               showTracker={showTracker} setShowTracker={setShowTracker}/>
         )}
         {screen==="results"  &&formData&&!report&&(
-          <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 24px"}}>
-            <div style={{textAlign:"center",maxWidth:360}}>
-              <div style={{fontSize:32,marginBottom:16}}>📋</div>
-              <div style={{fontFamily:"var(--f-mono)",fontSize:13,color:"var(--gold)",letterSpacing:".08em",marginBottom:8}}>Your report needs regenerating</div>
-              <p style={{fontSize:14,color:"var(--cream-40)",lineHeight:1.7,marginBottom:24}}>Your profile is saved but we couldn't find your report. This usually happens after a sign-in on a new device. Tap below to regenerate it — takes about 60 seconds.</p>
-              <button className="btn btn-gold" onClick={()=>handleSubmit(formData)} style={{padding:"12px 28px",fontSize:14}}>Regenerate my report</button>
+          <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".1em",marginBottom:16}}>Loading your report…</div>
+              <div style={{width:40,height:40,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto"}}/>
             </div>
           </div>
         )}
