@@ -9,7 +9,6 @@
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
  *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
- *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
  *    - Phone / OTP (requires Twilio integration in Supabase → Auth → Providers → Phone)
@@ -3182,7 +3181,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         .filter((_,i)=>!(i===0&&updated[0].role==="assistant"))
         .map(m=>({role:m.role,content:m.content}));
       if(!apiMsgs.length||apiMsgs[0].role!=="user") throw new Error("No user message");
-      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId)),userId,isPremium,isProMax});
+      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId))+langPrompt(),userId,isPremium,isProMax});
       pushToMemory(userId,"assistant",reply);setMsgs(p=>[...p,{role:"assistant",content:reply}]);
     }catch(e){
       console.error("Advisor error:",e.message,e);
@@ -4256,11 +4255,14 @@ const UI_STRINGS = {
 function t(lang, key){ return UI_STRINGS[lang]?.[key] || UI_STRINGS.en[key] || key; }
 
 // Language instruction for AI prompts
-function langPrompt(lang){
-  if(!lang||lang==="en") return "";
-  const found = LANGUAGES.find(l=>l.code===lang);
+function langPrompt(langCode){
+  // Read from localStorage if no code passed (works in standalone functions)
+  const code = langCode ||
+    (typeof window!=="undefined" ? (localStorage.getItem("diq_lang")||"en") : "en");
+  if(!code||code==="en") return "";
+  const found = LANGUAGES.find(l=>l.code===code);
   if(!found) return "";
-  return `\n\nIMPORTANT: Write your ENTIRE response in ${found.label} (${found.native}). All text must be in ${found.label}.`;
+  return `\n\nIMPORTANT: Respond ENTIRELY in ${found.label} (${found.native}). Every word must be in ${found.label} — no English.`;
 }
 
 // ── COUNTRIES with currency codes for onboarding ─────────────────────────────
@@ -5353,10 +5355,16 @@ function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, o
     setLoading2(true); setError2("");
     try{
       const currencyInfo = getLocalCurrency(profile?.country||"");
-      const prompt = cfg.prompt(profile, currencyInfo);
+      const currencySymbol = currencyInfo?.symbol || getLocalCurrency(profile?.country||"")?.symbol || "$";
+      const currencyName   = currencyInfo?.code   || getLocalCurrency(profile?.country||"")?.code   || "USD";
+      // Build currency instruction to append to every prompt
+      const currencyNote   = currencySymbol && currencySymbol!=="$"
+        ? `\n\nCURRENCY RULE: Use ${currencySymbol} (${currencyName}) for ALL local costs, prices, salaries, and expenses. Only use USD for international online income — and always show the ${currencySymbol} equivalent too.`
+        : "";
+      const prompt = cfg.prompt(profile, currencyInfo) + currencyNote;
       const result = await callAPI({
         messages:[{role:"user", content: prompt}],
-        system: `You are DestinIQ's specialist for ${cfg.title}. Be specific to the user's country, age, and situation. No generic advice.${langPrompt(lang||"en")}`,
+        system: `You are DestinIQ's specialist for ${cfg.title}. Be specific to the user's country (${profile?.country||"their country"}), age, and situation. No generic advice. When mentioning money amounts, use ${getLocalCurrency(profile?.country||"")?.symbol||""} (local currency), NOT $USD — unless it's international online income, then show USD + local equivalent.${langPrompt(lang||"en")}`,
         userId, isPremium, isProMax,
       });
       const txt = result?.content?.[0]?.text||result||"";
@@ -10115,7 +10123,7 @@ function StreakCelebration({streak, onClose}){
   );
 }
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker}){
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en"}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -12962,7 +12970,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
-              showTracker={showTracker} setShowTracker={setShowTracker}/>
+              lang={lang} showTracker={showTracker} setShowTracker={setShowTracker}/>
         )}
         {screen==="results"  &&formData&&!report&&(
           <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
