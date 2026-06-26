@@ -5303,44 +5303,67 @@ Write in second person ("you"). 300-350 words. Make it feel like it was written 
   dreaminterp: {
     title: "Dream Interpreter",
     icon: "🌙",
-    subtitle: "Psychological and practical interpretation of your recurring dreams",
-    prompt: (p) => `You are a depth psychologist and dream analyst. User: ${p.name||"someone"} from ${p.country||"their country"}.
-Their situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
-They haven't described a specific dream yet, so give them:
-1. A brief explanation of what recurring dreams mean psychologically (the unconscious processing they represent)
-2. The 5 most common dream themes and what they typically reveal about a person's waking life
-3. Based on their situation and challenge, the type of dream they're most likely having and what it means
-4. How to start a dream journal (simple 2-minute practice)
-5. A prompt: "Describe your most recent or recurring dream in the box below, and I'll interpret it for you"
-Make this feel like an intelligent psychological tool, not mysticism.`,
+    subtitle: "Describe your dream and get a psychological + practical interpretation",
+    needsInput: true,
+    inputLabel: "Describe your dream",
+    inputPlaceholder: "Tell me about a recurring or recent dream. Include as many details as you remember — what happened, who was there, how it felt, what stood out...",
+    inputMin: 20,
+    prompt: (p, cur, userInput) => `You are a depth psychologist and dream analyst.
+Person: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Their waking life: situation — "${p.situation||""}", challenge — "${p.challenge||""}".
+
+Their dream: "${userInput}"
+
+Interpret this dream in 4 parts:
+First, what the core emotional theme of this dream is (not surface level — the deeper emotional truth it's processing)
+Second, what specific element of their waking life this dream is most likely processing — connect it directly to what they've shared about their situation and challenge
+Third, what this dream is telling them they need to do or face in real life right now — be specific and honest
+Finally, one action they can take this week based on what their unconscious is showing them
+
+Write like a wise friend who knows both psychology and their life — not a textbook.`,
   },
   peopledecoder: {
     title: "People Decoder",
     icon: "🧩",
-    subtitle: "Understand difficult people in your life and how to handle them",
-    prompt: (p) => `You are a behavioral psychologist and social intelligence expert. User: ${p.name||"someone"} from ${p.country||"their country"}.
-Situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
-Build their People Decoder framework:
-1. The most likely difficult person type in their life based on their situation (narcissist, victim, passive-aggressive, controller — be specific)
-2. Why this person behaves this way (the psychology behind it — without excusing it)
-3. The exact approach to handle this person type without losing yourself or the relationship
-4. 3 phrases to use with difficult people that de-escalate without submitting
-5. When to walk away — the signs that someone is genuinely toxic vs just difficult
-Be psychologically informed but practical. Real scripts they can use this week.`,
+    subtitle: "Describe someone difficult in your life — understand them and how to handle them",
+    needsInput: true,
+    inputLabel: "Describe this person and the situation",
+    inputPlaceholder: "Who is this person to you (colleague, friend, family)? What do they do that's difficult? Give me a specific example of their behaviour and how it affects you...",
+    inputMin: 30,
+    prompt: (p, cur, userInput) => `You are a behavioral psychologist and social intelligence expert.
+Person asking: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+Their situation: "${p.situation||""}".
+
+The difficult person they're describing: "${userInput}"
+
+Do this in 4 parts:
+First, identify the behavioral pattern of the person they're describing — name it clearly and specifically (not just "difficult person" — be precise about the pattern)
+Second, explain the psychology behind why this person behaves this way — the fear or wound driving it — without excusing them
+Third, give the exact approach for handling this specific person — what to say, what not to say, how to position yourself. Be specific to ${p.country||"their culture"} — communication norms vary
+Finally, tell them what this dynamic is costing them personally and what a healthy boundary would look like
+
+Use the details they gave you. Make it feel like you decoded a specific real human, not a generic type.`,
   },
   hardconvo: {
     title: "Hard Conversation Helper",
     icon: "🗣️",
-    subtitle: "Plan and script your most difficult conversations",
-    prompt: (p) => `You are a communication and conflict resolution expert. User: ${p.name||"someone"} from ${p.country||"their country"}.
-Situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
-Build their Hard Conversation toolkit:
-1. Why most people avoid hard conversations (and what it costs them)
-2. The 4-part framework for any hard conversation (Prepare → Open → Core → Close)
-3. Based on their situation, the hard conversation they most need to have
-4. An exact script for how to open that conversation (first 3 sentences matter most)
-5. How to handle the 3 most likely responses: defensiveness, denial, and shutdown
-Give real scripts. Adapted to ${p.country||"their cultural communication style"}. Directness levels vary by culture — acknowledge this.`,
+    subtitle: "Tell me who you need to talk to — I'll help you plan and script it",
+    needsInput: true,
+    inputLabel: "Who do you need to have a hard conversation with, and why?",
+    inputPlaceholder: "e.g. I need to tell my boss I'm underpaid and deserve a raise. Or: I need to confront my friend who keeps letting me down. Or: I need to end a relationship...",
+    inputMin: 20,
+    prompt: (p, cur, userInput) => `You are a communication and conflict resolution expert who understands ${p.country||"their"} culture.
+Person: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
+
+The hard conversation they need to have: "${userInput}"
+
+Help them in 4 parts:
+First, acknowledge why this conversation feels hard and what they're risking — validate it without encouraging avoidance
+Second, give them the exact opening 2-3 sentences to start this conversation. These are the hardest words. Make them specific to what they described — not generic
+Third, walk through what's most likely to happen: the other person's likely reaction, and exactly how to respond to it
+Finally, tell them when and where to have this conversation — timing and setting matter more than most people think
+
+Write for ${p.country||"their cultural context"} — directness, respect, and face-saving mean different things in different places.`,
   },
   weeklychallenge: {
     title: "Weekly Challenge",
@@ -5369,8 +5392,17 @@ function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, o
   const [content2, setContent2] = useState(()=>{ try{return localStorage.getItem(cacheKey)||"";}catch{return "";} });
   const [loading2, setLoading2] = useState(false);
   const [error2,   setError2]   = useState("");
+  // For input-required modules (Dream, People Decoder, Hard Conversation)
+  const [userInput, setUserInput] = useState("");
+  const [inputSubmitted, setInputSubmitted] = useState(false);
 
-  const generate = async() => {
+  const generate = async(inputOverride) => {
+    const finalInput = inputOverride || userInput;
+    // For input modules, require the user to type something
+    if(cfg.needsInput && !finalInput?.trim()){
+      setError2("Please describe your situation above before generating.");
+      return;
+    }
     // Never force profile updates — use whatever data is available from onboarding
     setLoading2(true); setError2("");
     try{
@@ -5381,15 +5413,19 @@ function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, o
       const currencyNote   = currencySymbol && currencySymbol!=="$"
         ? `\n\nCURRENCY RULE: Use ${currencySymbol} (${currencyName}) for ALL local costs, prices, salaries, and expenses. Only use USD for international online income — and always show the ${currencySymbol} equivalent too.`
         : "";
-      const prompt = cfg.prompt(profile, currencyInfo) + currencyNote;
+      const prompt = cfg.prompt(profile, currencyInfo, userInput) + currencyNote;
       const result = await callAPI({
         messages:[{role:"user", content: prompt}],
-        system: `You are DestinIQ — a personal intelligence platform that knows this user deeply.
-Here is everything known about this user:
-${buildProfileContext(profile)}
+        system: `You are DestinIQ — a personal intelligence platform writing for a real person.
 
-You are generating their ${cfg.title} module.
-Currency rule: use ${currencySymbol} (${currencyName}) for local costs and prices. For international/online income show USD and add the ${currencySymbol} equivalent in brackets.`,
+WHAT YOU KNOW ABOUT THEM:
+${buildProfileContext(profile)||"A user who completed onboarding — generate helpful content based on common patterns for their situation."}
+
+YOU ARE WRITING: ${cfg.title}
+
+CURRENCY: ${currencySymbol&&currencySymbol!=="$"?`Use ${currencySymbol} (${currencyName}) for local costs. USD only for international online income — always add ${currencySymbol} equivalent.`:"Use USD for all amounts."}
+
+ABSOLUTE RULE: Generate the full response NOW using whatever information is available. Never say you need more information, never ask them to update their profile, never refuse. If a specific detail is missing, make a reasonable assumption based on what you know and keep going.`,
         userId, isPremium, isProMax,
       });
       const txt = result?.content?.[0]?.text||result||"";
@@ -5413,6 +5449,46 @@ Currency rule: use ${currencySymbol} (${currencyName}) for local costs and price
         <h2 className="d2" style={{marginBottom:6}}>{cfg.title}</h2>
         <p style={{fontSize:14, color:"var(--cream-40)", lineHeight:1.6}}>{cfg.subtitle}</p>
       </div>
+
+      {/* Input field for modules that need user description */}
+      {cfg.needsInput && (
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontSize:12,color:"var(--cream-40)",fontFamily:"var(--f-mono)",
+            letterSpacing:".08em",marginBottom:10}}>
+            {cfg.inputLabel?.toUpperCase()}
+          </label>
+          <textarea
+            value={userInput}
+            onChange={e=>setUserInput(e.target.value)}
+            placeholder={cfg.inputPlaceholder}
+            rows={5}
+            style={{width:"100%",background:"var(--midnight)",border:`1px solid ${userInput.length>=(cfg.inputMin||20)?"var(--gold)":"var(--line)"}`,
+              borderRadius:14,padding:"14px 16px",color:"var(--cream)",fontSize:14,
+              lineHeight:1.7,resize:"vertical",fontFamily:"inherit",outline:"none",
+              boxSizing:"border-box",transition:"border .2s"}}
+          />
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+            <span style={{fontSize:11,color:"var(--cream-30)"}}>
+              {userInput.length < (cfg.inputMin||20)
+                ? `${(cfg.inputMin||20)-userInput.length} more characters needed`
+                : "✓ Ready to generate"}
+            </span>
+            <button
+              className="btn btn-gold"
+              disabled={userInput.length < (cfg.inputMin||20) || loading2}
+              onClick={()=>generate(userInput)}
+              style={{fontSize:13,padding:"10px 20px"}}>
+              {loading2 ? "Generating…" : `Get my ${cfg.title}`}
+            </button>
+          </div>
+          {content2 && (
+            <button onClick={()=>{setContent2("");try{localStorage.removeItem(cacheKey);}catch{}setUserInput("");}}
+              style={{background:"none",border:"none",color:"var(--cream-30)",fontSize:12,cursor:"pointer",marginTop:8}}>
+              ✕ Clear and try a different one
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Mental health disclaimer */}
       {isWellbeing && cfg.disclaimer && (
@@ -7110,11 +7186,13 @@ function getLocalCurrency(country){
 
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
   setLoading(true); setErr("");
+  // Build full profile context from ALL onboarding fields
   const country  = profile?.country  || "their country";
   const skills   = profile?.skills   || "general";
-  const goals    = profile?.goals    || "success";
+  const goals    = profile?.goals || profile?.bigGoal || "success";
   const name     = profile?.name     || "the user";
   const income   = profile?.income   || "Under $500";
+  const profileCtx = buildProfileContext(profile);
   const challenge= profile?.challenge|| "getting started";
   // Resolve local currency — MUST happen before currencyNote is built
   const {code:currCode, symbol:currSym} = getLocalCurrency(country);
@@ -12353,13 +12431,17 @@ export default function DestinIQ(){
           }
         }
         if (profile.form_data){
+          // form_data is stored as TEXT in Supabase — must parse if it's a string
+          const parsedFD = typeof profile.form_data === "string"
+            ? (() => { try{ return JSON.parse(profile.form_data); } catch{ return {}; } })()
+            : (profile.form_data || {});
           setFormData({
-            ...profile.form_data,
-            last_checkin_date: profile.last_checkin_date||profile.form_data?._last_checkin||"",
+            ...parsedFD,
+            last_checkin_date: profile.last_checkin_date || parsedFD._last_checkin || "",
           });
           // Restore wins from Supabase if localStorage was cleared
           const _winsFromDB = profile.wins?.length ? profile.wins
-            : (_fd?._wins||[]);
+            : (parsedFD?._wins||[]);
           if(_winsFromDB?.length){
             const serverWins = _winsFromDB;
             const localWins  = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${u.id}`)||"[]"); }catch{ return []; } })();
