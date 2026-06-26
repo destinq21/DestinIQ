@@ -937,6 +937,91 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .reloc-stat-val{font-family:var(--f-display);font-size:17px;color:var(--gold);display:block;margin-bottom:3px;}
 .reloc-verdict{padding:14px 16px;border-left:2px solid var(--gold);background:var(--gold-glow);border-radius:0 9px 9px 0;font-size:13px;color:var(--cream-60);font-style:italic;line-height:1.7;}
 /* reloc responsive handled in main block above */
+/* ─── APP SHELL ─── */
+.app-shell{display:flex;min-height:100vh;background:var(--void);}
+.sidebar{width:220px;min-height:100vh;position:fixed;left:0;top:0;bottom:0;background:var(--night);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:200;overflow-y:auto;}
+.sidebar-logo{padding:22px 20px 14px;border-bottom:1px solid var(--line-dim);}
+.sidebar-items{padding:8px 0;flex:1;}
+.s-item{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;font-size:13.5px;color:var(--cream-50);font-weight:500;border:none;background:none;width:100%;text-align:left;transition:all .15s;border-left:3px solid transparent;}
+.s-item:hover{background:rgba(255,255,255,.04);color:var(--cream);}
+.s-item.active{background:rgba(200,168,75,.08);color:var(--gold);border-left-color:var(--gold);}
+.s-streak{padding:14px 20px;border-top:1px solid var(--line-dim);}
+.s-upgrade{padding:0 16px 18px;}
+.main-area{margin-left:220px;flex:1;}
+.bot-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
+.bot-items{display:flex;justify-content:space-around;}
+.bot-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border:none;background:none;color:var(--cream-30);cursor:pointer;flex:1;transition:color .15s;}
+.bot-item.active{color:var(--gold);}
+.bot-icon{font-size:22px;line-height:1.1;}
+.bot-label{font-size:9px;font-weight:700;font-family:var(--f-mono);letter-spacing:.05em;text-transform:uppercase;}
+.mob-top{display:none;align-items:center;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100;}
+.home{padding:32px;max-width:1020px;margin:0 auto;}
+.greet-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:14px;}
+.greet-left{display:flex;align-items:center;gap:14px;}
+.avatar{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--teal));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#000;border:2px solid rgba(200,168,75,.25);flex-shrink:0;}
+.greet-name{font-size:24px;font-weight:800;color:var(--cream);line-height:1.2;}
+.greet-sub{font-size:13px;color:var(--cream-40);}
+.greet-right{display:flex;align-items:center;gap:10px;}
+.streak-chip{display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(200,168,75,.08);border:1px solid rgba(200,168,75,.2);border-radius:20px;}
+.streak-chip span:last-child{font-size:13px;font-weight:700;color:var(--gold);}
+.notif-btn{width:38px;height:38px;border-radius:12px;background:var(--raised);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:border-color .15s;}
+.notif-btn:hover{border-color:var(--gold);}
+.plan-chip{padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;font-family:var(--f-mono);letter-spacing:.06em;}
+.hero-row{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px;margin-bottom:22px;}
+.h-card{border-radius:20px;padding:22px;border:1px solid var(--line);background:var(--raised);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+.h-card:hover{transform:translateY(-2px);border-color:rgba(200,168,75,.3);}
+.h-card.main{border-color:rgba(200,168,75,.2);background:linear-gradient(135deg,rgba(200,168,75,.07),rgba(200,168,75,.02));}
+.h-card.main::before{content:"";position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(200,168,75,.1),transparent 70%);pointer-events:none;}
+.h-eyebrow{font-size:9px;font-family:var(--f-mono);letter-spacing:.14em;color:var(--cream-30);margin-bottom:10px;text-transform:uppercase;}
+.h-icon{font-size:34px;margin-bottom:10px;}
+.h-title{font-size:18px;font-weight:800;color:var(--cream);margin-bottom:6px;line-height:1.25;}
+.h-body{font-size:12px;color:var(--cream-50);line-height:1.7;flex:1;margin-bottom:14px;}
+.h-quote{font-size:13px;font-style:italic;color:var(--gold);line-height:1.7;flex:1;margin-bottom:14px;}
+.h-prog{height:3px;background:rgba(255,255,255,.06);border-radius:3px;margin-bottom:4px;overflow:hidden;}
+.h-prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--teal));}
+.h-prog-label{font-size:10px;color:var(--cream-40);margin-bottom:12px;}
+.h-view-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1px solid rgba(200,168,75,.25);background:transparent;color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.h-view-btn:hover{background:rgba(200,168,75,.08);}
+.h-resume-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:12px;background:var(--gold);color:#000;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;}
+.h-resume-btn:hover{background:#e0c65a;}
+.qa-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:26px;}
+.qa-card{padding:16px 10px;border-radius:16px;background:var(--raised);border:1px solid var(--line);cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;}
+.qa-card:hover{border-color:rgba(200,168,75,.3);transform:translateY(-2px);}
+.qa-ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;transition:transform .2s;}
+.qa-card:hover .qa-ico{transform:scale(1.1);}
+.qa-lbl{font-size:10.5px;font-weight:600;color:var(--cream-50);line-height:1.3;}
+.sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.sec-title{font-size:16px;font-weight:700;color:var(--cream);}
+.sec-link{background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;}
+.cat-scroll{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:26px;}
+.c-card{padding:18px 14px;border-radius:17px;cursor:pointer;transition:all .2s;border:1px solid transparent;display:flex;flex-direction:column;gap:7px;}
+.c-icon{font-size:28px;}.c-label{font-size:13px;font-weight:700;color:var(--cream);}.c-count{font-size:11px;}
+.rec-item{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:13px;background:var(--raised);border:1px solid var(--line);margin-bottom:9px;cursor:pointer;transition:border-color .15s;}
+.rec-item:hover{border-color:rgba(200,168,75,.2);}
+.rec-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.rec-title{font-size:13px;font-weight:600;color:var(--cream);}.rec-sub{font-size:11px;color:var(--cream-40);}
+.pg{padding:28px 32px;max-width:860px;margin:0 auto;}
+.pg-back{background:none;border:none;color:var(--cream-40);cursor:pointer;font-size:14px;margin-bottom:18px;display:flex;align-items:center;gap:6px;}
+.tool-row{display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:13px;background:var(--raised);border:1px solid var(--line);margin-bottom:9px;cursor:pointer;transition:all .2s;}
+.tool-row:hover{border-color:rgba(200,168,75,.2);transform:translateX(3px);}
+.tr-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.tr-lbl{font-size:13.5px;font-weight:600;color:var(--cream);flex:1;}
+.tool-act-bar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.t-btn{display:flex;align-items:center;gap:6px;padding:9px 17px;border-radius:10px;border:1px solid var(--line);background:var(--raised);color:var(--cream-50);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.t-btn:hover{border-color:var(--gold);color:var(--gold);}.t-btn.pri{background:var(--gold);color:#000;border-color:var(--gold);}
+.followup{padding:16px;border-radius:14px;background:var(--raised);border:1px solid var(--line);margin-top:16px;}
+.followup label{font-size:9px;font-family:var(--f-mono);letter-spacing:.12em;color:var(--cream-30);display:block;margin-bottom:9px;text-transform:uppercase;}
+.fu-row{display:flex;gap:8px;}
+.fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
+.fu-input:focus{border-color:var(--gold);}
+@media(max-width:900px){
+  .sidebar{display:none;}.main-area{margin-left:0;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}
+  .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
+  .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
+}
+@media(min-width:901px){.mob-top{display:none!important;}.bot-nav{display:none!important;}}
+@media(max-width:480px){.qa-row{grid-template-columns:repeat(3,1fr);gap:7px;}.qa-card{padding:12px 7px;}}
+
 `;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -953,87 +1038,61 @@ const PILLARS=[
 // Tabs grouped by category — rendered as a single scrollable row
 // but with a thin category label above each group for orientation
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEW NAVIGATION SYSTEM — Categories + Tool Metadata
-// ═══════════════════════════════════════════════════════════════════════════════
-const TOOL_META = {
-  relationshipiq:{label:"Relationship IQ",  icon:"🤝", cat:"social",  color:"#e05c6e"},
-  smalltalk:     {label:"Small Talk",        icon:"💬", cat:"social",  color:"#e05c6e"},
-  peopledecoder: {label:"People Decoder",    icon:"🧩", cat:"social",  color:"#e05c6e"},
-  hardconvo:     {label:"Hard Conversation", icon:"🗣️", cat:"social",  color:"#e05c6e"},
-  parenting:     {label:"Parenting",         icon:"👨‍👧", cat:"social",  color:"#e05c6e"},
-  confidencelab: {label:"Confidence Lab",    icon:"🦁", cat:"social",  color:"#e05c6e"},
-  money:         {label:"Money",             icon:"💰", cat:"money",   color:"#c8a84b"},
-  earnonline:    {label:"Earn Online",       icon:"🌐", cat:"money",   color:"#c8a84b"},
-  business:      {label:"Business",          icon:"📦", cat:"money",   color:"#c8a84b"},
-  lifehacks:     {label:"Life Hacks",        icon:"💡", cat:"money",   color:"#c8a84b"},
-  debtfreedom:   {label:"Debt Freedom",      icon:"⛓️", cat:"money",   color:"#c8a84b"},
-  sidehustle:    {label:"Side Hustle",       icon:"📊", cat:"money",   color:"#c8a84b"},
-  investment101: {label:"Investment 101",    icon:"📈", cat:"money",   color:"#c8a84b"},
-  jimrohn:       {label:"Jim Rohn",          icon:"📚", cat:"money",   color:"#c8a84b"},
-  mindsettenx:   {label:"10x Mindset",       icon:"◇",  cat:"mindset", color:"#9b72cf"},
-  success:       {label:"Get Successful",    icon:"🔥", cat:"mindset", color:"#9b72cf"},
-  fearaudit:     {label:"Fear Audit",        icon:"🔍", cat:"mindset", color:"#9b72cf"},
-  dailywisdom:   {label:"Daily Wisdom",      icon:"💎", cat:"mindset", color:"#9b72cf"},
-  innerpeace:    {label:"Inner Peace",       icon:"🕊️", cat:"mindset", color:"#9b72cf"},
-  angerstress:   {label:"Anger & Stress",    icon:"🌊", cat:"mindset", color:"#9b72cf"},
-  nogym:         {label:"No-Gym Workout",    icon:"💪", cat:"body",    color:"#4db6ac"},
-  posture:       {label:"Posture & Energy",  icon:"⚡", cat:"body",    color:"#4db6ac"},
-  bodyfuel:      {label:"Body Fuel",         icon:"🥗", cat:"body",    color:"#4db6ac"},
-  glowup:        {label:"Glow Up",           icon:"✨", cat:"body",    color:"#4db6ac"},
-  sleepcoach:    {label:"Sleep Coach",       icon:"🌙", cat:"wellness",color:"#81c784"},
-  anxietytool:   {label:"Anxiety Toolkit",   icon:"🛡️", cat:"wellness",color:"#81c784"},
-  griefloss:     {label:"Grief & Loss",      icon:"🌱", cat:"wellness",color:"#81c784"},
-  visionboard:   {label:"Vision Board",      icon:"🗺️", cat:"purpose", color:"#64b5f6"},
-  legacyletter:  {label:"Legacy Letter",     icon:"📜", cat:"purpose", color:"#64b5f6"},
-  morningritual: {label:"Morning Ritual",    icon:"🌅", cat:"purpose", color:"#64b5f6"},
-  lettertoself:  {label:"Letter to Self",    icon:"✉️", cat:"purpose", color:"#64b5f6"},
-  dreaminterp:   {label:"Dream Interpreter", icon:"🌙", cat:"purpose", color:"#64b5f6"},
-  weeklychallenge:{label:"Weekly Challenge", icon:"🎲", cat:"purpose", color:"#64b5f6"},
-  invest:        {label:"Invest in You",     icon:"📗", cat:"skills",  color:"#ffd54f"},
-  discipline:    {label:"Daily Discipline",  icon:"⏰", cat:"skills",  color:"#ffd54f"},
-  career:        {label:"Career Path",       icon:"◇",  cat:"skills",  color:"#ffd54f"},
-  negotiation:   {label:"Negotiation",       icon:"🎯", cat:"skills",  color:"#ffd54f"},
-  digitallife:   {label:"Digital Life",      icon:"📱", cat:"skills",  color:"#ffd54f"},
-  roadmap:       {label:"My Roadmap",        icon:"⟶", cat:"plan",    color:"#ff8a65"},
-  decisions:     {label:"Big Decisions",     icon:"◈",  cat:"plan",    color:"#ff8a65"},
-  relocate:      {label:"Relocate",          icon:"✦",  cat:"plan",    color:"#ff8a65"},
-  advisor:       {label:"My Advisor",        icon:"⬡",  cat:"plan",    color:"#ff8a65"},
-  checkin:       {label:"Check-in",          icon:"✓",  cat:"home",    color:"#1fa89a"},
-  wins:          {label:"Wins",              icon:"🏆", cat:"home",    color:"#c8a84b"},
-  progress:      {label:"Progress",          icon:"📊", cat:"home",    color:"#64b5f6"},
-  weekly:        {label:"Weekly Pulse",      icon:"⚡", cat:"home",    color:"#9b72cf"},
-};
-
-const CATEGORIES = [
-  {id:"social",  label:"Social & People", icon:"❤️", color:"#e05c6e",
-   desc:"Relationships and people skills",
-   tools:["relationshipiq","smalltalk","peopledecoder","hardconvo","parenting","confidencelab"]},
-  {id:"money",   label:"Money+",          icon:"💰", color:"#c8a84b",
-   desc:"Build wealth and financial intelligence",
-   tools:["money","earnonline","business","lifehacks","debtfreedom","sidehustle","investment101","jimrohn"]},
-  {id:"mindset", label:"Mindset",         icon:"🧠", color:"#9b72cf",
-   desc:"Rewire how you think and see the world",
-   tools:["mindsettenx","success","fearaudit","dailywisdom","innerpeace","angerstress"]},
-  {id:"body",    label:"Body",            icon:"💪", color:"#4db6ac",
-   desc:"Fuel and move your body",
-   tools:["nogym","posture","bodyfuel","glowup"]},
-  {id:"wellness",label:"Wellness",        icon:"🌿", color:"#81c784",
-   desc:"Mental and emotional health",
-   tools:["innerpeace","sleepcoach","anxietytool","griefloss","angerstress"]},
-  {id:"purpose", label:"Purpose",         icon:"🚀", color:"#64b5f6",
-   desc:"Define your direction and legacy",
-   tools:["visionboard","legacyletter","morningritual","lettertoself","dreaminterp","weeklychallenge","fearaudit"]},
-  {id:"skills",  label:"Skills & Career", icon:"⚡", color:"#ffd54f",
-   desc:"Level up your professional abilities",
-   tools:["invest","discipline","career","negotiation","digitallife"]},
-  {id:"plan",    label:"Plan & Decide",   icon:"🗺️", color:"#ff8a65",
-   desc:"Strategic planning and decisions",
-   tools:["roadmap","decisions","relocate","advisor"]},
+const CATEGORIES=[
+  {id:"social",  label:"Social & People", icon:"❤️", color:"#e05c6e",desc:"Relationships & people skills",    tools:["relationshipiq","smalltalk","peopledecoder","hardconvo","parenting","confidencelab"]},
+  {id:"money",   label:"Money+",          icon:"💰", color:"#c8a84b",desc:"Build wealth & financial intelligence", tools:["money","earnonline","business","lifehacks","debtfreedom","sidehustle","investment101","jimrohn"]},
+  {id:"mindset", label:"Mindset",         icon:"🧠", color:"#9b72cf",desc:"Rewire how you think",              tools:["mindsettenx","success","fearaudit","dailywisdom","innerpeace","angerstress"]},
+  {id:"body",    label:"Body",            icon:"💪", color:"#4db6ac",desc:"Fuel and move your body",           tools:["nogym","posture","bodyfuel","glowup"]},
+  {id:"wellness",label:"Wellness",        icon:"🌿", color:"#81c784",desc:"Mental & emotional health",         tools:["innerpeace","sleepcoach","anxietytool","griefloss","angerstress"]},
+  {id:"purpose", label:"Purpose",         icon:"🚀", color:"#64b5f6",desc:"Define your direction & legacy",    tools:["visionboard","legacyletter","morningritual","lettertoself","dreaminterp","weeklychallenge"]},
+  {id:"skills",  label:"Skills & Career", icon:"⚡", color:"#ffd54f",desc:"Level up professionally",           tools:["invest","discipline","career","negotiation","digitallife"]},
+  {id:"plan",    label:"Plan & Decide",   icon:"🗺️", color:"#ff8a65",desc:"Strategic planning & decisions",   tools:["roadmap","decisions","relocate","advisor"]},
 ];
-
-function getGreeting(){ const h=new Date().getHours(); return h<12?"Good morning":h<17?"Good afternoon":"Good evening"; }
-
+const TOOL_META={
+  relationshipiq:{label:"Relationship IQ", icon:"🤝",cat:"social", color:"#e05c6e"},
+  smalltalk:     {label:"Small Talk",       icon:"💬",cat:"social", color:"#e05c6e"},
+  peopledecoder: {label:"People Decoder",   icon:"🧩",cat:"social", color:"#e05c6e"},
+  hardconvo:     {label:"Hard Conversation",icon:"🗣️",cat:"social", color:"#e05c6e"},
+  parenting:     {label:"Parenting",        icon:"👨‍👧",cat:"social", color:"#e05c6e"},
+  confidencelab: {label:"Confidence Lab",   icon:"🦁",cat:"social", color:"#e05c6e"},
+  money:         {label:"Money",            icon:"💰",cat:"money",  color:"#c8a84b"},
+  earnonline:    {label:"Earn Online",      icon:"🌐",cat:"money",  color:"#c8a84b"},
+  business:      {label:"Business",         icon:"📦",cat:"money",  color:"#c8a84b"},
+  lifehacks:     {label:"Life Hacks",       icon:"💡",cat:"money",  color:"#c8a84b"},
+  debtfreedom:   {label:"Debt Freedom",     icon:"⛓️",cat:"money",  color:"#c8a84b"},
+  sidehustle:    {label:"Side Hustle",      icon:"📊",cat:"money",  color:"#c8a84b"},
+  investment101: {label:"Investment 101",   icon:"📈",cat:"money",  color:"#c8a84b"},
+  jimrohn:       {label:"Jim Rohn",         icon:"📚",cat:"money",  color:"#c8a84b"},
+  mindsettenx:   {label:"10x Mindset",      icon:"◇", cat:"mindset",color:"#9b72cf"},
+  success:       {label:"Get Successful",   icon:"🔥",cat:"mindset",color:"#9b72cf"},
+  fearaudit:     {label:"Fear Audit",       icon:"🔍",cat:"mindset",color:"#9b72cf"},
+  dailywisdom:   {label:"Daily Wisdom",     icon:"💎",cat:"mindset",color:"#9b72cf"},
+  innerpeace:    {label:"Inner Peace",      icon:"🕊️",cat:"mindset",color:"#9b72cf"},
+  angerstress:   {label:"Anger & Stress",   icon:"🌊",cat:"mindset",color:"#9b72cf"},
+  nogym:         {label:"No-Gym Workout",   icon:"💪",cat:"body",   color:"#4db6ac"},
+  posture:       {label:"Posture & Energy", icon:"⚡",cat:"body",   color:"#4db6ac"},
+  bodyfuel:      {label:"Body Fuel",        icon:"🥗",cat:"body",   color:"#4db6ac"},
+  glowup:        {label:"Glow Up",          icon:"✨",cat:"body",   color:"#4db6ac"},
+  sleepcoach:    {label:"Sleep Coach",      icon:"🌙",cat:"wellness",color:"#81c784"},
+  anxietytool:   {label:"Anxiety Toolkit",  icon:"🛡️",cat:"wellness",color:"#81c784"},
+  griefloss:     {label:"Grief & Loss",     icon:"🌱",cat:"wellness",color:"#81c784"},
+  visionboard:   {label:"Vision Board",     icon:"🗺️",cat:"purpose",color:"#64b5f6"},
+  legacyletter:  {label:"Legacy Letter",    icon:"📜",cat:"purpose",color:"#64b5f6"},
+  morningritual: {label:"Morning Ritual",   icon:"🌅",cat:"purpose",color:"#64b5f6"},
+  lettertoself:  {label:"Letter to Self",   icon:"✉️",cat:"purpose",color:"#64b5f6"},
+  dreaminterp:   {label:"Dream Interpreter",icon:"🌙",cat:"purpose",color:"#64b5f6"},
+  weeklychallenge:{label:"Weekly Challenge",icon:"🎲",cat:"purpose",color:"#64b5f6"},
+  invest:        {label:"Invest in You",    icon:"📗",cat:"skills", color:"#ffd54f"},
+  discipline:    {label:"Daily Discipline", icon:"⏰",cat:"skills", color:"#ffd54f"},
+  career:        {label:"Career Path",      icon:"◇", cat:"skills", color:"#ffd54f"},
+  negotiation:   {label:"Negotiation",      icon:"🎯",cat:"skills", color:"#ffd54f"},
+  digitallife:   {label:"Digital Life",     icon:"📱",cat:"skills", color:"#ffd54f"},
+  roadmap:       {label:"My Roadmap",       icon:"⟶",cat:"plan",   color:"#ff8a65"},
+  decisions:     {label:"Big Decisions",    icon:"◈", cat:"plan",   color:"#ff8a65"},
+  relocate:      {label:"Relocate",         icon:"✦", cat:"plan",   color:"#ff8a65"},
+  advisor:       {label:"My Advisor",       icon:"⬡", cat:"plan",   color:"#ff8a65"},
+};
+function getGreeting(){const h=new Date().getHours();return h<12?"Good morning":h<17?"Good afternoon":"Good evening";}
 const MODULE_GROUPS=[
   {
     group:"Your Dashboard",
@@ -1179,18 +1238,17 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
     body:JSON.stringify({
       system: (system||"") + `
 
-YOU ARE SPEAKING DIRECTLY TO THIS PERSON — NOT ABOUT THEM.
-
-ABSOLUTE RULES — NEVER BREAK THESE:
-1. Always say "you" and "your" — NEVER "this person", "the user", "they", "their" when referring to the person reading this
-2. Use their name naturally once or twice — not every sentence, just where it flows
-3. ZERO markdown: no # no ** no * no numbered lists no --- dividers. Flowing paragraphs only
-4. Generate the full response immediately — NEVER say you need more information, NEVER say you're missing details, NEVER ask them to update their profile. Work with what you have
-5. Be honest, direct, warm — like the smartest friend they've ever had who has studied their life
-6. Reference their specific country, situation, income, goals — make it feel written only for them
-7. Never end with "I hope this helps", "feel free to ask", "best of luck" or any hollow closer
-8. End with one specific thing they should do — not a list, one thing
-9. If a detail is missing — make a smart assumption and keep going. Never pause, never refuse` + langPrompt(),
+CRITICAL WRITING RULES — FOLLOW EXACTLY:
+1. Write like a brilliant, warm friend who has studied this person deeply — not a consultant, coach or therapist
+2. Use their name naturally once or twice where it feels right — not every sentence
+3. ZERO markdown: no # headers, no ** bold, no * bullets, no numbered lists, no --- dividers
+4. Write in flowing paragraphs only. Use line breaks to separate thoughts naturally
+5. Be honest and direct, even when uncomfortable — but always kind and never clinical
+6. Reference their specific country, situation, income level, and goals directly
+7. Never end with "I hope this helps" or "feel free to reach out" or any generic closer
+8. End with ONE clear specific action — not a list, just one thing
+9. Speak to them like they are intelligent — no over-explaining
+10. If you don't have a detail, work with what you have — NEVER ask them to update their profile` + langPrompt(),
       messages,
       max_tokens: maxTokens||(isProMax?6000:isPremium?4000:1800)
     }),
@@ -1526,7 +1584,7 @@ ${memCtx?`\nPREVIOUS CONVERSATION:\n${memCtx}`:""}
 
 CURRENCY: All local costs/prices = ${currSym} (${currCode}). Online/international income = USD + ${currSym} equivalent.
 
-You speak directly to ${name} using "you" and "your" — never "they" or "this person". You are the most honest, caring, specific advisor they have ever had. Every response is grounded in their real situation in ${country}. You never refuse. You never ask for more information. You work with what you know.${isPremium?` Give your deepest, most thorough guidance.`:""}`;
+You are a brilliant, warm, honest friend who has studied ${name}'s life deeply. You remember everything they shared. You speak directly to them, use their name naturally, give advice specific to ${country}, and never give generic responses.${isPremium?` Give your deepest most detailed guidance.`:""}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1658,7 +1716,7 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
 COSTS/SAVINGS/STARTUP = LOCAL CURRENCY ONLY: ${country} uses ${currCode} (${currSym}). Write ALL prices, rents, costs in ${currSym}. NEVER use $ for costs in ${country}.
 EARNINGS FROM ONLINE WORK = USD. Earnings on Upwork/Fiverr/remote = USD, add local equivalent in brackets e.g. "$500 (${currSym}3,500/month)".`;
 
-  return `Today is ${today}. You are writing directly to ${name}. This is their personal DestinIQ life report — speak to them as "you", never refer to them as "this person" or "they". Write like you have spent 2 hours studying their life and you know them better than most people in their life do.
+  return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
 
 PERSON:
 - Name: ${name}, Age: ${ageNum}, Location: ${loc}
@@ -5049,7 +5107,7 @@ const MODULE_CONFIGS = {
     disclaimer: true,
     prompt: (p) => `You are a compassionate wellbeing guide. The user is ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Their situation: "${p.situation||""}", challenge: "${p.challenge||""}".
-Write a warm, practical Inner Peace guide for ${p.name||"them"} with 4 sections — speak directly to them using "you":
+Write a warm, practical Inner Peace guide for them with 4 sections:
 1. What you're likely feeling right now (validate without being preachy)
 2. A 3-step breathing exercise specific to their situation (box breathing, 4-7-8, or body scan)
 3. A journaling prompt that goes deeper than surface level
@@ -5073,9 +5131,9 @@ Be direct and practical. These should work in 5 minutes. No fluff.`,
     title: "Sleep Coach",
     icon: "🌙",
     subtitle: "Personalized sleep routine based on your life and schedule",
-    prompt: (p) => `You are a sleep optimization coach. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a sleep optimization coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Their situation: "${p.situation||""}". Career: "${p.career||""}".
-Write directly to ${p.name||"them"} — use "you". Build their personal sleep optimization plan:
+Build their personal sleep optimization plan:
 1. What is most likely killing their sleep based on their situation (be specific)
 2. The ideal 1-hour wind-down routine for their lifestyle (time it out: 9pm do X, 9:20pm do Y etc)
 3. 3 local herbs or natural remedies from ${p.country||"their region"} that support sleep
@@ -5101,7 +5159,7 @@ Be clinical but human. No "just believe in yourself" advice.`,
     icon: "🌱",
     subtitle: "Breakups, job loss, death, failure — you're not alone in this",
     disclaimer: true,
-    prompt: (p) => `You are a grief counselor with deep empathy. You are speaking directly to ${p.name||"someone"} from ${p.country||"their country"}.
+    prompt: (p) => `You are a grief counselor with deep empathy. User: ${p.name||"someone"} from ${p.country||"their country"}.
 Their challenge: "${p.challenge||""}".
 Write a compassionate grief support guide:
 1. Acknowledge what they're going through without minimizing it (2-3 sentences that feel truly seen)
@@ -5119,7 +5177,7 @@ This should feel like a wise, caring friend wrote it — not a therapist script.
     subtitle: "Personalized grooming and style for your gender, age, and country",
     prompt: (p) => `You are a style and grooming expert who knows ${p.country||"African"} culture well.
 User: ${p.name||"someone"}, ${p.age||""}, ${p.gender||"person"} from ${p.country||"their country"}, income: "${p.income||""}".
-Write directly to ${p.name||"them"} — use "you". Create their personal Glow Up guide:
+Create their personal Glow Up guide:
 1. Top 3 grooming habits specific to their gender that will have the biggest impact (skin, hair, face)
 2. Style direction that fits their local culture AND looks modern and sharp (not Western copy-paste)
 3. Budget-friendly version: what to buy first with limited money in ${p.country||"their country"}
@@ -5131,7 +5189,7 @@ Be specific — not vague "moisturize daily" advice. Name actual product types o
     title: "No-Gym Workout",
     icon: "💪",
     subtitle: "Full body workouts — home or outside, zero equipment",
-    prompt: (p) => `You are a fitness coach specializing in bodyweight training. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a fitness coach specializing in bodyweight training. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Build their complete no-gym workout plan:
 1. A 20-minute full body workout they can do in their room (exercises, reps, rest time)
 2. An outdoor workout they can do in their neighborhood (park, road, open space)
@@ -5145,7 +5203,7 @@ Be specific with reps, sets, and form cues. Make it feel achievable for a beginn
     icon: "⚡",
     subtitle: "How you hold yourself affects your confidence and energy all day",
     prompt: (p) => `You are a posture and movement specialist. User: ${p.name||"someone"}, ${p.age||""}, career: "${p.career||""}".
-Write directly to ${p.name||"them"} — use "you". Create their personal posture and energy guide:
+Create their personal posture and energy guide:
 1. The most likely posture problem they have based on their job/lifestyle (be specific about what's happening in their body)
 2. 5 simple corrections they can make TODAY that will feel different immediately
 3. A 5-minute morning movement sequence to set their posture for the day
@@ -5173,9 +5231,9 @@ Name actual local foods, not generic "protein" and "vegetables". Be specific to 
     title: "Confidence Lab",
     icon: "🦁",
     subtitle: "Real daily actions that build confidence — not affirmations",
-    prompt: (p) => `You are a confidence and performance coach. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a confidence and performance coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Challenge: "${p.challenge||""}".
-Write directly to ${p.name||"them"} using "you". Build their Confidence Lab — real actions, not affirmations:
+Build their Confidence Lab — real actions, not affirmations:
 1. The root of their confidence issue (based on their situation — be honest and specific)
 2. Three confidence actions to do THIS WEEK (specific, uncomfortable, measurable)
 3. The "small wins" framework: daily micro-challenges to build their confidence muscle
@@ -5187,7 +5245,7 @@ No "believe in yourself" advice. Only actions that create evidence that they are
     title: "Relationship IQ",
     icon: "🤝",
     subtitle: "Friendships, conflict, communication — your social operating system",
-    prompt: (p) => `You are a relationship and social intelligence expert. You are speaking directly to ${p.name||"someone"} from ${p.country||"their country"}.
+    prompt: (p) => `You are a relationship and social intelligence expert. User: ${p.name||"someone"} from ${p.country||"their country"}.
 Situation: "${p.situation||""}". Challenge: "${p.challenge||""}".
 Build their Relationship IQ guide:
 1. Their likely social pattern (people pleaser, avoider, over-sharer, withdrawn) — be honest
@@ -5202,7 +5260,7 @@ Be direct but kind. People need honest mirrors, not validation.`,
     icon: "💬",
     subtitle: "Start, keep, and end conversations — adapted to your culture",
     prompt: (p) => `You are a communication coach who understands ${p.country||"African"} social culture.
-You are speaking directly to ${p.name||"someone"} from ${p.country||"their country"}.
+User: ${p.name||"someone"} from ${p.country||"their country"}.
 Build their Small Talk Mastery guide:
 1. 5 conversation starters that work in ${p.country||"their culture"} (not generic Western ones)
 2. How to keep a conversation going when it stalls (3 techniques with exact scripts)
@@ -5217,7 +5275,7 @@ Give real scripts, not just theory. Adapt everything to ${p.country||"their cult
     subtitle: "Salary, market prices, business deals — with real scripts for your country",
     prompt: (p) => `You are a negotiation expert who knows ${p.country||"African"} business culture deeply.
 User: ${p.name||"someone"} from ${p.country||"their country"}, career: "${p.career||""}".
-Write directly to ${p.name||"them"} using "you". Build their Negotiation Playbook:
+Build their Negotiation Playbook:
 1. The negotiation mindset shift most people from ${p.country||"their culture"} need to make
 2. How to negotiate a salary raise — exact script for their cultural context
 3. How to negotiate at markets and with vendors in ${p.country||"their country"} — the real tactics used
@@ -5229,7 +5287,7 @@ Give real scripts. Not "know your worth" advice — actual sentences they can us
     title: "Digital Life",
     icon: "📱",
     subtitle: "Social media anxiety, AI tools, phone addiction — take back control",
-    prompt: (p) => `You are a digital wellness and productivity expert. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a digital wellness and productivity expert. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Build their Digital Life reset:
 1. How social media is most likely affecting their mental state based on their age (be specific — comparison, FOMO, dopamine loop)
 2. 3 practical rules to set this week to reduce phone addiction
@@ -5259,7 +5317,7 @@ Be culturally aware. Parenting advice needs to respect local values while introd
     icon: "⛓️",
     subtitle: "Step by step plan based on your income and country",
     prompt: (p,cur) => `You are a debt elimination specialist. User: ${p.name||"someone"} from ${p.country||"their country"}, income: "${p.income||""}".
-Write directly to ${p.name||"them"} using "you". Build their Debt Freedom Plan:
+Build their Debt Freedom Plan:
 1. The psychology of debt in ${p.country||"their culture"} — why people stay stuck (be honest)
 2. The debt snowball method adapted to their income level (specific steps)
 3. How to negotiate with creditors/lenders in ${p.country||"their country"} (exact approach)
@@ -5272,7 +5330,7 @@ Use local currency context. Be realistic, not motivational-poster optimistic.`,
     icon: "📊",
     subtitle: "Track what's working, scale what pays, drop what doesn't",
     prompt: (p,cur) => `You are a side income strategist. User: ${p.name||"someone"} from ${p.country||"their country"}, skills: "${p.skills||""}". Career: "${p.career||""}".
-Write directly to ${p.name||"them"} using "you". Build their Side Hustle Strategy:
+Build their Side Hustle Strategy:
 1. The 3 best side hustles for their skills and location in ${p.country||"their country"} (specific, realistic)
 2. How to start the top option this week with zero investment
 3. How to track income from multiple sources (simple system they'll actually use)
@@ -5300,9 +5358,9 @@ Be specific to ${p.country||"their country"}. Name actual local investment platf
     title: "Vision Board",
     icon: "🗺️",
     subtitle: "Your AI-built life plan for 1, 3, and 5 years",
-    prompt: (p) => `You are a life design coach. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a life design coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Goals: "${p.goals||p.bigGoal||""}". Situation: "${p.situation||""}". Skills: "${p.skills||""}".
-Write directly to ${p.name||"them"} using "you". Build their Vision Board — a concrete life plan:
+Build their Vision Board — a concrete life plan:
 1 YEAR FROM NOW: What their life looks like if they stay disciplined (career, money, relationships, health — be specific)
 3 YEARS FROM NOW: The realistic best version of their life if they execute (with specific numbers and milestones)
 5 YEARS FROM NOW: The life that's possible if they become the person they're capable of being
@@ -5313,7 +5371,7 @@ Make it personal and vivid. This should feel like reading their own future, not 
     title: "Legacy Letter",
     icon: "📜",
     subtitle: "What do you want people to say about you? Build backward from there.",
-    prompt: (p) => `You are a legacy and purpose coach. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a legacy and purpose coach. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Situation: "${p.situation||""}". Goals: "${p.goals||p.bigGoal||""}".
 Write their Legacy Letter — in two parts:
 PART 1: The Legacy Letter itself. Write it as if people who knew them well are speaking at their memorial 30 years from now. What did they stand for? What did they build? Who did they help? How did they make people feel? (Write in third person, past tense, 150 words)
@@ -5324,9 +5382,9 @@ This should move them. Make them see what's possible and what's at stake.`,
     title: "Fear Audit",
     icon: "🔍",
     subtitle: "The fears actually running your life — identified and called out",
-    prompt: (p) => `You are a fear and mindset analyst. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a fear and mindset analyst. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Goals: "${p.goals||p.bigGoal||""}".
-Write directly to ${p.name||"them"} using "you". Conduct their Fear Audit:
+Conduct their Fear Audit:
 1. The PRIMARY fear running their life right now (based on their situation — be specific and honest, not gentle)
 2. Where this fear most likely came from (childhood, culture, specific experience)
 3. How this fear is showing up in their current decisions (give 2-3 specific examples from their situation)
@@ -5338,7 +5396,7 @@ Be honest and direct. Most people already know their fears — they just need so
     title: "Morning Ritual Builder",
     icon: "🌅",
     subtitle: "Personalized morning routine for your goals, schedule, and personality",
-    prompt: (p) => `You are a morning routine architect. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a morning routine architect. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Goals: "${p.goals||p.bigGoal||""}". Career: "${p.career||""}". Situation: "${p.situation||""}".
 Build their perfect Morning Ritual:
 First, ask yourself: is this person a builder, achiever, or healer type? Identify it based on their goals.
@@ -5354,9 +5412,9 @@ Give times. Make it feel like a rhythm, not a chore. Adapted to ${p.country||"th
     title: "Daily Wisdom",
     icon: "💎",
     subtitle: "One powerful insight applied directly to your life today",
-    prompt: (p) => `You are a wisdom curator. You are speaking directly to ${p.name||"someone"} from ${p.country||"their country"}.
+    prompt: (p) => `You are a wisdom curator. User: ${p.name||"someone"} from ${p.country||"their country"}.
 Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Today's date: ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}.
-Write directly to ${p.name||"them"} using "you". Here is today's wisdom:
+Give them today's wisdom:
 1. One powerful quote or insight from a great mind (philosopher, leader, scientist, writer — diverse sources, not just Stoics)
 2. What this person was facing when they developed this insight
 3. Exactly how this wisdom applies to ${p.name||"their"} specific situation right now (not generic — tie it directly)
@@ -5371,7 +5429,7 @@ Make the connection between the wisdom and their life so specific it feels writt
     prompt: (p) => `You are writing a deeply personal letter to ${p.name||"this person"} based on everything known about them.
 They are ${p.age||""} from ${p.country||"their country"}. 
 Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Goals: "${p.goals||p.bigGoal||""}". Skills: "${p.skills||""}".
-Write this letter speaking directly to ${p.name||"them"} using "you" throughout. You are their wisest, most honest friend who knows them completely.
+Write the letter as if you are their wisest, most honest friend who knows them completely.
 The letter should:
 — Open by acknowledging exactly where they are right now (no sugarcoating)
 — Name the specific thing they are avoiding or holding back from
@@ -5452,7 +5510,7 @@ Write for ${p.country||"their cultural context"} — directness, respect, and fa
     title: "Weekly Challenge",
     icon: "🎲",
     subtitle: "One specific challenge that pushes you slightly outside your comfort zone",
-    prompt: (p) => `You are a growth catalyst. You are speaking directly to ${p.name||"someone"} (${p.age||""}, ${p.country||"their country"}).
+    prompt: (p) => `You are a growth catalyst. User: ${p.name||"someone"}, ${p.age||""} from ${p.country||"their country"}.
 Situation: "${p.situation||""}". Challenge: "${p.challenge||""}". Goals: "${p.goals||p.bigGoal||""}".
 Today is ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}.
 Design this week's personal growth challenge for them:
@@ -5499,9 +5557,9 @@ function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, o
       const prompt = cfg.prompt(profile, currencyInfo, userInput) + currencyNote;
       const result = await callAPI({
         messages:[{role:"user", content: prompt}],
-        system: `You are DestinIQ — speaking DIRECTLY to this person using "you" and "your" at all times. Never say "this person", "the user", or "they" when referring to who you're speaking to.
+        system: `You are DestinIQ — a personal intelligence platform writing for a real person.
 
-WHAT YOU KNOW ABOUT THE PERSON YOU ARE SPEAKING TO:
+WHAT YOU KNOW ABOUT THEM:
 ${buildProfileContext(profile)||"A user who completed onboarding — generate helpful content based on common patterns for their situation."}
 
 YOU ARE WRITING: ${cfg.title}
@@ -5610,639 +5668,6 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
           <button className="btn btn-gold" onClick={generate}>Generate My {cfg.title}</button>
         </div>
       )}
-    </div>
-  );
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEW UI COMPONENTS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ── QuickIdentityStep — shown after landing CTA, before onboarding ──────────
-function QuickIdentityStep({onSelect}){
-  const [selected, setSelected] = useState(null);
-  const options = [
-    {id:"relationships", icon:"❤️", label:"Relationships"},
-    {id:"money",         icon:"💰", label:"Money"},
-    {id:"mindset",       icon:"🧠", label:"Mindset"},
-    {id:"discipline",    icon:"💪", label:"Discipline"},
-    {id:"purpose",       icon:"🚀", label:"Purpose"},
-  ];
-  return(
-    <div className="identity-step">
-      <div style={{textAlign:"center",marginBottom:8}}>
-        <div style={{fontSize:32,marginBottom:12}}>✦</div>
-        <h2 style={{fontSize:26,fontWeight:800,color:"var(--cream)",marginBottom:8}}>
-          What do you want to improve first?
-        </h2>
-        <p style={{fontSize:14,color:"var(--cream-40)",maxWidth:360,margin:"0 auto"}}>
-          This helps us personalize your DestinIQ experience from day one.
-        </p>
-      </div>
-      <div className="identity-options">
-        {options.map(o=>(
-          <div key={o.id}
-            className={`identity-option ${selected===o.id?"selected":""}`}
-            onClick={()=>setSelected(o.id)}>
-            <span className="io-icon">{o.icon}</span>
-            <span className="io-label">{o.label}</span>
-          </div>
-        ))}
-      </div>
-      <button
-        className="btn btn-gold btn-lg"
-        style={{width:"100%",maxWidth:400,opacity:selected?1:0.4,transition:"opacity .2s"}}
-        disabled={!selected}
-        onClick={()=>selected&&onSelect(selected)}>
-        Continue →
-      </button>
-      <button onClick={()=>onSelect("general")}
-        style={{background:"none",border:"none",color:"var(--cream-30)",fontSize:13,cursor:"pointer",marginTop:16}}>
-        Skip — show me everything
-      </button>
-    </div>
-  );
-}
-
-// ── SidebarNav ───────────────────────────────────────────────────────────────
-function SidebarNav({nav, setNav, isPaid, isPremium, isProMax, streak, name, photoURL, onUnlock, onSignOut, lang}){
-  const items = [
-    {id:"home",     icon:"🏠", label:"Home"},
-    {id:"explore",  icon:"🔍", label:"Explore"},
-    {id:"progress", icon:"📊", label:"Progress"},
-    {id:"report",   icon:"📋", label:"My Report"},
-    {id:"checkin",  icon:"✅", label:"Check-in"},
-    {id:"tool:dailywisdom",   icon:"💎", label:"Daily Wisdom"},
-    {id:"tool:weeklychallenge",icon:"🎲",label:"Weekly Challenge"},
-    {id:"wins",     icon:"🏆", label:"Wins"},
-    {id:"practices",icon:"⚡", label:"My Practices"},
-    {id:"tool:advisor",icon:"⬡", label:"My Advisor"},
-    {id:"profile",  icon:"👤", label:"Profile"},
-  ];
-  const planLabel = isProMax?"Pro Max":isPaid?"Pro":"Free";
-  const planColor = isProMax?"#9b72cf":isPaid?"var(--gold)":"var(--cream-30)";
-
-  return(
-    <nav className="sidebar-nav">
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <div className="logo">Destin<b>IQ</b></div>
-        {isPaid && (
-          <div style={{marginTop:4,fontSize:10,fontFamily:"var(--f-mono)",color:planColor}}>
-            {isProMax?"✦ PRO MAX":"◆ PRO"}
-          </div>
-        )}
-      </div>
-
-      {/* Nav items */}
-      <div className="sidebar-items">
-        {items.map(item=>(
-          <button key={item.id}
-            className={`sidebar-item ${nav===item.id||nav?.startsWith(item.id)?"active":""}`}
-            onClick={()=>setNav(item.id)}>
-            <span className="s-icon">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Streak */}
-      <div className="sidebar-streak">
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-          <span style={{fontSize:20}}>🔥</span>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>{streak} day streak</div>
-            <div style={{fontSize:10,color:"var(--cream-30)"}}>Keep it going</div>
-          </div>
-        </div>
-        {/* Mini calendar dots */}
-        <div style={{display:"flex",gap:5}}>
-          {["M","T","W","T","F","S","S"].map((d,i)=>(
-            <div key={i} style={{textAlign:"center"}}>
-              <div style={{fontSize:8,color:"var(--cream-20)",marginBottom:3}}>{d}</div>
-              <div style={{width:8,height:8,borderRadius:"50%",
-                background:i<streak%7?"var(--gold)":"var(--cream-10)"}}/>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Upgrade if free */}
-      {!isPaid && (
-        <div className="sidebar-upgrade">
-          <button className="btn btn-gold" style={{width:"100%",fontSize:12}}
-            onClick={onUnlock}>
-            Upgrade to Pro
-          </button>
-        </div>
-      )}
-    </nav>
-  );
-}
-
-// ── BottomNav ────────────────────────────────────────────────────────────────
-function BottomNav({nav, setNav}){
-  const tabs = [
-    {id:"home",    icon:"🏠", label:"Home"},
-    {id:"explore", icon:"🔍", label:"Explore"},
-    {id:"progress",icon:"📊", label:"Progress"},
-    {id:"profile", icon:"👤", label:"Profile"},
-  ];
-  return(
-    <div className="bottom-nav">
-      <div className="bottom-nav-items">
-        {tabs.map(tab=>(
-          <button key={tab.id}
-            className={`bottom-nav-item ${nav===tab.id||nav?.startsWith(tab.id)?"active":""}`}
-            onClick={()=>setNav(tab.id)}>
-            <span className="bn-icon">{tab.icon}</span>
-            <span className="bn-label">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── MobileTopBar ─────────────────────────────────────────────────────────────
-function MobileTopBar({title, nav, setNav, onBack, streak, isPaid, isProMax, onNotif, photoURL}){
-  return(
-    <div className="mobile-topbar">
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        {onBack ? (
-          <button onClick={onBack}
-            style={{background:"none",border:"none",color:"var(--cream-60)",cursor:"pointer",fontSize:20,padding:0}}>
-            ←
-          </button>
-        ) : (
-          <span style={{fontSize:16,fontWeight:800,color:"var(--cream)"}}>
-            Destin<b style={{color:"var(--gold)"}}>IQ</b>
-          </span>
-        )}
-        {title && <span style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{title}</span>}
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        {streak>0 && (
-          <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",
-            background:"rgba(200,168,75,0.1)",borderRadius:20}}>
-            <span style={{fontSize:14}}>🔥</span>
-            <span style={{fontSize:12,fontWeight:700,color:"var(--gold)"}}>{streak}</span>
-          </div>
-        )}
-        {isPaid && (
-          <div style={{fontSize:10,padding:"3px 8px",borderRadius:20,
-            background:isProMax?"rgba(155,114,207,0.15)":"rgba(200,168,75,0.1)",
-            color:isProMax?"#9b72cf":"var(--gold)",fontFamily:"var(--f-mono)",fontWeight:700}}>
-            {isProMax?"✦ PRO MAX":"◆ PRO"}
-          </div>
-        )}
-        <button onClick={onNotif}
-          style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:20,padding:0}}>
-          🔔
-        </button>
-        {photoURL ? (
-          <img src={photoURL} alt="" style={{width:32,height:32,borderRadius:"50%",objectFit:"cover",cursor:"pointer"}}
-            onClick={()=>setNav("profile")}/>
-        ) : (
-          <div style={{width:32,height:32,borderRadius:"50%",background:"var(--lift)",
-            display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,fontWeight:700,color:"var(--gold)"}}
-            onClick={()=>setNav("profile")}>
-            {/* initials */}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── HomeScreen ────────────────────────────────────────────────────────────────
-function HomeScreen({data, formData, streak, isPaid, isPremium, isProMax, userId, onUnlock, setNav, setShowNotif, setShowCheckin}){
-  const name     = formData?.name   || "there";
-  const scores   = data?.scores;
-  const overall  = scores
-    ? Math.round((scores.life||0)*0.25+(scores.wealth||0)*0.3+(scores.mindset||0)*0.25+(scores.relations||0)*0.2)
-    : 0;
-  const insight  = data?.daily_insight || data?.closing || "";
-  const lastTool = (() => { try{ return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null"); }catch{return null;} })();
-
-  return(
-    <div className="home-screen">
-      {/* Greeting */}
-      <div className="home-greeting">
-        <h1>{getGreeting()}, {name} 👋</h1>
-        <p>You're becoming the best version of yourself.</p>
-      </div>
-
-      {/* Hero 3 cards */}
-      <div className="home-hero">
-        {/* Continue Your Journey */}
-        <div className="hero-card continue" onClick={()=>setNav(lastTool?"tool:"+lastTool.id:"explore")}>
-          <div className="hc-eyebrow">CONTINUE YOUR JOURNEY</div>
-          {lastTool ? (
-            <>
-              <div style={{fontSize:28,marginBottom:6}}>{TOOL_META[lastTool.id]?.icon||"✦"}</div>
-              <div className="hc-title">{lastTool.label||TOOL_META[lastTool.id]?.label}</div>
-              <div className="hc-desc">Keep the momentum going. You were making progress.</div>
-              <div className="progress-bar-home">
-                <div className="progress-bar-home-fill" style={{width:`${lastTool.progress||45}%`}}/>
-              </div>
-              <div style={{fontSize:11,color:"var(--cream-30)",marginBottom:8}}>{lastTool.progress||45}% complete</div>
-              <div className="hc-action">Continue →</div>
-            </>
-          ) : (
-            <>
-              <div style={{fontSize:28,marginBottom:6}}>✦</div>
-              <div className="hc-title">Start Your Journey</div>
-              <div className="hc-desc">Explore tools personalized to your goals and situation.</div>
-              <div className="hc-action">Explore now →</div>
-            </>
-          )}
-        </div>
-
-        {/* Today's Focus */}
-        <div className="hero-card" onClick={()=>setNav("tool:weeklychallenge")}>
-          <div className="hc-eyebrow">TODAY'S FOCUS</div>
-          <div className="hc-title">Weekly Challenge</div>
-          <div className="hc-desc" style={{fontSize:13}}>
-            {data?.weekly_challenge
-              ? data.weekly_challenge.slice(0,80)+"..."
-              : "Your personalized challenge is ready. Step outside your comfort zone today."}
-          </div>
-          <div className="hc-action">View Challenge →</div>
-        </div>
-
-        {/* AI Insight */}
-        <div className="hero-card" onClick={()=>setNav("tool:lettertoself")}>
-          <div className="hc-eyebrow">AI INSIGHT FOR YOU</div>
-          <div style={{fontSize:13,fontStyle:"italic",color:"var(--gold)",lineHeight:1.7,flex:1,marginBottom:8}}>
-            {insight
-              ? `"${insight.slice(0,120)}..."`
-              : `"The gap between where you are and where you're going is smaller than you think."`
-            }
-          </div>
-          <div className="hc-action">View Full Insight →</div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <h2>Quick Actions</h2>
-        <div className="qa-grid">
-          {[
-            {icon:"✓",  label:"Check-in",  color:"#1fa89a", bg:"rgba(31,168,154,0.12)", action:()=>setShowCheckin(true)},
-            {icon:"💎", label:"Daily Wisdom",color:"#c8a84b",bg:"rgba(200,168,75,0.12)", action:()=>setNav("tool:dailywisdom")},
-            {icon:"🎲", label:"Challenge", color:"#64b5f6", bg:"rgba(100,181,246,0.12)", action:()=>setNav("tool:weeklychallenge")},
-            {icon:"📊", label:"Progress",  color:"#81c784", bg:"rgba(129,199,132,0.12)", action:()=>setNav("progress")},
-            {icon:"🏆", label:"Wins",      color:"#ffd54f", bg:"rgba(255,213,79,0.12)",  action:()=>setNav("wins")},
-          ].map(qa=>(
-            <div key={qa.label} className="qa-item" onClick={qa.action}>
-              <div className="qa-icon" style={{background:qa.bg}}>
-                <span style={{color:qa.color}}>{qa.icon}</span>
-              </div>
-              <span className="qa-label">{qa.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Explore by Category */}
-      <div className="explore-section">
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <h2 style={{margin:0}}>Explore by Category</h2>
-          <button onClick={()=>setNav("explore")}
-            style={{background:"none",border:"none",color:"var(--gold)",fontSize:13,cursor:"pointer",fontWeight:600}}>
-            See all →
-          </button>
-        </div>
-        <div className="cat-scroll">
-          {CATEGORIES.map(cat=>(
-            <div key={cat.id} className="cat-card"
-              style={{borderColor:cat.color+"30",background:`linear-gradient(135deg,${cat.color}12,${cat.color}04)`}}
-              onClick={()=>setNav("category:"+cat.id)}>
-              <span className="cc-icon">{cat.icon}</span>
-              <div className="cc-label">{cat.label}</div>
-              <div className="cc-count" style={{color:cat.color}}>{cat.tools.length} tools</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Progress + Journey */}
-      <div className="home-stats">
-        <div className="stat-card">
-          <h3>YOUR PROGRESS</h3>
-          <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:16}}>
-            <div className="stat-big">{overall||72}%</div>
-            <div style={{fontSize:12,color:"var(--cream-40)",paddingBottom:8}}>Overall</div>
-          </div>
-          {[
-            {icon:"🔧", value: (() => { try{ const k=`diq_mod_count_${userId}`; return localStorage.getItem(k)||"0"; }catch{return"0";} })(), label:"Tools Explored"},
-            {icon:"📋", value: data?.score_history?.length||"1", label:"Reports Generated"},
-            {icon:"🔥", value: streak, label:"Day Streak"},
-          ].map(s=>(
-            <div key={s.label} className="stat-item">
-              <span className="si-icon">{s.icon}</span>
-              <span className="si-value">{s.value}</span>
-              <span className="si-label">{s.label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="stat-card">
-          <h3>MOTIVATIONAL QUOTE</h3>
-          <p style={{fontSize:16,fontStyle:"italic",color:"var(--gold)",lineHeight:1.7,marginBottom:12}}>
-            "Discipline today, freedom tomorrow."
-          </p>
-          <p style={{fontSize:12,color:"var(--cream-40)"}}>Keep going, you're doing great.</p>
-
-          {/* Upgrade nudge for free users */}
-          {!isPaid && (
-            <button className="btn btn-gold" style={{width:"100%",marginTop:16,fontSize:13}}
-              onClick={onUnlock}>
-              Upgrade to Pro — $9/month
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── ExploreScreen ─────────────────────────────────────────────────────────────
-function ExploreScreen({setNav, isPaid}){
-  return(
-    <div style={{padding:"28px 32px"}}>
-      <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",marginBottom:6}}>Explore</h2>
-      <p style={{fontSize:14,color:"var(--cream-40)",marginBottom:24}}>All tools organized by what matters to you.</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:16}}>
-        {CATEGORIES.map(cat=>(
-          <div key={cat.id}
-            style={{padding:20,borderRadius:18,border:`1px solid ${cat.color}30`,
-              background:`linear-gradient(135deg,${cat.color}10,${cat.color}04)`,
-              cursor:"pointer",transition:"all .2s"}}
-            onClick={()=>setNav("category:"+cat.id)}
-            onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
-            onMouseLeave={e=>e.currentTarget.style.transform="none"}>
-            <div style={{fontSize:32,marginBottom:10}}>{cat.icon}</div>
-            <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:4}}>{cat.label}</div>
-            <div style={{fontSize:12,color:cat.color,marginBottom:6}}>{cat.tools.length} tools</div>
-            <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.6}}>{cat.desc}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── CategoryPage ──────────────────────────────────────────────────────────────
-function CategoryPage({catId, setNav, formData, userId, isPaid, isPremium, isProMax, onUnlock, lang}){
-  const cat = CATEGORIES.find(c=>c.id===catId);
-  if(!cat) return null;
-
-  const lastTool = (() => { try{ return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null"); }catch{return null;} })();
-
-  return(
-    <div className="cat-page">
-      {/* Header */}
-      <div className="cat-page-header">
-        <button onClick={()=>setNav("explore")}
-          style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:20,padding:0,marginRight:4}}>
-          ←
-        </button>
-        <div className="cat-page-icon" style={{background:`${cat.color}18`}}>
-          {cat.icon}
-        </div>
-        <div>
-          <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:0}}>{cat.label}</h2>
-          <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>{cat.desc}</p>
-        </div>
-      </div>
-
-      {/* Tool list */}
-      <div style={{marginBottom:24}}>
-        {cat.tools.map(toolId=>{
-          const meta = TOOL_META[toolId];
-          if(!meta) return null;
-          const isLastUsed = lastTool?.id === toolId;
-          return(
-            <div key={toolId} className="tool-list-item"
-              onClick={()=>setNav("tool:"+toolId)}>
-              <div className="tool-list-icon" style={{background:`${meta.color}18`}}>
-                {meta.icon}
-              </div>
-              <div style={{flex:1}}>
-                <div className="tool-list-label">{meta.label}</div>
-                {isLastUsed && (
-                  <div style={{fontSize:11,color:meta.color}}>Continue where you left off</div>
-                )}
-              </div>
-              <span className="tool-list-arrow">›</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Related categories */}
-      <div>
-        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".08em",marginBottom:12}}>
-          EXPLORE OTHER CATEGORIES
-        </div>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          {CATEGORIES.filter(c=>c.id!==catId).map(c=>(
-            <button key={c.id} onClick={()=>setNav("category:"+c.id)}
-              style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${c.color}30`,
-                background:`${c.color}08`,color:c.color,fontSize:12,fontWeight:600,cursor:"pointer"}}>
-              {c.icon} {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── ToolPage ──────────────────────────────────────────────────────────────────
-function ToolPage({toolId, catId, setNav, formData, userId, isPaid, isPremium, isProMax, onUnlock, lang}){
-  const meta = TOOL_META[toolId];
-  if(!meta) return null;
-  const cat = CATEGORIES.find(c=>c.id===(catId||meta.cat));
-
-  // Save last used tool to localStorage
-  useEffect(()=>{
-    try{
-      localStorage.setItem(`diq_last_tool_${userId}`,
-        JSON.stringify({id:toolId, label:meta.label, progress:45, ts:Date.now()}));
-      // Track tool count
-      const k=`diq_mod_count_${userId}`;
-      const existing=new Set(JSON.parse(localStorage.getItem(k+`_list`)||"[]"));
-      existing.add(toolId);
-      localStorage.setItem(k+`_list`, JSON.stringify([...existing]));
-      localStorage.setItem(k, String(existing.size));
-    }catch{}
-  },[toolId]);
-
-  const [followUp, setFollowUp] = useState("");
-  const [followUpRes, setFollowUpRes] = useState("");
-  const [followUpLoading, setFollowUpLoading] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-
-  const relatedTools = (cat?.tools||[]).filter(t=>t!==toolId).slice(0,3);
-
-  const handleFollowUp = async() => {
-    if(!followUp.trim()) return;
-    setFollowUpLoading(true);
-    try{
-      const result = await callAPI({
-        messages:[{role:"user",content:`About ${meta.label}: ${followUp}`}],
-        system:`You are DestinIQ. The user is asking a follow-up about ${meta.label}. Their profile: ${buildProfileContext(formData)}. Answer directly and personally.`,
-        userId, isPremium, isProMax,
-      });
-      setFollowUpRes(result?.content?.[0]?.text||result||"");
-    }catch(e){ setFollowUpRes("Something went wrong. Please try again."); }
-    setFollowUpLoading(false);
-    setFollowUp("");
-  };
-
-  return(
-    <div className="tool-page">
-      {/* Header */}
-      <div className="tool-page-header">
-        <button onClick={()=>setNav(cat?"category:"+cat.id:"explore")}
-          style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:20,padding:0,marginRight:4}}>
-          ←
-        </button>
-        <div style={{width:40,height:40,borderRadius:12,background:`${meta.color}18`,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-          {meta.icon}
-        </div>
-        <div>
-          <h2 style={{fontSize:18,fontWeight:800,color:"var(--cream)",margin:0}}>{meta.label}</h2>
-          {cat && <p style={{fontSize:12,color:meta.color,margin:0}}>{cat.label}</p>}
-        </div>
-      </div>
-
-      {/* Action bar */}
-      <div className="tool-actions">
-        <button className="tool-action-btn primary">🔊 Listen</button>
-        <button className="tool-action-btn">↺ Refresh</button>
-        <button className="tool-action-btn" onClick={()=>setBookmarked(b=>!b)}
-          style={{color:bookmarked?"var(--gold)":""}}>
-          {bookmarked?"★":"☆"} Bookmark
-        </button>
-        <button className="tool-action-btn">↗ Share</button>
-      </div>
-
-      {/* The actual module content */}
-      <GenericAIModule
-        modId={toolId}
-        profile={formData}
-        userId={userId}
-        isPaid={isPaid}
-        isPremium={isPremium}
-        isProMax={isProMax}
-        onUnlock={onUnlock}
-        lang={lang||"en"}
-      />
-
-      {/* Follow-up question */}
-      <div className="tool-followup" style={{marginTop:16}}>
-        <label>ASK DESTINIQ A FOLLOW-UP</label>
-        <div className="tool-followup-input">
-          <input
-            value={followUp}
-            onChange={e=>setFollowUp(e.target.value)}
-            placeholder="What should I focus on?"
-            onKeyDown={e=>e.key==="Enter"&&handleFollowUp()}
-          />
-          <button className="btn btn-gold" style={{padding:"10px 16px",fontSize:13}}
-            onClick={handleFollowUp} disabled={followUpLoading}>
-            {followUpLoading?"…":"→"}
-          </button>
-        </div>
-        {followUpRes && (
-          <div style={{marginTop:12,padding:"12px",background:"var(--midnight)",borderRadius:10,
-            fontSize:13,color:"var(--cream-70)",lineHeight:1.8}}>
-            {followUpRes}
-          </div>
-        )}
-      </div>
-
-      {/* Related tools */}
-      {relatedTools.length>0 && (
-        <div className="related-tools">
-          <h3>RELATED TOOLS</h3>
-          {relatedTools.map(t=>{
-            const m=TOOL_META[t]; if(!m) return null;
-            return(
-              <div key={t} className="tool-list-item" onClick={()=>setNav("tool:"+t)}>
-                <div className="tool-list-icon" style={{background:`${m.color}18`}}>{m.icon}</div>
-                <span className="tool-list-label">{m.label}</span>
-                <span className="tool-list-arrow">›</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── ProgressScreen ────────────────────────────────────────────────────────────
-function ProgressScreen({data, formData, streak, userId, setNav}){
-  const scores = data?.scores;
-  const overall = scores
-    ? Math.round((scores.life||0)*0.25+(scores.wealth||0)*0.3+(scores.mindset||0)*0.25+(scores.relations||0)*0.2)
-    : 0;
-  const toolCount = (() => { try{ const k=`diq_mod_count_${userId}`; return parseInt(localStorage.getItem(k)||"0"); }catch{return 0;} })();
-
-  const catProgress = CATEGORIES.map(cat => {
-    const done = cat.tools.filter(t => {
-      try{ return !!localStorage.getItem(`diq_mod_${t}_${userId}`); }catch{return false;}
-    }).length;
-    return { ...cat, done, pct: Math.round((done/cat.tools.length)*100) };
-  });
-
-  return(
-    <div style={{padding:"28px 32px",maxWidth:900}}>
-      <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",marginBottom:6}}>Your Progress</h2>
-      <p style={{fontSize:14,color:"var(--cream-40)",marginBottom:24}}>Track your transformation journey.</p>
-
-      {/* Overview stats */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:14,marginBottom:28}}>
-        {[
-          {label:"Overall",  value:`${overall||72}%`, icon:"📊", color:"var(--gold)"},
-          {label:"Tools Used",value:toolCount||"0",   icon:"🔧", color:"#64b5f6"},
-          {label:"Reports",  value:data?.score_history?.length||"1", icon:"📋", color:"#81c784"},
-          {label:"Day Streak",value:streak,           icon:"🔥", color:"#ff8a65"},
-        ].map(s=>(
-          <div key={s.label} style={{padding:"16px",borderRadius:16,background:"var(--raised)",
-            border:"1px solid var(--line)",textAlign:"center"}}>
-            <div style={{fontSize:24,marginBottom:6}}>{s.icon}</div>
-            <div style={{fontSize:24,fontWeight:800,color:s.color}}>{s.value}</div>
-            <div style={{fontSize:11,color:"var(--cream-40)",marginTop:3}}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Category progress */}
-      <h3 style={{fontSize:14,fontWeight:700,color:"var(--cream-40)",marginBottom:14,fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
-        CATEGORIES PROGRESS
-      </h3>
-      {catProgress.map(cat=>(
-        <div key={cat.id} style={{marginBottom:14,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:16}}>{cat.icon}</span>
-              <span style={{fontSize:13,fontWeight:600,color:"var(--cream)"}}>{cat.label}</span>
-            </div>
-            <span style={{fontSize:12,color:cat.color,fontFamily:"var(--f-mono)"}}>{cat.done}/{cat.tools.length}</span>
-          </div>
-          <div style={{height:5,borderRadius:3,background:"rgba(255,255,255,0.06)"}}>
-            <div style={{height:"100%",borderRadius:3,background:cat.color,width:`${cat.pct}%`,transition:"width 1s"}}/>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -10942,25 +10367,454 @@ function StreakCelebration({streak, onClose}){
   );
 }
 
+
+// ── SidebarNav ───────────────────────────────────────────────────────────
+function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock}){
+  const ITEMS=[
+    {id:"home",    icon:"🏠",label:"Home"},
+    {id:"explore", icon:"🔍",label:"Explore"},
+    {id:"progress",icon:"📊",label:"Progress"},
+    {id:"report",  icon:"📋",label:"My Report"},
+    {id:"checkin", icon:"✅",label:"Check-in"},
+    {id:"tool:dailywisdom",    icon:"💎",label:"Daily Wisdom"},
+    {id:"tool:weeklychallenge",icon:"🎲",label:"Weekly Challenge"},
+    {id:"wins",    icon:"🏆",label:"Wins"},
+    {id:"practices",icon:"⚡",label:"My Practices"},
+    {id:"tool:advisor",icon:"⬡",label:"My Advisor"},
+    {id:"profile", icon:"👤",label:"Profile"},
+  ];
+  return(
+    <nav className="sidebar">
+      <div className="sidebar-logo">
+        <div className="logo" style={{fontSize:18}}>Destin<b>IQ</b></div>
+        {isPaid&&<div style={{fontSize:10,fontFamily:"var(--f-mono)",color:isProMax?"#9b72cf":"var(--gold)",marginTop:3}}>
+          {isProMax?"✦ PRO MAX":"◆ PRO"}
+        </div>}
+      </div>
+      <div className="sidebar-items">
+        {ITEMS.map(item=>(
+          <button key={item.id} className={`s-item ${nav===item.id||nav?.startsWith(item.id)?"active":""}`}
+            onClick={()=>setNav(item.id)}>
+            <span style={{fontSize:15,width:20,textAlign:"center",flexShrink:0}}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="s-streak">
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <span style={{fontSize:20}}>🔥</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>{streak||1} day streak</div>
+            <div style={{fontSize:10,color:"var(--cream-30)"}}>Keep it going</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:5}}>
+          {["M","T","W","T","F","S","S"].map((d,i)=>(
+            <div key={i} style={{textAlign:"center"}}>
+              <div style={{fontSize:7,color:"var(--cream-20)",marginBottom:2}}>{d}</div>
+              <div style={{width:7,height:7,borderRadius:"50%",background:i<(streak||1)%7?"var(--gold)":"var(--cream-10)"}}/>
+            </div>
+          ))}
+        </div>
+      </div>
+      {!isPaid&&(
+        <div className="s-upgrade">
+          <button className="btn btn-gold" style={{width:"100%",fontSize:12}} onClick={onUnlock}>
+            ✦ Upgrade to Pro
+          </button>
+        </div>
+      )}
+    </nav>
+  );
+}
+
+// ── BottomNav ────────────────────────────────────────────────────────────
+function BottomNav({nav,setNav}){
+  return(
+    <div className="bot-nav">
+      <div className="bot-items">
+        {[{id:"home",icon:"🏠",label:"Home"},{id:"explore",icon:"🔍",label:"Explore"},{id:"progress",icon:"📊",label:"Progress"},{id:"profile",icon:"👤",label:"Profile"}]
+          .map(t=>(
+            <button key={t.id} className={`bot-item ${nav===t.id||nav?.startsWith(t.id)?"active":""}`} onClick={()=>setNav(t.id)}>
+              <span className="bot-icon">{t.icon}</span>
+              <span className="bot-label">{t.label}</span>
+            </button>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+// ── MobileTopBar ─────────────────────────────────────────────────────────
+function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,onProfile}){
+  return(
+    <div className="mob-top">
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        {onBack
+          ?<button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1}}>←</button>
+          :<span style={{fontSize:17,fontWeight:800,color:"var(--cream)"}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></span>}
+        {title&&<span style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{title}</span>}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        {(streak||0)>0&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:"rgba(200,168,75,.1)",border:"1px solid rgba(200,168,75,.2)",borderRadius:20}}>
+          <span>🔥</span><span style={{fontSize:12,fontWeight:700,color:"var(--gold)"}}>{streak}</span>
+        </div>}
+        {isPaid&&<div style={{fontSize:9,padding:"3px 8px",borderRadius:20,fontFamily:"var(--f-mono)",fontWeight:700,
+          background:isProMax?"rgba(155,114,207,.15)":"rgba(200,168,75,.1)",
+          color:isProMax?"#9b72cf":"var(--gold)",border:`1px solid ${isProMax?"rgba(155,114,207,.3)":"rgba(200,168,75,.2)"}`}}>
+          {isProMax?"✦ MAX":"◆ PRO"}
+        </div>}
+        <div className="notif-btn" onClick={onNotif}>🔔</div>
+      </div>
+    </div>
+  );
+}
+
+// ── HomeScreen ────────────────────────────────────────────────────────────
+function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin}){
+  const name   = formData?.name||"there";
+  const scores = data?.scores;
+  const overall= scores?Math.round((scores.life||0)*.25+(scores.wealth||0)*.3+(scores.mindset||0)*.25+(scores.relations||0)*.2):0;
+  const lastTool=(()=>{try{return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null");}catch{return null;}})();
+  const insight = data?.daily_insight||data?.headline||data?.closing||null;
+
+  return(
+    <div className="home">
+
+      {/* 1 ── GREETING */}
+      <div className="greet-row">
+        <div className="greet-left">
+          <div className="avatar">{name.slice(0,1).toUpperCase()}</div>
+          <div>
+            <div className="greet-name">{getGreeting()}, {name} 👋</div>
+            <div className="greet-sub">You're becoming the best version of yourself.</div>
+          </div>
+        </div>
+        <div className="greet-right">
+          <div className="streak-chip">
+            <span>🔥</span><span>{streak||1} day</span>
+          </div>
+          <div className="notif-btn" onClick={()=>window.dispatchEvent(new CustomEvent("showNotif"))}>🔔</div>
+          {isPaid&&(
+            <div className="plan-chip" style={{
+              background:isProMax?"rgba(155,114,207,.1)":"rgba(200,168,75,.08)",
+              color:isProMax?"#9b72cf":"var(--gold)",
+              border:`1px solid ${isProMax?"rgba(155,114,207,.25)":"rgba(200,168,75,.18)"}`,
+            }}>
+              {isProMax?"✦ PRO MAX":"◆ PRO"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2+3 ── HERO ROW: Continue Journey | Today's Focus | AI Insight */}
+      <div className="hero-row">
+
+        {/* Continue Journey */}
+        <div className="h-card main" onClick={()=>setNav(lastTool?"tool:"+lastTool.id:"explore")}>
+          <div className="h-eyebrow">{lastTool?"Continue Your Journey":"Start Your Journey"}</div>
+          {lastTool?(
+            <>
+              <div className="h-icon">{TOOL_META[lastTool.id]?.icon||"✦"}</div>
+              <div className="h-title">{lastTool.label}</div>
+              <div className="h-body">Resume your last session. Momentum is everything.</div>
+              <div className="h-prog"><div className="h-prog-fill" style={{width:`${lastTool.progress||45}%`}}/></div>
+              <div className="h-prog-label">{lastTool.progress||45}% complete</div>
+              <button className="h-resume-btn">Resume →</button>
+            </>
+          ):(
+            <>
+              <div className="h-icon">✦</div>
+              <div className="h-title">Begin your first AI session</div>
+              <div className="h-body">Your personalized intelligence platform is ready. Every session brings you closer.</div>
+              <button className="h-resume-btn">Explore now →</button>
+            </>
+          )}
+        </div>
+
+        {/* Today's Focus */}
+        <div className="h-card" onClick={()=>setNav("tool:weeklychallenge")}>
+          <div className="h-eyebrow">Today's Focus</div>
+          <div className="h-title">Weekly Challenge</div>
+          <div className="h-body">
+            {data?.weekly_challenge
+              ?data.weekly_challenge.slice(0,90)+"..."
+              :"Today's goal: Step outside your comfort zone and start a meaningful conversation."}
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"auto"}}>
+            <div style={{fontSize:28,fontWeight:800,color:"var(--teal)"}}>1<span style={{fontSize:14,fontWeight:400,color:"var(--cream-30)"}}>/2</span></div>
+            <button className="h-view-btn" onClick={e=>{e.stopPropagation();setNav("tool:weeklychallenge");}}>View Challenge</button>
+          </div>
+        </div>
+
+        {/* AI Insight */}
+        <div className="h-card" onClick={()=>setNav("report")}>
+          <div className="h-eyebrow">AI Insight for You</div>
+          <div className="h-quote">
+            {insight
+              ?`"${insight.slice(0,130)}${insight.length>130?"...":""}"`
+              :`"Your hesitation is not weakness. It's protection. But growth lives on the other side of discomfort."`}
+          </div>
+          <button className="h-view-btn" style={{marginTop:"auto"}} onClick={e=>{e.stopPropagation();setNav("report");}}>View Full Insight</button>
+        </div>
+      </div>
+
+      {/* 4 ── QUICK ACTIONS */}
+      <div style={{marginBottom:26}}>
+        <div className="sec-hd"><span className="sec-title">Quick Actions</span></div>
+        <div className="qa-row">
+          {[
+            {icon:"✅",label:"Check-in",    bg:"rgba(31,168,154,.12)", color:"#1fa89a",  fn:()=>setShowCheckin(true)},
+            {icon:"💎",label:"Daily Wisdom", bg:"rgba(200,168,75,.12)", color:"var(--gold)",fn:()=>setNav("tool:dailywisdom")},
+            {icon:"🎲",label:"Challenge",    bg:"rgba(100,181,246,.12)",color:"#64b5f6",  fn:()=>setNav("tool:weeklychallenge")},
+            {icon:"🏆",label:"Wins",         bg:"rgba(255,213,79,.12)", color:"#ffd54f",  fn:()=>setNav("wins")},
+            {icon:"📊",label:"Progress",     bg:"rgba(129,199,132,.12)",color:"#81c784",  fn:()=>setNav("progress")},
+          ].map(q=>(
+            <div key={q.label} className="qa-card" onClick={q.fn}>
+              <div className="qa-ico" style={{background:q.bg}}>
+                <span style={{color:q.color}}>{q.icon}</span>
+              </div>
+              <span className="qa-lbl">{q.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 5 ── EXPLORE CATEGORIES */}
+      <div style={{marginBottom:26}}>
+        <div className="sec-hd">
+          <span className="sec-title">Explore by Category</span>
+          <button className="sec-link" onClick={()=>setNav("explore")}>See all →</button>
+        </div>
+        <div className="cat-scroll">
+          {CATEGORIES.map(cat=>(
+            <div key={cat.id} className="c-card"
+              style={{background:`linear-gradient(135deg,${cat.color}12,${cat.color}05)`,borderColor:`${cat.color}25`}}
+              onClick={()=>setNav("category:"+cat.id)}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=cat.color+"55";e.currentTarget.style.transform="translateY(-3px)";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=cat.color+"25";e.currentTarget.style.transform="none";}}>
+              <span className="c-icon">{cat.icon}</span>
+              <div className="c-label">{cat.label}</div>
+              <div className="c-count" style={{color:cat.color}}>{cat.tools.length} tools</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 6 ── RECENT ACTIVITY */}
+      <div style={{marginBottom:40}}>
+        <div className="sec-hd"><span className="sec-title">Recent Activity</span></div>
+        {[
+          {ico:"📋",bg:"rgba(200,168,75,.1)",ic:"var(--gold)",
+           title:"My Life Report",
+           sub:scores?`Overall score: ${overall}% · View full analysis`:"Your personalized report is ready",
+           fn:()=>setNav("report")},
+          {ico:lastTool?(TOOL_META[lastTool.id]?.icon||"✦"):"🔍",
+           bg:lastTool?`${TOOL_META[lastTool.id]?.color||"#c8a84b"}18`:"rgba(100,181,246,.1)",
+           ic:lastTool?(TOOL_META[lastTool.id]?.color||"var(--gold)"):"#64b5f6",
+           title:lastTool?`Last session: ${lastTool.label}`:"Start your first session",
+           sub:lastTool?"Continue where you left off":"Pick a category to begin",
+           fn:()=>setNav(lastTool?"tool:"+lastTool.id:"explore")},
+          {ico:"🔥",bg:"rgba(255,138,101,.1)",ic:"#ff8a65",
+           title:`${streak||1} day streak`,
+           sub:streak>6?"Impressive consistency — keep it up!":"Check in daily to build your streak",
+           fn:()=>setShowCheckin(true)},
+        ].map((r,i)=>(
+          <div key={i} className="rec-item" onClick={r.fn}>
+            <div className="rec-ico" style={{background:r.bg}}>
+              <span style={{color:r.ic}}>{r.ico}</span>
+            </div>
+            <div style={{flex:1}}>
+              <div className="rec-title">{r.title}</div>
+              <div className="rec-sub">{r.sub}</div>
+            </div>
+            <span style={{color:"var(--cream-20)",fontSize:18}}>›</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Upgrade nudge */}
+      {!isPaid&&(
+        <div style={{padding:"22px",borderRadius:18,border:"1px solid rgba(200,168,75,.14)",
+          background:"linear-gradient(135deg,rgba(200,168,75,.05),transparent)",
+          textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:13,color:"var(--cream-40)",marginBottom:14}}>
+            Unlock deep reports, unlimited advisor, and all 40+ tools.
+          </div>
+          <button className="btn btn-gold" onClick={onUnlock}>Upgrade to Pro — $9/month</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ExploreScreen ─────────────────────────────────────────────────────────
+function ExploreScreen({setNav}){
+  return(
+    <div className="pg">
+      <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",margin:"0 0 6px"}}>Explore</h2>
+      <p style={{fontSize:13,color:"var(--cream-40)",margin:"0 0 24px"}}>All tools, organized by what matters to you.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
+        {CATEGORIES.map(cat=>(
+          <div key={cat.id}
+            style={{padding:20,borderRadius:18,cursor:"pointer",transition:"all .2s",
+              border:`1px solid ${cat.color}25`,background:`linear-gradient(135deg,${cat.color}10,${cat.color}04)`}}
+            onClick={()=>setNav("category:"+cat.id)}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor=cat.color+"50";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor=cat.color+"25";}}>
+            <div style={{fontSize:30,marginBottom:10}}>{cat.icon}</div>
+            <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{cat.label}</div>
+            <div style={{fontSize:11,color:cat.color,marginBottom:5,fontFamily:"var(--f-mono)"}}>{cat.tools.length} tools</div>
+            <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.6}}>{cat.desc}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── CategoryPage ──────────────────────────────────────────────────────────
+function CategoryPage({catId,setNav,userId}){
+  const cat=CATEGORIES.find(c=>c.id===catId);
+  if(!cat) return null;
+  const lastTool=(()=>{try{return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null");}catch{return null;}})();
+  return(
+    <div className="pg">
+      <button className="pg-back" onClick={()=>setNav("explore")}>← Back to Explore</button>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24,padding:"20px",borderRadius:18,
+        background:`linear-gradient(135deg,${cat.color}10,${cat.color}04)`,border:`1px solid ${cat.color}25`}}>
+        <div style={{width:52,height:52,borderRadius:16,background:`${cat.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>{cat.icon}</div>
+        <div>
+          <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:"0 0 3px"}}>{cat.label}</h2>
+          <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>{cat.desc}</p>
+        </div>
+      </div>
+      {cat.tools.map(tid=>{
+        const m=TOOL_META[tid]; if(!m) return null;
+        const isLast=lastTool?.id===tid;
+        return(
+          <div key={tid} className="tool-row" onClick={()=>setNav("tool:"+tid)}>
+            <div className="tr-ico" style={{background:`${m.color}18`}}>{m.icon}</div>
+            <div style={{flex:1}}>
+              <div className="tr-lbl">{m.label}</div>
+              {isLast&&<div style={{fontSize:10,color:m.color,marginTop:1}}>Continue where you left off</div>}
+            </div>
+            <span style={{color:"var(--cream-20)",fontSize:18}}>›</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── ToolPage ──────────────────────────────────────────────────────────────
+function ToolPage({toolId,setNav,formData,userId,isPaid,isPremium,isProMax,onUnlock,lang}){
+  const meta=TOOL_META[toolId];
+  const cat=meta?CATEGORIES.find(c=>c.id===meta.cat):null;
+  const [fu,setFu]=useState(""); const [fuRes,setFuRes]=useState(""); const [fuL,setFuL]=useState(false); const [bm,setBm]=useState(false);
+  useEffect(()=>{
+    if(!userId||!toolId) return;
+    try{
+      localStorage.setItem(`diq_last_tool_${userId}`,JSON.stringify({id:toolId,label:meta?.label||toolId,progress:45,ts:Date.now()}));
+      const k=`diq_tlist_${userId}`;const e=new Set(JSON.parse(localStorage.getItem(k)||"[]"));e.add(toolId);localStorage.setItem(k,JSON.stringify([...e]));
+    }catch{}
+  },[toolId,userId]);
+  const submit=async()=>{
+    if(!fu.trim()) return; setFuL(true);
+    try{const r=await callAPI({messages:[{role:"user",content:`On ${meta?.label||toolId}: ${fu}`}],system:`You are DestinIQ. Answer this follow-up about ${meta?.label||toolId}. Profile: ${buildProfileContext(formData)}.`,userId,isPremium,isProMax});setFuRes(r?.content?.[0]?.text||r||"");}
+    catch{setFuRes("Something went wrong. Try again.");}
+    setFuL(false);setFu("");
+  };
+  const related=(cat?.tools||[]).filter(t=>t!==toolId).slice(0,3);
+  return(
+    <div className="pg">
+      <button className="pg-back" onClick={()=>setNav(cat?"category:"+cat.id:"explore")}>← {cat?.label||"Explore"}</button>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
+        <div style={{width:46,height:46,borderRadius:13,background:`${meta?.color||"var(--gold)"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{meta?.icon||"✦"}</div>
+        <div>
+          <h2 style={{fontSize:19,fontWeight:800,color:"var(--cream)",margin:"0 0 2px"}}>{meta?.label||toolId}</h2>
+          {cat&&<p style={{fontSize:11,color:meta?.color||"var(--gold)",margin:0}}>{cat.label}</p>}
+        </div>
+      </div>
+      <div className="tool-act-bar">
+        <button className="t-btn pri">🔊 Listen</button>
+        <button className="t-btn">↺ Refresh</button>
+        <button className="t-btn" style={{color:bm?"var(--gold)":""}} onClick={()=>setBm(b=>!b)}>{bm?"★ Saved":"☆ Save"}</button>
+        <button className="t-btn">↗ Share</button>
+      </div>
+      <GenericAIModule modId={toolId} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang||"en"}/>
+      <div className="followup">
+        <label>Ask DestinIQ a follow-up</label>
+        <div className="fu-row">
+          <input className="fu-input" value={fu} onChange={e=>setFu(e.target.value)} placeholder="What should I focus on?" onKeyDown={e=>e.key==="Enter"&&submit()}/>
+          <button className="btn btn-gold" style={{padding:"10px 16px",fontSize:13}} onClick={submit} disabled={fuL}>{fuL?"…":"→"}</button>
+        </div>
+        {fuRes&&<div style={{marginTop:10,padding:"12px",background:"var(--midnight)",borderRadius:10,fontSize:13,color:"var(--cream-70)",lineHeight:1.85}}>{fuRes}</div>}
+      </div>
+      {related.length>0&&(
+        <div style={{marginTop:22}}>
+          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em",marginBottom:10,textTransform:"uppercase"}}>Related Tools</div>
+          {related.map(t=>{const m=TOOL_META[t];if(!m)return null;return(
+            <div key={t} className="tool-row" onClick={()=>setNav("tool:"+t)}>
+              <div className="tr-ico" style={{background:`${m.color}18`}}>{m.icon}</div>
+              <span className="tr-lbl">{m.label}</span>
+              <span style={{color:"var(--cream-20)",fontSize:18}}>›</span>
+            </div>
+          );})}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ProgressScreen ────────────────────────────────────────────────────────
+function ProgressScreen({data,streak,userId,setNav}){
+  const s=data?.scores;
+  const overall=s?Math.round((s.life||0)*.25+(s.wealth||0)*.3+(s.mindset||0)*.25+(s.relations||0)*.2):0;
+  const toolCount=(()=>{try{return JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]").length;}catch{return 0;}})();
+  return(
+    <div className="pg">
+      <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",margin:"0 0 6px"}}>Your Progress</h2>
+      <p style={{fontSize:13,color:"var(--cream-40)",margin:"0 0 24px"}}>Track your transformation journey.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:11,marginBottom:26}}>
+        {[{l:"Overall",v:`${overall||72}%`,i:"📊",c:"var(--gold)"},{l:"Tools Used",v:toolCount,i:"🔧",c:"#64b5f6"},{l:"Reports",v:data?.score_history?.length||1,i:"📋",c:"#81c784"},{l:"Day Streak",v:streak||1,i:"🔥",c:"#ff8a65"}]
+          .map(s=>(
+            <div key={s.l} style={{padding:"16px 12px",borderRadius:15,background:"var(--raised)",border:"1px solid var(--line)",textAlign:"center"}}>
+              <div style={{fontSize:22,marginBottom:7}}>{s.i}</div>
+              <div style={{fontSize:24,fontWeight:800,color:s.c}}>{s.v}</div>
+              <div style={{fontSize:10,color:"var(--cream-40)",marginTop:4}}>{s.l}</div>
+            </div>
+          ))}
+      </div>
+      <div style={{fontSize:10,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em",marginBottom:13,textTransform:"uppercase"}}>Categories Progress</div>
+      {CATEGORIES.map(cat=>{
+        const done=cat.tools.filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
+        const pct=Math.round((done/cat.tools.length)*100);
+        return(
+          <div key={cat.id} style={{marginBottom:14,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <span>{cat.icon}</span>
+                <span style={{fontSize:13,fontWeight:600,color:"var(--cream)"}}>{cat.label}</span>
+              </div>
+              <span style={{fontSize:10,color:cat.color,fontFamily:"var(--f-mono)"}}>{done}/{cat.tools.length}</span>
+            </div>
+            <div style={{height:4,borderRadius:4,background:"rgba(255,255,255,.06)"}}>
+              <div style={{height:"100%",borderRadius:4,background:cat.color,width:`${pct}%`,transition:"width .8s ease"}}/>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en"}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
     return localStorage.getItem("diq_active_tab")||"today";
   });
-  // NEW: Top-level navigation section
-  const [navSection,setNavSection]=useState(()=>{
-    if(typeof window==="undefined") return "home";
-    return localStorage.getItem("diq_nav_section")||"home";
-  });
-  const setNav=(section)=>{
-    setNavSection(section);
-    try{ localStorage.setItem("diq_nav_section", section); }catch{}
-    // Map navSection to legacy mod where needed
-    const modMap={checkin:"checkin",wins:"wins",practices:"practices",advisor:"advisor",
-      wisdom:"wisdom",challenge:"weeklychallenge",progress:"progress"};
-    if(modMap[section]) setMod(modMap[section]);
-  };
   const [streakCelebration,setStreakCelebration]=useState(null);
   const [miniStreak,setMiniStreak]=useState(null); // for non-milestone days
   useEffect(()=>{
@@ -11090,210 +10944,98 @@ Rules:
   const _strengths = _derived.strengths;
   const _risks = _derived.risks;
 
-  // Determine if navSection is a category or tool
-  const isCategoryNav = navSection?.startsWith("category:");
-  const isToolNav     = navSection?.startsWith("tool:");
-  const catId  = isCategoryNav ? navSection.split(":")[1] : null;
-  const toolId = isToolNav     ? navSection.split(":")[1] : null;
+  // ── nav routing ──────────────────────────────────────────────────────
+  const [navSection,setNavSection]=useState(()=>{try{return localStorage.getItem("diq_nav")||"home";}catch{return "home";}});
+  const setNav=(s)=>{setNavSection(s);try{localStorage.setItem("diq_nav",s);}catch{}};
+  const isCat  = navSection?.startsWith("category:");
+  const isTool = navSection?.startsWith("tool:");
+  const catId  = isCat  ? navSection.slice(9)  : null;
+  const toolId = isTool ? navSection.slice(5)  : null;
 
-  // ── inner report/module content (legacy tab system) ──────────────────
-  const LegacyModuleView = () => (
+  // Helper: legacy module view (report + existing module content)
+  const showModView = ()=>(
     <div style={{paddingTop:8}}>
-      {streakCelebration && <StreakCelebration days={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
-      {miniStreak && <MiniStreakCelebration days={miniStreak} onClose={()=>setMiniStreak(null)}/>}
-
+      {streakCelebration&&<StreakCelebration days={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+      {miniStreak&&<MiniStreakCelebration days={miniStreak} onClose={()=>setMiniStreak(null)}/>}
       {showCheckin&&(
         <div className="cx-md" style={{paddingTop:24,paddingBottom:24}}>
-          <CheckIn profile={formData} reportData={data} streak={streak} onComplete={async()=>{
-            const today=new Date().toISOString().slice(0,10);
-            const lastKey=`destiniq_checkin_${userId}`;
-            let lastLocal=""; try{lastLocal=localStorage.getItem(lastKey)||"";}catch{}
-            const lastSupabase=formData?.last_checkin_date||"";
-            const alreadyDone=lastLocal===today||lastSupabase===today;
-            if(!alreadyDone){
-              try{localStorage.setItem(lastKey,today);}catch{}
-              const newStreak=(streak||1)+1;
-              setStreak(newStreak);
-              try{localStorage.setItem(`diq_streak_${userId}`,String(newStreak));}catch{}
-              if(STREAK_MILESTONES[newStreak]){
-                const celebKey=`diq_celebrated_${userId}_${newStreak}`;
-                try{if(!localStorage.getItem(celebKey)){localStorage.setItem(celebKey,"1");setTimeout(()=>setStreakCelebration(newStreak),1200);}}catch{}
-              } else {
-                setTimeout(()=>setMiniStreak(newStreak),1200);
-              }
-              if(userId){
-                supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
-                  .then(({data:pd})=>{
-                    const fd=typeof pd?.form_data==="string"?(()=>{try{return JSON.parse(pd.form_data);}catch{return{};}})():(pd?.form_data||{});
-                    return supabase.from("user_profiles").upsert({user_id:userId,streak:newStreak,last_checkin_date:today,updated_at:new Date().toISOString(),form_data:JSON.stringify({...fd,_streak:newStreak,_last_checkin:today})},{onConflict:"user_id"});
-                  }).then(({error})=>{
-                    if(!error) setFormData(prev=>prev?{...prev,last_checkin_date:today,_streak:newStreak}:prev);
-                  }).catch(()=>{});
-              }
-            }
-            setShowCheckin(false);
-          }}/>
+          <CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
         </div>
       )}
-
-      {mod==="today"&&(
-        <div className="cx-md" style={{paddingTop:24}}>
-          <div style={{marginBottom:20}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-              <Ring score={Math.round((data.scores?.life||0)*0.25+(data.scores?.wealth||0)*0.30+(data.scores?.mindset||0)*0.25+(data.scores?.relations||0)*0.20)||72} color="var(--gold)" size={72} label=""/>
-              <div>
-                <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:0}}>{formData?.name||""}</h2>
-                <p style={{fontSize:13,color:"var(--cream-40)",margin:0}}>{data.greeting||""}</p>
+      {!showCheckin&&(
+        <div>
+          <div className="cx-md" style={{paddingTop:24,paddingBottom:8}}>
+            <button onClick={()=>setNav("home")} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:16,display:"flex",alignItems:"center",gap:6}}>← Home</button>
+          </div>
+          {mod==="today"&&(
+            <div className="cx-md" style={{paddingTop:8,paddingBottom:32}}>
+              <div className="insight" style={{marginBottom:16}}><p className="body">{dailyInsight||data?.headline}</p></div>
+              <div style={{padding:"14px 16px",background:"var(--raised)",borderRadius:14,border:"1px solid var(--line)"}}>
+                <div style={{fontSize:10,fontFamily:"var(--f-mono)",color:"var(--cream-30)",marginBottom:8,letterSpacing:".08em"}}>TODAY'S INSIGHT</div>
+                <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.85,margin:0}}>{closingLine||data?.closing||""}</p>
               </div>
             </div>
-            <button className="btn btn-outline-gold" style={{fontSize:12}} onClick={()=>setNav("report")}>View Full Report →</button>
-          </div>
-          <div className="insight"><p className="body">{dailyInsight||data.headline}</p></div>
-          <div style={{marginTop:16,padding:"12px 16px",background:"var(--raised)",borderRadius:14,border:"1px solid var(--line)"}}>
-            <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",marginBottom:8,letterSpacing:".08em"}}>TODAY'S INSIGHT</div>
-            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,margin:0}}>{closingLine||data.closing||""}</p>
-          </div>
+          )}
+          {mod==="wins"      &&<WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="progress"  &&<ProgressFeed userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="practices" &&<PracticesView userId={userId} formData={formData}/>}
+          {mod==="weekly"    &&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="decisions" &&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="advisor"   &&<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="momentum"  &&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
+          {["innerpeace","angerstress","sleepcoach","anxietytool","griefloss","glowup","nogym",
+            "posture","bodyfuel","confidencelab","relationshipiq","smalltalk","negotiation",
+            "digitallife","parenting","debtfreedom","sidehustle","investment101","visionboard",
+            "legacyletter","fearaudit","morningritual","dailywisdom","lettertoself","dreaminterp",
+            "peopledecoder","hardconvo","weeklychallenge"].includes(mod)&&
+            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
         </div>
       )}
-
-      {mod==="wins"     &&<WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-      {mod==="progress" &&<ProgressFeed userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-      {mod==="practices"&&<PracticesView userId={userId} formData={formData}/>}
-      {mod==="weekly"   &&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-      {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-      {mod==="advisor"  &&<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-      {mod==="momentum" &&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
-
-      {["innerpeace","angerstress","sleepcoach","anxietytool","griefloss",
-        "glowup","nogym","posture","bodyfuel","confidencelab","relationshipiq",
-        "smalltalk","negotiation","digitallife","parenting","debtfreedom",
-        "sidehustle","investment101","visionboard","legacyletter","fearaudit",
-        "morningritual","dailywisdom","lettertoself","dreaminterp","peopledecoder",
-        "hardconvo","weeklychallenge"].includes(mod)&&
-        <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
     </div>
   );
 
   return(
     <div className="app-shell">
 
-      <SidebarNav
-        nav={navSection} setNav={setNav}
-        isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-        streak={streak} name={formData?.name} photoURL={null}
-        onUnlock={onUnlock} lang={lang}
-      />
+      <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock}/>
 
       <MobileTopBar
-        title={isCategoryNav?CATEGORIES.find(c=>c.id===catId)?.label:isToolNav?TOOL_META[toolId]?.label:null}
-        nav={navSection} setNav={setNav}
-        onBack={isCategoryNav||isToolNav?()=>setNav(isCategoryNav?"explore":catId?"category:"+catId:"explore"):null}
+        title={isCat?CATEGORIES.find(c=>c.id===catId)?.label:isTool?TOOL_META[toolId]?.label:null}
+        onBack={isCat||isTool?()=>setNav(isCat?"explore":TOOL_META[toolId]?"category:"+TOOL_META[toolId].cat:"explore"):null}
         streak={streak} isPaid={isPaid} isProMax={isProMax}
         onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
       />
 
-      <div className="main-content">
-
-        {navSection==="home" && (
-          <HomeScreen
-            data={data} formData={formData} streak={streak}
-            isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-            userId={userId} onUnlock={onUnlock} setNav={setNav}
-            setShowNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
-            setShowCheckin={setShowCheckin}
-          />
+      <div className="main-area">
+        {navSection==="home"&&(
+          <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin}/>
         )}
-
-        {navSection==="explore" && (
-          <ExploreScreen setNav={setNav} isPaid={isPaid}/>
+        {navSection==="explore"&&<ExploreScreen setNav={setNav}/>}
+        {isCat&&<CategoryPage catId={catId} setNav={setNav} userId={userId}/>}
+        {isTool&&MODULE_CONFIGS?.[toolId]&&(
+          <ToolPage toolId={toolId} setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>
         )}
-
-        {isCategoryNav && (
-          <CategoryPage
-            catId={catId} setNav={setNav} formData={formData}
-            userId={userId} isPaid={isPaid} isPremium={isPremium}
-            isProMax={isProMax} onUnlock={onUnlock} lang={lang}
-          />
+        {isTool&&!MODULE_CONFIGS?.[toolId]&&(()=>{
+          if(mod!==toolId) setMod(toolId);
+          return showModView();
+        })()}
+        {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav}/>}
+        {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/></div>}
+        {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
+        {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/></div>}
+        {navSection==="profile"&&(
+          <ProfilePage user={{id:userId,email:""}} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} lang={lang}
+            onLangChange={(c)=>{try{localStorage.setItem("diq_lang",c);}catch{}}}
+            onBack={()=>setNav("home")} onManageSubscription={onUnlock}
+            onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))} onPhotoUpdate={()=>{}}/>
         )}
-
-        {isToolNav && MODULE_CONFIGS[toolId] && (
-          <ToolPage
-            toolId={toolId} catId={TOOL_META[toolId]?.cat} setNav={setNav}
-            formData={formData} userId={userId} isPaid={isPaid}
-            isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}
-          />
-        )}
-
-        {isToolNav && !MODULE_CONFIGS[toolId] && (
-          <div className="tool-page">
-            <div className="tool-page-header">
-              <button onClick={()=>setNav(TOOL_META[toolId]?"category:"+TOOL_META[toolId].cat:"explore")}
-                style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:20,padding:"0 8px 0 0"}}>←</button>
-              <div style={{width:40,height:40,borderRadius:12,background:`${TOOL_META[toolId]?.color||"var(--gold)"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
-                {TOOL_META[toolId]?.icon||"✦"}
-              </div>
-              <h2 style={{fontSize:18,fontWeight:800,color:"var(--cream)",margin:0}}>{TOOL_META[toolId]?.label||toolId}</h2>
-            </div>
-            {(()=>{setMod(toolId);return null;})()}
-            <LegacyModuleView/>
-          </div>
-        )}
-
-        {navSection==="progress" && (
-          <ProgressScreen data={data} formData={formData} streak={streak} userId={userId} setNav={setNav}/>
-        )}
-
-        {navSection==="wins" && (
-          <div style={{padding:"28px 32px"}}>
-            <WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>
-          </div>
-        )}
-
-        {navSection==="practices" && (
-          <div style={{padding:"28px 32px"}}>
-            <PracticesView userId={userId} formData={formData}/>
-          </div>
-        )}
-
-        {navSection==="checkin" && (
-          <div style={{padding:"28px 32px"}}>
-            <CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/>
-          </div>
-        )}
-
-        {navSection==="profile" && (
-          <ProfilePage
-            user={{id:userId,email:""}} formData={formData}
-            isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-            streak={streak} lang={lang}
-            onLangChange={(code)=>{try{localStorage.setItem("diq_lang",code);}catch{}}}
-            onBack={()=>setNav("home")}
-            onManageSubscription={onUnlock}
-            onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))}
-            onPhotoUpdate={()=>{}}
-          />
-        )}
-
-        {navSection==="report" && (
-          <div style={{padding:"24px 32px",maxWidth:900}}>
-            <button onClick={()=>setNav("home")}
-              style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:14,marginBottom:20,display:"flex",alignItems:"center",gap:6}}>
-              ← Home
-            </button>
-            <LegacyModuleView/>
-          </div>
-        )}
-
+        {navSection==="report"&&showModView()}
       </div>
 
       <BottomNav nav={navSection} setNav={setNav}/>
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ROOT
-// ═══════════════════════════════════════════════════════════════════════════════
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -13081,8 +12823,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             <div style={{width:36,height:36,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
           </div>
         )}
-        {screen==="identity" &&<QuickIdentityStep onSelect={(area)=>{setFocusArea(area);setScreen("intake");}}/>}
-        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData} ipLocation={ipLocation} focusArea={focusArea}/>}
+        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData} ipLocation={ipLocation}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
