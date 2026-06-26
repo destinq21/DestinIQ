@@ -295,7 +295,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -11096,9 +11096,87 @@ Rules:
   const catId  = isCategoryNav ? navSection.split(":")[1] : null;
   const toolId = isToolNav     ? navSection.split(":")[1] : null;
 
+  // ── inner report/module content (legacy tab system) ──────────────────
+  const LegacyModuleView = () => (
+    <div style={{paddingTop:8}}>
+      {streakCelebration && <StreakCelebration days={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+      {miniStreak && <MiniStreakCelebration days={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+
+      {showCheckin&&(
+        <div className="cx-md" style={{paddingTop:24,paddingBottom:24}}>
+          <CheckIn profile={formData} reportData={data} streak={streak} onComplete={async()=>{
+            const today=new Date().toISOString().slice(0,10);
+            const lastKey=`destiniq_checkin_${userId}`;
+            let lastLocal=""; try{lastLocal=localStorage.getItem(lastKey)||"";}catch{}
+            const lastSupabase=formData?.last_checkin_date||"";
+            const alreadyDone=lastLocal===today||lastSupabase===today;
+            if(!alreadyDone){
+              try{localStorage.setItem(lastKey,today);}catch{}
+              const newStreak=(streak||1)+1;
+              setStreak(newStreak);
+              try{localStorage.setItem(`diq_streak_${userId}`,String(newStreak));}catch{}
+              if(STREAK_MILESTONES[newStreak]){
+                const celebKey=`diq_celebrated_${userId}_${newStreak}`;
+                try{if(!localStorage.getItem(celebKey)){localStorage.setItem(celebKey,"1");setTimeout(()=>setStreakCelebration(newStreak),1200);}}catch{}
+              } else {
+                setTimeout(()=>setMiniStreak(newStreak),1200);
+              }
+              if(userId){
+                supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
+                  .then(({data:pd})=>{
+                    const fd=typeof pd?.form_data==="string"?(()=>{try{return JSON.parse(pd.form_data);}catch{return{};}})():(pd?.form_data||{});
+                    return supabase.from("user_profiles").upsert({user_id:userId,streak:newStreak,last_checkin_date:today,updated_at:new Date().toISOString(),form_data:JSON.stringify({...fd,_streak:newStreak,_last_checkin:today})},{onConflict:"user_id"});
+                  }).then(({error})=>{
+                    if(!error) setFormData(prev=>prev?{...prev,last_checkin_date:today,_streak:newStreak}:prev);
+                  }).catch(()=>{});
+              }
+            }
+            setShowCheckin(false);
+          }}/>
+        </div>
+      )}
+
+      {mod==="today"&&(
+        <div className="cx-md" style={{paddingTop:24}}>
+          <div style={{marginBottom:20}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <Ring score={Math.round((data.scores?.life||0)*0.25+(data.scores?.wealth||0)*0.30+(data.scores?.mindset||0)*0.25+(data.scores?.relations||0)*0.20)||72} color="var(--gold)" size={72} label=""/>
+              <div>
+                <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:0}}>{formData?.name||""}</h2>
+                <p style={{fontSize:13,color:"var(--cream-40)",margin:0}}>{data.greeting||""}</p>
+              </div>
+            </div>
+            <button className="btn btn-outline-gold" style={{fontSize:12}} onClick={()=>setNav("report")}>View Full Report →</button>
+          </div>
+          <div className="insight"><p className="body">{dailyInsight||data.headline}</p></div>
+          <div style={{marginTop:16,padding:"12px 16px",background:"var(--raised)",borderRadius:14,border:"1px solid var(--line)"}}>
+            <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",marginBottom:8,letterSpacing:".08em"}}>TODAY'S INSIGHT</div>
+            <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,margin:0}}>{closingLine||data.closing||""}</p>
+          </div>
+        </div>
+      )}
+
+      {mod==="wins"     &&<WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+      {mod==="progress" &&<ProgressFeed userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+      {mod==="practices"&&<PracticesView userId={userId} formData={formData}/>}
+      {mod==="weekly"   &&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+      {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+      {mod==="advisor"  &&<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
+      {mod==="momentum" &&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
+
+      {["innerpeace","angerstress","sleepcoach","anxietytool","griefloss",
+        "glowup","nogym","posture","bodyfuel","confidencelab","relationshipiq",
+        "smalltalk","negotiation","digitallife","parenting","debtfreedom",
+        "sidehustle","investment101","visionboard","legacyletter","fearaudit",
+        "morningritual","dailywisdom","lettertoself","dreaminterp","peopledecoder",
+        "hardconvo","weeklychallenge"].includes(mod)&&
+        <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+    </div>
+  );
+
   return(
     <div className="app-shell">
-      {/* ── Sidebar (desktop only) ── */}
+
       <SidebarNav
         nav={navSection} setNav={setNav}
         isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
@@ -11106,1246 +11184,108 @@ Rules:
         onUnlock={onUnlock} lang={lang}
       />
 
-      {/* ── Mobile top bar ── */}
       <MobileTopBar
         title={isCategoryNav?CATEGORIES.find(c=>c.id===catId)?.label:isToolNav?TOOL_META[toolId]?.label:null}
         nav={navSection} setNav={setNav}
-        onBack={isCategoryNav||isToolNav ? ()=>setNav(isCategoryNav?"explore":catId?"category:"+catId:"explore") : null}
+        onBack={isCategoryNav||isToolNav?()=>setNav(isCategoryNav?"explore":catId?"category:"+catId:"explore"):null}
         streak={streak} isPaid={isPaid} isProMax={isProMax}
         onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
       />
 
-      {/* ── Main content area ── */}
       <div className="main-content">
 
-      {/* HOME SCREEN */}
-      {navSection==="home" && (
-        <HomeScreen
-          data={data} formData={formData} streak={streak}
-          isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-          userId={userId} onUnlock={onUnlock}
-          setNav={setNav}
-          setShowNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
-          setShowCheckin={setShowCheckin}
-        />
-      )}
+        {navSection==="home" && (
+          <HomeScreen
+            data={data} formData={formData} streak={streak}
+            isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
+            userId={userId} onUnlock={onUnlock} setNav={setNav}
+            setShowNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
+            setShowCheckin={setShowCheckin}
+          />
+        )}
 
-      {/* EXPLORE SCREEN */}
-      {navSection==="explore" && (
-        <ExploreScreen setNav={setNav} isPaid={isPaid}/>
-      )}
+        {navSection==="explore" && (
+          <ExploreScreen setNav={setNav} isPaid={isPaid}/>
+        )}
 
-      {/* CATEGORY PAGE */}
-      {isCategoryNav && (
-        <CategoryPage
-          catId={catId} setNav={setNav}
-          formData={formData} userId={userId}
-          isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-          onUnlock={onUnlock} lang={lang}
-        />
-      )}
+        {isCategoryNav && (
+          <CategoryPage
+            catId={catId} setNav={setNav} formData={formData}
+            userId={userId} isPaid={isPaid} isPremium={isPremium}
+            isProMax={isProMax} onUnlock={onUnlock} lang={lang}
+          />
+        )}
 
-      {/* TOOL PAGE — for GenericAIModule tools */}
-      {isToolNav && MODULE_CONFIGS[toolId] && (
-        <ToolPage
-          toolId={toolId}
-          catId={TOOL_META[toolId]?.cat}
-          setNav={setNav}
-          formData={formData} userId={userId}
-          isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-          onUnlock={onUnlock} lang={lang}
-        />
-      )}
+        {isToolNav && MODULE_CONFIGS[toolId] && (
+          <ToolPage
+            toolId={toolId} catId={TOOL_META[toolId]?.cat} setNav={setNav}
+            formData={formData} userId={userId} isPaid={isPaid}
+            isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}
+          />
+        )}
 
-      {/* TOOL PAGE — for legacy modules (roadmap, decisions, advisor etc.) */}
-      {isToolNav && !MODULE_CONFIGS[toolId] && (()=>{
-        const meta = TOOL_META[toolId];
-        return(
+        {isToolNav && !MODULE_CONFIGS[toolId] && (
           <div className="tool-page">
             <div className="tool-page-header">
-              <button onClick={()=>setNav(meta?"category:"+meta.cat:"explore")}
-                style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:20,padding:0,marginRight:4}}>←</button>
-              <div style={{width:40,height:40,borderRadius:12,background:`${meta?.color||"var(--gold)"}18`,
-                display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                {meta?.icon||"✦"}
+              <button onClick={()=>setNav(TOOL_META[toolId]?"category:"+TOOL_META[toolId].cat:"explore")}
+                style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:20,padding:"0 8px 0 0"}}>←</button>
+              <div style={{width:40,height:40,borderRadius:12,background:`${TOOL_META[toolId]?.color||"var(--gold)"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+                {TOOL_META[toolId]?.icon||"✦"}
               </div>
-              <h2 style={{fontSize:18,fontWeight:800,color:"var(--cream)",margin:0}}>{meta?.label||toolId}</h2>
+              <h2 style={{fontSize:18,fontWeight:800,color:"var(--cream)",margin:0}}>{TOOL_META[toolId]?.label||toolId}</h2>
             </div>
-            <div className="tool-actions">
-              <button className="tool-action-btn primary">🔊 Listen</button>
-              <button className="tool-action-btn">↺ Refresh</button>
-            </div>
-            {/* Render the legacy module */}
-            {toolId==="roadmap"   &&<div className="cx-md">{mod==="roadmap"?null:setMod("roadmap")}</div>}
-            {toolId==="decisions" &&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {toolId==="advisor"   &&<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {toolId==="weekly"    &&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {toolId==="checkin"   &&<CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/>}
+            {(()=>{setMod(toolId);return null;})()}
+            <LegacyModuleView/>
           </div>
-        );
-      })()}
+        )}
 
-      {/* PROGRESS SCREEN */}
-      {navSection==="progress" && (
-        <ProgressScreen data={data} formData={formData} streak={streak} userId={userId} setNav={setNav}/>
-      )}
+        {navSection==="progress" && (
+          <ProgressScreen data={data} formData={formData} streak={streak} userId={userId} setNav={setNav}/>
+        )}
 
-      {/* WINS */}
-      {navSection==="wins" && (
-        <div style={{padding:"28px 32px"}}>
-          <WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>
-        </div>
-      )}
-
-      {/* MY PRACTICES */}
-      {navSection==="practices" && (
-        <div style={{padding:"28px 32px"}}>
-          <PracticesView userId={userId} formData={formData}/>
-        </div>
-      )}
-
-      {/* CHECKIN */}
-      {navSection==="checkin" && (
-        <div style={{padding:"28px 32px"}}>
-          <CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/>
-        </div>
-      )}
-
-      {/* PROFILE */}
-      {navSection==="profile" && (
-        <ProfilePage
-          user={{id:userId}} formData={formData}
-          isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-          streak={streak} lang={lang}
-          onLangChange={(code)=>{try{localStorage.setItem("diq_lang",code);}catch{}}}
-          onBack={()=>setNav("home")}
-          onManageSubscription={onUnlock}
-          onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))}
-          onPhotoUpdate={()=>{}}
-        />
-      )}
-
-      {/* MY REPORT — accessible from home */}
-      {navSection==="report" && (
-      <div style={{paddingTop:0}}>
-      <div style={{padding:"40px 32px 28px",borderBottom:"1px solid var(--line)",background:"rgba(210,175,90,0.02)"}}>
-        <div className="cx-md">
-          <button onClick={()=>setNav("home")} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:14,marginBottom:16,display:"flex",alignItems:"center",gap:6}}>
-            ← Back to Home
-          </button>
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",flexWrap:"wrap",gap:16,marginBottom:28}}>
-            <div>
-              <div className="fu" style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,flexWrap:"wrap"}}>
-                <div className="mono">Your personal clarity picture</div>
-                {ipLocation&&ipLocation.city&&(
-                  <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"3px 10px",background:"var(--teal-dim)",border:"1px solid rgba(31,168,154,0.2)",borderRadius:20}}>
-                    <div style={{width:5,height:5,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 5px var(--teal)",animation:"pulse 2s ease infinite"}}/>
-                    <span style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".1em",color:"var(--teal)",textTransform:"uppercase"}}>{ipLocation.city}, {ipLocation.country}</span>
-                  </div>
-                )}
-              </div>
-              <h1 className="d2 fu1" style={{marginBottom:8}}>{formData?.name||""}</h1>
-              {data.greeting&&<p className="body fu2" style={{fontStyle:"italic",maxWidth:500}}>&ldquo;{data.greeting}&rdquo;</p>}
-            </div>
-            <div className="fu2" style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-              <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-              {isPaid&&(
-  <div className="prem-badge" style={{
-    background:isPremium?"linear-gradient(90deg,rgba(155,114,207,0.2),rgba(155,114,207,0.08))":"linear-gradient(90deg,rgba(210,175,90,0.15),rgba(232,203,122,0.08))",
-    borderColor:isPremium?"rgba(155,114,207,0.4)":"var(--line-gold)",
-    color:isPremium?"#9b72cf":"var(--gold-bright)",
-  }}>
-    {isPremium?"✦ PRO MAX":"◆ PRO"}
-  </div>
-)}
-              {!showCheckin&&(()=>{
-                const todayStr = new Date().toISOString().slice(0,10);
-                const todayKey = `diq_ci_result_${userId}_${todayStr}`;
-                const doneLocal    = typeof window!=="undefined"&&!!localStorage.getItem(todayKey);
-                const doneSupabase = formData?.last_checkin_date===todayStr;
-                const doneToday    = doneLocal||doneSupabase;
-                return doneToday
-                  ?<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)} style={{opacity:0.7,fontSize:11}}>✓ Checked in · View</button>
-                  :<button className="btn btn-outline-gold" onClick={()=>setShowCheckin(true)}>Check in</button>;
-              })()}
-            </div>
+        {navSection==="wins" && (
+          <div style={{padding:"28px 32px"}}>
+            <WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>
           </div>
-          {/* Score History Chart — Pro/ProMax only */}
-          {isPaid&&<ScoreHistoryChart history={data.score_history}/>}
-          {!isPaid&&data?.score_history?.length>=2&&(
-            <div style={{padding:"14px 16px",background:"var(--lift)",borderRadius:12,border:"1px solid var(--line)",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-              <div>
-                <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",marginBottom:3}}>SCORE HISTORY</div>
-                <p style={{fontSize:13,color:"var(--cream-40)",margin:0}}>You have {data.score_history.length} assessments. Upgrade to see your progress chart.</p>
-              </div>
-              <button className="btn btn-gold" style={{fontSize:12,padding:"8px 16px"}} onClick={onUnlock}>Unlock →</button>
-            </div>
-          )}
+        )}
 
-          {/* Score update notice — prompts user to re-assess if they've improved */}
-          <div style={{marginBottom:14,padding:"10px 14px",background:"rgba(31,168,154,0.05)",border:"1px solid rgba(31,168,154,0.12)",borderRadius:10,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <p style={{fontSize:12,color:"var(--cream-40)",margin:0,flex:1,lineHeight:1.6}}>
-              📈 Got a job? Started saving? Hit a goal? Your scores can improve.
-              <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}
-                style={{background:"none",border:"none",color:"var(--teal)",cursor:"pointer",fontSize:12,padding:"0 4px",fontWeight:600}}>
-                Update your profile & re-assess →
-              </button>
-            </p>
+        {navSection==="practices" && (
+          <div style={{padding:"28px 32px"}}>
+            <PracticesView userId={userId} formData={formData}/>
           </div>
+        )}
 
-          <div className="fu3 pillar-wrap" style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
-            <Ring score={
-              (aScores.life||aScores.wealth||aScores.mindset||aScores.relations)
-                ? Math.round((aScores.life||0)*0.25+(aScores.wealth||0)*0.30+(aScores.mindset||0)*0.25+(aScores.relations||0)*0.20)
-                : 70
-            } color="var(--gold)" size={106} label="Overall"/>
-            <div style={{flex:1,display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,minWidth:"min(260px,100%)"}}>
-              {PILLARS.map(p=>(
-                <div className="pillar-bar-card" key={p.id}>
-                  <div className="pb-row"><span className="pb-name">{p.label}</span><span className="pb-val" style={{color:p.color}}>{aScores[p.id]||0}</span></div>
-                  <div className="pb-track"><div className="pb-fill" style={{width:`${aScores[p.id]||0}%`,background:p.color}}/></div>
-                </div>
-              ))}
-            </div>
+        {navSection==="checkin" && (
+          <div style={{padding:"28px 32px"}}>
+            <CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/>
           </div>
-          <div className="insight fu4">
-            <p className="body">{data.headline}</p>
-            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:8}}>
-              <AudioPlayer text={[data.headline,...(PILLARS||[]).map(p=>data.score_explanations?.[p.id]).filter(Boolean)].join(". ")} label="Listen to full report"/>
-              <VoiceSelector/>
-            </div>
-          </div>
+        )}
 
-          {/* Score explanation cards — 2-col on mobile, 4-col on desktop */}
-          {data.score_explanations&&(
-            <div className="fu4 score-explain-grid" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
-              {PILLARS.map(p=>data.score_explanations[p.id]&&(
-                <div key={p.id} style={{padding:"12px 14px",background:"var(--lift)",borderRadius:10,borderLeft:`2px solid ${p.color}`}}>
-                  <div style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".12em",textTransform:"uppercase",color:p.color,marginBottom:5}}>{p.label}</div>
-                  <p style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65,fontWeight:300,margin:0}}>{data.score_explanations[p.id]}</p>
-                  <AudioPlayer text={`${p.label}: ${data.score_explanations[p.id]}`} label="" mini={true}/>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {navSection==="profile" && (
+          <ProfilePage
+            user={{id:userId,email:""}} formData={formData}
+            isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
+            streak={streak} lang={lang}
+            onLangChange={(code)=>{try{localStorage.setItem("diq_lang",code);}catch{}}}
+            onBack={()=>setNav("home")}
+            onManageSubscription={onUnlock}
+            onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))}
+            onPhotoUpdate={()=>{}}
+          />
+        )}
+
+        {navSection==="report" && (
+          <div style={{padding:"24px 32px",maxWidth:900}}>
+            <button onClick={()=>setNav("home")}
+              style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:14,marginBottom:20,display:"flex",alignItems:"center",gap:6}}>
+              ← Home
+            </button>
+            <LegacyModuleView/>
+          </div>
+        )}
+
       </div>
 
-      {showCheckin&&(
-        <div style={{padding:"32px 0",borderBottom:"1px solid var(--line)",background:"rgba(31,168,154,0.03)"}}>
-          <div className="cx-md"><CheckIn profile={formData} reportData={data} streak={streak} onComplete={async()=>{
-            // ── INCREMENT STREAK — once per calendar day only ──────────────
-            const today   = new Date().toISOString().slice(0,10);
-            // Use BOTH localStorage AND Supabase last_checkin_date to check
-            const lastKey = `destiniq_checkin_${userId}`;
-            let lastLocal = "";
-            try{ lastLocal = localStorage.getItem(lastKey)||""; }catch{}
-            // Also check Supabase's last_checkin_date (reliable fallback)
-            const lastSupabase = formData?.last_checkin_date||"";
-            const alreadyDone  = lastLocal===today || lastSupabase===today;
-
-            if(!alreadyDone){
-              // First check-in of the day — increment
-              try{ localStorage.setItem(lastKey, today); }catch{}
-              // Use Supabase streak as base (more reliable than React state)
-              const baseStreak = streak||1;
-              const newStreak  = baseStreak + 1;
-              setStreak(newStreak);
-              // Save to localStorage immediately
-              try{ localStorage.setItem(`diq_streak_${userId}`, String(newStreak)); }catch{}
-              // Celebrate — big popup for milestones, small banner for every other day
-              if(STREAK_MILESTONES[newStreak]){
-                const celebKey=`diq_celebrated_${userId}_${newStreak}`;
-                try{
-                  if(!localStorage.getItem(celebKey)){
-                    localStorage.setItem(celebKey,"1");
-                    setTimeout(()=>setStreakCelebration(newStreak), 1200);
-                  }
-                }catch{}
-              } else {
-                // Non-milestone day — show small "Day X" banner
-                setTimeout(()=>setMiniStreak(newStreak), 800);
-              }
-              if(userId){
-                // Save streak — use form_data JSONB as reliable fallback
-                // Works even if dedicated streak/last_checkin_date columns don't exist
-                supabase.from("user_profiles").select("form_data")
-                  .eq("user_id", userId).single()
-                  .then(({data:pd})=>{
-                    // form_data is TEXT in Supabase — must parse before merging
-                    const fd = typeof pd?.form_data==="string"
-                      ? (()=>{try{return JSON.parse(pd.form_data);}catch{return{};}})()
-                      : (pd?.form_data||{});
-                    return supabase.from("user_profiles").upsert({
-                      user_id: userId,
-                      streak: newStreak,
-                      last_checkin_date: today,
-                      updated_at: new Date().toISOString(),
-                      form_data: JSON.stringify({...fd, _streak:newStreak, _last_checkin:today}),
-                    },{onConflict:"user_id"});
-                  })
-                  .then(({error})=>{
-                    if(error) console.warn("Streak save:", error.message);
-                    else setFormData(prev=>prev?{...prev, last_checkin_date:today, _streak:newStreak}:prev);
-                  })
-                  .catch(e=>console.warn("Streak save:", e.message));
-              }
-            }
-            // else: already checked in today — don't increment again
-            setShowCheckin(false);
-          }} userId={userId} isPremium={isPremium}/></div>
-        </div>
-      )}
-
-      <div style={{padding:"36px 0"}}>
-        <div className="cx-md">
-          {/* ── Habit tracker mini bar */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:10,flexWrap:"wrap"}}>
-            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em"}}>YOUR MODULES</div>
-            <HabitMiniBar userId={userId} onClick={()=>setShowTracker(true)}/>
-          </div>
-          {/* ── TAB BAR: grouped, horizontally scrollable ─────────────────── */}
-          <div style={{marginBottom:20,overflowX:"auto",WebkitOverflowScrolling:"touch",
-            scrollbarWidth:"none",msOverflowStyle:"none",
-            // hide scrollbar on webkit
-            }}>
-            <style>{".tab-scroll::-webkit-scrollbar{display:none}"}</style>
-            <div className="tab-scroll" style={{display:"flex",flexDirection:"column",gap:0,minWidth:"max-content"}}>
-              {MODULE_GROUPS.map(group=>(
-                <div key={group.group} style={{display:"flex",flexDirection:"column",gap:0,marginBottom:6}}>
-                  {/* Group label */}
-                  <div style={{
-                    fontSize:"8px",fontFamily:"var(--f-mono)",
-                    color:group.color,letterSpacing:".14em",
-                    padding:"0 4px 4px 6px",textTransform:"uppercase",
-                    display:"flex",alignItems:"center",gap:6,
-                  }}>
-                    <div style={{flex:"0 0 16px",height:1,background:group.color,opacity:.4}}/>
-                    {group.group}
-                    <div style={{flex:1,height:1,background:group.color,opacity:.15}}/>
-                  </div>
-                  {/* Tabs in this group */}
-                  <div style={{display:"flex",gap:5,flexWrap:"nowrap"}}>
-                    {group.items.map(m=>(
-                      <button key={m.id}
-                        className={`tab ${mod===m.id?"on":""}`}
-                        onClick={()=>setMod(m.id)}
-                        style={{
-                          borderColor:mod===m.id?group.color:"transparent",
-                          whiteSpace:"nowrap",
-                          ...(mod===m.id?{
-                            background:`${group.color}14`,
-                            color:group.color,
-                          }:{}),
-                        }}>
-                        <span>{m.icon}</span><span>{m.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {mod==="today"&&(
-            <div className="fu">
-              <div className="d3" style={{marginBottom:20}}>What we want you to hold onto today</div>
-              <div className="insight" style={{marginBottom:24}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,gap:10,flexWrap:"wrap"}}>
-                  <div className="mono" style={{fontSize:"9px"}} suppressHydrationWarning>Written for you · {new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
-                  <button className="btn btn-ghost btn-sm" onClick={refreshDailyInsight} disabled={refreshingInsight} style={{fontSize:11,padding:"4px 12px"}}>
-                    {refreshingInsight?"Refreshing…":"↺ Refresh today's insight"}
-                  </button>
-                </div>
-                <p className="body">{refreshingInsight?"Getting your fresh insight for today…":dailyInsight}</p>
-              </div>
-              {isPaid ? (
-                <>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}}>
-                    <div className="card card-sm">
-                      <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--teal)"}}>◎ What you bring to this</div>
-                      {_strengths.length>0
-                        ? _strengths.map((s,i)=>(
-                            <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
-                              <span style={{color:"var(--teal)",flexShrink:0,marginTop:3,fontSize:10}}>◎</span>
-                              <span>{s}</span>
-                            </div>
-                          ))
-                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Your strengths are being extracted from your report…</p>
-                      }
-                    </div>
-                    <div className="card card-sm">
-                      <div className="mono" style={{marginBottom:10,fontSize:"9px",color:"var(--rose)"}}>◇ What to watch out for</div>
-                      {_risks.length>0
-                        ? _risks.map((r,i)=>(
-                            <div key={i} style={{display:"flex",gap:8,marginBottom:8,fontSize:13,color:"var(--cream-60)",lineHeight:1.7}}>
-                              <span style={{color:"var(--rose)",flexShrink:0,marginTop:3,fontSize:10}}>◇</span>
-                              <span>{r}</span>
-                            </div>
-                          ))
-                        : <p style={{fontSize:12,color:"var(--cream-30)",fontStyle:"italic"}}>Your watch-outs are being extracted from your report…</p>
-                      }
-                    </div>
-                  </div>
-                  <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:10}}>
-                      <div className="mono" style={{fontSize:"9px"}}>Something to carry with you</div>
-                      <button onClick={refreshClosing} disabled={refreshingClosing} title="Get a new one" style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"2px 10px",color:"var(--cream-40)",fontSize:10,cursor:refreshingClosing?"not-allowed":"pointer",fontFamily:"var(--f-mono)"}}>
-                        {refreshingClosing?"…":"↺"}
-                      </button>
-                    </div>
-                    <p style={{fontFamily:"var(--f-display)",fontSize:20,fontStyle:"italic",color:"var(--gold)",fontWeight:400,lineHeight:1.5}}>
-                    {refreshingClosing
-                      ? <span>&ldquo;Thinking…&rdquo;</span>
-                      : closingLine
-                        ? <>&ldquo;{closingLine}&rdquo;</>
-                        : <span style={{fontSize:13,color:"var(--cream-30)"}}>Generating your personal sentence…</span>
-                    }
-                  </p>
-                    <AudioPlayer text={closingLine} label="Listen"/>
-                  </div>
-                </>
-              ) : (
-                <div style={{marginTop:24}}>
-                  <div style={{position:"relative",overflow:"hidden",borderRadius:16,marginBottom:16}}>
-                    <div style={{padding:"20px",background:"var(--lift)",border:"1px solid rgba(255,255,255,0.06)",filter:"blur(4px)",userSelect:"none",pointerEvents:"none",lineHeight:1.8,fontSize:13,color:"var(--cream-50)"}}>
-                      {data.sections?.[0]?.content?.slice(0,220)||"Your clarity report goes much deeper than the scores above..."}...
-                    </div>
-                    <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 30%,var(--night) 80%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",padding:24}}>
-                      <div style={{fontSize:22,marginBottom:8}}>🔒</div>
-                      <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:6,textAlign:"center"}}>Your full report is waiting</div>
-                      <p style={{fontSize:13,color:"var(--cream-40)",textAlign:"center",maxWidth:320,lineHeight:1.65,marginBottom:20}}>
-                        Deep dives into Life, Wealth, Mindset and Relationships. Your strengths, your watch-outs, your next 30 days.
-                      </p>
-                      <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:15,padding:"14px 32px"}}>
-                        Unlock full report — $9/month
-                      </button>
-                      <p style={{fontSize:11,color:"var(--cream-30)",marginTop:10,fontFamily:"var(--f-mono)"}}>Pro plan · Cancel anytime · No hidden fees</p>
-                    </div>
-                  </div>
-                  {data.teaser&&(
-                    <div style={{padding:"16px 20px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:12}}>
-                      <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>We noticed something important</div>
-                      <p style={{fontSize:14,fontStyle:"italic",color:"var(--cream-60)",lineHeight:1.7,margin:0}}>"{data.teaser}"</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {mod==="momentum"&&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
-            {mod==="momentum"&&<ReferralWidget user={{id:userId}} isPaid={isPaid}/>}
-            {mod==="wins"&&<WinTracker profile={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="progress"&&<ProgressFeed profile={formData} reportData={data} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="hacks"&&<LifeHacksModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="money"&&<MoneyModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="jimrohn"&&<JimRohnTab isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="online"&&<OnlineIncomeModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="business"&&<BusinessModule data={data} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="practices"&&<PracticesView userId={userId}/>}
-            {mod==="invest"&&<InvestInYourselfModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="success"&&<DisgustinglySuccessfulModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="discipline"&&<DailyDisciplineModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-            {mod==="mindset10x"&&<MindsetTenXModule formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="decisions"&&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-          {mod==="weekly"&&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
-
-
-
-          {mod==="roadmap"&&(
-            <LockGate isPaid={isPaid} onUnlock={onUnlock}>
-              <div className="fu">
-                {/* Header */}
-                <div style={{marginBottom:28}}>
-                  <div className="d3" style={{marginBottom:8}}>
-                    {formData?.name?"Your Roadmap, "+formData.name:"Your Roadmap"}
-                  </div>
-                  <p className="body" style={{marginBottom:0,lineHeight:1.75}}>
-                    Not a template. Not generic advice. This roadmap is built around your exact situation in {formData?.country||"your country"}.
-                    Every cost shown is in local currency. Every step has a direct action you can take today.
-                  </p>
-                </div>
-
-                {/* Phase cards */}
-                {(data.roadmap||[]).map((r,i)=>{
-                  const phaseColors=["var(--gold)","var(--teal)","#9b72cf"];
-                  const color=phaseColors[i]||"var(--gold)";
-                  return(
-                  <div key={i} style={{marginBottom:24,background:"var(--lift)",borderRadius:18,border:`1px solid ${color}20`,overflow:"hidden"}}>
-                    {/* Phase header */}
-                    <div style={{padding:"16px 20px",background:`linear-gradient(135deg,${color}08,transparent)`,borderBottom:`1px solid ${color}15`,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{width:44,height:44,borderRadius:12,background:`${color}14`,border:`1px solid ${color}30`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <div style={{fontFamily:"var(--f-mono)",fontSize:13,fontWeight:800,color,lineHeight:1}}>{String(i+1).padStart(2,"0")}</div>
-                      </div>
-                      <div>
-                        <div style={{fontSize:10,fontFamily:"var(--f-mono)",color,letterSpacing:".1em",marginBottom:3}}>{r.phase}</div>
-                        <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",lineHeight:1.3}}>{r.title}</div>
-                      </div>
-                    </div>
-
-                    <div style={{padding:"16px 20px"}}>
-                      {/* Deep description */}
-                      <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.85,marginBottom:16}}>{r.desc}</p>
-
-                      {/* Steps — with local currency note */}
-                      {Array.isArray(r.steps)&&r.steps.length>0&&(
-                        <div style={{marginBottom:16}}>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color,letterSpacing:".1em",marginBottom:10}}>
-                            EXACT STEPS — COSTS IN {(formData?.country||"YOUR COUNTRY").toUpperCase()} CURRENCY
-                          </div>
-                          {r.steps.map((step,si)=>(
-                            <div key={si} style={{display:"flex",gap:10,marginBottom:8,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
-                              <div style={{width:24,height:24,borderRadius:"50%",background:`${color}12`,border:`1px solid ${color}25`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color,fontWeight:700}}>{si+1}</div>
-                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.65,margin:0}}>{step}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Win / milestone */}
-                      {r.win&&(
-                        <div style={{padding:"12px 16px",background:`${color}08`,border:`1px solid ${color}20`,borderRadius:12,marginBottom:16,display:"flex",gap:10,alignItems:"flex-start"}}>
-                          <span style={{fontSize:18,flexShrink:0}}>🎯</span>
-                          <div>
-                            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color,letterSpacing:".1em",marginBottom:4}}>MILESTONE — WHAT YOU&apos;LL HAVE BY THE END</div>
-                            <p style={{fontSize:13,color:"var(--cream)",fontWeight:600,margin:0,lineHeight:1.6}}>{r.win}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Direct links for this phase */}
-                      {i===0&&(
-                        <div>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".1em",marginBottom:10}}>TOOLS TO START THIS PHASE</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                            {[
-                              {label:"Notion — free planning & tracking template",url:"https://www.notion.so/templates",type:"tool"},
-                              {label:"Todoist — daily task manager (free)",url:"https://todoist.com",type:"tool"},
-                              {label:"Google Calendar — schedule your roadmap blocks",url:"https://calendar.google.com",type:"tool"},
-                            ].map((lk,li)=>(
-                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
-                                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 13px",background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
-                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
-                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                                <span style={{fontSize:14}}>🛠</span>
-                                <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
-                                <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {i===1&&(
-                        <div>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--teal)",letterSpacing:".1em",marginBottom:10}}>LEVEL UP IN THIS PHASE</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                            {[
-                              {label:"Coursera — take a skill course relevant to your path",url:"https://www.coursera.org",type:"course"},
-                              {label:"LinkedIn Learning — professional skills",url:"https://www.linkedin.com/learning/",type:"course"},
-                              {label:"YouTube — search your exact skill for free tutorials",url:"https://www.youtube.com",type:"resource"},
-                            ].map((lk,li)=>(
-                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
-                                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 13px",background:"rgba(31,168,154,0.06)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
-                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
-                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                                <span style={{fontSize:14}}>📚</span>
-                                <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
-                                <span style={{fontSize:9,color:"var(--teal)",fontFamily:"var(--f-mono)"}}>↗</span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {i===2&&(
-                        <div>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".1em",marginBottom:10}}>SCALE IN THIS PHASE</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                            {[
-                              {label:"Deel — get paid internationally in USD",url:"https://www.deel.com",type:"tool"},
-                              {label:"Wise — transfer money globally at low fees",url:"https://wise.com",type:"tool"},
-                              {label:"Lunchclub — find mentors and collaborators",url:"https://lunchclub.com",type:"platform"},
-                            ].map((lk,li)=>(
-                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
-                                style={{display:"flex",alignItems:"center",gap:10,padding:"9px 13px",background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:9,textDecoration:"none",transition:"opacity .15s"}}
-                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
-                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                                <span style={{fontSize:14}}>🌐</span>
-                                <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
-                                <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <AudioPlayer text={`Phase ${i+1}: ${r.phase}. ${r.title}. ${r.desc} ${r.win?`By the end: ${r.win}`:""}`} label="Listen" mini={false}/>
-                    </div>
-                  </div>
-                );})}
-
-                {/* Currency reminder */}
-                <div style={{padding:"14px 18px",background:"rgba(31,168,154,0.05)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:12,display:"flex",gap:10,alignItems:"flex-start"}}>
-                  <span style={{fontSize:16,flexShrink:0}}>💡</span>
-                  <p style={{fontSize:12,color:"var(--cream-50)",margin:0,lineHeight:1.7}}>
-                    All startup costs and budgets in this roadmap are shown in {formData?.country||"your country"}&apos;s local currency.
-                    When you reach the earning phase, income figures are in USD — because online income is typically paid in USD regardless of where you live.
-                  </p>
-                </div>
-              </div>
-            </LockGate>
-          )}
-
-          {mod==="mindset"&&(
-            <div className="fu">
-              {/* Header */}
-              <div style={{marginBottom:24}}>
-                <div className="d3" style={{marginBottom:8}}>
-                  {formData?.name?"Your Inner Mindset, "+formData.name:"Your Inner Mindset"}
-                </div>
-                <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,margin:0}}>
-                  This is the psychological layer of your report — what the AI noticed about your thinking
-                  patterns, your emotional reality, and what to actually do about it every day.
-                  This is not generic advice. It is written specifically for you.
-                </p>
-              </div>
-
-              {/* 4 Deep Cards */}
-              {[
-                {
-                  icon:"◇",
-                  label:"PATTERN",
-                  title:"What keeps tripping you up",
-                  key:"pattern",
-                  color:"var(--rose)",
-                  bg:"rgba(248,113,113,0.05)",
-                  border:"rgba(248,113,113,0.2)",
-                  reflection:"When did this pattern last show up? What triggered it?",
-                  why:"Understanding your pattern is the first step. You cannot change what you haven't named."
-                },
-                {
-                  icon:"↺",
-                  label:"REFRAME",
-                  title:"A different way to see it",
-                  key:"reframe",
-                  color:"var(--gold)",
-                  bg:"rgba(210,175,90,0.05)",
-                  border:"rgba(210,175,90,0.2)",
-                  reflection:"Does this reframe feel true to you? What would change if you believed it?",
-                  why:"A reframe doesn't dismiss the problem — it puts it in a context where you can act."
-                },
-                {
-                  icon:"◎",
-                  label:"EMOTIONAL TRUTH",
-                  title:"What's really happening emotionally",
-                  key:"emotional",
-                  color:"#9b72cf",
-                  bg:"rgba(155,114,207,0.05)",
-                  border:"rgba(155,114,207,0.2)",
-                  reflection:"Has anyone ever said this to you before? How does it feel to read it?",
-                  why:"Most people address the surface problem and wonder why nothing changes. This is the deeper layer."
-                },
-                {
-                  icon:"◈",
-                  label:"MORNING PRACTICE",
-                  title:"One thing to try every morning",
-                  key:"practice",
-                  color:"var(--teal)",
-                  bg:"rgba(31,168,154,0.05)",
-                  border:"rgba(31,168,154,0.2)",
-                  reflection:"Can you commit to this for 7 days? What would get in the way?",
-                  why:"A morning practice isn't about perfection — it's about giving your mind a direction before the world sets one for you."
-                },
-              ].map(s=>{
-                const text = data.mindset?.[s.key];
-                if(!text) return null;
-                return(
-                  <div key={s.key} style={{marginBottom:16,background:"var(--lift)",borderRadius:18,border:`1px solid ${s.border}`,overflow:"hidden"}}>
-                    {/* Header */}
-                    <div style={{padding:"16px 20px",background:s.bg,borderBottom:`1px solid ${s.border}`}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                        <span style={{color:s.color,fontFamily:"var(--f-mono)",fontSize:16}}>{s.icon}</span>
-                        <span style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em"}}>{s.label}</span>
-                      </div>
-                      <div style={{fontSize:16,fontWeight:700,color:"var(--cream)"}}>{s.title}</div>
-                    </div>
-
-                    <div style={{padding:"16px 20px"}}>
-                      {/* Main content */}
-                      <p style={{fontSize:14,color:"var(--cream-70)",lineHeight:1.85,marginBottom:14}}>{text}</p>
-
-                      {/* Why this matters */}
-                      <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderLeft:`2px solid ${s.color}`,borderRadius:"0 8px 8px 0",marginBottom:14}}>
-                        <p style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.65,margin:0,fontStyle:"italic"}}>{s.why}</p>
-                      </div>
-
-                      {/* Self-reflection prompt */}
-                      <div style={{padding:"10px 14px",background:s.bg,border:`1px solid ${s.border}`,borderRadius:10,marginBottom:14}}>
-                        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".1em",marginBottom:4}}>REFLECT ON THIS</div>
-                        <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.65,fontStyle:"italic"}}>
-                          {s.reflection}
-                        </p>
-                      </div>
-
-                      <AudioPlayer text={`${s.title}. ${text}. ${s.why}`} label="Listen" mini={false}/>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Mindset resources */}
-              <div style={{marginTop:8,padding:"16px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:14}}>
-                <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".12em",marginBottom:12}}>GO DEEPER — MINDSET RESOURCES</div>
-                <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                  {[
-                    {emoji:"📖",label:"Mindset by Carol Dweck — the growth vs fixed mindset",url:"https://www.amazon.com/Mindset-Psychology-Carol-S-Dweck/dp/0345472322"},
-                    {emoji:"📖",label:"Feeling Good by David Burns — change how you think (CBT)",url:"https://www.amazon.com/Feeling-Good-New-Mood-Therapy/dp/0380810336"},
-                    {emoji:"📖",label:"The Power of Now — Eckhart Tolle",url:"https://www.amazon.com/Power-Now-Guide-Spiritual-Enlightenment/dp/1577314808"},
-                    {emoji:"🎧",label:"Jim Rohn — Personal Philosophy (YouTube, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+personal+philosophy"},
-                    {emoji:"🛠",label:"Woebot — free AI mental wellness check-ins",url:"https://woebothealth.com"},
-                    {emoji:"🛠",label:"Reflectly — guided daily reflection journal app",url:"https://reflectly.app"},
-                  ].map((lk,i)=>(
-                    <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-                      style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
-                      onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
-                      onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                      <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
-                      <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
-                      <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {mod==="career"&&(
-            <LockGate isPaid={isPaid} onUnlock={onUnlock}>
-              <div className="fu">
-                {/* Header */}
-                <div style={{marginBottom:28}}>
-                  <div className="d3" style={{marginBottom:8}}>Your Career Paths{formData?.name?`, ${formData.name}`:""}</div>
-                  <p className="body" style={{marginBottom:0,lineHeight:1.75}}>
-                    Three real paths matched to your skills, your country, and where you are right now.
-                    Each one has what it pays, what it costs to start (in {formData?.country||"your country"}&apos;s currency), and the exact steps to begin this week.
-                  </p>
-                </div>
-
-                {(data.career||[]).map((o,i)=>{
-                  // Derive resource links from job type and steps content
-                  const careerLinks = getCareerLinks(o, formData);
-                  return(
-                  <div key={i} style={{marginBottom:24,background:"var(--lift)",borderRadius:18,border:"1px solid rgba(255,255,255,0.07)",overflow:"hidden"}}>
-                    {/* Title bar */}
-                    <div style={{padding:"18px 20px",background:"linear-gradient(135deg,rgba(210,175,90,0.06),transparent)",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
-                      <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-                        <div style={{width:46,height:46,borderRadius:12,background:"var(--gold-dim)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-                          {o.type==="job"?"💼":o.type==="freelance"?"🌐":o.type==="business"?"⚡":"◈"}
-                        </div>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:17,fontWeight:700,color:"var(--cream)",marginBottom:6,lineHeight:1.3}}>{o.title}</div>
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            <span style={{fontSize:10,padding:"3px 10px",borderRadius:20,background:"rgba(210,175,90,0.1)",color:"var(--gold)",fontFamily:"var(--f-mono)",border:"1px solid rgba(210,175,90,0.2)"}}>{o.type}</span>
-                            <span style={{fontSize:10,padding:"3px 10px",borderRadius:20,background:"rgba(31,168,154,0.08)",color:"var(--teal)",fontFamily:"var(--f-mono)",border:"1px solid rgba(31,168,154,0.15)"}}>{o.timeline}</span>
-                            <span style={{fontSize:10,padding:"3px 10px",borderRadius:20,background:"rgba(255,255,255,0.04)",color:"var(--cream-40)",fontFamily:"var(--f-mono)",border:"1px solid rgba(255,255,255,0.08)"}}>Effort: {o.effort}</span>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Income — shown prominently */}
-                      <div style={{marginTop:12,padding:"10px 14px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:10,display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:16}}>💰</span>
-                        <div>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:2}}>EARNING POTENTIAL</div>
-                          <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{o.income}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{padding:"16px 20px"}}>
-                      {/* Why this fits */}
-                      {o.why&&(
-                        <div style={{padding:"12px 16px",background:"rgba(210,175,90,0.04)",borderLeft:"2px solid var(--gold)",borderRadius:"0 10px 10px 0",marginBottom:16}}>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:5}}>WHY THIS FITS YOU</div>
-                          <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,margin:0}}>{o.why}</p>
-                        </div>
-                      )}
-                      {o.desc&&!o.why&&<p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75,marginBottom:16}}>{o.desc}</p>}
-
-                      {/* Steps */}
-                      {o.how&&Array.isArray(o.how)&&o.how.length>0&&(
-                        <div style={{marginBottom:16}}>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--teal)",letterSpacing:".1em",marginBottom:10}}>HOW TO START — THIS WEEK</div>
-                          {o.how.map((step,si)=>(
-                            <div key={si} style={{display:"flex",gap:10,marginBottom:8,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
-                              <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(31,168,154,0.1)",border:"1px solid rgba(31,168,154,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:"var(--teal)",fontWeight:700}}>{si+1}</div>
-                              <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.65,margin:0}}>{step}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Resource links — direct links to platforms, courses, tools */}
-                      {careerLinks.length>0&&(
-                        <div>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".1em",marginBottom:10}}>START HERE — DIRECT LINKS</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                            {careerLinks.map((lk,li)=>(
-                              <a key={li} href={lk.url} target="_blank" rel="noopener noreferrer"
-                                style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
-                                  background:lk.type==="course"?"rgba(155,114,207,0.08)":lk.type==="platform"?"rgba(31,168,154,0.08)":"rgba(210,175,90,0.08)",
-                                  border:`1px solid ${lk.type==="course"?"rgba(155,114,207,0.2)":lk.type==="platform"?"rgba(31,168,154,0.2)":"rgba(210,175,90,0.2)"}`,
-                                  borderRadius:10,textDecoration:"none",transition:"opacity .15s"}}
-                                onMouseEnter={e=>e.currentTarget.style.opacity=".75"}
-                                onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                                <span style={{fontSize:15,flexShrink:0}}>{lk.type==="course"?"📚":lk.type==="platform"?"🌐":"🛠"}</span>
-                                <div style={{flex:1}}>
-                                  <div style={{fontSize:13,color:"var(--cream)",fontWeight:500}}>{lk.label}</div>
-                                </div>
-                                <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
-                                  background:lk.type==="course"?"rgba(155,114,207,0.15)":lk.type==="platform"?"rgba(31,168,154,0.15)":"rgba(210,175,90,0.15)",
-                                  color:lk.type==="course"?"#9b72cf":lk.type==="platform"?"var(--teal)":"var(--gold)",
-                                  fontFamily:"var(--f-mono)",flexShrink:0}}>
-                                  {lk.type} ↗
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <AudioPlayer text={`${o.title}. ${o.why||o.desc||""}. How to start: ${(o.how||[]).join(". ")}`} label="Listen" mini={false}/>
-                    </div>
-                  </div>
-                );})}
-              </div>
-            </LockGate>
-          )}
-
-          {mod==="relocate"&&(
-            <RelocationExplorer
-              suggestedCountries={data.relocation||[]}
-              formData={formData}
-              userId={userId}
-              isPremium={isPremium}
-              isPaid={isPaid}
-              onUnlock={onUnlock}
-            />
-          )}
-          {mod==="advisor"&&(
-            <AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
-          )}
-
-          {/* ── WELLBEING ── */}
-          {["innerpeace","angerstress","sleepcoach","anxietytool","griefloss"].includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
-
-          {/* ── BODY & STYLE ── */}
-          {["glowup","nogym","posture","bodyfuel"].includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
-
-          {/* ── SOCIAL & LIFE ── */}
-          {["confidencelab","relationshipiq","smalltalk","negotiation","digitallife","parenting"].includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
-
-          {/* ── MONEY DEEP DIVES ── */}
-          {["debtfreedom","sidehustle","investment101"].includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
-
-          {/* ── PURPOSE ── */}
-          {["visionboard","legacyletter","fearaudit","morningritual","dailywisdom","lettertoself"].includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
-
-          {/* ── DISCOVER ── */}
-          {["dreaminterp","peopledecoder","hardconvo","weeklychallenge"].includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
-
-          <div style={{marginTop:48,paddingTop:28,borderTop:"1px solid var(--line)",display:"flex",gap:10,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}>
-            <div className="small" suppressHydrationWarning>Last updated · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
-            <div style={{display:"flex",gap:8}}>
-              {isPremium&&<button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>{
-                const name   = formData?.name    || "User";
-                const country= formData?.country || "";
-                const today  = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-                const scores = data?.scores || {};
-                const overall= data?.overall || 0;
-
-                const sec=(tag,title,body,accent="#c8a84b")=>body?`
-                  <div class="sec">
-                    <div class="tag" style="color:${accent}">${tag}</div>
-                    <h3>${title}</h3>
-                    <p>${body}</p>
-                  </div>`:""
-
-                const pillarRow=(label,score,exp,color)=>`
-                  <div class="pillar">
-                    <div class="pillar-head">
-                      <span class="pillar-label">${label}</span>
-                      <span class="pillar-score" style="color:${color}">${score}/100</span>
-                    </div>
-                    <div class="bar-track"><div class="bar-fill" style="width:${score}%;background:${color}"></div></div>
-                    ${exp?`<p class="pillar-exp">${exp}</p>`:""}
-                  </div>`
-
-                const roadmapSection=()=>{
-                  if(!data?.roadmap?.length) return "";
-                  return `<div class="sec"><div class="tag" style="color:#4ab8a0">PREMIUM CONTENT</div><h3>Your Roadmap</h3>${
-                    data.roadmap.map((r,i)=>`<div class="roadmap-phase">
-                      <div class="phase-label">${r.phase}</div>
-                      <strong>${r.title}</strong>
-                      <p>${r.desc}</p>
-                      ${r.steps?.length?`<ol>${r.steps.map(s=>`<li>${s}</li>`).join("")}</ol>`:""}
-                      ${r.win?`<div class="win">🎯 ${r.win}</div>`:""}
-                    </div>`).join("")
-                  }</div>`
-                }
-
-                const careerSection=()=>{
-                  if(!data?.career?.length) return "";
-                  return `<div class="sec"><div class="tag" style="color:#9b72cf">CAREER PATHS</div><h3>Your 3 Career Paths</h3>${
-                    data.career.map((c,i)=>`<div class="career-card">
-                      <strong>${i+1}. ${c.title}</strong> <span class="badge">${c.type}</span>
-                      <div class="income">💰 ${c.income}</div>
-                      ${c.why?`<p>${c.why}</p>`:""}
-                      ${c.how?.length?`<ul>${c.how.map(s=>`<li>${s}</li>`).join("")}</ul>`:""}
-                    </div>`).join("")
-                  }</div>`
-                }
-
-                const scoreHistorySection=()=>{
-                  if(!data?.score_history||data.score_history.length<2) return "";
-                  const first=data.score_history[0];
-                  const last=data.score_history[data.score_history.length-1];
-                  const diff=last.overall-first.overall;
-                  return `<div class="sec"><div class="tag">SCORE HISTORY</div><h3>Your Progress Over Time</h3>
-                    <p>Since your first assessment on ${first.date}, your overall score has ${diff>=0?"increased by":"changed by"} <strong style="color:${diff>=0?"#4ab8a0":"#f87171"}">${diff>=0?"+":""}${diff} points</strong>.</p>
-                    <table class="history-table">
-                      <tr><th>Date</th><th>Overall</th><th>Life</th><th>Wealth</th><th>Mindset</th><th>Relations</th></tr>
-                      ${data.score_history.map(h=>`<tr><td>${h.date}</td><td><strong>${h.overall}</strong></td><td>${h.life}</td><td>${h.wealth}</td><td>${h.mindset}</td><td>${h.relations}</td></tr>`).join("")}
-                    </table>
-                  </div>`
-                }
-
-                const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/>
-                <title>DestinIQ Report — ${name}</title>
-                <style>
-                  *{box-sizing:border-box;}
-                  body{font-family:Georgia,serif;max-width:740px;margin:0 auto;color:#1a1a1a;line-height:1.75;padding:32px 24px;font-size:14px;}
-                  .cover{text-align:center;padding:48px 0 40px;border-bottom:3px solid #c8a84b;margin-bottom:40px;}
-                  .cover h1{font-size:36px;margin:0 0 4px;letter-spacing:-.5px;}
-                  .cover .subtitle{color:#888;font-size:13px;margin-bottom:20px;}
-                  .overall{font-size:52px;font-weight:900;color:#c8a84b;line-height:1;margin:12px 0 4px;}
-                  .overall-label{font-size:11px;font-family:monospace;color:#888;letter-spacing:.15em;text-transform:uppercase;}
-                  .pillars{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0;}
-                  .pillar{background:#fafaf8;border-radius:8px;padding:14px 16px;}
-                  .pillar-head{display:flex;justify-content:space-between;margin-bottom:6px;}
-                  .pillar-label{font-weight:600;font-size:13px;}
-                  .pillar-score{font-weight:800;font-size:15px;}
-                  .bar-track{background:#eee;border-radius:4px;height:6px;}
-                  .bar-fill{height:6px;border-radius:4px;}
-                  .pillar-exp{font-size:12px;color:#666;margin:8px 0 0;line-height:1.6;}
-                  .sec{margin:32px 0;padding:22px 24px;background:#fafaf8;border-left:4px solid #c8a84b;border-radius:0 12px 12px 0;}
-                  .sec h3{margin:0 0 10px;font-size:17px;}
-                  .sec p{margin:0;color:#333;}
-                  .tag{font-size:9px;font-family:monospace;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;font-weight:700;}
-                  .strengths-risks{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:32px 0;}
-                  .sr-box{background:#fafaf8;border-radius:10px;padding:16px;}
-                  .sr-box h4{margin:0 0 10px;font-size:14px;}
-                  .sr-item{display:flex;gap:8px;margin-bottom:7px;font-size:13px;color:#444;line-height:1.5;}
-                  .roadmap-phase{margin:16px 0;padding:16px;background:#fff;border:1px solid #e8e0d0;border-radius:8px;}
-                  .phase-label{font-size:10px;font-family:monospace;color:#c8a84b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
-                  .roadmap-phase ol{margin:10px 0;padding-left:18px;}
-                  .roadmap-phase li{margin-bottom:5px;font-size:13px;color:#444;}
-                  .win{background:#f0faf5;border-left:3px solid #4ab8a0;padding:8px 12px;margin-top:10px;border-radius:0 6px 6px 0;font-size:13px;}
-                  .career-card{margin:14px 0;padding:14px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;}
-                  .badge{display:inline-block;padding:2px 8px;background:#f0eaf8;color:#9b72cf;border-radius:10px;font-size:10px;font-family:monospace;margin-left:6px;}
-                  .income{color:#c8a84b;font-size:12px;margin:4px 0 8px;font-weight:600;}
-                  .career-card ul{margin:6px 0;padding-left:18px;}
-                  .career-card li{font-size:12px;color:#555;margin-bottom:4px;}
-                  .history-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;}
-                  .history-table th{background:#f0ece4;padding:7px 10px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:.05em;}
-                  .history-table td{padding:6px 10px;border-bottom:1px solid #eee;}
-                  .closing-quote{text-align:center;padding:32px 24px;margin:40px 0;border-top:2px solid #e8e0d0;border-bottom:2px solid #e8e0d0;}
-                  .closing-quote p{font-size:20px;font-style:italic;color:#c8a84b;line-height:1.6;margin:0;}
-                  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #eee;text-align:center;font-size:11px;color:#aaa;font-family:monospace;}
-                  
-/* ══════════════════════════════════════════════════════════════════════════
-   NEW UI SYSTEM — Sidebar, Bottom Nav, Home Screen, Category Cards
-   ══════════════════════════════════════════════════════════════════════════ */
-
-/* App layout shell */
-.app-shell{display:flex;min-height:100vh;background:var(--void);}
-
-/* ── Sidebar (desktop) ──────────────────────────────────────────────────── */
-.sidebar-nav{
-  width:220px;min-height:100vh;position:fixed;left:0;top:0;bottom:0;
-  background:var(--night);border-right:1px solid var(--line);
-  display:flex;flex-direction:column;padding:0;z-index:200;
-  overflow-y:auto;
-}
-.sidebar-logo{padding:20px 20px 8px;border-bottom:1px solid var(--line-dim);}
-.sidebar-logo .logo{font-size:18px;font-weight:800;letter-spacing:-.02em;}
-.sidebar-items{padding:12px 0;flex:1;}
-.sidebar-item{
-  display:flex;align-items:center;gap:12px;padding:11px 20px;
-  cursor:pointer;transition:all .15s;border-radius:0;
-  font-size:14px;color:var(--cream-50);font-weight:500;border:none;
-  background:none;width:100%;text-align:left;
-}
-.sidebar-item:hover{background:rgba(255,255,255,0.04);color:var(--cream);}
-.sidebar-item.active{
-  background:rgba(200,168,75,0.08);color:var(--gold);
-  border-left:3px solid var(--gold);
-}
-.sidebar-item .s-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0;}
-.sidebar-streak{padding:16px 20px;border-top:1px solid var(--line-dim);}
-.sidebar-upgrade{padding:16px 20px;padding-top:0;}
-
-/* ── Main content area (desktop) ─────────────────────────────────────────── */
-.main-content{margin-left:220px;flex:1;min-height:100vh;}
-
-/* ── Bottom Nav (mobile) ──────────────────────────────────────────────────── */
-.bottom-nav{
-  display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
-  background:var(--night);border-top:1px solid var(--line);
-  padding:8px 0 max(8px,env(safe-area-inset-bottom));
-}
-.bottom-nav-items{display:flex;justify-content:space-around;align-items:flex-end;}
-.bottom-nav-item{
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  cursor:pointer;padding:4px 12px;border-radius:12px;border:none;
-  background:none;color:var(--cream-30);transition:all .15s;flex:1;
-}
-.bottom-nav-item.active{color:var(--gold);}
-.bottom-nav-item .bn-icon{font-size:20px;line-height:1;}
-.bottom-nav-item .bn-label{font-size:10px;font-weight:600;font-family:var(--f-mono);letter-spacing:.04em;}
-
-/* ── Top bar (mobile only) ────────────────────────────────────────────────── */
-.mobile-topbar{
-  display:none;padding:12px 16px;
-  background:var(--night);border-bottom:1px solid var(--line);
-  position:sticky;top:0;z-index:100;
-  display:flex;align-items:center;justify-content:space-between;
-}
-
-/* ── Home Screen ─────────────────────────────────────────────────────────── */
-.home-screen{padding:28px 32px;max-width:1100px;}
-.home-greeting{margin-bottom:28px;}
-.home-greeting h1{font-size:28px;font-weight:800;color:var(--cream);margin-bottom:4px;}
-.home-greeting p{font-size:14px;color:var(--cream-40);}
-
-/* 3-column hero cards */
-.home-hero{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-bottom:28px;}
-.hero-card{
-  padding:20px;border-radius:18px;border:1px solid var(--line);
-  background:var(--raised);cursor:pointer;transition:all .2s;
-  display:flex;flex-direction:column;min-height:140px;
-}
-.hero-card:hover{border-color:rgba(200,168,75,0.3);transform:translateY(-2px);}
-.hero-card.continue{background:linear-gradient(135deg,rgba(200,168,75,0.08),rgba(200,168,75,0.02));border-color:rgba(200,168,75,0.2);}
-.hero-card .hc-eyebrow{font-size:10px;font-family:var(--f-mono);letter-spacing:.12em;color:var(--cream-30);margin-bottom:10px;}
-.hero-card .hc-title{font-size:17px;font-weight:700;color:var(--cream);margin-bottom:6px;line-height:1.3;}
-.hero-card .hc-desc{font-size:12px;color:var(--cream-40);flex:1;line-height:1.6;}
-.hero-card .hc-action{font-size:12px;color:var(--gold);font-weight:600;margin-top:12px;display:flex;align-items:center;gap:4px;}
-.hero-card .hc-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(200,168,75,0.1);color:var(--gold);display:inline-block;margin-bottom:8px;}
-.progress-bar-home{height:3px;background:rgba(255,255,255,0.08);border-radius:3px;margin:8px 0 4px;}
-.progress-bar-home-fill{height:100%;border-radius:3px;background:var(--gold);}
-
-/* Quick Actions */
-.quick-actions{margin-bottom:28px;}
-.quick-actions h2{font-size:16px;font-weight:700;color:var(--cream);margin-bottom:14px;}
-.qa-grid{display:flex;gap:12px;flex-wrap:wrap;}
-.qa-item{
-  display:flex;flex-direction:column;align-items:center;gap:8px;
-  cursor:pointer;padding:14px 18px;border-radius:16px;
-  background:var(--raised);border:1px solid var(--line);
-  transition:all .2s;min-width:90px;
-}
-.qa-item:hover{border-color:rgba(200,168,75,0.3);background:rgba(200,168,75,0.05);}
-.qa-item .qa-icon{
-  width:44px;height:44px;border-radius:12px;
-  display:flex;align-items:center;justify-content:center;font-size:20px;
-}
-.qa-item .qa-label{font-size:11px;color:var(--cream-50);font-weight:600;text-align:center;}
-
-/* Explore by Category */
-.explore-section{margin-bottom:28px;}
-.explore-section h2{font-size:16px;font-weight:700;color:var(--cream);margin-bottom:14px;}
-.cat-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;}
-.cat-scroll::-webkit-scrollbar{display:none;}
-.cat-card{
-  flex-shrink:0;width:160px;padding:16px;border-radius:16px;
-  border:1px solid var(--line);cursor:pointer;transition:all .2s;
-  background:var(--raised);
-}
-.cat-card:hover{transform:translateY(-2px);}
-.cat-card .cc-icon{font-size:28px;margin-bottom:10px;display:block;}
-.cat-card .cc-label{font-size:13px;font-weight:700;color:var(--cream);margin-bottom:3px;}
-.cat-card .cc-count{font-size:11px;color:var(--cream-30);}
-
-/* Progress section on home */
-.home-stats{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px;}
-.stat-card{padding:20px;border-radius:18px;background:var(--raised);border:1px solid var(--line);}
-.stat-card h3{font-size:13px;font-weight:600;color:var(--cream-40);margin-bottom:16px;}
-.stat-big{font-size:42px;font-weight:800;color:var(--cream);}
-.stat-item{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
-.stat-item .si-icon{font-size:16px;width:24px;}
-.stat-item .si-value{font-size:15px;font-weight:700;color:var(--cream);}
-.stat-item .si-label{font-size:12px;color:var(--cream-40);}
-
-/* ── Category Page ────────────────────────────────────────────────────────── */
-.cat-page{padding:28px 32px;max-width:900px;}
-.cat-page-header{display:flex;align-items:center;gap:12px;margin-bottom:24px;}
-.cat-page-icon{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;}
-.tool-list-item{
-  display:flex;align-items:center;gap:14px;padding:14px 16px;
-  border-radius:14px;cursor:pointer;border:1px solid var(--line);
-  background:var(--raised);margin-bottom:10px;transition:all .2s;
-}
-.tool-list-item:hover{border-color:rgba(200,168,75,0.3);}
-.tool-list-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.tool-list-label{font-size:14px;font-weight:600;color:var(--cream);flex:1;}
-.tool-list-desc{font-size:12px;color:var(--cream-40);}
-.tool-list-arrow{color:var(--cream-30);font-size:16px;}
-
-/* ── Tool Page ────────────────────────────────────────────────────────────── */
-.tool-page{padding:24px 32px;max-width:820px;}
-.tool-page-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
-.tool-actions{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
-.tool-action-btn{
-  display:flex;align-items:center;gap:6px;padding:8px 16px;
-  border-radius:10px;border:1px solid var(--line);background:var(--raised);
-  color:var(--cream-60);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
-}
-.tool-action-btn:hover{border-color:var(--gold);color:var(--gold);}
-.tool-action-btn.primary{background:var(--gold);color:#000;border-color:var(--gold);}
-.tool-content{
-  padding:20px;border-radius:16px;background:var(--raised);
-  border:1px solid var(--line);line-height:1.9;font-size:14px;
-  color:var(--cream-70);white-space:pre-wrap;margin-bottom:16px;
-}
-.tool-followup{padding:16px;border-radius:14px;background:var(--raised);border:1px solid var(--line);}
-.tool-followup label{font-size:11px;font-family:var(--f-mono);color:var(--cream-30);letter-spacing:.08em;display:block;margin-bottom:10px;}
-.tool-followup-input{display:flex;gap:8px;}
-.tool-followup input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 14px;color:var(--cream);font-size:13px;outline:none;}
-.related-tools{margin-top:20px;}
-.related-tools h3{font-size:13px;font-weight:600;color:var(--cream-40);margin-bottom:12px;font-family:var(--f-mono);letter-spacing:.08em;}
-
-/* ── Quick Identity Step ──────────────────────────────────────────────────── */
-.identity-step{
-  min-height:100vh;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;padding:32px 20px;
-  background:var(--void);
-}
-.identity-options{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:500px;width:100%;margin:28px 0;}
-.identity-option{
-  padding:20px 16px;border-radius:18px;border:1px solid var(--line);
-  background:var(--raised);cursor:pointer;transition:all .2s;text-align:center;
-  display:flex;flex-direction:column;align-items:center;gap:10px;
-}
-.identity-option:hover,.identity-option.selected{border-color:var(--gold);background:rgba(200,168,75,0.06);}
-.identity-option .io-icon{font-size:32px;}
-.identity-option .io-label{font-size:13px;font-weight:600;color:var(--cream);}
-
-/* ── Responsive overrides ─────────────────────────────────────────────────── */
-@media(max-width:900px){
-  .sidebar-nav{display:none;}
-  .main-content{margin-left:0;}
-  .bottom-nav{display:block;}
-  .mobile-topbar{display:flex;}
-  .home-screen{padding:16px 16px 80px;}
-  .cat-page{padding:16px 16px 80px;}
-  .tool-page{padding:16px 16px 80px;}
-  .home-hero{grid-template-columns:1fr;}
-  .home-stats{grid-template-columns:1fr;}
-  .identity-options{grid-template-columns:repeat(2,1fr);}
-}
-@media(min-width:901px){
-  .mobile-topbar{display:none!important;}
-  .bottom-nav{display:none!important;}
-}
-
-@media print{
-                    body{padding:16px;}
-                    .pillars,.strengths-risks{break-inside:avoid;}
-                    .roadmap-phase,.career-card,.sec{break-inside:avoid;}
-                  }
-                </style></head><body>
-
-                <!-- COVER -->
-                <div class="cover">
-                  <div class="tag" style="color:#c8a84b">DestinIQ · Personal Clarity Report</div>
-                  <h1>${name}</h1>
-                  <div class="subtitle">${country?country+" · ":""}<em>${today}</em></div>
-                  <div class="overall">${overall}</div>
-                  <div class="overall-label">Overall Score · /100</div>
-                </div>
-
-                <!-- PILLAR SCORES -->
-                <div class="tag" style="color:#888">Your Four Pillars</div>
-                <div class="pillars">
-                  ${pillarRow("Life",   scores.life||0,   data?.score_explanations?.life,    "#c8a84b")}
-                  ${pillarRow("Wealth", scores.wealth||0, data?.score_explanations?.wealth,  "#4ab8a0")}
-                  ${pillarRow("Mindset",scores.mindset||0,data?.score_explanations?.mindset, "#9b72cf")}
-                  ${pillarRow("Relations",scores.relations||0,data?.score_explanations?.relations,"#f87171")}
-                </div>
-
-                <!-- HEADLINE & GREETING -->
-                ${sec("Your Clarity Picture","What This All Means",data?.headline)}
-                ${sec("Personal Message","We Read Everything You Shared",data?.greeting,"#4ab8a0")}
-
-                <!-- DEEP PILLARS -->
-                ${data?.life       ?sec("Deep Dive","Life",    data.life   ):""}
-                ${data?.wealth     ?sec("Deep Dive","Wealth",  data.wealth ,"#4ab8a0"):""}
-                ${data?.mindset    ?sec("Deep Dive","Mindset", data.mindset,"#9b72cf"):""}
-                ${data?.relationships?sec("Deep Dive","Relationships",data.relationships,"#f87171"):""}
-
-                <!-- STRENGTHS & RISKS -->
-                ${(data?.strengths?.length||data?.risks?.length)?`
-                <div class="strengths-risks">
-                  ${data?.strengths?.length?`<div class="sr-box">
-                    <h4 style="color:#4ab8a0">What You Bring ✓</h4>
-                    ${data.strengths.map(s=>`<div class="sr-item"><span style="color:#4ab8a0">◎</span>${s}</div>`).join("")}
-                  </div>`:""}
-                  ${data?.risks?.length?`<div class="sr-box">
-                    <h4 style="color:#f87171">What to Watch Out For ◇</h4>
-                    ${data.risks.map(r=>`<div class="sr-item"><span style="color:#f87171">◇</span>${r}</div>`).join("")}
-                  </div>`:""}
-                </div>`:""}
-
-                <!-- REPORT SECTIONS -->
-                ${(data?.sections||[]).map(s=>sec("Your Report",s.title,s.content)).join("")}
-
-                <!-- ROADMAP -->
-                ${roadmapSection()}
-
-                <!-- CAREER PATHS -->
-                ${careerSection()}
-
-                <!-- SCORE HISTORY -->
-                ${scoreHistorySection()}
-
-                <!-- CLOSING -->
-                ${data?.closing?`<div class="closing-quote"><p>"${data.closing}"</p></div>`:""}
-
-                <div class="footer">
-                  Generated by DestinIQ · destiniq.vercel.app · ${today}
-                  <br/>This report is personal and confidential. Regenerate anytime as your situation changes.
-                </div>
-                </body></html>`;
-
-                const w=window.open("","_blank");
-                if(w){w.document.write(html);w.document.close();setTimeout(()=>w.print(),600);}
-              }}>📄 Download PDF</button>}
-              {!isPremium&&<button className="btn btn-ghost" style={{fontSize:11,opacity:.6}} onClick={onUnlock}>🔒 PDF — Pro Max only</button>}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="disc">DestinIQ is a personal intelligence platform. All insights are frameworks for reflection, not professional advice.</div>
-    </div>
-      )}{/* end report section */}
-
-      </div>{/* main-content */}
       <BottomNav nav={navSection} setNav={setNav}/>
     </div>
   );
