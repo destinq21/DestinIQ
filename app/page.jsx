@@ -295,7 +295,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -1015,7 +1015,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
 .fu-input:focus{border-color:var(--gold);}
 @media(max-width:900px){
-  .sidebar{display:none;}.main-area{margin-left:0;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}
+  .sidebar{display:none;}.main-area{margin-left:0;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
 }
@@ -5621,6 +5621,83 @@ WHAT THIS BUILDS: The specific capability or confidence this challenge develops
 BONUS LEVEL: A harder version for if they complete the main challenge
 Make it feel like a personal trainer designed this specifically for them. Not a generic "talk to a stranger" challenge.`,
   },
+  money:{
+    title:"Money Intelligence",icon:"💰",subtitle:"Build wealth with clarity",
+    prompt:(p)=>`You are DestinIQ, a financial intelligence coach. Generate a personalized money intelligence report for ${p.name||"this user"} (${p.age}, ${p.country}).
+Their situation: ${p.goals||p.bigGoal}. Income level: ${p.income||"not specified"}.
+Create a structured report with:
+1. Their Current Financial Reality (honest assessment)
+2. The #1 Money Mindset Shift They Need
+3. Three specific income or saving strategies tailored to ${p.country}
+4. A 30-day money action plan
+Use ${p.currencySymbol||"$"} for all amounts. Be specific, actionable, and encouraging.`,
+  },
+  earnonline:{
+    title:"Online Income Builder",icon:"🌐",subtitle:"Create income from the internet",
+    prompt:(p)=>`You are DestinIQ. Create a personalized online income plan for ${p.name||"this user"} in ${p.country}.
+Their skills: ${p.skills||"general skills"}. Goal: ${p.goals||p.bigGoal}.
+Provide: Top 3 online income opportunities for their profile, step-by-step starter plan for the best option, realistic income timeline, and first action to take today.`,
+  },
+  business:{
+    title:"Business Builder",icon:"🏢",subtitle:"Launch and grow your business",
+    prompt:(p)=>`You are DestinIQ. Create a personalized business strategy for ${p.name||"this user"} in ${p.country}.
+Their background: ${p.career||p.occupation||"not specified"}. Goal: ${p.goals||p.bigGoal}.
+Cover: Best business model for their profile, ${p.country}-specific startup considerations, a lean launch plan with budget in ${p.currencySymbol||"$"}, and first 3 action steps.`,
+  },
+  lifehacks:{
+    title:"Life Hacks",icon:"⚡",subtitle:"Shortcuts to a better life",
+    prompt:(p)=>`You are DestinIQ. Generate 10 powerful, personalized life hacks for ${p.name||"this user"} based on their profile.
+Their biggest blockers: ${p.challenge||"not specified"}. Goal: ${p.goals||p.bigGoal}.
+Each hack should be: practical, immediately actionable, and specific to their situation. Focus on time, energy, money, and relationships.`,
+  },
+  jimrohn:{
+    title:"Jim Rohn Wisdom",icon:"📚",subtitle:"Classic success principles",
+    prompt:(p)=>`You are DestinIQ applying Jim Rohn's philosophy. Give ${p.name||"this user"} a personalized wisdom session.
+Their situation: ${p.goals||p.bigGoal}. Challenges: ${p.challenge||"not specified"}.
+Draw from Jim Rohn's principles: personal development, discipline, philosophy of failure, seasons of life, and financial independence. Apply each principle directly to their current situation.`,
+  },
+  mindsettenx:{
+    title:"10X Mindset",icon:"🚀",subtitle:"Think and grow 10 times bigger",
+    prompt:(p)=>`You are DestinIQ applying 10X thinking. Help ${p.name||"this user"} break their mental ceiling.
+Current thinking: ${p.goals||p.bigGoal}. Blockers: ${p.challenge||"not specified"}.
+Create: A 10X vision of their life in 5 years, the mindset shifts required, the ONE biggest fear holding them back, and a 10X action plan for the next 90 days.`,
+  },
+  success:{
+    title:"Success Psychology",icon:"🏆",subtitle:"The psychology of high achievers",
+    prompt:(p)=>`You are DestinIQ, a success psychology coach. Analyse ${p.name||"this user"}'s success potential.
+Their ambition: ${p.goals||p.bigGoal}. Current challenges: ${p.challenge||"not specified"}.
+Provide: Their success personality type, the psychological patterns blocking them, success habits of people with their profile, and a 21-day success psychology practice.`,
+  },
+  invest:{
+    title:"Invest in Yourself",icon:"💎",subtitle:"Your best ROI is you",
+    prompt:(p)=>`You are DestinIQ. Create a personal investment roadmap for ${p.name||"this user"}.
+Current situation: ${p.goals||p.bigGoal}. Skills: ${p.skills||"not specified"}.
+Design: Top 5 self-investments with highest ROI for their profile, a skills development plan, recommended books and resources, and a 6-month self-improvement budget in ${p.currencySymbol||"$"}.`,
+  },
+  discipline:{
+    title:"Daily Discipline",icon:"🔥",subtitle:"Build unbreakable habits",
+    prompt:(p)=>`You are DestinIQ. Build a personalised discipline system for ${p.name||"this user"}.
+Their struggle: ${p.challenge||"not specified"}. Goal: ${p.goals||p.bigGoal}.
+Create: A personalised morning routine, their 3 non-negotiable daily disciplines, strategies for their specific blockers, and a habit stacking system for their lifestyle.`,
+  },
+  career:{
+    title:"Career Intelligence",icon:"💼",subtitle:"Accelerate your career",
+    prompt:(p)=>`You are DestinIQ, a career strategy coach. Analyse the career path for ${p.name||"this user"} (${p.age}, ${p.country}).
+Current work: ${p.career||p.occupation||"not specified"}. Goal: ${p.goals||p.bigGoal}.
+Provide: Career strengths assessment, top 3 career moves to make in the next 12 months, salary negotiation strategy for ${p.country}, and skills to develop immediately.`,
+  },
+  roadmap:{
+    title:"Life Roadmap",icon:"🗺️",subtitle:"Your personalised life plan",
+    prompt:(p)=>`You are DestinIQ. Build a comprehensive life roadmap for ${p.name||"this user"} (${p.age}, ${p.country}).
+Vision: ${p.goals||p.bigGoal}. Blockers: ${p.challenge||"not specified"}.
+Create a 12-month roadmap with: Quarterly milestones, monthly focus areas, weekly action themes, and the single most important thing to do each month. Make it specific and achievable.`,
+  },
+  decisions:{
+    title:"Decision Clarity",icon:"🎯",subtitle:"Make better decisions faster",
+    prompt:(p)=>`You are DestinIQ. Help ${p.name||"this user"} build a personal decision-making framework.
+Their situation: ${p.goals||p.bigGoal}. Blockers: ${p.challenge||"not specified"}.
+Cover: Their decision-making style and blind spots, a personal decision framework for major life choices, how to overcome analysis paralysis, and a framework for the most important decision they face right now.`,
+  },
 };
 
 // ── GenericAIModule renderer ────────────────────────────────────────────────
@@ -5676,7 +5753,7 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
   };
 
   // Auto-generate if no content yet
-  useEffect(()=>{ if(!content2 && profile?.name) generate(); },[profile?.name]);
+  useEffect(()=>{ if(!content2 && (profile?.name||profile?.country||profile)) generate(); },[profile?.name,profile?.country]);
 
   const wellbeingIds = ['innerpeace','angerstress','sleepcoach','anxietytool','griefloss'];
   const isWellbeing  = wellbeingIds.includes(modId);
@@ -10600,7 +10677,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   // Today's Insight — from report data or derived from profile
   const getInsight=()=>{
     const ri=txt(dailyInsight)||txt(data?.daily_insight)||txt(data?.daily_recommendation)||txt(data?.closing);
-    if(ri&&ri.length>20) return ri.slice(0,200);
+    if(ri&&ri.length>20) return ri;
     const bl=(Array.isArray(formData?.blockers)?formData.blockers.join(" "):(formData?.challenge||"")).toLowerCase();
     const fo=(formData?.focus||"").toLowerCase();
     if(bl.includes("overthink"))  return "You tend to overthink decisions. Today is about taking one clear action without delay.";
@@ -10642,32 +10719,23 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   const recom=getRecom();
 
   const quickActions=[
-    {icon:"✅",label:"Check-in",    color:"#1ab89a",action:()=>setShowCheckin(true)},
-    {icon:"📋",label:"My Report",  color:G.gold,   action:()=>setNav("report")},
-    {icon:"🏆",label:"Wins",       color:"#ffd54f", action:()=>setNav("wins")},
-    {icon:"💎",label:"Wisdom",     color:"#64b5f6", action:()=>setNav("tool:dailywisdom")},
-    {icon:"⚡",label:"Explore",    color:"#b39ddb", action:()=>setNav("explore")},
-  ];
+    {icon:"✅",label:"Daily Check-in",bg:"rgba(26,184,154,.12)",brd:"rgba(26,184,154,.25)",color:"#1ab89a",action:()=>setNav("checkin")},
+    {icon:"🤖",label:"AI Coach",     bg:"rgba(155,114,207,.12)",brd:"rgba(155,114,207,.25)",color:"#9b72cf", action:()=>setNav("tool:advisor")},
+    {icon:"⚡",label:"Challenge",    bg:"rgba(229,115,115,.12)",brd:"rgba(229,115,115,.25)",color:"#e57373", action:()=>setNav("tool:weeklychallenge")},
+    {icon:"🏆",label:"My Wins",      bg:"rgba(255,213,79,.10)", brd:"rgba(255,213,79,.25)", color:"#ffd54f", action:()=>setNav("wins")},
+    {icon:"📓",label:"Journal",      bg:"rgba(100,181,246,.12)",brd:"rgba(100,181,246,.25)",color:"#64b5f6", action:()=>setNav("tool:lettertoself")},
+  ]
 
   return(
     <div style={{padding:"0 0 90px",minHeight:"100vh",background:G.bg,color:G.cream,
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
-      {/* ══ 1. GREETING HEADER ══ */}
-      <div style={{padding:"22px 20px 18px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:13,color:G.dimmer,marginBottom:3}}>{timeGreet},</div>
-          <h1 style={{fontSize:26,fontWeight:800,color:G.cream,margin:"0 0 4px",lineHeight:1.1}}>{name} 👋</h1>
-          <p style={{fontSize:12,color:G.dimmer,margin:0}}>{today}</p>
-        </div>
-        {streak>0&&(
-          <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
-            background:"rgba(240,180,41,0.08)",border:"1px solid rgba(240,180,41,0.2)",
-            borderRadius:20,alignSelf:"flex-start",marginTop:4}}>
-            <span style={{fontSize:15}}>🔥</span>
-            <span style={{fontSize:13,fontWeight:700,color:G.gold}}>{streak} day{streak!==1?"s":""}</span>
-          </div>
-        )}
+      {/* ══ 1. GREETING (desktop content, mobile uses MobileTopBar) ══ */}
+      <div style={{padding:"22px 20px 14px"}}>
+        <p style={{fontSize:12,color:G.dimmer,margin:"0 0 3px"}}>{today}</p>
+        <h1 style={{fontSize:24,fontWeight:800,color:G.cream,margin:0,lineHeight:1.15}}>
+          {timeGreet}, <span style={{color:G.gold}}>{name}</span> 👋
+        </h1>
       </div>
 
       <div style={{padding:"0 20px"}}>
@@ -10695,11 +10763,11 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
                 <div style={{fontSize:11,color:G.dimmer}}>{journeyPct}% in progress</div>
               </div>
             </div>
-            <button onClick={()=>setNav("report")}
+            <button onClick={()=>setNav("explore")}
               style={{display:"flex",alignItems:"center",gap:8,background:G.gold,color:"#000",
                 border:"none",borderRadius:10,padding:"12px 22px",fontSize:13,fontWeight:700,
                 cursor:"pointer",fontFamily:"inherit"}}>
-              Resume Session <span style={{fontSize:16}}>→</span>
+              Continue Learning <span style={{fontSize:16}}>→</span>
             </button>
           </div>
         </div>
@@ -10723,13 +10791,13 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
             {quickActions.map(a=>(
               <button key={a.label} onClick={a.action}
-                style={{background:G.card,border:"1px solid "+G.border,borderRadius:13,
+                style={{background:a.bg||G.card,border:"1px solid "+(a.brd||G.border),borderRadius:13,
                   padding:"14px 6px",textAlign:"center",cursor:"pointer",
-                  fontFamily:"inherit",outline:"none",transition:"border-color .15s"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.25)"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
-                <div style={{fontSize:22,marginBottom:6}}>{a.icon}</div>
-                <div style={{fontSize:10,color:G.dim,fontWeight:500,lineHeight:1.3}}>{a.label}</div>
+                  fontFamily:"inherit",outline:"none",transition:"all .15s"}}
+                onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.3)"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}>
+                <div style={{fontSize:22,marginBottom:7}}>{a.icon}</div>
+                <div style={{fontSize:10,color:a.color||G.dim,fontWeight:600,lineHeight:1.3}}>{a.label}</div>
               </button>
             ))}
           </div>
@@ -11082,9 +11150,9 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
   const menuItems=[
     {icon:"✏️",label:"Edit Profile",    action:()=>onEditProfile?.()},
     {icon:"⚡",label:"My Practices",    action:()=>setNav("practices")},
-    {icon:"📋",label:"Saved Reports",   action:()=>setNav("report")},
-    {icon:"📈",label:"Report History",  action:()=>setNav("report")},
-    {icon:"⚙️",label:"Settings",        action:()=>{}},
+    {icon:"📋",label:"Saved Reports",   action:()=>setNav("savedreports")},
+    {icon:"📈",label:"Report History",  action:()=>setNav("savedreports")},
+    {icon:"⚙️",label:"Settings",        action:()=>window.dispatchEvent(new CustomEvent("showEditProfile"))},
     {icon:"❓",label:"Help & Support",  action:()=>window.open("mailto:support@destiniq.app")},
   ];
 
@@ -11474,7 +11542,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
 
         {/* Right: CTA */}
         <div style={{textAlign:"center",flexShrink:0}}>
-          <button onClick={()=>setNav("home")}
+          <button onClick={()=>setNav("explore")}
             style={{display:"flex",alignItems:"center",gap:10,
               background:G.gold,color:"#000",border:"none",borderRadius:12,
               padding:"16px 30px",fontSize:15,fontWeight:700,cursor:"pointer",
@@ -11678,11 +11746,7 @@ Rules:
           {mod==="decisions" &&<DecisionModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="advisor"   &&<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="momentum"  &&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
-          {["innerpeace","angerstress","sleepcoach","anxietytool","griefloss","glowup","nogym",
-            "posture","bodyfuel","confidencelab","relationshipiq","smalltalk","negotiation",
-            "digitallife","parenting","debtfreedom","sidehustle","investment101","visionboard",
-            "legacyletter","fearaudit","morningritual","dailywisdom","lettertoself","dreaminterp",
-            "peopledecoder","hardconvo","weeklychallenge"].includes(mod)&&
+          {Object.keys(MODULE_CONFIGS).includes(mod)&&
             <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
         </div>
       )}
@@ -11695,7 +11759,12 @@ Rules:
       <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock}/>
 
       <MobileTopBar
-        title={isCat?CATEGORIES.find(c=>c.id===catId)?.label:isTool?TOOL_META[toolId]?.label:null}
+        title={(()=>{
+          if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
+          if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
+          if(isTool) return TOOL_META[toolId]?.label;
+          return null;
+        })()}
         onBack={isCat||isTool?()=>setNav(isCat?"explore":TOOL_META[toolId]?"category:"+TOOL_META[toolId].cat:"explore"):null}
         streak={streak} isPaid={isPaid} isProMax={isProMax}
         onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
@@ -11716,6 +11785,35 @@ Rules:
         {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/></div>}
         {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
         {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/></div>}
+        {navSection==="savedreports"&&(
+          <div style={{padding:"28px 24px 80px",maxWidth:860,margin:"0 auto"}}>
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(240,180,41,0.07)",border:"1px solid rgba(240,180,41,0.25)",borderRadius:20,padding:"5px 14px",marginBottom:20}}>
+              <span style={{fontSize:12}}>📋</span>
+              <span style={{fontSize:9,fontWeight:700,letterSpacing:".8px",color:"var(--gold)",fontFamily:"monospace"}}>SAVED REPORTS</span>
+            </div>
+            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",margin:"0 0 8px"}}>Your Saved Reports</h2>
+            <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",margin:"0 0 24px",lineHeight:1.6}}>Your intelligence reports are stored here for future reference.</p>
+            <div style={{background:"var(--night)",border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"22px",marginBottom:14,cursor:"pointer"}} onClick={()=>setNav("report")}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:44,height:44,borderRadius:12,background:"rgba(240,180,41,0.1)",border:"1px solid rgba(240,180,41,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📊</div>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:2}}>Personal Intelligence Report</div>
+                    <div style={{fontSize:11,color:"rgba(232,220,200,0.4)"}}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+                  </div>
+                </div>
+                <div style={{padding:"4px 10px",background:"rgba(129,199,132,0.12)",border:"1px solid rgba(129,199,132,0.25)",borderRadius:20,fontSize:10,color:"#81c784",fontWeight:700,flexShrink:0}}>LATEST</div>
+              </div>
+              <p style={{fontSize:13,color:"rgba(232,220,200,0.5)",margin:"0 0 14px",lineHeight:1.65}}>Complete AI analysis of your strengths, blind spots, opportunities and personalized roadmap.</p>
+              <button style={{background:"var(--gold)",color:"#000",border:"none",borderRadius:9,padding:"10px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>View Report →</button>
+            </div>
+            <div style={{background:"#111008",border:"1px solid rgba(232,220,200,0.06)",borderRadius:16,padding:"22px",textAlign:"center"}}>
+              <div style={{fontSize:30,marginBottom:10}}>🔮</div>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:6}}>More reports coming soon</div>
+              <div style={{fontSize:12,color:"rgba(232,220,200,0.4)"}}>Each time you update your profile, a new report will be saved here automatically.</div>
+            </div>
+          </div>
+        )}
         {navSection==="profile"&&(
           <DashboardProfileView
             user={{id:userId,email:formData?.email||""}}
@@ -11727,6 +11825,7 @@ Rules:
             onEditProfile={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}
           />
         )}
+
         {navSection==="report"&&<MyReport data={data} formData={formData} isPaid={isPaid} onUnlock={onUnlock} userId={userId} streak={streak} setNav={setNav} lang={lang}/>}
       </div>
 
