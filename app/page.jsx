@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -10415,6 +10415,313 @@ function ProgressScreen({data,streak,userId,setNav}){
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MY REPORT — First screen after onboarding
+// Shows: Core Insight, At a Glance, Holding Back, Recommended Path,
+//        Strengths, Focus Cards, Priorities, Daily Rec, Next Action
+// ═══════════════════════════════════════════════════════════════════════════════
+function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lang="en"}){
+  const scores  = data?.scores||{};
+  const name    = formData?.name||"there";
+  const focus   = formData?.focus||formData?.bigGoal||"";
+
+  const overall = Math.min(99,Math.max(1,Math.round(
+    (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
+  )));
+
+  // Safe text extractor
+  const txt=(v)=>{
+    if(!v) return "";
+    if(typeof v==="string") return v;
+    if(v?.content) return String(v.content);
+    if(Array.isArray(v)) return v.filter(Boolean).map(x=>typeof x==="string"?x:x?.content||"").join(" ");
+    return String(v);
+  };
+
+  const coreInsight = txt(data?.headline)||txt(data?.sections?.[0]?.content)||txt(data?.sections?.[0])||
+    `You are a high-potential individual — your personalized report reveals exactly where to focus first.`;
+
+  const aag = (data?.at_a_glance&&typeof data.at_a_glance==="object"&&!Array.isArray(data.at_a_glance))
+    ? data.at_a_glance : {};
+
+  const holdingBack = Array.isArray(data?.holding_back) ? data.holding_back
+    : Array.isArray(formData?.blockers) ? formData.blockers.slice(0,3).map(b=>({label:b,desc:""}))
+    : [];
+
+  const roadmap    = Array.isArray(data?.roadmap)    ? data.roadmap    : [];
+  const strengths  = Array.isArray(data?.strengths)  ? data.strengths  : [];
+  const priorities = Array.isArray(data?.priorities) ? data.priorities : [];
+  const dailyRec   = txt(data?.daily_recommendation)||txt(data?.closing)||"";
+
+  // Icon mapping for focus areas
+  const getIcon=(t)=>{
+    const s=(t||"").toLowerCase();
+    if(s.includes("relation")||s.includes("communicat")||s.includes("love")||s.includes("connect")) return "❤️";
+    if(s.includes("mind")||s.includes("mental")||s.includes("think")||s.includes("clarity"))       return "🧠";
+    if(s.includes("purpos")||s.includes("vision")||s.includes("meaning")||s.includes("impact"))    return "🎯";
+    if(s.includes("money")||s.includes("financ")||s.includes("wealth")||s.includes("income"))      return "💰";
+    if(s.includes("disciplin")||s.includes("habit")||s.includes("routine")||s.includes("consist")) return "🔥";
+    if(s.includes("career")||s.includes("job")||s.includes("skill"))                               return "💼";
+    if(s.includes("health")||s.includes("body")||s.includes("fitness"))                            return "💪";
+    return "⭐";
+  };
+
+  const focusLabels  = ["Primary Focus","Secondary Focus","Tertiary Focus"];
+  const whyLabels    = ["WHY THIS FIRST?","WHY THIS SECOND?","WHY THIS THIRD?"];
+  const focusBg      = ["rgba(229,62,62,0.12)","rgba(155,114,207,0.12)","rgba(240,180,41,0.08)"];
+  const focusAcc     = ["#e57373","#b39ddb","var(--gold)"];
+
+  const focuses = roadmap.slice(0,3).map((p,i)=>({
+    label:focusLabels[i], title:txt(p.title)||`Focus ${i+1}`,
+    desc: txt(p.desc)||"", why: Array.isArray(p.steps)?txt(p.steps[0]):"",
+    icon: getIcon(txt(p.title)), bg:focusBg[i], acc:focusAcc[i], phase:txt(p.phase)||"",
+  }));
+  if(!focuses.length&&focus) focuses.push({
+    label:"Primary Focus", title:focus, desc:`Build on your ${focus.toLowerCase()} journey.`,
+    why:"This is your chosen focus area.", icon:getIcon(focus),
+    bg:focusBg[0], acc:focusAcc[0], phase:"Days 1–30",
+  });
+
+  const pathItems = roadmap.slice(0,4).map((p,i)=>({
+    num:i+1, title:txt(p.title)||`Phase ${i+1}`,
+    timeline:txt(p.phase)||`Step ${i+1}`, desc:txt(p.win)||"",
+  }));
+
+  const hbIcons = ["❤️","🧠","😨","⚠️","💭","🚫"];
+
+  // SVG score ring
+  const ScoreRing=({score,size=66,sw=5})=>{
+    const r=(size/2)-sw; const circ=2*Math.PI*r;
+    const off=circ-(Math.min(99,Math.max(0,score))/100)*circ;
+    return(
+      <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
+        <svg width={size} height={size} style={{transform:"rotate(-90deg)",position:"absolute",inset:0}}>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={sw}/>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--gold)" strokeWidth={sw}
+            strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
+        </svg>
+        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:13,fontWeight:800,color:"var(--gold)"}}>{score}%</span>
+        </div>
+      </div>
+    );
+  };
+
+  // Shared card style
+  const card={background:"var(--night)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"18px",boxSizing:"border-box"};
+  const mono=(txt,col="var(--cream-30)")=>(
+    <div style={{fontSize:9,color:col,letterSpacing:".12em",fontFamily:"var(--f-mono)",marginBottom:11,textTransform:"uppercase",fontWeight:700}}>{txt}</div>
+  );
+
+  return(
+    <div style={{padding:"20px 20px 60px",maxWidth:1140,margin:"0 auto"}}>
+
+      {/* ── HEADER ── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:9,color:"var(--gold)",letterSpacing:".12em",fontFamily:"var(--f-mono)",marginBottom:5}}>DESTINIQ REPORT</div>
+          <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:"0 0 3px"}}>Your DestinIQ Report is Ready 🎉</h2>
+          <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>Based on your answers, we've created your personal intelligence profile.</p>
+        </div>
+        <button style={{display:"flex",alignItems:"center",gap:6,padding:"9px 14px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,color:"var(--cream-50)",fontSize:11,cursor:"pointer",fontFamily:"inherit",flexShrink:0}} onClick={()=>{try{window.print();}catch{}}}>
+          Download Report ↓
+        </button>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════
+          ROW 1: Core Insight | At a Glance | Holding Back | Path
+      ════════════════════════════════════════════════════════ */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:11,marginBottom:11}}>
+
+        {/* Core Insight — double-wide on desktop */}
+        <div style={{...card,gridColumn:"span 2",background:"linear-gradient(135deg,#0f0820 0%,#14092a 60%,#0a0810 100%)",border:"1px solid rgba(120,80,200,0.18)",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",right:0,top:0,bottom:0,width:"45%",background:"radial-gradient(ellipse at 80% 50%,rgba(90,50,180,0.35),transparent 65%)",pointerEvents:"none"}}/>
+          <div style={{position:"relative"}}>
+            {mono("Your Core Insight","rgba(180,140,255,0.65)")}
+            <blockquote style={{fontSize:15,fontWeight:600,color:"var(--cream)",lineHeight:1.72,margin:"0 0 20px",fontStyle:"italic",maxWidth:380}}>
+              "{coreInsight.slice(0,210)}{coreInsight.length>210?"…":""}"
+            </blockquote>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <ScoreRing score={overall}/>
+              <div>
+                <div style={{fontSize:9,color:"var(--cream-30)",letterSpacing:".1em",fontFamily:"var(--f-mono)"}}>OVERALL POTENTIAL SCORE</div>
+                <div style={{fontSize:24,fontWeight:800,color:"var(--cream)",lineHeight:1}}>{overall}<span style={{fontSize:11,color:"var(--cream-40)"}}>/100</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* At a Glance */}
+        <div style={{...card}}>
+          {mono("At a Glance")}
+          {[
+            ["🌱","Life Stage",     aag.life_stage    ||aag.lifestage    ||"Growth & Building"],
+            ["💰","Financial Level",aag.financial_level||aag.financialLevel||"Developing"],
+            ["🧠","Mindset Type",   aag.mindset_type  ||aag.mindsetType  ||"—"],
+            ["🔥","Primary Drive",  aag.primary_drive ||aag.primaryDrive ||"—"],
+            ["⚡","Current Energy", String(aag.current_energy||aag.currentEnergy||"—")],
+          ].map(([icon,label,val])=>(
+            <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+              <span style={{display:"flex",alignItems:"center",gap:7}}>
+                <span style={{fontSize:12}}>{icon}</span>
+                <span style={{fontSize:11,color:"var(--cream-40)"}}>{label}</span>
+              </span>
+              <span style={{fontSize:11,fontWeight:700,color:"var(--cream)",textAlign:"right",maxWidth:"52%"}}>{val}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* What's Holding You Back */}
+        <div style={{...card}}>
+          {mono("What's Holding You Back")}
+          {holdingBack.length>0 ? holdingBack.slice(0,4).map((b,i)=>{
+            const lbl=typeof b==="string"?b:txt(b?.label||b?.name||b?.title||"");
+            const dsc=typeof b==="object"?txt(b?.desc||b?.description||b?.reason||""):"";
+            return(
+              <div key={i} style={{display:"flex",gap:9,marginBottom:12,paddingBottom:i<Math.min(3,holdingBack.length)-1?12:0,borderBottom:i<Math.min(3,holdingBack.length)-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+                <span style={{fontSize:15,flexShrink:0,marginTop:1}}>{hbIcons[i]||"•"}</span>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"var(--cream)",marginBottom:2}}>{lbl}</div>
+                  {dsc&&<div style={{fontSize:10,color:"var(--cream-40)",lineHeight:1.5}}>{dsc.slice(0,80)}</div>}
+                </div>
+              </div>
+            );
+          }) : <p style={{fontSize:12,color:"var(--cream-40)"}}>Challenges will appear here.</p>}
+        </div>
+
+        {/* Recommended Path */}
+        <div style={{...card}}>
+          {mono("Recommended Path")}
+          {pathItems.map((item,i)=>(
+            <div key={i} style={{display:"flex",gap:9,marginBottom:i<pathItems.length-1?12:0,paddingBottom:i<pathItems.length-1?12:0,borderBottom:i<pathItems.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
+              <div style={{width:21,height:21,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#000",flexShrink:0,marginTop:1}}>{item.num}</div>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"var(--cream)",marginBottom:1}}>{item.title}</div>
+                <div style={{fontSize:10,color:"var(--cream-40)"}}>{item.timeline}</div>
+                {item.desc&&<div style={{fontSize:10,color:"var(--cream-30)",lineHeight:1.4,marginTop:2}}>{item.desc.slice(0,55)}{item.desc.length>55?"…":""}</div>}
+              </div>
+            </div>
+          ))}
+          {!pathItems.length&&<p style={{fontSize:12,color:"var(--cream-40)"}}>Your path will appear here.</p>}
+          {pathItems.length>0&&(
+            <button onClick={()=>setNav(isPaid?"explore":"")} style={{width:"100%",marginTop:13,padding:"10px",background:"var(--gold)",color:"#000",border:"none",borderRadius:9,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+              Start Your Journey →
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════
+          ROW 2: Strengths | Primary Focus | Secondary | Tertiary
+      ════════════════════════════════════════════════════════ */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:11,marginBottom:11}}>
+
+        {/* Strengths */}
+        <div style={{...card}}>
+          {mono("Your Strengths")}
+          {strengths.slice(0,6).map((s,i)=>{
+            const lbl=typeof s==="string"?s:txt(s?.label||s?.name||"");
+            return(
+              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,marginBottom:9}}>
+                <div style={{width:17,height:17,borderRadius:"50%",background:"rgba(26,184,154,0.12)",border:"1px solid rgba(26,184,154,0.22)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+                  <span style={{fontSize:8,color:"var(--teal)"}}>✓</span>
+                </div>
+                <span style={{fontSize:12,color:"rgba(232,220,200,0.6)",lineHeight:1.5}}>{lbl}</span>
+              </div>
+            );
+          })}
+          {!strengths.length&&<p style={{fontSize:12,color:"var(--cream-40)"}}>Strengths will appear here.</p>}
+        </div>
+
+        {/* Primary, Secondary, Tertiary Focus */}
+        {focuses.map((fc,i)=>(
+          <div key={i} style={{...card,background:`linear-gradient(145deg,${fc.bg},rgba(10,8,0,0))`,border:`1px solid ${i===2?"rgba(240,180,41,0.18)":"rgba(255,255,255,0.07)"}`}}>
+            {mono(fc.label,fc.acc)}
+            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:10}}>
+              <span style={{fontSize:20}}>{fc.icon}</span>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--cream)"}}>{fc.title}</span>
+            </div>
+            <p style={{fontSize:12,color:"rgba(232,220,200,0.55)",lineHeight:1.68,margin:"0 0 11px"}}>
+              {fc.desc.slice(0,110)}{fc.desc.length>110?"…":""}
+            </p>
+            {fc.why&&(
+              <div style={{padding:"9px 11px",background:"rgba(0,0,0,0.25)",borderRadius:8,marginBottom:11}}>
+                <div style={{fontSize:8,color:fc.acc,fontFamily:"var(--f-mono)",fontWeight:700,marginBottom:3}}>{whyLabels[i]}</div>
+                <p style={{fontSize:11,color:"rgba(232,220,200,0.45)",lineHeight:1.6,margin:0}}>{fc.why.slice(0,100)}{fc.why.length>100?"…":""}</p>
+              </div>
+            )}
+            {!isPaid&&i===0
+              ?<button onClick={onUnlock} style={{width:"100%",padding:"9px",background:"linear-gradient(135deg,rgba(212,175,55,0.18),rgba(212,175,55,0.06))",color:"var(--gold)",border:"1px solid rgba(212,175,55,0.28)",borderRadius:9,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                  ✦ Upgrade to Pro
+                </button>
+              :<button onClick={()=>setNav("explore")} style={{width:"100%",padding:"9px",background:i===0?"var(--gold)":"transparent",color:i===0?"#000":"rgba(232,220,200,0.5)",border:i===0?"none":"1px solid rgba(255,255,255,0.09)",borderRadius:9,fontSize:11,fontWeight:i===0?700:500,cursor:"pointer",fontFamily:"inherit"}}>
+                  {i===0?"Start First Session →":"View Plan →"}
+                </button>
+            }
+          </div>
+        ))}
+        {/* Pad to 4 columns if fewer focuses */}
+        {Array(Math.max(0,3-focuses.length)).fill(null).map((_,i)=>(
+          <div key={`fp${i}`} style={{...card,opacity:0.35,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:12,color:"var(--cream-40)",textAlign:"center"}}>Focus area {focuses.length+i+2} will appear here</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ════════════════════════════════════════════════════════
+          ROW 3: Top Priorities | Daily Recommendation | Next Action
+      ════════════════════════════════════════════════════════ */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:11}}>
+
+        {/* Top Priorities */}
+        <div style={{...card}}>
+          {mono("Your Top Priorities (Next 7 Days)")}
+          {priorities.slice(0,6).map((p,i)=>{
+            const lbl=typeof p==="string"?p:txt(p?.task||p?.label||p?.action||"");
+            return(
+              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,marginBottom:10}}>
+                <div style={{width:14,height:14,border:"1.5px solid rgba(232,220,200,0.2)",borderRadius:3,flexShrink:0,marginTop:2}}/>
+                <span style={{fontSize:12,color:"rgba(232,220,200,0.6)",lineHeight:1.5}}>{lbl}</span>
+              </div>
+            );
+          })}
+          {!priorities.length&&<p style={{fontSize:12,color:"var(--cream-40)"}}>Weekly priorities will appear here.</p>}
+        </div>
+
+        {/* Daily Recommendation */}
+        <div style={{...card,background:"linear-gradient(135deg,#0e0820,#08051a)",border:"1px solid rgba(155,114,207,0.14)",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",bottom:-25,right:-25,width:120,height:120,background:"radial-gradient(circle,rgba(155,114,207,0.2),transparent 65%)",pointerEvents:"none"}}/>
+          {mono("Daily Recommendation","rgba(180,140,255,0.55)")}
+          {dailyRec
+            ?<blockquote style={{fontSize:14,fontWeight:600,color:"var(--cream)",lineHeight:1.78,fontStyle:"italic",margin:0,position:"relative"}}>
+                "{dailyRec.slice(0,180)}{dailyRec.length>180?"…":""}"
+              </blockquote>
+            :<p style={{fontSize:12,color:"var(--cream-40)"}}>Your daily insight will appear here.</p>
+          }
+        </div>
+
+        {/* Next Action */}
+        <div style={{...card,background:"linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))",border:"1px solid rgba(212,175,55,0.18)",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",bottom:-10,right:-10,fontSize:72,opacity:0.06,pointerEvents:"none",lineHeight:1}}>❤️</div>
+          {mono("Next Action (Start Now)","var(--gold)")}
+          <div style={{fontSize:15,fontWeight:800,color:"var(--cream)",marginBottom:7,lineHeight:1.4,position:"relative"}}>
+            Start your first session in {focuses[0]?.title||focus||"your focus area"}
+          </div>
+          <p style={{fontSize:12,color:"rgba(232,220,200,0.5)",marginBottom:15,lineHeight:1.6,position:"relative"}}>
+            Your personalized journey begins here. The first session sets everything in motion.
+          </p>
+          <button onClick={isPaid?()=>setNav("explore"):onUnlock}
+            style={{padding:"11px 20px",background:"var(--gold)",color:"#000",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:8,position:"relative"}}>
+            {isPaid?"Start Now →":"Unlock with Pro →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en"}){
 
   const [mod,setMod]=useState(()=>{
@@ -10639,7 +10946,7 @@ Rules:
             onBack={()=>setNav("home")} onManageSubscription={onUnlock}
             onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))} onPhotoUpdate={()=>{}}/>
         )}
-        {navSection==="report"&&showModView()}
+        {navSection==="report"&&<MyReport data={data} formData={formData} isPaid={isPaid} onUnlock={onUnlock} userId={userId} streak={streak} setNav={setNav} lang={lang}/>}
       </div>
 
       <BottomNav nav={navSection} setNav={setNav}/>
@@ -10971,18 +11278,6 @@ function PolicyPage({type,onBack}){
 
 
 
-
-// ── LANGUAGES ─────────────────────────────────────────────────────────────────
-const LANGUAGES = [
-  { code:"en",  flag:"🇬🇧", label:"English",    native:"English"    },
-  { code:"fr",  flag:"🇫🇷", label:"French",     native:"Français"   },
-  { code:"es",  flag:"🇪🇸", label:"Spanish",    native:"Español"    },
-  { code:"pt",  flag:"🇧🇷", label:"Portuguese", native:"Português"  },
-  { code:"ar",  flag:"🇸🇦", label:"Arabic",     native:"العربية"    },
-  { code:"hi",  flag:"🇮🇳", label:"Hindi",      native:"हिन्दी"     },
-  { code:"zh",  flag:"🇨🇳", label:"Chinese",    native:"中文"        },
-  { code:"de",  flag:"🇩🇪", label:"German",     native:"Deutsch"    },
-];
 
 // ── LanguageSelector ──────────────────────────────────────────────────────────
 function LanguageSelector({lang, onChange}){
@@ -12119,6 +12414,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         const computed=Math.round(life*0.25+wealth*0.30+mindset*0.25+relations*0.20);
         parsed.overall=computed;
       }
+      try{localStorage.setItem("diq_nav","report");}catch{} // New users land on My Report first
       setScreen("results");
       // Show tutorial to first-time users
       try{
