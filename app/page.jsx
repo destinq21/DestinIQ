@@ -295,7 +295,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -3931,87 +3931,367 @@ function getIncomeRanges(currencySymbol){
 }
 
 function Landing({onStart,ipLocation}){
+  const [scrolled,setScrolled]=useState(false);
   const [userCount,setUserCount]=useState(25847);
+
   useEffect(()=>{
     const ref=new URLSearchParams(window.location.search).get("ref");
     if(ref)try{localStorage.setItem("diq_ref",ref);}catch{}
     supabase.from("user_profiles").select("user_id",{count:"exact",head:true})
-      .then(({count})=>{if(count&&count>500)setUserCount(count);})
-      .catch(()=>{});
+      .then(({count})=>{if(count&&count>500)setUserCount(count);}).catch(()=>{});
+    const onScroll=()=>setScrolled(window.scrollY>50);
+    window.addEventListener("scroll",onScroll,{passive:true});
+    return()=>window.removeEventListener("scroll",onScroll);
   },[]);
 
-  const orb={
-    width:"240px",height:"240px",borderRadius:"50%",
-    background:"radial-gradient(circle at 38% 38%,rgba(240,180,41,0.55),rgba(140,90,10,0.25) 45%,transparent 70%)",
-    boxShadow:"0 0 80px rgba(240,180,41,0.22),0 0 160px rgba(240,180,41,0.08)",
-    margin:"0 auto",
+  const G={
+    gold:"#f0b429",bg:"#0a0800",surface:"#0e0b02",card:"#131008",
+    border:"rgba(240,180,41,0.12)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.55)",dimmer:"rgba(232,220,200,0.3)",
   };
 
+  const Badge=({icon,text})=>(
+    <div style={{display:"inline-flex",alignItems:"center",gap:6,
+      background:"rgba(240,180,41,0.07)",border:"1px solid rgba(240,180,41,0.28)",
+      borderRadius:20,padding:"5px 14px",marginBottom:22}}>
+      <span style={{fontSize:12}}>{icon}</span>
+      <span style={{fontSize:9,fontWeight:700,letterSpacing:".8px",color:G.gold,fontFamily:"monospace"}}>{text}</span>
+    </div>
+  );
+
+  const features=[
+    {icon:"🎯",title:"Personalized AI Reports",color:"#f0b429",
+     desc:"Your full life analyzed in minutes. Built for your age, country, income, and actual goals — not a generic template."},
+    {icon:"💰",title:"Money & Career Intelligence",color:"#81c784",
+     desc:"Real income strategies for your actual situation. Side hustles, investments, and career moves that work where you live."},
+    {icon:"❤️",title:"Relationships & Social Skills",color:"#e57373",
+     desc:"Build deeper connections. Communicate with clarity. Understand people better and strengthen every relationship in your life."},
+    {icon:"💪",title:"Wellness & Mental Performance",color:"#64b5f6",
+     desc:"Sharper focus, stronger habits, better energy. Your mind and body working together — not against each other."},
+    {icon:"⭐",title:"Purpose & Personal Growth",color:"#b39ddb",
+     desc:"Find your why. Build your path. Turn your values into daily decisions that actually move you forward."},
+  ];
+
+  const testimonials=[
+    {init:"S",name:"Sarah M.",meta:"28 · United Kingdom",
+     quote:"DestinIQ showed me exactly what was blocking my financial growth. Within 60 days I had a plan I could actually follow."},
+    {init:"K",name:"Kwame A.",meta:"34 · Ghana",
+     quote:"I doubled my freelance income in 3 months using the career roadmap. The currency-specific advice was a game changer."},
+    {init:"P",name:"Priya S.",meta:"26 · India",
+     quote:"The relationship section alone changed how I communicate at work. I've never had a tool understand my situation this well."},
+  ];
+
+  const sec={padding:"56px 24px",maxWidth:860,margin:"0 auto"};
+
   return(
-    <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column"}}>
+    <div style={{background:G.bg,color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",overflowX:"hidden",minHeight:"100vh"}}>
 
-      {/* ── NAV ─── */}
-      <div style={{padding:"18px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontWeight:800,fontSize:20,color:"var(--cream)"}}>
-          Destin<span style={{color:"var(--gold)"}}>IQ</span>
+      {/* ══════════════════════════════════════════
+          STICKY NAV
+      ══════════════════════════════════════════ */}
+      <nav style={{position:"sticky",top:0,zIndex:300,
+        background:scrolled?"rgba(10,8,0,0.96)":"transparent",
+        backdropFilter:scrolled?"blur(20px)":"none",
+        WebkitBackdropFilter:scrolled?"blur(20px)":"none",
+        borderBottom:scrolled?"1px solid rgba(240,180,41,0.1)":"1px solid transparent",
+        padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",
+        transition:"all 0.3s ease",maxWidth:"100%",boxSizing:"border-box"}}>
+        <div style={{fontWeight:800,fontSize:20,color:G.cream,cursor:"pointer",letterSpacing:"-.3px"}}
+          onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>
+          Destin<span style={{color:G.gold}}>IQ</span>
         </div>
-        <div style={{color:"var(--cream-30)",fontSize:20}}>☰</div>
-      </div>
-
-      {/* ── HERO ─── */}
-      <div style={{flex:1,padding:"20px 24px 0",maxWidth:480,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
-
-        {/* AI badge */}
-        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(212,175,55,0.1)",border:"1px solid rgba(212,175,55,0.3)",borderRadius:20,padding:"5px 13px",marginBottom:24}}>
-          <span style={{fontSize:11}}>⚡</span>
-          <span style={{fontSize:10,color:"var(--gold)",fontWeight:700,letterSpacing:".6px"}}>AI PERSONAL INTELLIGENCE</span>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <button onClick={onStart}
+            style={{background:"none",border:"none",color:G.dim,cursor:"pointer",fontSize:14,fontWeight:500,padding:"8px 14px"}}>
+            Sign In
+          </button>
+          <button onClick={onStart}
+            style={{background:G.gold,color:"#000",border:"none",borderRadius:10,
+              padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+            Get Started Free
+          </button>
         </div>
+      </nav>
 
-        <h1 style={{fontSize:"clamp(34px,9vw,44px)",fontWeight:800,lineHeight:1.15,color:"var(--cream)",marginBottom:16,letterSpacing:"-.5px"}}>
-          Understand<br/>Yourself.<br/>Upgrade Your<br/>Life.
+      {/* ══════════════════════════════════════════
+          HERO
+      ══════════════════════════════════════════ */}
+      <section style={{padding:"52px 24px 64px",maxWidth:600,margin:"0 auto"}}>
+        <Badge icon="⚡" text="AI-POWERED PERSONAL INTELLIGENCE"/>
+
+        <h1 style={{fontSize:"clamp(40px,10vw,64px)",fontWeight:800,lineHeight:1.08,
+          letterSpacing:"-1.5px",margin:"0 0 22px",color:G.cream}}>
+          The system<br/>that knows<br/>
+          <span style={{color:G.gold}}>your next<br/>move.</span>
         </h1>
 
-        <p style={{fontSize:15,color:"var(--cream-50)",lineHeight:1.65,marginBottom:28}}>
-          AI-powered insights, personalized for who you are and who you're becoming.
+        <p style={{fontSize:16,lineHeight:1.75,color:G.dim,margin:"0 0 36px",maxWidth:420}}>
+          DestinIQ analyzes your current situation, uncovers what's holding you back, and gives you a personalized roadmap to improve your life.
         </p>
 
-        <button onClick={onStart}
-          style={{display:"inline-flex",alignItems:"center",gap:10,background:"var(--gold)",color:"#000",border:"none",borderRadius:12,padding:"14px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:28}}>
-          Start – it's free <span>→</span>
-        </button>
+        {/* CTAs */}
+        <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:380,marginBottom:32}}>
+          <button onClick={onStart}
+            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+              background:G.gold,color:"#000",border:"none",borderRadius:13,
+              padding:"17px 28px",fontSize:16,fontWeight:700,cursor:"pointer",
+              boxShadow:"0 0 40px rgba(240,180,41,0.25)"}}>
+            Start Your Journey <span style={{fontSize:18}}>→</span>
+          </button>
+          <button
+            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              background:"transparent",color:G.dim,
+              border:"1px solid rgba(232,220,200,0.14)",
+              borderRadius:13,padding:"15px 28px",fontSize:14,fontWeight:500,cursor:"default"}}>
+            <span style={{fontSize:12,opacity:.7}}>▶</span> Watch Demo
+            <span style={{fontSize:10,padding:"2px 7px",background:"rgba(240,180,41,0.1)",borderRadius:6,color:G.gold,marginLeft:4}}>Soon</span>
+          </button>
+        </div>
 
-        {/* Social proof */}
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:32}}>
+        {/* Social proof avatars */}
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
           <div style={{display:"flex"}}>
-            {["#c0392b","#d4ac0d","#1a9e88","#7d3c98"].map((c,i)=>(
-              <div key={i} style={{width:28,height:28,borderRadius:"50%",background:c,border:"2px solid var(--bg)",marginLeft:i>0?-9:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",fontWeight:700}}>
-                {"ABCD"[i]}
+            {["#c0392b","#d4ac0d","#1a9e88","#7d3c98","#2980b9"].map((c,i)=>(
+              <div key={i} style={{width:32,height:32,borderRadius:"50%",background:c,
+                border:"2px solid "+G.bg,marginLeft:i>0?-10:0,display:"flex",
+                alignItems:"center",justifyContent:"center",fontSize:12,color:"#fff",fontWeight:700}}>
+                {"ABCDE"[i]}
               </div>
             ))}
           </div>
-          <span style={{fontSize:13,color:"var(--cream-50)"}}>
-            Join <strong style={{color:"var(--cream)"}}>{userCount.toLocaleString()}+</strong> people transforming their lives
-          </span>
+          <div style={{fontSize:14}}>
+            <strong style={{color:G.cream}}>{userCount.toLocaleString()}+ people</strong>
+            <span style={{color:G.dim}}> transforming their lives</span>
+          </div>
         </div>
 
-        {/* Globe orb */}
-        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",height:110,overflow:"hidden",marginBottom:0}}>
-          <div style={orb}/>
-        </div>
-      </div>
+        <button onClick={onStart}
+          style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",
+            fontSize:13,padding:"4px 0",textDecoration:"underline",textDecorationColor:"rgba(232,220,200,0.2)"}}>
+          I already have an account
+        </button>
 
-      {/* ── PRESS ─── */}
-      <div style={{padding:"20px 24px 32px",maxWidth:480,margin:"0 auto",width:"100%",boxSizing:"border-box",borderTop:"1px solid var(--cream-10)"}}>
-        <div style={{fontSize:9,color:"var(--cream-25)",letterSpacing:"1.5px",textTransform:"uppercase",fontFamily:"var(--f-mono)",marginBottom:10}}>Featured in</div>
-        <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-          {["Forbes","TechCrunch","Business Insider"].map(n=>(
-            <span key={n} style={{fontSize:13,fontWeight:700,color:"var(--cream-40)"}}>{n}</span>
+        {/* Press logos */}
+        <div style={{borderTop:"1px solid rgba(232,220,200,0.07)",paddingTop:28,marginTop:36}}>
+          <div style={{fontSize:9,color:G.dimmer,letterSpacing:"1.6px",marginBottom:14,textTransform:"uppercase",fontFamily:"monospace"}}>Featured in</div>
+          <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
+            {["Forbes","TechCrunch","Business Insider"].map(n=>(
+              <span key={n} style={{fontSize:13,fontWeight:700,color:G.dimmer,letterSpacing:"-.2px"}}>{n}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          STATS
+      ══════════════════════════════════════════ */}
+      <section style={{padding:"0 24px 56px",maxWidth:860,margin:"0 auto"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",
+          background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.14)",
+          borderRadius:18,overflow:"hidden"}}>
+          {[
+            {num:"50+",   label:"Countries Served"},
+            {num:"40+",   label:"AI Intelligence Tools"},
+            {num:"10K+",  label:"Reports Generated"},
+          ].map(({num,label},i)=>(
+            <div key={label} style={{padding:"28px 20px",textAlign:"center",
+              borderRight:i<2?"1px solid rgba(240,180,41,0.1)":"none"}}>
+              <div style={{fontSize:32,fontWeight:800,color:G.gold,lineHeight:1,marginBottom:6}}>{num}</div>
+              <div style={{fontSize:12,color:G.dim,lineHeight:1.4}}>{label}</div>
+            </div>
           ))}
         </div>
-      </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          FEATURES
+      ══════════════════════════════════════════ */}
+      <section style={{...sec,paddingTop:16}}>
+        <div style={{marginBottom:36}}>
+          <Badge icon="✦" text="WHAT DESTINIQ COVERS"/>
+          <h2 style={{fontSize:"clamp(26px,6vw,38px)",fontWeight:800,lineHeight:1.2,margin:0,color:G.cream}}>
+            Every area of your life.<br/>
+            <span style={{color:G.gold}}>One intelligent system.</span>
+          </h2>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+          {features.map((f)=>(
+            <div key={f.title} style={{background:G.card,border:"1px solid rgba(232,220,200,0.06)",
+              borderRadius:16,padding:"22px",display:"flex",gap:16,alignItems:"flex-start",
+              transition:"border-color 0.2s"}}>
+              <div style={{width:48,height:48,borderRadius:13,
+                background:f.color+"14",border:"1px solid "+f.color+"22",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+                {f.icon}
+              </div>
+              <div>
+                <div style={{fontSize:15,fontWeight:700,color:G.cream,marginBottom:7,lineHeight:1.3}}>{f.title}</div>
+                <div style={{fontSize:13,color:G.dim,lineHeight:1.65}}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          PREVIEW (mock report)
+      ══════════════════════════════════════════ */}
+      <section style={{...sec}}>
+        <div style={{marginBottom:28}}>
+          <Badge icon="📋" text="REPORT PREVIEW"/>
+          <h2 style={{fontSize:"clamp(24px,6vw,34px)",fontWeight:800,lineHeight:1.25,margin:"0 0 10px",color:G.cream}}>
+            See exactly what<br/>
+            <span style={{color:G.gold}}>your report looks like.</span>
+          </h2>
+          <p style={{fontSize:14,color:G.dim,lineHeight:1.7,maxWidth:440,margin:0}}>
+            A real-time intelligence profile built entirely around your life — your country, income, goals, and blockers.
+          </p>
+        </div>
+
+        <div style={{background:"linear-gradient(145deg,#0f0820,#130c08)",
+          border:"1px solid rgba(120,80,200,0.2)",borderRadius:20,overflow:"hidden",
+          padding:"28px",position:"relative",maxWidth:520}}>
+          {/* Decorative glow */}
+          <div style={{position:"absolute",top:0,right:0,width:"55%",height:"100%",
+            background:"radial-gradient(ellipse at 80% 40%,rgba(90,50,180,0.2),transparent 65%)",
+            pointerEvents:"none"}}/>
+          <div style={{position:"relative"}}>
+            <div style={{fontSize:9,color:"rgba(200,160,255,0.6)",letterSpacing:".12em",
+              marginBottom:14,fontFamily:"monospace"}}>YOUR CORE INSIGHT</div>
+
+            <blockquote style={{fontSize:14,fontWeight:600,color:G.cream,lineHeight:1.75,
+              fontStyle:"italic",margin:"0 0 24px",maxWidth:360}}>
+              "You are a high-potential individual with strong ambition — your progress is currently blocked by inconsistency and overthinking."
+            </blockquote>
+
+            {/* Score ring */}
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:20}}>
+              <div style={{position:"relative",width:68,height:68}}>
+                <svg width={68} height={68} style={{transform:"rotate(-90deg)",position:"absolute"}}>
+                  <circle cx={34} cy={34} r={28} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5}/>
+                  <circle cx={34} cy={34} r={28} fill="none" stroke={G.gold} strokeWidth={5}
+                    strokeDasharray="175.9" strokeDashoffset="38.7" strokeLinecap="round"/>
+                </svg>
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
+                  justifyContent:"center",fontSize:14,fontWeight:800,color:G.gold}}>78%</div>
+              </div>
+              <div>
+                <div style={{fontSize:9,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:4}}>OVERALL POTENTIAL SCORE</div>
+                <div style={{fontSize:22,fontWeight:800,color:G.cream}}>78<span style={{fontSize:12,color:G.dim}}>/100</span></div>
+              </div>
+            </div>
+
+            {/* Mock metrics */}
+            {[
+              {label:"Primary Focus",val:"Relationships",color:"#e57373"},
+              {label:"Key Blocker",   val:"Overthinking", color:G.gold},
+              {label:"First Move",   val:"Start Week 1 →",color:"#81c784"},
+            ].map(({label,val,color},i)=>(
+              <div key={label} style={{display:"flex",justifyContent:"space-between",
+                alignItems:"center",padding:"10px 0",
+                borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                <span style={{fontSize:12,color:G.dim}}>{label}</span>
+                <span style={{fontSize:12,fontWeight:700,color}}>{val}</span>
+              </div>
+            ))}
+
+            {/* CTA bar */}
+            <div style={{marginTop:20,padding:"14px 18px",
+              background:"rgba(240,180,41,0.07)",border:"1px solid rgba(240,180,41,0.2)",
+              borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}
+              onClick={onStart}>
+              <span style={{fontSize:13,color:G.cream,fontWeight:600}}>Get your full report</span>
+              <span style={{fontSize:13,color:G.gold,fontWeight:700}}>Free in 60s →</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          TESTIMONIALS
+      ══════════════════════════════════════════ */}
+      <section style={{...sec}}>
+        <div style={{marginBottom:32}}>
+          <Badge icon="💬" text="WHAT PEOPLE SAY"/>
+          <h2 style={{fontSize:"clamp(24px,6vw,34px)",fontWeight:800,lineHeight:1.25,margin:0,color:G.cream}}>
+            Real results from<br/><span style={{color:G.gold}}>real people.</span>
+          </h2>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
+          {testimonials.map((t,i)=>(
+            <div key={t.name} style={{background:G.card,border:"1px solid rgba(232,220,200,0.06)",
+              borderRadius:16,padding:"22px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                <div style={{width:40,height:40,borderRadius:"50%",
+                  background:`hsl(${i*80+30},50%,42%)`,display:"flex",alignItems:"center",
+                  justifyContent:"center",fontSize:15,fontWeight:800,color:"#fff",flexShrink:0}}>
+                  {t.init}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:G.cream}}>{t.name}</div>
+                  <div style={{fontSize:11,color:G.dim}}>{t.meta}</div>
+                </div>
+                <div style={{color:G.gold,fontSize:12,letterSpacing:"1px"}}>★★★★★</div>
+              </div>
+              <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,fontStyle:"italic"}}>
+                "{t.quote}"
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          FINAL CTA
+      ══════════════════════════════════════════ */}
+      <section style={{...sec,paddingBottom:80}}>
+        <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.06),rgba(240,180,41,0.02))",
+          border:"1px solid rgba(240,180,41,0.16)",borderRadius:24,padding:"52px 36px",textAlign:"center"}}>
+          <h2 style={{fontSize:"clamp(26px,6vw,40px)",fontWeight:800,lineHeight:1.25,
+            margin:"0 0 14px",color:G.cream}}>
+            Start making better<br/>decisions <span style={{color:G.gold}}>today.</span>
+          </h2>
+          <p style={{fontSize:15,color:G.dim,lineHeight:1.7,margin:"0 auto 32px",maxWidth:360}}>
+            Your personalized intelligence report is ready in 60 seconds. Always free to start.
+          </p>
+          <button onClick={onStart}
+            style={{display:"inline-flex",alignItems:"center",gap:10,
+              background:G.gold,color:"#000",border:"none",borderRadius:13,
+              padding:"17px 36px",fontSize:16,fontWeight:700,cursor:"pointer",marginBottom:14,
+              boxShadow:"0 0 50px rgba(240,180,41,0.2)"}}>
+            Create Free Account <span style={{fontSize:18}}>→</span>
+          </button>
+          <p style={{fontSize:11,color:G.dimmer,margin:0}}>
+            No credit card required · Free forever · Cancel anytime
+          </p>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          FOOTER
+      ══════════════════════════════════════════ */}
+      <footer style={{borderTop:"1px solid rgba(232,220,200,0.06)",padding:"28px 24px 36px",
+        maxWidth:860,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+          flexWrap:"wrap",gap:12,marginBottom:16}}>
+          <div style={{fontWeight:800,fontSize:17,color:G.cream}}>
+            Destin<span style={{color:G.gold}}>IQ</span>
+          </div>
+          <div style={{display:"flex",gap:20}}>
+            {["Privacy Policy","Terms of Service","Support"].map(l=>(
+              <span key={l} style={{fontSize:12,color:G.dimmer,cursor:"pointer"}}>{l}</span>
+            ))}
+          </div>
+        </div>
+        <p style={{fontSize:11,color:G.dimmer,margin:0,textAlign:"center"}}>
+          © 2025 DestinIQ. All rights reserved. · Built for people who take their growth seriously.
+        </p>
+      </footer>
     </div>
   );
 }
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTAKE
