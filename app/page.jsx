@@ -3813,620 +3813,8 @@ function TestimonialMarquee(){
   );
 }
 
-function Landing({onStart,ipLocation}){
-  const [userCount, setUserCount] = useState(2859);
-  useEffect(()=>{
-    // Save referral code from URL to localStorage
-    const ref = new URLSearchParams(window.location.search).get("ref");
-    if(ref) try{ localStorage.setItem("diq_ref", ref); }catch{}
-    // Get live user count
-    supabase.from("user_profiles").select("user_id",{count:"exact",head:true})
-      .then(({count})=>{ if(count && count>100) setUserCount(count); })
-      .catch(()=>{});
-  },[]);
-  const [profileIdx, setProfileIdx] = useState(0);
-  const [animScores, setAnimScores] = useState({life:0,wealth:0,mindset:0,relations:0});
-  const [testimIdx, setTestimIdx] = useState(0);
-  const [testimFade, setTestimFade] = useState(true);
-  const [liveCount, setLiveCount] = useState(2847);
-  const targetProfile = LIVE_PROFILES[profileIdx];
 
-  // Animate scores whenever profile changes
-  useEffect(()=>{
-    setAnimScores({life:0,wealth:0,mindset:0,relations:0});
-    const t=setTimeout(()=>setAnimScores(targetProfile.scores), 80);
-    return ()=>clearTimeout(t);
-  },[profileIdx]);
-
-  // Cycle through live profiles every 4s
-  useEffect(()=>{
-    const t=setInterval(()=>{
-      setProfileIdx(i=>(i+1)%LIVE_PROFILES.length);
-    }, 4000);
-    return ()=>clearInterval(t);
-  },[]);
-
-  // Cycle testimonials every 5s — simple index increment, CSS handles the fade
-  useEffect(()=>{
-    const t=setInterval(()=>{
-      setTestimIdx(i=>(i+1)%ALL_TESTIMONIALS.length);
-    }, 5000);
-    return ()=>clearInterval(t);
-  },[]);
-
-  // Tick up "live users" counter
-  useEffect(()=>{
-    const t=setInterval(()=>setLiveCount(n=>n+Math.floor(Math.random()*3)), 3000);
-    return ()=>clearInterval(t);
-  },[]);
-
-  // Show 3 testimonials, wrapping around the end of the array
-  const visibleTestimonials = [0,1,2].map(offset=>
-    ALL_TESTIMONIALS[(testimIdx+offset)%ALL_TESTIMONIALS.length]
-  );
-
-  return(
-    <div style={{paddingTop:60}}>
-      <section style={{minHeight:"92vh",display:"flex",alignItems:"center",borderBottom:"1px solid var(--line)",padding:"clamp(48px,10vw,80px) 0"}}>
-        <div className="cx hero-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:60,alignItems:"center"}}>
-          <div>
-            <div className="fu" style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 8px var(--teal)",animation:"pulse 2s ease infinite"}}/>
-                <div className="mono" style={{color:"var(--teal)"}} suppressHydrationWarning>Real people · {liveCount.toLocaleString()} on their journey</div>
-              </div>
-              {ipLocation&&ipLocation.city&&(
-                <div style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",borderRadius:20}}>
-                  <span style={{fontFamily:"var(--f-mono)",fontSize:"8px",letterSpacing:".1em",color:"var(--gold)",textTransform:"uppercase"}}>📍 {ipLocation.city}, {ipLocation.country}</span>
-                </div>
-              )}
-            </div>
-            <h1 className="d1 fu1" style={{marginBottom:28}}>The system<br/>that knows<br/><span className="em">your next move</span></h1>
-            <p className="body-lg fu2" style={{marginBottom:36,maxWidth:"100%",wordWrap:"break-word",overflowWrap:"break-word",paddingRight:16}}>Most people spend years trying things in the wrong order. DestinIQ helps you finally see your situation clearly — where you are, what's actually blocking you, and the exact sequence of moves that changes things.</p>
-            <div className="fu3" style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-              <button className="btn btn-gold btn-lg" onClick={onStart}>Start — it's free</button>
-              <span className="small">Free to start. Takes about 60 seconds.</span>
-            </div>
-            <div className="fu4" style={{marginTop:40,display:"flex",gap:28}}>
-              {[["40+","Countries"],["Daily","Intelligence"],["9","Life Modules"]].map(([v,l])=>(
-                <div key={l} style={{textAlign:"center"}}>
-                  <div style={{fontFamily:"var(--f-display)",fontSize:26,fontWeight:500,color:"var(--gold)"}}>{v}</div>
-                  <div className="small">{l}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* LIVE PREVIEW CARD — scores animate every 4s */}
-          <div className="fu2" style={{position:"relative"}}>
-            <div style={{position:"absolute",inset:-1,borderRadius:20,background:"linear-gradient(135deg,rgba(31,168,154,.15),rgba(210,175,90,.1))",zIndex:-1,filter:"blur(20px)"}}/>
-            <div className="card" style={{borderColor:"var(--line-gold)"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-                <div>
-                  <div className="mono" style={{marginBottom:4}}>How they're doing today</div>
-                  <div style={{fontFamily:"var(--f-display)",fontSize:18,transition:"all .4s"}}>{targetProfile.name}</div>
-                </div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <div className="streak-badge"><span className="streak-fire">🔥</span>{targetProfile.streak} days</div>
-                  <div style={{width:7,height:7,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 6px var(--teal)",animation:"pulse 2s ease infinite"}}/>
-                </div>
-              </div>
-
-              {/* Animated rings */}
-              <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:14}}>
-                {PILLARS.map(p=><Ring key={p.id} score={animScores[p.id]||0} color={p.color} size={78} label={p.label.split(" ")[0]}/>)}
-              </div>
-
-              {/* Live bar indicators */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:12}}>
-                {[{l:"Energy",v:targetProfile.energy,c:"var(--teal)"},{l:"Focus",v:targetProfile.focus,c:"var(--gold)"},{l:"Momentum",v:targetProfile.momentum,c:"var(--violet)"}].map(s=>(
-                  <div key={s.l} style={{textAlign:"center",background:"var(--lift)",borderRadius:8,padding:"8px 4px",transition:"all .4s"}}>
-                    <div style={{fontFamily:"var(--f-display)",fontSize:20,color:s.c,transition:"all .5s"}}>{s.v}</div>
-                    <div className="mono" style={{fontSize:"8px"}}>{s.l}</div>
-                    {/* mini progress */}
-                    <div style={{height:2,background:"var(--line)",borderRadius:2,marginTop:5,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:`${s.v*10}%`,background:s.c,transition:"width 1.2s ease"}}/>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="insight" style={{margin:0}}>
-                <div className="mono" style={{marginBottom:6,fontSize:"9px"}}>What DestinIQ told them today</div>
-                <p style={{fontSize:12,color:"var(--cream-60)",fontStyle:"italic",lineHeight:1.7,transition:"opacity .4s",opacity:1}}>"{targetProfile.insight}"</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section style={{padding:"80px 0",borderBottom:"1px solid var(--line)",background:"rgba(210,175,90,0.02)"}}>
-        <div className="cx-md" style={{textAlign:"center"}}>
-          <div className="mono fu" style={{marginBottom:16}}>Why People Come Back Every Day</div>
-          <h2 className="d2 fu1" style={{marginBottom:16}}>You deserve something that<br/><span className="em">actually knows you</span></h2>
-          <p className="body-lg fu2" style={{maxWidth:"100%",margin:"0 auto 48px",wordWrap:"break-word"}}>Most tools treat you like a problem to solve. DestinIQ treats you like a person — one with real pressures, real goals, and a life that's more complicated than any checklist.</p>
-          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
-            {[
-              {icon:"⚡",title:"How are you really doing?",desc:"30 seconds every day to check in with yourself — honestly. Over time, you start to see patterns in your own life you never noticed before."},
-              {icon:"↗",title:"Your week, actually understood",desc:"At the end of each week, we look at what you logged and tell you what it means — not just numbers, but what they say about where you're headed."},
-              {icon:"◈",title:"A space to think out loud",desc:"Wrestling with a big decision? Drop it here. We'll help you think it through without judgement — just clarity, structure, and honesty."},
-              {icon:"🔔",title:"A gentle reminder that you matter",desc:"A nudge at the time you choose. Not a notification — a moment to pause, reflect, and stay connected to what you're building."},
-              {icon:"◎",title:"Someone who sees the full picture",desc:"Your direction, your money, your mindset, your relationships, your options in the world. All of it, understood together — not in separate apps."},
-              {icon:"⬡",title:"Someone to talk to, any time",desc:"Ask anything. About your situation, your fears, your next move. You'll get real, specific, honest answers — not scripts."},
-            ].map(f=>(
-              <div key={f.title} className="card card-sm" style={{textAlign:"left"}}>
-                <div style={{color:"var(--gold)",fontFamily:"var(--f-mono)",fontSize:18,marginBottom:10}}>{f.icon}</div>
-                <div style={{fontWeight:500,fontSize:14,marginBottom:6}}>{f.title}</div>
-                <div className="small">{f.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS — 3 steps */}
-      <section style={{padding:"56px 0",borderBottom:"1px solid var(--line)"}}>
-        <div className="cx" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:24}}>
-          {[
-            {n:"01",icon:"✍️",title:"Tell us what's really going on",desc:"60 seconds. Your situation, your goals, what's been holding you back. No judgement — just honesty."},
-            {n:"02",icon:"🧠",title:"Get a report built only for you",desc:"Not generic advice. A full breakdown of your life, money, mindset, and relationships — with a roadmap that fits your exact situation."},
-            {n:"03",icon:"📈",title:"Show up daily, watch it click",desc:"Check in, log wins, ask your advisor anything. Every day you show up, your picture gets clearer and your plan gets sharper."},
-          ].map(s=>(
-            <div key={s.n} className="fu" style={{textAlign:"left"}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                <div className="mono" style={{color:"var(--gold)",fontSize:18}}>{s.n}</div>
-                <div style={{fontSize:24}}>{s.icon}</div>
-              </div>
-              <div style={{fontWeight:600,fontSize:15,marginBottom:6,color:"var(--cream)"}}>{s.title}</div>
-              <p className="small" style={{lineHeight:1.7}}>{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* WHAT'S INSIDE — module showcase */}
-      <section style={{padding:"80px 0",borderBottom:"1px solid var(--line)"}}>
-        <div className="cx" style={{textAlign:"center"}}>
-          <div className="mono fu" style={{marginBottom:16}}>Everything In One Place</div>
-          <h2 className="d2 fu1" style={{marginBottom:16}}>Your whole life,<br/><span className="em">finally organized</span></h2>
-          <p className="body-lg fu2" style={{maxWidth:"100%",margin:"0 auto 48px",wordWrap:"break-word"}}>No more switching between five apps and a dozen tabs. Your report, your money plan, your career options, your roadmap — all in one place, all built around YOU.</p>
-
-          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,maxWidth:900,margin:"0 auto"}}>
-            {[
-              {icon:"◎",label:"My Report",desc:"Clarity picture with scores, strengths & daily insight"},
-              {icon:"⚡",label:"Daily Check-in",desc:"30 seconds to track your real momentum"},
-              {icon:"🏆",label:"Win Tracker",desc:"Log wins + see your streak leaderboard"},
-              {icon:"📜",label:"Jim Rohn",desc:"5 money principles from the master himself"},
-              {icon:"💡",label:"Life Hacks",desc:"Shortcuts built for your exact country",premium:true},
-              {icon:"💰",label:"Money Plan",desc:"Protect and grow what you have",premium:true},
-              {icon:"🌐",label:"Earn Online",desc:"Real platforms, real first steps",premium:true},
-              {icon:"🏗️",label:"Business",desc:"Start something, even with zero capital",premium:true},
-              {icon:"↗",label:"Weekly Pulse",desc:"Patterns in your week, explained",premium:true},
-              {icon:"⟶",label:"Roadmap",desc:"Your exact next 90 days mapped out",premium:true},
-              {icon:"◈",label:"Career Path",desc:"3 real paths matched to your skills",premium:true},
-              {icon:"✦",label:"Relocate",desc:"Explore countries that fit your goals",premium:true},
-              {icon:"◈",label:"Big Decisions",desc:"Think through what's next, clearly",premium:true},
-              {icon:"⬡",label:"My Advisor",desc:"AI coach who knows your full report"},
-              {icon:"📈",label:"Score History",desc:"Track how your scores improve over time"},
-              {icon:"✏️",label:"Edit Profile",desc:"Update goals & re-generate your report"},
-            ].map(m=>(
-              <div key={m.label} style={{position:"relative",padding:"18px 14px",background:"var(--night)",border:"1px solid var(--line)",borderRadius:14,textAlign:"left",transition:"border-color .25s"}}>
-                {(m.premium||m.promax)&&<div style={{position:"absolute",top:10,right:10,fontSize:9,fontFamily:"var(--f-mono)",
-  color:m.promax?"#9b72cf":"var(--gold)",
-  background:m.promax?"rgba(155,114,207,0.1)":"var(--gold-dim)",
-  border:`1px solid ${m.promax?"rgba(155,114,207,0.3)":"var(--line-gold)"}`,
-  borderRadius:6,padding:"2px 6px"}}>{m.promax?"PRO MAX":"PRO"}</div>}
-                <div style={{fontSize:22,marginBottom:8}}>{m.icon}</div>
-                <div style={{fontWeight:600,fontSize:13,marginBottom:4,color:"var(--cream)"}}>{m.label}</div>
-                <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.5}}>{m.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* PRICING */}
-      <section style={{padding:"80px 0",borderBottom:"1px solid var(--line)",background:"rgba(210,175,90,0.02)"}}>
-        <div className="cx-md" style={{textAlign:"center"}}>
-          <div className="mono fu" style={{marginBottom:16}}>Simple Pricing</div>
-          <h2 className="d2 fu1" style={{marginBottom:16}}>Start free.<br/><span className="em">Go deeper when you're ready.</span></h2>
-          <p className="body-lg fu2" style={{maxWidth:"100%",margin:"0 auto 16px",wordWrap:"break-word"}}>
-            Free gives you your scores and the taste. Pro gives you everything to act on them. Pro Max gives you the full AI depth and tools for people who are serious.
-          </p>
-          <p className="small fu2" style={{color:"var(--cream-30)",marginBottom:48}}>All prices in USD. Billed monthly or annually. Cancel anytime.</p>
-
-          <div className="fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16,maxWidth:900,margin:"0 auto",alignItems:"start"}}>
-
-            {/* FREE */}
-            <div className="card" style={{textAlign:"left"}}>
-              <div className="mono" style={{color:"var(--cream-30)",marginBottom:8,letterSpacing:".14em"}}>FREE</div>
-              <div style={{fontFamily:"var(--f-display)",fontSize:36,marginBottom:2,color:"var(--cream)"}}>$0</div>
-              <div className="small" style={{marginBottom:24,color:"var(--cream-40)"}}>No card required · forever free</div>
-              <div style={{height:1,background:"var(--line)",marginBottom:18}}/>
-              {[
-                {t:"Your clarity picture (scores + headline)", ok:true},
-                {t:"Personal message from the AI", ok:true},
-                {t:"Daily Check-in", ok:true},
-                {t:"Win Tracker (up to 10 wins)", ok:true},
-                {t:"Jim Rohn — 5 money principles", ok:true},
-                {t:"Inner Mindset (from your report)", ok:true},
-                {t:"1 advisor message per day", ok:true},
-                {t:"First section of each Level Up module", ok:true},
-                {t:"Full deep-dive report sections", ok:false},
-                {t:"Roadmap, Career Path, Decisions", ok:false},
-                {t:"Weekly Pulse", ok:false},
-                {t:"Module refreshes", ok:false},
-              ].map(({t,ok})=>(
-                <div key={t} style={{display:"flex",gap:8,marginBottom:9,fontSize:13,color:ok?"var(--cream-60)":"var(--cream-25)",alignItems:"flex-start"}}>
-                  <span style={{color:ok?"var(--teal)":"rgba(255,255,255,0.12)",flexShrink:0,marginTop:1}}>{ok?"✓":"—"}</span>{t}
-                </div>
-              ))}
-              <button className="btn btn-ghost" style={{width:"100%",marginTop:20,fontSize:13}} onClick={onStart}>
-                Start for free →
-              </button>
-            </div>
-
-            {/* PRO */}
-            <div className="card" style={{textAlign:"left",borderColor:"var(--line-gold)",position:"relative",background:"rgba(210,175,90,0.04)"}}>
-              <div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"#000",fontSize:10,fontWeight:800,padding:"5px 16px",borderRadius:20,fontFamily:"var(--f-mono)",whiteSpace:"nowrap"}}>
-                MOST POPULAR
-              </div>
-              <div className="mono" style={{color:"var(--gold)",marginBottom:8,letterSpacing:".14em"}}>PRO</div>
-              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:2}}>
-                <span style={{fontFamily:"var(--f-display)",fontSize:36,color:"var(--gold)"}}>$9</span>
-                <span style={{fontSize:13,color:"var(--cream-40)"}}>/month</span>
-              </div>
-              <div className="small" style={{marginBottom:8,color:"var(--cream-40)"}}>or <strong style={{color:"var(--gold)"}}>$79/year</strong> — save $29 (27% off)</div>
-              <div style={{padding:"6px 12px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:8,fontSize:11,color:"var(--gold)",marginBottom:18,display:"inline-block"}}>
-                = $6.58/month billed annually
-              </div>
-              <div style={{height:1,background:"rgba(210,175,90,0.2)",marginBottom:18}}/>
-              {[
-                {t:"Everything in Free, plus:", ok:"head"},
-                {t:"Full deep-dive report — all 3 sections", ok:true},
-                {t:"Your Strengths + Watch-outs", ok:true},
-                {t:"Something personal to carry with you", ok:true},
-                {t:"My Roadmap (3-phase plan)", ok:true},
-                {t:"Career Path (3 matched paths)", ok:true},
-                {t:"Big Decisions thinking partner", ok:true},
-                {t:"Weekly Pulse — pattern analysis", ok:true},
-                {t:"Relocate — explore any country", ok:true},
-                {t:"All module refreshes (anytime)", ok:true},
-                {t:"My Progress — unlimited updates", ok:true},
-                {t:"Win Tracker — unlimited", ok:true},
-                {t:"My Advisor — 10 messages/day", ok:true},
-                {t:"Edit profile & re-generate report", ok:true},
-                {t:"Score History chart", ok:true},
-                {t:"Full Level Up modules (all sections)", ok:true},
-              ].map(({t,ok},i)=>(
-                <div key={t} style={{display:"flex",gap:8,marginBottom:9,fontSize:13,
-                  color:ok==="head"?"var(--cream-40)":ok?"var(--cream-70)":"var(--cream-25)",
-                  fontWeight:ok==="head"?600:400,alignItems:"flex-start"}}>
-                  {ok==="head"?<span/>:<span style={{color:"var(--gold)",flexShrink:0,marginTop:1}}>✓</span>}{t}
-                </div>
-              ))}
-              <button className="btn btn-gold" style={{width:"100%",marginTop:20,fontSize:14,padding:"14px"}} onClick={onStart}>
-                Start free → Upgrade to Pro
-              </button>
-              <p style={{fontSize:11,color:"var(--cream-30)",textAlign:"center",marginTop:8,fontFamily:"var(--f-mono)"}}>Cancel anytime · No hidden fees</p>
-            </div>
-
-            {/* PRO MAX */}
-            <div className="card" style={{textAlign:"left",borderColor:"rgba(155,114,207,0.4)",position:"relative",background:"rgba(155,114,207,0.04)"}}>
-              <div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"#9b72cf",color:"#fff",fontSize:10,fontWeight:800,padding:"5px 16px",borderRadius:20,fontFamily:"var(--f-mono)",whiteSpace:"nowrap"}}>
-                FOR SERIOUS USERS
-              </div>
-              <div className="mono" style={{color:"#9b72cf",marginBottom:8,letterSpacing:".14em"}}>PRO MAX</div>
-              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:2}}>
-                <span style={{fontFamily:"var(--f-display)",fontSize:36,color:"#9b72cf"}}>$19</span>
-                <span style={{fontSize:13,color:"var(--cream-40)"}}>/month</span>
-              </div>
-              <div className="small" style={{marginBottom:8,color:"var(--cream-40)"}}>or <strong style={{color:"#9b72cf"}}>$149/year</strong> — save $79 (35% off)</div>
-              <div style={{padding:"6px 12px",background:"rgba(155,114,207,0.08)",border:"1px solid rgba(155,114,207,0.2)",borderRadius:8,fontSize:11,color:"#9b72cf",marginBottom:18,display:"inline-block"}}>
-                = $12.42/month billed annually
-              </div>
-              <div style={{height:1,background:"rgba(155,114,207,0.2)",marginBottom:18}}/>
-              {[
-                {t:"Everything in Pro, plus:", ok:"head"},
-                {t:"Unlimited advisor — no daily limit", ok:true},
-                {t:"Deep AI responses (2.5× more detailed)", ok:true},
-                {t:"PDF download — full branded report", ok:true},
-                {t:"Priority AI speed", ok:true},
-                {t:"✦ Pro Max badge in your dashboard", ok:true},
-              ].map(({t,ok})=>(
-                <div key={t} style={{display:"flex",gap:8,marginBottom:9,fontSize:13,
-                  color:ok==="head"?"var(--cream-40)":"var(--cream-70)",
-                  fontWeight:ok==="head"?600:400,alignItems:"flex-start"}}>
-                  {ok==="head"?<span/>:<span style={{color:"#9b72cf",flexShrink:0,marginTop:1}}>✓</span>}{t}
-                </div>
-              ))}
-              <div style={{marginTop:16,padding:"12px 14px",background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:10,marginBottom:16}}>
-                <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:0}}>
-                  <strong style={{color:"#9b72cf"}}>Who is Pro Max for?</strong> Someone who uses the advisor daily, wants the deepest AI insights possible, and wants a polished PDF report to review or share.
-                </p>
-              </div>
-              <button className="btn" style={{width:"100%",marginTop:4,fontSize:14,padding:"14px",background:"#9b72cf",border:"none",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer"}} onClick={onStart}>
-                Start free → Upgrade to Pro Max
-              </button>
-              <p style={{fontSize:11,color:"var(--cream-30)",textAlign:"center",marginTop:8,fontFamily:"var(--f-mono)"}}>Cancel anytime · No hidden fees</p>
-            </div>
-          </div>
-
-          <div style={{marginTop:40,padding:"20px 24px",background:"var(--lift)",borderRadius:14,display:"inline-flex",gap:24,flexWrap:"wrap",justifyContent:"center"}}>
-            {[
-              {icon:"🔒",t:"Your data is private"},
-              {icon:"💳",t:"No card to start"},
-              {icon:"↩",t:"Cancel anytime"},
-              {icon:"🌍",t:"Works for any country"},
-              {icon:"💬",t:"Prices in your local currency"},
-            ].map(({icon,t})=>(
-              <span key={t} style={{fontSize:12,color:"var(--cream-40)",display:"flex",gap:6,alignItems:"center"}}>
-                <span>{icon}</span>{t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* LIVE SLIDING TESTIMONIALS + SUBMIT FORM */}
-      <section style={{padding:"64px 0",borderBottom:"1px solid var(--line)",overflow:"hidden"}}>
-        <div className="cx">
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,justifyContent:"center"}}>
-            <div style={{width:7,height:7,borderRadius:"50%",background:"var(--teal)",boxShadow:"0 0 6px var(--teal)",animation:"pulse 2s ease infinite"}}/>
-            <div className="mono" style={{color:"var(--teal)"}}>In their own words</div>
-          </div>
-          <p style={{textAlign:"center",fontSize:13,color:"var(--cream-30)",marginBottom:28}}>Real people. Real results. Auto-updating as users share their experience.</p>
-
-          {/* Sliding testimonials — infinite marquee */}
-          <TestimonialMarquee/>
-
-          {/* Share your story CTA */}
-          <TestimonialForm/>
-        </div>
-      </section>
-
-      <section style={{padding:"80px 0",textAlign:"center"}}>
-        <div className="cx-sm">
-          <div className="mono fu" style={{marginBottom:16}}>Free to start · No card needed</div>
-          <h2 className="d2 fu1" style={{marginBottom:20}}>What would change<br/>if you finally <span className="em">had a plan?</span></h2>
-          <p className="body fu2" style={{marginBottom:32,color:"var(--cream-60)"}}>Answer honestly. We do the rest. You deserve to finally understand what's actually going on in your life — and what to do next.</p>
-          <button className="btn btn-gold btn-lg fu3" onClick={onStart}>Get my free report →</button>
-          <div className="fu4" style={{display:"flex",gap:24,justifyContent:"center",marginTop:24,flexWrap:"wrap"}}>
-            {["🔒 Your data stays private","⚡ Takes about 60 seconds","💳 No card required to start"].map(t=>(
-              <span key={t} className="small" style={{color:"var(--cream-30)"}}>{t}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-      <div className="disc">DestinIQ is a personal clarity and life strategy platform. Everything here is meant to help you think — not to replace a doctor, lawyer, or financial advisor. Use it as a trusted friend who's done their homework.</div>
-    </div>
-  );
-}
-
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MULTI-LANGUAGE SUPPORT
-// AI content: language injected into every prompt automatically
-// UI strings: translated via t() helper function
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const LANGUAGES = [
-  {code:"en", label:"English",      flag:"🇬🇧", native:"English"},
-  {code:"zh", label:"Chinese",      flag:"🇨🇳", native:"中文"},
-  {code:"hi", label:"Hindi",        flag:"🇮🇳", native:"हिन्दी"},
-  {code:"es", label:"Spanish",      flag:"🇪🇸", native:"Español"},
-  {code:"fr", label:"French",       flag:"🇫🇷", native:"Français"},
-  {code:"ar", label:"Arabic",       flag:"🇸🇦", native:"العربية", rtl:true},
-  {code:"bn", label:"Bengali",      flag:"🇧🇩", native:"বাংলা"},
-  {code:"pt", label:"Portuguese",   flag:"🇧🇷", native:"Português"},
-  {code:"ru", label:"Russian",      flag:"🇷🇺", native:"Русский"},
-  {code:"ur", label:"Urdu",         flag:"🇵🇰", native:"اردو", rtl:true},
-  {code:"id", label:"Indonesian",   flag:"🇮🇩", native:"Bahasa Indonesia"},
-  {code:"de", label:"German",       flag:"🇩🇪", native:"Deutsch"},
-  {code:"ja", label:"Japanese",     flag:"🇯🇵", native:"日本語"},
-  {code:"tr", label:"Turkish",      flag:"🇹🇷", native:"Türkçe"},
-  {code:"ko", label:"Korean",       flag:"🇰🇷", native:"한국어"},
-  {code:"vi", label:"Vietnamese",   flag:"🇻🇳", native:"Tiếng Việt"},
-  {code:"it", label:"Italian",      flag:"🇮🇹", native:"Italiano"},
-  {code:"th", label:"Thai",         flag:"🇹🇭", native:"ภาษาไทย"},
-  {code:"sw", label:"Swahili",      flag:"🇰🇪", native:"Kiswahili"},
-  {code:"pl", label:"Polish",       flag:"🇵🇱", native:"Polski"},
-  {code:"nl", label:"Dutch",        flag:"🇳🇱", native:"Nederlands"},
-  {code:"fa", label:"Persian",      flag:"🇮🇷", native:"فارسی", rtl:true},
-];
-
-const UI_STRINGS = {
-  en: {
-    startFree:"Start — it's free", signIn:"Sign in", getStarted:"Get started free →",
-    myReport:"My Report", checkIn:"Check-in", wins:"Wins", progress:"Progress",
-    myPractices:"My Practices", weeklyPulse:"Weekly Pulse",
-    makeMoney:"Make Money", levelUp:"Level Up", planDecide:"Plan & Decide",
-    wellbeing:"Wellbeing", bodyStyle:"Body & Style", socialLife:"Social & Life",
-    moneyDives:"Money Deep Dives", purpose:"Purpose", discover:"Discover",
-    upgrade:"Upgrade", signOut:"Sign out", settings:"Settings",
-    generate:"Generate", refresh:"Refresh", loading:"Loading…",
-    yourDashboard:"Your Dashboard", advisorMsg:"Message your advisor…",
-    logWin:"Log a Win", addProgress:"Add progress entry",
-    free:"Free", pro:"Pro", proMax:"Pro Max",
-    savePercent:"Save", perMonth:"/month", perYear:"/year",
-    unlockFull:"Unlock full report", subscribePro:"Subscribe to Pro",
-    today:"Today", yesterday:"Yesterday", daysAgo:"days ago",
-    checkInTitle:"Check In", howWasYourDay:"How was your day?",
-    writtenFor:"Written for you",
-    somethingCarry:"Something to carry with you",
-    whatBring:"What you bring to this",
-    whatWatch:"What to watch out for",
-    profile:"Profile", language:"Language", notifications:"Notifications",
-    editProfile:"Edit profile", regenerate:"Re-generate report",
-    referFriend:"Refer a friend", aboutUs:"About DestinIQ",
-  },
-  fr: {
-    startFree:"Commencer — c'est gratuit", signIn:"Connexion", getStarted:"Commencer gratuitement →",
-    myReport:"Mon Rapport", checkIn:"Enregistrement", wins:"Victoires", progress:"Progrès",
-    myPractices:"Mes Pratiques", weeklyPulse:"Pouls Hebdomadaire",
-    makeMoney:"Gagner de l'argent", levelUp:"Progresser", planDecide:"Planifier & Décider",
-    wellbeing:"Bien-être", bodyStyle:"Corps & Style", socialLife:"Social & Vie",
-    moneyDives:"Finances Approfondies", purpose:"Objectif", discover:"Découvrir",
-    upgrade:"Améliorer", signOut:"Déconnexion", settings:"Paramètres",
-    generate:"Générer", refresh:"Actualiser", loading:"Chargement…",
-    yourDashboard:"Votre Tableau de Bord", advisorMsg:"Message à votre conseiller…",
-    logWin:"Enregistrer une victoire", addProgress:"Ajouter une entrée",
-    free:"Gratuit", pro:"Pro", proMax:"Pro Max",
-    savePercent:"Économiser", perMonth:"/mois", perYear:"/an",
-    unlockFull:"Débloquer le rapport complet", subscribePro:"S'abonner à Pro",
-    today:"Aujourd'hui", yesterday:"Hier", daysAgo:"jours",
-    checkInTitle:"Enregistrement", howWasYourDay:"Comment était votre journée ?",
-    writtenFor:"Écrit pour vous",
-    somethingCarry:"Quelque chose à retenir",
-    whatBring:"Ce que vous apportez",
-    whatWatch:"Points de vigilance",
-    profile:"Profil", language:"Langue", notifications:"Notifications",
-    editProfile:"Modifier le profil", regenerate:"Régénérer le rapport",
-    referFriend:"Parrainer un ami", aboutUs:"À propos de DestinIQ",
-  },
-  ar: {
-    startFree:"ابدأ — مجاناً", signIn:"تسجيل الدخول", getStarted:"ابدأ مجاناً →",
-    myReport:"تقريري", checkIn:"تسجيل الوصول", wins:"الانتصارات", progress:"التقدم",
-    myPractices:"ممارساتي", weeklyPulse:"النبض الأسبوعي",
-    makeMoney:"كسب المال", levelUp:"ارتقِ بنفسك", planDecide:"خطط وقرر",
-    wellbeing:"العافية", bodyStyle:"الجسم والأناقة", socialLife:"الحياة الاجتماعية",
-    moneyDives:"المال بعمق", purpose:"الهدف", discover:"اكتشف",
-    upgrade:"ترقية", signOut:"تسجيل الخروج", settings:"الإعدادات",
-    generate:"توليد", refresh:"تحديث", loading:"جار التحميل…",
-    yourDashboard:"لوحتك", advisorMsg:"رسالة لمستشارك…",
-    logWin:"سجّل انتصاراً", addProgress:"أضف إدخالاً",
-    free:"مجاني", pro:"برو", proMax:"برو ماكس",
-    savePercent:"وفّر", perMonth:"/شهر", perYear:"/سنة",
-    unlockFull:"فتح التقرير الكامل", subscribePro:"اشترك في برو",
-    today:"اليوم", yesterday:"أمس", daysAgo:"أيام",
-    checkInTitle:"تسجيل الوصول", howWasYourDay:"كيف كان يومك؟",
-    writtenFor:"كُتب لك",
-    somethingCarry:"شيء تحمله معك",
-    whatBring:"ما تحضره",
-    whatWatch:"ما يجب مراقبته",
-    profile:"الملف الشخصي", language:"اللغة", notifications:"الإشعارات",
-    editProfile:"تعديل الملف", regenerate:"إعادة توليد التقرير",
-    referFriend:"دعوة صديق", aboutUs:"عن DestinIQ",
-  },
-  sw: {
-    startFree:"Anza — bila malipo", signIn:"Ingia", getStarted:"Anza bure →",
-    myReport:"Ripoti Yangu", checkIn:"Kujiandikisha", wins:"Mafanikio", progress:"Maendeleo",
-    myPractices:"Mazoea Yangu", weeklyPulse:"Mapigo ya Wiki",
-    makeMoney:"Pata Pesa", levelUp:"Jiboreshe", planDecide:"Panga & Amua",
-    wellbeing:"Afya ya Akili", bodyStyle:"Mwili & Mtindo", socialLife:"Maisha ya Kijamii",
-    moneyDives:"Fedha Kwa Kina", purpose:"Kusudi", discover:"Gundua",
-    upgrade:"Boresha", signOut:"Toka", settings:"Mipangilio",
-    generate:"Tengeneza", refresh:"Onyesha upya", loading:"Inapakia…",
-    yourDashboard:"Dashibodi Yako", advisorMsg:"Tuma ujumbe kwa mshauri wako…",
-    logWin:"Andika mafanikio", addProgress:"Ongeza rekodi",
-    free:"Bure", pro:"Pro", proMax:"Pro Max",
-    savePercent:"Okoa", perMonth:"/mwezi", perYear:"/mwaka",
-    unlockFull:"Fungua ripoti kamili", subscribePro:"Jiandikishe Pro",
-    today:"Leo", yesterday:"Jana", daysAgo:"siku zilizopita",
-    checkInTitle:"Kujiandikisha", howWasYourDay:"Siku yako ilikuwaje?",
-    writtenFor:"Imeandikwa kwako",
-    somethingCarry:"Kitu cha kubeba nawe",
-    whatBring:"Unachokuja nacho",
-    whatWatch:"Mambo ya kuangalia",
-    profile:"Wasifu", language:"Lugha", notifications:"Arifa",
-    editProfile:"Hariri wasifu", regenerate:"Tengeneza ripoti upya",
-    referFriend:"Mwalika rafiki", aboutUs:"Kuhusu DestinIQ",
-  },
-  pt: {
-    startFree:"Começar — é grátis", signIn:"Entrar", getStarted:"Começar grátis →",
-    myReport:"Meu Relatório", checkIn:"Check-in", wins:"Conquistas", progress:"Progresso",
-    myPractices:"Minhas Práticas", weeklyPulse:"Pulso Semanal",
-    makeMoney:"Ganhar Dinheiro", levelUp:"Evoluir", planDecide:"Planejar & Decidir",
-    wellbeing:"Bem-estar", bodyStyle:"Corpo & Estilo", socialLife:"Vida Social",
-    moneyDives:"Finanças a Fundo", purpose:"Propósito", discover:"Descobrir",
-    upgrade:"Atualizar", signOut:"Sair", settings:"Configurações",
-    generate:"Gerar", refresh:"Atualizar", loading:"Carregando…",
-    yourDashboard:"Seu Painel", advisorMsg:"Mensagem para seu consultor…",
-    logWin:"Registrar conquista", addProgress:"Adicionar entrada",
-    free:"Grátis", pro:"Pro", proMax:"Pro Max",
-    savePercent:"Economize", perMonth:"/mês", perYear:"/ano",
-    unlockFull:"Desbloquear relatório completo", subscribePro:"Assinar Pro",
-    today:"Hoje", yesterday:"Ontem", daysAgo:"dias atrás",
-    checkInTitle:"Check-in", howWasYourDay:"Como foi seu dia?",
-    writtenFor:"Escrito para você",
-    somethingCarry:"Algo para levar consigo",
-    whatBring:"O que você traz",
-    whatWatch:"O que observar",
-    profile:"Perfil", language:"Idioma", notifications:"Notificações",
-    editProfile:"Editar perfil", regenerate:"Gerar relatório novamente",
-    referFriend:"Indicar amigo", aboutUs:"Sobre o DestinIQ",
-  },
-  es: {
-    startFree:"Empezar — es gratis", signIn:"Iniciar sesión", getStarted:"Empezar gratis →",
-    myReport:"Mi Informe", checkIn:"Check-in", wins:"Logros", progress:"Progreso",
-    myPractices:"Mis Prácticas", weeklyPulse:"Pulso Semanal",
-    makeMoney:"Ganar Dinero", levelUp:"Superarse", planDecide:"Planear & Decidir",
-    wellbeing:"Bienestar", bodyStyle:"Cuerpo & Estilo", socialLife:"Vida Social",
-    moneyDives:"Finanzas a Fondo", purpose:"Propósito", discover:"Descubrir",
-    upgrade:"Actualizar", signOut:"Cerrar sesión", settings:"Configuración",
-    generate:"Generar", refresh:"Actualizar", loading:"Cargando…",
-    yourDashboard:"Tu Panel", advisorMsg:"Mensaje a tu asesor…",
-    logWin:"Registrar logro", addProgress:"Agregar entrada",
-    free:"Gratis", pro:"Pro", proMax:"Pro Max",
-    savePercent:"Ahorra", perMonth:"/mes", perYear:"/año",
-    unlockFull:"Desbloquear informe completo", subscribePro:"Suscribirse a Pro",
-    today:"Hoy", yesterday:"Ayer", daysAgo:"días",
-    checkInTitle:"Check-in", howWasYourDay:"¿Cómo fue tu día?",
-    writtenFor:"Escrito para ti",
-    somethingCarry:"Algo para llevar contigo",
-    whatBring:"Lo que aportas",
-    whatWatch:"Lo que debes observar",
-    profile:"Perfil", language:"Idioma", notifications:"Notificaciones",
-    editProfile:"Editar perfil", regenerate:"Regenerar informe",
-    referFriend:"Invitar amigo", aboutUs:"Sobre DestinIQ",
-  },
-};
-
-// For languages without full UI translation, AI handles content
-// UI falls back to English but ALL generated content is in chosen language
-["zh","hi","bn","ru","ur","id","de","ja","tr","ko","vi","it","th","sw","pl","nl","fa"].forEach(code=>{
-  if(!UI_STRINGS[code]) UI_STRINGS[code] = {...UI_STRINGS.en};
-});
-
-// Translation helper — falls back to English
-function t(lang, key){ return UI_STRINGS[lang]?.[key] || UI_STRINGS.en[key] || key; }
-
-// Build a rich profile context string from ALL onboarding fields
-// Used to ensure every AI call has the full picture of who the user is
-function buildProfileContext(p){
-  if(!p) return "User profile not yet available.";
-  const parts = [];
-  if(p.name)         parts.push(`Name: ${p.name}`);
-  if(p.age)          parts.push(`Age: ${p.age}`);
-  if(p.gender)       parts.push(`Gender: ${p.gender}`);
-  if(p.country)      parts.push(`Country: ${p.country}`);
-  if(p.relationship) parts.push(`Relationship: ${p.relationship}`);
-  if(p.income)       parts.push(`Monthly income: ${p.income}`);
-  if(p.education)    parts.push(`Education: ${p.education}`);
-  if(p.career)       parts.push(`Career/Job: ${p.career}`);
-  if(p.skills)       parts.push(`Skills: ${p.skills}`);
-  if(p.habits)       parts.push(`Current habits: ${p.habits}`);
-  if(p.situation)    parts.push(`Current situation: ${p.situation}`);
-  if(p.challenge)    parts.push(`Biggest challenge: ${p.challenge}`);
-  if(p.goals||p.bigGoal) parts.push(`Main goal: ${p.goals||p.bigGoal}`);
-  if(p.wantFrom)     parts.push(`What they want from DestinIQ: ${p.wantFrom}`);
-  return parts.join("\n");
-}
-
-// Language instruction for AI prompts
-function langPrompt(langCode){
-  // Read from localStorage if no code passed (works in standalone functions)
-  const code = langCode ||
-    (typeof window!=="undefined" ? (localStorage.getItem("diq_lang")||"en") : "en");
-  if(!code||code==="en") return "";
-  const found = LANGUAGES.find(l=>l.code===code);
-  if(!found) return "";
-  return `\n\nIMPORTANT: Respond ENTIRELY in ${found.label} (${found.native}). Every word must be in ${found.label} — no English.`;
-}
-
-// ── COUNTRIES with currency codes for onboarding ─────────────────────────────
+// ─── COUNTRIES LIST ──────────────────────────────────────────────────────────
 const COUNTRIES_LIST = [
   {name:"Afghanistan",currency:"AFN",symbol:"؋"},
   {name:"Albania",currency:"ALL",symbol:"L"},
@@ -4542,375 +3930,593 @@ function getIncomeRanges(currencySymbol){
   return ["Under $500","$500–$1,500","$1,500–$4,000","$4,000–$10,000","$10,000+"];
 }
 
+function Landing({onStart,ipLocation}){
+  const [userCount,setUserCount]=useState(25847);
+  useEffect(()=>{
+    const ref=new URLSearchParams(window.location.search).get("ref");
+    if(ref)try{localStorage.setItem("diq_ref",ref);}catch{}
+    supabase.from("user_profiles").select("user_id",{count:"exact",head:true})
+      .then(({count})=>{if(count&&count>500)setUserCount(count);})
+      .catch(()=>{});
+  },[]);
+
+  const orb={
+    width:"240px",height:"240px",borderRadius:"50%",
+    background:"radial-gradient(circle at 38% 38%,rgba(240,180,41,0.55),rgba(140,90,10,0.25) 45%,transparent 70%)",
+    boxShadow:"0 0 80px rgba(240,180,41,0.22),0 0 160px rgba(240,180,41,0.08)",
+    margin:"0 auto",
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column"}}>
+
+      {/* ── NAV ─── */}
+      <div style={{padding:"18px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontWeight:800,fontSize:20,color:"var(--cream)"}}>
+          Destin<span style={{color:"var(--gold)"}}>IQ</span>
+        </div>
+        <div style={{color:"var(--cream-30)",fontSize:20}}>☰</div>
+      </div>
+
+      {/* ── HERO ─── */}
+      <div style={{flex:1,padding:"20px 24px 0",maxWidth:480,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+
+        {/* AI badge */}
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(212,175,55,0.1)",border:"1px solid rgba(212,175,55,0.3)",borderRadius:20,padding:"5px 13px",marginBottom:24}}>
+          <span style={{fontSize:11}}>⚡</span>
+          <span style={{fontSize:10,color:"var(--gold)",fontWeight:700,letterSpacing:".6px"}}>AI PERSONAL INTELLIGENCE</span>
+        </div>
+
+        <h1 style={{fontSize:"clamp(34px,9vw,44px)",fontWeight:800,lineHeight:1.15,color:"var(--cream)",marginBottom:16,letterSpacing:"-.5px"}}>
+          Understand<br/>Yourself.<br/>Upgrade Your<br/>Life.
+        </h1>
+
+        <p style={{fontSize:15,color:"var(--cream-50)",lineHeight:1.65,marginBottom:28}}>
+          AI-powered insights, personalized for who you are and who you're becoming.
+        </p>
+
+        <button onClick={onStart}
+          style={{display:"inline-flex",alignItems:"center",gap:10,background:"var(--gold)",color:"#000",border:"none",borderRadius:12,padding:"14px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:28}}>
+          Start – it's free <span>→</span>
+        </button>
+
+        {/* Social proof */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:32}}>
+          <div style={{display:"flex"}}>
+            {["#c0392b","#d4ac0d","#1a9e88","#7d3c98"].map((c,i)=>(
+              <div key={i} style={{width:28,height:28,borderRadius:"50%",background:c,border:"2px solid var(--bg)",marginLeft:i>0?-9:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",fontWeight:700}}>
+                {"ABCD"[i]}
+              </div>
+            ))}
+          </div>
+          <span style={{fontSize:13,color:"var(--cream-50)"}}>
+            Join <strong style={{color:"var(--cream)"}}>{userCount.toLocaleString()}+</strong> people transforming their lives
+          </span>
+        </div>
+
+        {/* Globe orb */}
+        <div style={{display:"flex",justifyContent:"center",alignItems:"flex-end",height:110,overflow:"hidden",marginBottom:0}}>
+          <div style={orb}/>
+        </div>
+      </div>
+
+      {/* ── PRESS ─── */}
+      <div style={{padding:"20px 24px 32px",maxWidth:480,margin:"0 auto",width:"100%",boxSizing:"border-box",borderTop:"1px solid var(--cream-10)"}}>
+        <div style={{fontSize:9,color:"var(--cream-25)",letterSpacing:"1.5px",textTransform:"uppercase",fontFamily:"var(--f-mono)",marginBottom:10}}>Featured in</div>
+        <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+          {["Forbes","TechCrunch","Business Insider"].map(n=>(
+            <span key={n} style={{fontSize:13,fontWeight:700,color:"var(--cream-40)"}}>{n}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTAKE
+// 4-step onboarding: Focus → Info → Goal → Blockers
 // ═══════════════════════════════════════════════════════════════════════════════
 function Intake({onSubmit, savedFormData, ipLocation}){
-  const TOTAL=6;
-  const [step,setStep]=useState(1);
-  const [animating,setAnimating]=useState(false);
-  const [direction,setDirection]=useState("forward");
-  // Auto-detect country from IP if not already saved
-  const detectedCountry = savedFormData?.country || ipLocation?.country || "";
-  const [f,setF]=useState(()=>({
-    name:"",age:"",gender:"",country:detectedCountry,relationship:"",income:"",
-    education:"",career:"",skills:"",habits:"",goals:"",challenge:"",
-    situation:"",bigGoal:"",wantFrom:"",
-    // Pre-fill from saved data if it exists — so refresh never loses the form
-    ...(savedFormData||{}),
-    // Always use best available country
-    country: savedFormData?.country || detectedCountry,
-  }));
+  const FOCUS_AREAS=[
+    {id:"Relationships",icon:"❤️",sub:"Build stronger connections"},
+    {id:"Money",icon:"💲",sub:"Create financial freedom"},
+    {id:"Mindset",icon:"🧠",sub:"Develop a powerful mindset"},
+    {id:"Discipline",icon:"🔥",sub:"Build habits and self-control"},
+    {id:"Purpose",icon:"⭐",sub:"Find direction and live with purpose"},
+  ];
+  const BLOCKERS_LIST=[
+    "Overthinking","Lack of confidence","Past experiences",
+    "Fear of rejection","Poor communication","Don't know where to start","Other",
+  ];
+
+  const detectedCountry=savedFormData?.country||ipLocation?.country||"";
+  const [step,setStep]=useState(0); // 0=Focus 1=Info 2=Goal 3=Blockers
   const [err,setErr]=useState("");
-  // When ipLocation loads (async), update country if not already filled
+  const [showDrop,setShowDrop]=useState(false);
+  const [f,setF]=useState(()=>({
+    focus:      savedFormData?.focus||"",
+    name:       savedFormData?.name||"",
+    age:        savedFormData?.age||"",
+    country:    savedFormData?.country||detectedCountry||"Ghana",
+    countrySearch: savedFormData?.country||detectedCountry||"Ghana",
+    currency:   savedFormData?.currency||"GHS",
+    currencySymbol:savedFormData?.currencySymbol||"GH₵",
+    income:     savedFormData?.income||"",
+    skills:     savedFormData?.skills||"",
+    goal:       savedFormData?.goals||savedFormData?.goal||"",
+    blockers:   savedFormData?.blockers||[],
+  }));
+
   useEffect(()=>{
-    if(ipLocation?.country && !f.country){
-      const matched = COUNTRIES_LIST.find(c=>
-        c.name.toLowerCase()===ipLocation.country.toLowerCase() ||
+    if(ipLocation?.country&&!f.country){
+      const m=COUNTRIES_LIST.find(c=>
+        c.name.toLowerCase()===ipLocation.country.toLowerCase()||
         c.name.toLowerCase().includes(ipLocation.country.toLowerCase())
       );
-      if(matched){
-        setF(p=>({...p, country:matched.name, currency:matched.currency, currencySymbol:matched.symbol}));
-        setCountrySearch(matched.name);
-      } else {
-        setF(p=>({...p, country:ipLocation.country}));
-        setCountrySearch(ipLocation.country);
-      }
+      if(m) setF(p=>({...p,country:m.name,countrySearch:m.name,currency:m.currency,currencySymbol:m.symbol}));
+      else  setF(p=>({...p,country:ipLocation.country,countrySearch:ipLocation.country}));
     }
   },[ipLocation?.country]);
-  const [countrySearch,setCountrySearch]=useState(()=>savedFormData?.country||detectedCountry||"");
-  const [showDropdown,setShowDropdown]=useState(false);
+
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
 
-  const SITUATIONS=[
-    {id:"employed",icon:"💼",label:"Employed",sub:"Working for someone else"},
-    {id:"selfemployed",icon:"🚀",label:"Self-employed",sub:"Running my own thing"},
-    {id:"student",icon:"📚",label:"Student",sub:"Still in school or university"},
-    {id:"unemployed",icon:"🔍",label:"Job seeking",sub:"Looking for opportunities"},
-    {id:"freelance",icon:"💻",label:"Freelancer",sub:"Project to project"},
-    {id:"business",icon:"🏢",label:"Business owner",sub:"I have a team"},
-  ];
-
-  const BIG_GOALS=[
-    {id:"relocate",icon:"✈️",label:"Move abroad",sub:"Start fresh in a new country"},
-    {id:"business",icon:"🏗️",label:"Build a business",sub:"Create something of my own"},
-    {id:"career",icon:"📈",label:"Level up my career",sub:"Better role, better pay"},
-    {id:"financial",icon:"💰",label:"Financial freedom",sub:"Money working for me"},
-    {id:"personal",icon:"🌱",label:"Personal growth",sub:"Become my best self"},
-    {id:"family",icon:"🏡",label:"Provide for family",sub:"Security and stability"},
-  ];
-
-  const WANT_FROM=[
-    {id:"plan",icon:"🗺️",label:"A real plan",sub:"Step-by-step roadmap"},
-    {id:"accountability",icon:"🔥",label:"Accountability",sub:"Keep me on track daily"},
-    {id:"clarity",icon:"🔮",label:"Clarity",sub:"Help me figure out what I want"},
-    {id:"insights",icon:"💡",label:"Insights",sub:"Data and trends about my path"},
-    {id:"all",icon:"⚡",label:"All of it",sub:"Give me everything"},
-  ];
+  const toggleBlocker=(b)=>setF(p=>({
+    ...p,
+    blockers:Array.isArray(p.blockers)
+      ?p.blockers.includes(b)?p.blockers.filter(x=>x!==b):[...p.blockers,b]
+      :[b],
+  }));
 
   const validate=()=>{
-    if(step===1&&!f.name.trim()) return "Please enter your name.";
-    if(step===2&&(!f.age||parseInt(f.age)<13||parseInt(f.age)>99)) return "Please enter a valid age.";
-    if(step===2&&!f.country.trim()) return "Please enter your country.";
-    if(step===3&&!f.situation) return "Please select your current situation.";
-    if(step===4&&!f.bigGoal) return "Please select your main goal.";
-    if(step===5&&!f.goals.trim()) return "Please describe what you want.";
-    if(step===5&&!f.challenge.trim()) return "Please describe your challenge.";
-    if(step===6&&!f.wantFrom) return "Please select what you want from DestinIQ.";
+    if(step===0&&!f.focus)     return "Please select a focus area to continue.";
+    if(step===1){
+      if(!f.name?.trim())      return "Please enter your name.";
+      const a=parseInt(f.age);
+      if(!f.age||isNaN(a)||a<13||a>99) return "Please enter a valid age (13–99).";
+      if(!f.country?.trim())   return "Please select your country.";
+    }
+    if(step===2&&f.goal?.trim().length<8) return "Please describe your goal in more detail.";
+    if(step===3&&(!Array.isArray(f.blockers)||!f.blockers.length)) return "Please select at least one challenge.";
     return "";
   };
 
-  const goTo=(nextStep)=>{
-    const e=validate();
-    if(e){setErr(e);return;}
-    setErr("");
-    setDirection(nextStep>step?"forward":"back");
-    setAnimating(true);
-    setTimeout(()=>{
-      setStep(nextStep);
-      setAnimating(false);
-    },220);
-  };
-
   const next=()=>{
-    if(step<TOTAL) goTo(step+1);
-    else{
-      const e=validate();
-      if(e){setErr(e);return;}
-      // Map new fields onto the shape the rest of the app expects
-      const combined={
-        ...f,
-        career: f.career||(f.situation?SITUATIONS.find(s=>s.id===f.situation)?.label:""),
-        goals: f.goals||(f.bigGoal?BIG_GOALS.find(g=>g.id===f.bigGoal)?.label:""),
-      };
-      onSubmit(combined);
-    }
-  };
-  const back=()=>{ if(step>1) goTo(step-1); };
-
-  const prog=(step/TOTAL)*100;
-
-  const cardStyle={
-    background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,
-    padding:"32px 28px",
-    opacity:animating?0:1,
-    transform:animating?(direction==="forward"?"translateX(30px)":"translateX(-30px)"):"translateX(0)",
-    transition:"opacity 0.22s ease, transform 0.22s ease",
+    const e=validate(); if(e){setErr(e);return;} setErr("");
+    if(step<3){ setStep(s=>s+1); return; }
+    // Submit — map fields to the shape the AI report engine expects
+    onSubmit({
+      ...f,
+      goals:    f.goal||"",
+      challenge:Array.isArray(f.blockers)&&f.blockers.length?f.blockers.join(", "):"",
+      bigGoal:  f.focus||"",
+      wantFrom: "all",
+      situation:f.situation||"employed",
+      career:   f.career||"",
+      education:f.education||"",
+      relationship:f.relationship||"",
+      habits:   f.habits||"",
+      support:  f.support||"",
+    });
   };
 
-  const optionStyle=(selected)=>({
-    display:"flex",alignItems:"center",gap:14,padding:"14px 16px",
-    borderRadius:14,border:`1.5px solid ${selected?"var(--gold)":"var(--cream-10)"}`,
-    background:selected?"rgba(var(--gold-rgb,212,175,55),0.08)":"transparent",
-    cursor:"pointer",transition:"all 0.18s",marginBottom:10,
-  });
+  const back=()=>{setErr("");setStep(s=>Math.max(0,s-1));};
 
-  const greetings=["Hey","Hi","Hello","Hey there"];
-  const greeting=greetings[f.name.length%greetings.length]||"Hey";
+  // ── Shared styles ────────────────────────────────────────────────────────
+  const iStyle={width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"};
+  const btnGold={width:"100%",padding:"15px",background:"var(--gold)",color:"#000",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"};
+
+  // ── Progress bar (4 segments, one per step) ──────────────────────────────
+  const ProgBar=()=>(
+    <div style={{display:"flex",gap:4,marginBottom:26}}>
+      {[0,1,2,3].map(i=>(
+        <div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=step?"var(--gold)":"var(--cream-10)",transition:"background .3s"}}/>
+      ))}
+    </div>
+  );
+
+  const BackBtn=()=>(
+    <button onClick={back} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:22,padding:"0 0 10px",display:"block",lineHeight:1}}>←</button>
+  );
+
+  const ErrMsg=()=>err?<div style={{color:"#F87171",fontSize:13,marginBottom:11}}>⚠ {err}</div>:null;
 
   return(
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"clamp(20px,5vw,80px) 20px 40px"}}>
-      <div style={{width:"100%",maxWidth:560}}>
+    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--cream)",fontFamily:"inherit",display:"flex",flexDirection:"column"}}>
 
-        {/* Progress bar */}
-        <div style={{marginBottom:28}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <span style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>STEP {step} OF {TOTAL}</span>
-            <span style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{Math.round(prog)}%</span>
-          </div>
-          <div style={{height:4,background:"var(--cream-10)",borderRadius:99,overflow:"hidden"}}>
-            <div style={{height:"100%",background:"var(--gold)",borderRadius:99,width:`${prog}%`,transition:"width 0.4s cubic-bezier(.4,0,.2,1)"}}/>
-          </div>
-        </div>
+      <div style={{flex:1,padding:"22px 24px 56px",maxWidth:500,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+        <BackBtn/>
+        <ProgBar/>
 
-        <div style={cardStyle}>
+        {/* ════════════════════════════════
+            STEP 0 — CHOOSE YOUR FOCUS
+        ════════════════════════════════ */}
+        {step===0&&(
+          <div>
+            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",lineHeight:1.2,marginBottom:6}}>
+              What do you want to improve first?
+            </h2>
+            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:22,lineHeight:1.5}}>
+              Choose the area that matters most to you right now.
+            </p>
 
-          {/* STEP 1 — Name */}
-          {step===1&&(
-            <div>
-              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>WELCOME TO DESTINIQ</div>
-              <h2 style={{fontSize:26,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>Let's start with your name.</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:28,lineHeight:1.6}}>This isn't just a form. What you share here shapes a plan built entirely around you.</p>
-              <div style={{marginBottom:20}}>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>FULL NAME</label>
-                <input
-                  autoFocus
-                  style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"15px 18px",color:"var(--cream)",fontSize:18,fontWeight:600,outline:"none",boxSizing:"border-box",letterSpacing:".01em"}}
-                  placeholder="Type your name…"
-                  value={f.name}
-                  onChange={e=>set("name",e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&next()}
-                  maxLength={60}
-                />
-              </div>
-              {f.name.trim()&&<p style={{fontSize:13,color:"var(--cream-40)",marginBottom:4}}>Nice to meet you, <strong style={{color:"var(--cream)"}}>{f.name}</strong> 👋</p>}
-            </div>
-          )}
-
-          {/* STEP 2 — Age, Country, Currency, Gender */}
-          {step===2&&(()=>{
-            const filtered=COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(countrySearch.toLowerCase())).slice(0,8);
-            const selectedCurrency=getCurrencyForCountry(f.country);
-            const incomeRanges=getIncomeRanges(selectedCurrency.symbol);
-            return(
-            <div>
-              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>{greeting.toUpperCase()}, {f.name.toUpperCase()}!</div>
-              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>Tell us about yourself.</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>Where you are shapes everything we build for you.</p>
-
-              {/* Country — searchable dropdown */}
-              <div style={{marginBottom:14,position:"relative"}}>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>COUNTRY</label>
-                <div style={{position:"relative"}}>
-                  <input
-                    style={{width:"100%",background:"var(--midnight)",border:`1px solid ${f.country?"var(--gold)":"var(--cream-15)"}`,borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:15,outline:"none",boxSizing:"border-box",paddingRight:36}}
-                    placeholder="Search your country…"
-                    value={countrySearch}
-                    onChange={e=>{setCountrySearch(e.target.value);setShowDropdown(true);if(!e.target.value){set("country","");}}}
-                    onFocus={()=>setShowDropdown(true)}
-                    onBlur={()=>setTimeout(()=>setShowDropdown(false),200)}
-                  />
-                  {f.country&&<span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:14}}>
-                    {selectedCurrency.symbol} <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{selectedCurrency.currency}</span>
-                  </span>}
+            {/* 2×2 grid */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
+              {FOCUS_AREAS.filter((_,i)=>i<4).map(fa=>(
+                <div key={fa.id} onClick={()=>set("focus",fa.id)}
+                  style={{background:f.focus===fa.id?"rgba(212,175,55,0.1)":"var(--night)",border:`2px solid ${f.focus===fa.id?"var(--gold)":"var(--cream-10)"}`,borderRadius:13,padding:"17px 13px",cursor:"pointer",transition:"all .18s"}}>
+                  <div style={{fontSize:26,marginBottom:9}}>{fa.icon}</div>
+                  <div style={{fontWeight:700,fontSize:13,color:"var(--cream)",marginBottom:3}}>{fa.id}</div>
+                  <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.4}}>{fa.sub}</div>
                 </div>
-                {showDropdown&&countrySearch&&filtered.length>0&&(
-                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:12,zIndex:100,maxHeight:220,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.4)"}}>
-                    {filtered.map(c=>(
-                      <div key={c.name} onMouseDown={()=>{
-                        set("country",c.name);
-                        set("currency",c.currency);
-                        set("currencySymbol",c.symbol);
-                        setCountrySearch(c.name);
-                        setShowDropdown(false);
-                      }} style={{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="rgba(210,175,90,0.08)"}
-                      onMouseLeave={e=>e.currentTarget.style.background="none"}>
+              ))}
+            </div>
+
+            {/* Purpose — full width */}
+            {(()=>{const fa=FOCUS_AREAS[4];return(
+              <div onClick={()=>set("focus",fa.id)}
+                style={{display:"flex",alignItems:"center",gap:14,background:f.focus===fa.id?"rgba(212,175,55,0.1)":"var(--night)",border:`2px solid ${f.focus===fa.id?"var(--gold)":"var(--cream-10)"}`,borderRadius:13,padding:"14px 18px",cursor:"pointer",marginBottom:20,transition:"all .18s"}}>
+                <span style={{fontSize:22}}>{fa.icon}</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:13,color:"var(--cream)",marginBottom:2}}>{fa.id}</div>
+                  <div style={{fontSize:11,color:"var(--cream-40)"}}>{fa.sub}</div>
+                </div>
+                {f.focus===fa.id&&<span style={{marginLeft:"auto",color:"var(--gold)",fontWeight:700}}>✓</span>}
+              </div>
+            );})()}
+
+            <ErrMsg/>
+            <button onClick={next} style={btnGold}>Continue</button>
+          </div>
+        )}
+
+        {/* ════════════════════════════════
+            STEP 1 — LET'S GET TO KNOW YOU
+        ════════════════════════════════ */}
+        {step===1&&(
+          <div>
+            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:5}}>Let's get to know you</h2>
+            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:26}}>This helps our AI generate personalized insights.</p>
+
+            <div style={{marginBottom:16}}>
+              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT SHOULD WE CALL YOU?</label>
+              <input autoFocus value={f.name||""} onChange={e=>set("name",e.target.value)}
+                placeholder="John" maxLength={60}
+                style={iStyle} onKeyDown={e=>e.key==="Enter"&&next()}/>
+            </div>
+
+            <div style={{marginBottom:16}}>
+              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>HOW OLD ARE YOU?</label>
+              <input type="number" min="13" max="99" value={f.age||""} onChange={e=>set("age",e.target.value)} placeholder="25" style={iStyle}/>
+            </div>
+
+            <div style={{marginBottom:16}}>
+              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>MONTHLY INCOME</label>
+              <select value={f.income||""} onChange={e=>set("income",e.target.value)}
+                style={{...iStyle,appearance:"none",color:f.income?"var(--cream)":"var(--cream-30)"}}>
+                <option value="">Select range…</option>
+                {getIncomeRanges((()=>getCurrencyForCountry(f.country).symbol)()).map(r=><option key={r}>{r}</option>)}
+              </select>
+            </div>
+
+            {/* Country — searchable */}
+            <div style={{marginBottom:24,position:"relative"}}>
+              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT'S YOUR COUNTRY?</label>
+              <div style={{position:"relative"}}>
+                <input
+                  value={f.countrySearch||f.country||""}
+                  onChange={e=>{set("countrySearch",e.target.value);setShowDrop(true);if(!e.target.value)set("country","");}}
+                  onFocus={()=>setShowDrop(true)}
+                  onBlur={()=>setTimeout(()=>setShowDrop(false),200)}
+                  placeholder="Search your country…"
+                  style={{...iStyle,border:`1px solid ${f.country?"var(--gold)":"var(--cream-15)"}`}}
+                />
+                {showDrop&&f.countrySearch&&(
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:12,zIndex:100,maxHeight:200,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+                    {COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes((f.countrySearch||"").toLowerCase())).slice(0,8).map(c=>(
+                      <div key={c.name}
+                        onMouseDown={()=>{set("country",c.name);set("countrySearch",c.name);set("currency",c.currency);set("currencySymbol",c.symbol);setShowDrop(false);}}
+                        style={{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                        onMouseEnter={e=>e.currentTarget.style.background="rgba(212,175,55,0.08)"}
+                        onMouseLeave={e=>e.currentTarget.style.background="none"}>
                         <span style={{fontSize:14,color:"var(--cream)"}}>{c.name}</span>
-                        <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{c.symbol} {c.currency}</span>
+                        <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{c.symbol}</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
-                <div>
-                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>AGE</label>
-                  <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:15,outline:"none",boxSizing:"border-box"}} type="number" min="13" max="99" placeholder="e.g. 24" value={f.age} onChange={e=>set("age",e.target.value)}/>
-                </div>
-                <div>
-                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>GENDER</label>
-                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.gender?"var(--cream)":"var(--cream-30)",fontSize:15,outline:"none",boxSizing:"border-box"}} value={f.gender} onChange={e=>set("gender",e.target.value)}>
-                    <option value="">Select…</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-                <div>
-                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>RELATIONSHIP</label>
-                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.relationship?"var(--cream)":"var(--cream-30)",fontSize:14,outline:"none",boxSizing:"border-box"}} value={f.relationship} onChange={e=>set("relationship",e.target.value)}>
-                    <option value="">Select…</option><option>Single</option><option>In a relationship</option><option>Engaged</option><option>Married</option><option>Divorced</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>
-                    MONTHLY INCOME {f.country&&<span style={{color:"var(--gold)",fontWeight:400}}>({selectedCurrency.symbol})</span>}
-                  </label>
-                  <select style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:f.income?"var(--cream)":"var(--cream-30)",fontSize:13,outline:"none",boxSizing:"border-box"}} value={f.income} onChange={e=>set("income",e.target.value)}>
-                    <option value="">Select…</option>
-                    {incomeRanges.map(r=><option key={r}>{r}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{marginTop:14}}>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>YOUR SKILLS</label>
-                <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box"}} placeholder="e.g. graphic design, driving, cooking, coding, sales…" value={f.skills} onChange={e=>set("skills",e.target.value)} maxLength={200}/>
-              </div>
             </div>
-            );
-          })()}
 
-          {/* STEP 3 — Current situation */}
-          {step===3&&(
-            <div>
-              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>YOUR CURRENT REALITY</div>
-              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>What does your life look like right now?</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>No judgement here. We just need to know where you're starting from.</p>
-              {SITUATIONS.map(s=>(
-                <div key={s.id} style={optionStyle(f.situation===s.id)} onClick={()=>set("situation",s.id)}>
-                  <span style={{fontSize:24}}>{s.icon}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{s.label}</div>
-                    <div style={{fontSize:12,color:"var(--cream-40)"}}>{s.sub}</div>
-                  </div>
-                  {f.situation===s.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:700}}>✓</div>}
-                </div>
-              ))}
-              {(f.situation==="employed"||f.situation==="selfemployed"||f.situation==="business")&&(
-                <div style={{marginTop:14}}>
-                  <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>BRIEFLY DESCRIBE YOUR WORK</label>
-                  <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none"}} rows={2} maxLength={300} placeholder="e.g. Sales rep at a telecoms company, $600/month" value={f.career} onChange={e=>set("career",e.target.value)}/>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 4 — Big goal */}
-          {step===4&&(
-            <div>
-              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>YOUR AMBITION</div>
-              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>What's the big thing you're working towards?</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>Pick the one that feels most like you right now.</p>
-              {BIG_GOALS.map(g=>(
-                <div key={g.id} style={optionStyle(f.bigGoal===g.id)} onClick={()=>set("bigGoal",g.id)}>
-                  <span style={{fontSize:24}}>{g.icon}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{g.label}</div>
-                    <div style={{fontSize:12,color:"var(--cream-40)"}}>{g.sub}</div>
-                  </div>
-                  {f.bigGoal===g.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:700}}>✓</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* STEP 5 — Goals & Challenge */}
-          {step===5&&(
-            <div>
-              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>THE REAL TALK</div>
-              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>In your own words, {f.name}.</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>This is the most important part. The more honest you are, the more powerful your report will be.</p>
-              <div style={{marginBottom:18}}>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT DO YOU ACTUALLY WANT FROM LIFE?</label>
-                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder={`Don't filter yourself. Financial freedom, moving to ${f.country==="Ghana"?"Europe":"another country"}, a business, feeling less stuck — whatever it honestly is.`} value={f.goals} onChange={e=>set("goals",e.target.value)}/>
-                <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.goals.length}/600</div>
-              </div>
-              <div>
-                <label style={{fontSize:12,color:"var(--cream-40)",fontWeight:600,letterSpacing:".06em",display:"block",marginBottom:8}}>WHAT'S ACTUALLY GETTING IN THE WAY?</label>
-                <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6}} rows={3} maxLength={600} placeholder="What keeps coming back no matter what you try? Money, time, fear, family pressure, no connections — be real." value={f.challenge} onChange={e=>set("challenge",e.target.value)}/>
-                <div style={{textAlign:"right",fontSize:11,color:"var(--cream-20)",marginTop:4}}>{f.challenge.length}/600</div>
-              </div>
-              <div style={{marginTop:16,padding:"14px 16px",background:"rgba(20,184,166,0.06)",border:"1px solid rgba(20,184,166,0.15)",borderRadius:12}}>
-                <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,margin:0}}><strong style={{color:"var(--teal)"}}>This matters most.</strong> People who are honest here get reports that actually change how they see their future. You're not being judged — you're being understood.</p>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 6 — What they want from DestinIQ + launch */}
-          {step===6&&(
-            <div>
-              <div style={{fontSize:13,color:"var(--gold)",fontWeight:600,marginBottom:8,letterSpacing:".05em"}}>ALMOST THERE</div>
-              <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.2}}>What do you want DestinIQ to do for you?</h2>
-              <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.6}}>We'll shape your experience around this.</p>
-              {WANT_FROM.map(w=>(
-                <div key={w.id} style={optionStyle(f.wantFrom===w.id)} onClick={()=>set("wantFrom",w.id)}>
-                  <span style={{fontSize:24}}>{w.icon}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{w.label}</div>
-                    <div style={{fontSize:12,color:"var(--cream-40)"}}>{w.sub}</div>
-                  </div>
-                  {f.wantFrom===w.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#000",fontWeight:700}}>✓</div>}
-                </div>
-              ))}
-              {f.wantFrom&&(
-                <div style={{marginTop:16,padding:"16px",background:"rgba(212,175,55,0.06)",border:"1px solid rgba(212,175,55,0.15)",borderRadius:12,textAlign:"center"}}>
-                  <div style={{fontSize:22,marginBottom:6}}>🚀</div>
-                  <p style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.6,margin:0}}>You're ready, <strong style={{color:"var(--cream)"}}>{f.name}</strong>. We're about to build your personal report. This takes about 30 seconds.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Error */}
-          {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:10,padding:"10px 14px",marginTop:16,fontSize:13,color:"#F87171"}}>⚠ {err}</div>}
-
-          {/* Navigation */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:24}}>
-            {step>1
-              ?<button onClick={back} style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"10px 18px",color:"var(--cream-50)",fontSize:14,cursor:"pointer",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.color="var(--cream)"} onMouseLeave={e=>e.currentTarget.style.color="var(--cream-50)"}>← Back</button>
-              :<div/>
-            }
-            <button
-              onClick={next}
-              style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"12px 28px",color:"#000",fontSize:15,fontWeight:700,cursor:"pointer",transition:"all .2s",boxShadow:"0 4px 20px rgba(212,175,55,0.25)"}}
-              onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
-              onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
-            >
-              {step<TOTAL?"Continue →":"Generate My Report ✨"}
-            </button>
+            <ErrMsg/>
+            <button onClick={next} style={btnGold}>Continue</button>
           </div>
+        )}
+
+        {/* ════════════════════════════════
+            STEP 2 — MAIN GOAL
+        ════════════════════════════════ */}
+        {step===2&&(
+          <div>
+            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:5}}>What's your main goal right now?</h2>
+            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:26}}>Be specific. The more honest you are, the better we can help.</p>
+
+            <textarea
+              autoFocus
+              value={f.goal||""}
+              onChange={e=>set("goal",e.target.value)}
+              placeholder="I want to build a meaningful relationship and become more confident in myself."
+              rows={6}
+              maxLength={600}
+              style={{...iStyle,resize:"vertical",lineHeight:1.65,marginBottom:6}}
+            />
+            <div style={{textAlign:"right",fontSize:11,color:"var(--cream-25)",marginBottom:20}}>{(f.goal||"").length}/600</div>
+
+            <ErrMsg/>
+            <button onClick={next} style={btnGold}>Continue</button>
+          </div>
+        )}
+
+        {/* ════════════════════════════════
+            STEP 3 — BLOCKERS
+        ════════════════════════════════ */}
+        {step===3&&(
+          <div>
+            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:5}}>What's holding you back the most?</h2>
+            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:22}}>Select all that apply.</p>
+
+            <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:22}}>
+              {BLOCKERS_LIST.map(b=>{
+                const chk=Array.isArray(f.blockers)&&f.blockers.includes(b);
+                return(
+                  <div key={b} onClick={()=>{toggleBlocker(b);setErr("");}}
+                    style={{display:"flex",alignItems:"center",gap:13,padding:"13px 15px",background:chk?"rgba(212,175,55,0.07)":"var(--night)",border:`1.5px solid ${chk?"var(--gold)":"var(--cream-10)"}`,borderRadius:10,cursor:"pointer",transition:"all .15s"}}>
+                    <div style={{width:19,height:19,borderRadius:5,border:`2px solid ${chk?"var(--gold)":"rgba(232,220,200,0.2)"}`,background:chk?"var(--gold)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                      {chk&&<span style={{color:"#000",fontSize:12,fontWeight:900,lineHeight:1}}>✓</span>}
+                    </div>
+                    <span style={{fontSize:14,color:chk?"var(--cream)":"var(--cream-60)"}}>{b}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <ErrMsg/>
+            <button onClick={next} style={btnGold}>Get My Report →</button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPLETE PROFILE
+// Shown to existing accounts whose profile is saved but incomplete or whose
+// report was never generated. Detects exactly which fields are missing and
+// shows only those — keeping the flow as short as possible.
+// ═══════════════════════════════════════════════════════════════════════════════
+function getProfileGaps(fd){
+  if(!fd) return {name:true,age:true,country:true,goal:true,blockers:true};
+  return {
+    name:    !fd.name?.trim(),
+    age:     !fd.age,
+    country: !fd.country?.trim(),
+    goal:    !(fd.goals?.trim()||fd.goal?.trim()),
+    blockers:!(fd.challenge?.trim()||(Array.isArray(fd.blockers)&&fd.blockers.length)),
+  };
+}
+
+function CompleteProfile({savedFormData, onSubmit}){
+  const gaps  = getProfileGaps(savedFormData);
+  const anyGap= Object.values(gaps).some(Boolean);
+
+  const BLOCKERS_OPT=["Overthinking","Lack of confidence","Past experiences","Fear of rejection","Poor communication","Don't know where to start","Other"];
+
+  // Pre-fill whatever we already have
+  const [name,   setName   ]=useState(savedFormData?.name||"");
+  const [age,    setAge    ]=useState(savedFormData?.age||"");
+  const [country,setCountry]=useState(savedFormData?.country||"Ghana");
+  const [cSearch,setCSearch]=useState(savedFormData?.country||"Ghana");
+  const [showDrop,setShowDrop]=useState(false);
+  const [goal,   setGoal   ]=useState(savedFormData?.goals||savedFormData?.goal||"");
+  const [blockers,setBlockers]=useState(()=>{
+    if(Array.isArray(savedFormData?.blockers)&&savedFormData.blockers.length) return savedFormData.blockers;
+    if(savedFormData?.challenge) return [savedFormData.challenge];
+    return [];
+  });
+  const [err,setErr]=useState("");
+
+  // If nothing is actually missing — just regenerate immediately
+  useEffect(()=>{
+    if(!anyGap){
+      onSubmit({
+        ...savedFormData,
+        wantFrom: savedFormData?.wantFrom||"all",
+        situation:savedFormData?.situation||"employed",
+        goals:    savedFormData?.goals||savedFormData?.goal||"",
+        challenge:savedFormData?.challenge||(Array.isArray(savedFormData?.blockers)?savedFormData.blockers.join(", "):""),
+      });
+    }
+  },[]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  if(!anyGap) return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <div style={{width:36,height:36,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <p style={{fontSize:13,color:"var(--cream-40)"}}>Regenerating your report…</p>
+    </div>
+  );
+
+  const toggleB=(b)=>setBlockers(p=>p.includes(b)?p.filter(x=>x!==b):[...p,b]);
+
+  const handleSubmit=()=>{
+    if(gaps.name  &&!name.trim())         return setErr("Please enter your name.");
+    const ageN=parseInt(age);
+    if(gaps.age   &&(!age||isNaN(ageN)||ageN<13||ageN>99)) return setErr("Please enter a valid age.");
+    if(gaps.goal  &&!goal.trim())          return setErr("Please describe your goal.");
+    if(gaps.blockers&&!blockers.length)    return setErr("Please select at least one challenge.");
+    setErr("");
+
+    onSubmit({
+      ...savedFormData,
+      name:     name   ||savedFormData?.name   ||"",
+      age:      age    ||savedFormData?.age    ||"",
+      country:  country||savedFormData?.country||"",
+      goals:    goal   ||savedFormData?.goals  ||savedFormData?.goal||"",
+      goal:     goal   ||savedFormData?.goals  ||savedFormData?.goal||"",
+      challenge:blockers.length?blockers.join(", "):(savedFormData?.challenge||""),
+      blockers:  blockers.length?blockers:(Array.isArray(savedFormData?.blockers)?savedFormData.blockers:[]),
+      bigGoal:   savedFormData?.focus||savedFormData?.bigGoal||"",
+      wantFrom:  savedFormData?.wantFrom||"all",
+      situation: savedFormData?.situation||"employed",
+      career:    savedFormData?.career||"",
+      skills:    savedFormData?.skills||"",
+      income:    savedFormData?.income||"",
+      education: savedFormData?.education||"",
+      relationship:savedFormData?.relationship||"",
+    });
+  };
+
+  const iStyle={width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"};
+
+  // Count missing so user knows how short this is
+  const missingCount = Object.values(gaps).filter(Boolean).length;
+  const userName = savedFormData?.name?.trim();
+
+  return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--cream)",fontFamily:"inherit",display:"flex",flexDirection:"column"}}>
+      <div style={{flex:1,padding:"32px 24px 56px",maxWidth:500,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+
+        {/* Header */}
+        <div style={{marginBottom:28}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(212,175,55,0.1)",border:"1px solid rgba(212,175,55,0.3)",borderRadius:20,padding:"5px 12px",marginBottom:18}}>
+            <span style={{fontSize:11}}>⚡</span>
+            <span style={{fontSize:10,color:"var(--gold)",fontWeight:700,letterSpacing:".6px"}}>COMPLETE YOUR PROFILE</span>
+          </div>
+          <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>
+            {userName?`Welcome back, ${userName}!`:"Welcome back!"}<br/>
+            <span style={{color:"var(--gold)"}}>Let's finish setting you up.</span>
+          </h2>
+          <p style={{fontSize:13,color:"var(--cream-40)",lineHeight:1.6}}>
+            {missingCount===1?"Just one more detail":"A few more details"} and we'll generate your personalized report.
+          </p>
         </div>
 
-        {/* Step dots */}
-        <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:20}}>
-          {Array.from({length:TOTAL},(_,i)=>(
-            <div key={i} style={{width:i+1===step?20:6,height:6,borderRadius:99,background:i+1<=step?"var(--gold)":"var(--cream-10)",transition:"all .3s"}}/>
-          ))}
-        </div>
+        {/* ── Missing: Name ── */}
+        {gaps.name&&(
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT SHOULD WE CALL YOU?</label>
+            <input autoFocus={gaps.name} value={name} onChange={e=>setName(e.target.value)}
+              placeholder="Your name" maxLength={60}
+              style={iStyle} onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+          </div>
+        )}
 
+        {/* ── Missing: Age ── */}
+        {gaps.age&&(
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>HOW OLD ARE YOU?</label>
+            <input type="number" min="13" max="99" value={age} onChange={e=>setAge(e.target.value)} placeholder="e.g. 25" style={iStyle}/>
+          </div>
+        )}
+
+        {/* ── Missing: Country ── */}
+        {gaps.country&&(
+          <div style={{marginBottom:16,position:"relative"}}>
+            <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT'S YOUR COUNTRY?</label>
+            <input
+              value={cSearch}
+              onChange={e=>{setCSearch(e.target.value);setShowDrop(true);if(!e.target.value)setCountry("");}}
+              onFocus={()=>setShowDrop(true)}
+              onBlur={()=>setTimeout(()=>setShowDrop(false),200)}
+              placeholder="Search your country…"
+              style={{...iStyle,border:`1px solid ${country?"var(--gold)":"var(--cream-15)"}`}}
+            />
+            {showDrop&&cSearch&&(
+              <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:12,zIndex:100,maxHeight:200,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+                {COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(cSearch.toLowerCase())).slice(0,8).map(c=>(
+                  <div key={c.name}
+                    onMouseDown={()=>{setCountry(c.name);setCSearch(c.name);setShowDrop(false);}}
+                    style={{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                    onMouseEnter={e=>e.currentTarget.style.background="rgba(212,175,55,0.08)"}
+                    onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                    <span style={{fontSize:14,color:"var(--cream)"}}>{c.name}</span>
+                    <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{c.symbol}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Missing: Goal ── */}
+        {gaps.goal&&(
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT'S YOUR MAIN GOAL RIGHT NOW?</label>
+            <textarea
+              autoFocus={!gaps.name&&!gaps.age&&!gaps.country}
+              value={goal} onChange={e=>setGoal(e.target.value)}
+              placeholder="Be specific — what do you actually want to achieve?"
+              rows={4} maxLength={600}
+              style={{...iStyle,resize:"vertical",lineHeight:1.65}}
+            />
+            <div style={{textAlign:"right",fontSize:11,color:"var(--cream-25)",marginTop:4}}>{goal.length}/600</div>
+          </div>
+        )}
+
+        {/* ── Missing: Blockers ── */}
+        {gaps.blockers&&(
+          <div style={{marginBottom:20}}>
+            <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:10}}>WHAT'S HOLDING YOU BACK? <span style={{color:"var(--cream-25)",fontWeight:400,letterSpacing:0}}>(select all that apply)</span></label>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {BLOCKERS_OPT.map(b=>{
+                const chk=blockers.includes(b);
+                return(
+                  <div key={b} onClick={()=>{toggleB(b);setErr("");}}
+                    style={{display:"flex",alignItems:"center",gap:12,padding:"12px 15px",background:chk?"rgba(212,175,55,0.07)":"var(--night)",border:`1.5px solid ${chk?"var(--gold)":"var(--cream-10)"}`,borderRadius:10,cursor:"pointer",transition:"all .15s"}}>
+                    <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${chk?"var(--gold)":"rgba(232,220,200,0.2)"}`,background:chk?"var(--gold)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                      {chk&&<span style={{color:"#000",fontSize:11,fontWeight:900,lineHeight:1}}>✓</span>}
+                    </div>
+                    <span style={{fontSize:14,color:chk?"var(--cream)":"var(--cream-60)"}}>{b}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {err&&<div style={{color:"#F87171",fontSize:13,marginBottom:12}}>⚠ {err}</div>}
+
+        {/* CTA */}
+        <button onClick={handleSubmit}
+          style={{width:"100%",padding:"15px",background:"var(--gold)",color:"#000",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginTop:4}}>
+          Generate My Report →
+        </button>
+
+        {/* What we already have — reassurance */}
+        {(savedFormData?.name||savedFormData?.country||savedFormData?.focus)&&(
+          <div style={{marginTop:20,padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid var(--cream-10)",borderRadius:12}}>
+            <div style={{fontSize:10,color:"var(--cream-30)",letterSpacing:".1em",marginBottom:10,fontFamily:"var(--f-mono)",textTransform:"uppercase"}}>Already on your profile</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {[
+                savedFormData?.name     &&{label:"Name",    value:savedFormData.name},
+                savedFormData?.country  &&{label:"Country", value:savedFormData.country},
+                savedFormData?.focus    &&{label:"Focus",   value:savedFormData.focus},
+                savedFormData?.bigGoal  &&!savedFormData?.focus&&{label:"Focus",value:savedFormData.bigGoal},
+                savedFormData?.income   &&{label:"Income",  value:savedFormData.income},
+              ].filter(Boolean).map(item=>(
+                <div key={item.label} style={{padding:"5px 12px",background:"rgba(212,175,55,0.07)",border:"1px solid rgba(212,175,55,0.2)",borderRadius:20}}>
+                  <span style={{fontSize:10,color:"var(--cream-40)"}}>{item.label}: </span>
+                  <span style={{fontSize:11,color:"var(--gold)",fontWeight:600}}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -10952,11 +10558,18 @@ Rules:
   const catId  = isCat  ? navSection.slice(9)  : null;
   const toolId = isTool ? navSection.slice(5)  : null;
 
+  // Sync mod with toolId SAFELY via effect — never during render
+  useEffect(()=>{
+    if(isTool && !MODULE_CONFIGS?.[toolId] && toolId && mod!==toolId){
+      setMod(toolId);
+    }
+  },[navSection]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Helper: legacy module view (report + existing module content)
   const showModView = ()=>(
     <div style={{paddingTop:8}}>
-      {streakCelebration&&<StreakCelebration days={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
-      {miniStreak&&<MiniStreakCelebration days={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+      {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+      {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
       {showCheckin&&(
         <div className="cx-md" style={{paddingTop:24,paddingBottom:24}}>
           <CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
@@ -11015,10 +10628,7 @@ Rules:
         {isTool&&MODULE_CONFIGS?.[toolId]&&(
           <ToolPage toolId={toolId} setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>
         )}
-        {isTool&&!MODULE_CONFIGS?.[toolId]&&(()=>{
-          if(mod!==toolId) setMod(toolId);
-          return showModView();
-        })()}
+        {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
         {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav}/>}
         {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/></div>}
         {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
@@ -12223,16 +11833,18 @@ export default function DestinIQ(){
         }catch(e){}
 
         if (profile.form_data && profile.report) {
-          // Has both — go straight to the dashboard
+          // ── CASE 1: Complete profile + report → straight to Dashboard
           setScreen("results");
+        } else if (profile.form_data) {
+          // ── CASE 2: Has profile data but missing report or incomplete fields
+          // Show a short "complete your profile" flow, then regenerate report
+          setScreen("complete-profile");
         } else {
-          // Either no onboarding data yet, or it exists but report generation
-          // was interrupted — either way, send to intake (it pre-fills from
-          // savedFormData, so nothing is lost) instead of the landing page.
+          // ── CASE 3: Brand-new account — no profile data at all
           setScreen("intake");
         }
       } else {
-        // No profile row yet at all — brand-new user, show the welcome/intake form.
+        // No profile row at all → brand-new account → full onboarding
         setScreen("intake");
       }
     }catch(e){
@@ -12823,7 +12435,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             <div style={{width:36,height:36,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
           </div>
         )}
-        {screen==="intake"   &&<Intake onSubmit={handleSubmit} savedFormData={formData} ipLocation={ipLocation}/>}
+        {screen==="intake"            &&<Intake onSubmit={handleSubmit} savedFormData={formData} ipLocation={ipLocation}/>}
+        {screen==="complete-profile"&&<CompleteProfile savedFormData={formData} onSubmit={handleSubmit}/>}
         {screen==="loading"  &&<Loading/>}
         {screen==="paywall"  &&<Paywall onUnlock={handlePay} teaser={report?.teaser||""} userEmail={user?.email||""} userId={userId} ipLocation={ipLocation}/>}
         {screen==="results"  &&formData&&report&&(
