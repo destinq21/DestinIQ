@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -4045,7 +4045,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
     income:     savedFormData?.income||"",
     skills:     savedFormData?.skills||"",
     goal:       savedFormData?.goals||savedFormData?.goal||"",
-    blockers:   savedFormData?.blockers||[],
+    blockers:   Array.isArray(savedFormData?.blockers)?savedFormData.blockers:[],
   }));
 
   useEffect(()=>{
@@ -4350,7 +4350,7 @@ function CompleteProfile({savedFormData, onSubmit}){
     </div>
   );
 
-  const toggleB=(b)=>setBlockers(p=>p.includes(b)?p.filter(x=>x!==b):[...p,b]);
+  const toggleB=(b)=>setBlockers(p=>Array.isArray(p)?(p.includes(b)?p.filter(x=>x!==b):[...p,b]):[b]);
 
   const handleSubmit=()=>{
     if(gaps.name  &&!name.trim())         return setErr("Please enter your name.");
@@ -10471,10 +10471,10 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
   const focusBg      = ["rgba(229,62,62,0.12)","rgba(155,114,207,0.12)","rgba(240,180,41,0.08)"];
   const focusAcc     = ["#e57373","#b39ddb","var(--gold)"];
 
-  const focuses = roadmap.slice(0,3).map((p,i)=>({
-    label:focusLabels[i], title:txt(p.title)||`Focus ${i+1}`,
-    desc: txt(p.desc)||"", why: Array.isArray(p.steps)?txt(p.steps[0]):"",
-    icon: getIcon(txt(p.title)), bg:focusBg[i], acc:focusAcc[i], phase:txt(p.phase)||"",
+  const focuses = roadmap.filter(p=>p&&typeof p==="object").slice(0,3).map((p,i)=>({
+    label:focusLabels[i], title:txt(p?.title)||`Focus ${i+1}`,
+    desc: txt(p?.desc)||"", why: Array.isArray(p?.steps)?txt(p?.steps[0]):"",
+    icon: getIcon(txt(p?.title)), bg:focusBg[i], acc:focusAcc[i], phase:txt(p?.phase)||"",
   }));
   if(!focuses.length&&focus) focuses.push({
     label:"Primary Focus", title:focus, desc:`Build on your ${focus.toLowerCase()} journey.`,
@@ -10482,9 +10482,9 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
     bg:focusBg[0], acc:focusAcc[0], phase:"Days 1–30",
   });
 
-  const pathItems = roadmap.slice(0,4).map((p,i)=>({
-    num:i+1, title:txt(p.title)||`Phase ${i+1}`,
-    timeline:txt(p.phase)||`Step ${i+1}`, desc:txt(p.win)||"",
+  const pathItems = roadmap.filter(p=>p&&typeof p==="object").slice(0,4).map((p,i)=>({
+    num:i+1, title:txt(p?.title)||`Phase ${i+1}`,
+    timeline:txt(p?.phase)||`Step ${i+1}`, desc:txt(p?.win)||"",
   }));
 
   const hbIcons = ["❤️","🧠","😨","⚠️","💭","🚫"];
@@ -10574,7 +10574,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
         {/* What's Holding You Back */}
         <div style={{...card}}>
           {mono("What's Holding You Back")}
-          {holdingBack.length>0 ? holdingBack.slice(0,4).map((b,i)=>{
+          {holdingBack.length>0 ? holdingBack.filter(Boolean).slice(0,4).map((b,i)=>{
             const lbl=typeof b==="string"?b:txt(b?.label||b?.name||b?.title||"");
             const dsc=typeof b==="object"?txt(b?.desc||b?.description||b?.reason||""):"";
             return(
@@ -10619,7 +10619,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
         {/* Strengths */}
         <div style={{...card}}>
           {mono("Your Strengths")}
-          {strengths.slice(0,6).map((s,i)=>{
+          {strengths.filter(Boolean).slice(0,6).map((s,i)=>{
             const lbl=typeof s==="string"?s:txt(s?.label||s?.name||"");
             return(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,marginBottom:9}}>
@@ -10676,7 +10676,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
         {/* Top Priorities */}
         <div style={{...card}}>
           {mono("Your Top Priorities (Next 7 Days)")}
-          {priorities.slice(0,6).map((p,i)=>{
+          {priorities.filter(Boolean).slice(0,6).map((p,i)=>{
             const lbl=typeof p==="string"?p:txt(p?.task||p?.label||p?.action||"");
             return(
               <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,marginBottom:10}}>
