@@ -10972,6 +10972,18 @@ function PolicyPage({type,onBack}){
 
 
 
+// ── LANGUAGES ─────────────────────────────────────────────────────────────────
+const LANGUAGES = [
+  { code:"en",  flag:"🇬🇧", label:"English",    native:"English"    },
+  { code:"fr",  flag:"🇫🇷", label:"French",     native:"Français"   },
+  { code:"es",  flag:"🇪🇸", label:"Spanish",    native:"Español"    },
+  { code:"pt",  flag:"🇧🇷", label:"Portuguese", native:"Português"  },
+  { code:"ar",  flag:"🇸🇦", label:"Arabic",     native:"العربية"    },
+  { code:"hi",  flag:"🇮🇳", label:"Hindi",      native:"हिन्दी"     },
+  { code:"zh",  flag:"🇨🇳", label:"Chinese",    native:"中文"        },
+  { code:"de",  flag:"🇩🇪", label:"German",     native:"Deutsch"    },
+];
+
 // ── LanguageSelector ──────────────────────────────────────────────────────────
 function LanguageSelector({lang, onChange}){
   const [open, setOpen] = useState(false);
