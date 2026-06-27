@@ -295,7 +295,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -11280,6 +11280,67 @@ function PolicyPage({type,onBack}){
 
 
 // ── LanguageSelector ──────────────────────────────────────────────────────────
+
+// ─── LANGUAGES ────────────────────────────────────────────────────────────────
+const LANGUAGES = [
+  {code:"en", label:"English",      flag:"🇬🇧", native:"English"},
+  {code:"zh", label:"Chinese",      flag:"🇨🇳", native:"中文"},
+  {code:"hi", label:"Hindi",        flag:"🇮🇳", native:"हिन्दी"},
+  {code:"es", label:"Spanish",      flag:"🇪🇸", native:"Español"},
+  {code:"fr", label:"French",       flag:"🇫🇷", native:"Français"},
+  {code:"ar", label:"Arabic",       flag:"🇸🇦", native:"العربية", rtl:true},
+  {code:"bn", label:"Bengali",      flag:"🇧🇩", native:"বাংলা"},
+  {code:"pt", label:"Portuguese",   flag:"🇧🇷", native:"Português"},
+  {code:"ru", label:"Russian",      flag:"🇷🇺", native:"Русский"},
+  {code:"ur", label:"Urdu",         flag:"🇵🇰", native:"اردو", rtl:true},
+  {code:"id", label:"Indonesian",   flag:"🇮🇩", native:"Bahasa Indonesia"},
+  {code:"de", label:"German",       flag:"🇩🇪", native:"Deutsch"},
+  {code:"ja", label:"Japanese",     flag:"🇯🇵", native:"日本語"},
+  {code:"tr", label:"Turkish",      flag:"🇹🇷", native:"Türkçe"},
+  {code:"ko", label:"Korean",       flag:"🇰🇷", native:"한국어"},
+  {code:"vi", label:"Vietnamese",   flag:"🇻🇳", native:"Tiếng Việt"},
+  {code:"it", label:"Italian",      flag:"🇮🇹", native:"Italiano"},
+  {code:"th", label:"Thai",         flag:"🇹🇭", native:"ภาษาไทย"},
+  {code:"sw", label:"Swahili",      flag:"🇰🇪", native:"Kiswahili"},
+  {code:"pl", label:"Polish",       flag:"🇵🇱", native:"Polski"},
+  {code:"nl", label:"Dutch",        flag:"🇳🇱", native:"Nederlands"},
+  {code:"fa", label:"Persian",      flag:"🇮🇷", native:"فارسی", rtl:true},
+];
+
+// ─── buildProfileContext ──────────────────────────────────────────────────────
+function buildProfileContext(p){
+  if(!p) return "User profile not yet available.";
+  const parts = [];
+  if(p.name)         parts.push(`Name: ${p.name}`);
+  if(p.age)          parts.push(`Age: ${p.age}`);
+  if(p.gender)       parts.push(`Gender: ${p.gender}`);
+  if(p.country)      parts.push(`Country: ${p.country}`);
+  if(p.relationship) parts.push(`Relationship: ${p.relationship}`);
+  if(p.income)       parts.push(`Monthly income: ${p.income}`);
+  if(p.education)    parts.push(`Education: ${p.education}`);
+  if(p.career)       parts.push(`Career/Job: ${p.career}`);
+  if(p.skills)       parts.push(`Skills: ${p.skills}`);
+  if(p.habits)       parts.push(`Current habits: ${p.habits}`);
+  if(p.situation)    parts.push(`Current situation: ${p.situation}`);
+  if(p.challenge)    parts.push(`Biggest challenge: ${p.challenge}`);
+  if(p.goals||p.bigGoal) parts.push(`Main goal: ${p.goals||p.bigGoal}`);
+  if(p.wantFrom)     parts.push(`What they want from DestinIQ: ${p.wantFrom}`);
+  return parts.join("\n");
+}
+
+// Language instruction for AI prompts
+
+// ─── langPrompt ───────────────────────────────────────────────────────────────
+function langPrompt(langCode){
+  // Read from localStorage if no code passed (works in standalone functions)
+  const code = langCode ||
+    (typeof window!=="undefined" ? (localStorage.getItem("diq_lang")||"en") : "en");
+  if(!code||code==="en") return "";
+  const found = LANGUAGES.find(l=>l.code===code);
+  if(!found) return "";
+  return `\n\nIMPORTANT: Respond ENTIRELY in ${found.label} (${found.native}). Every word must be in ${found.label} — no English.`;
+}
+
 function LanguageSelector({lang, onChange}){
   const [open, setOpen] = useState(false);
   const cur = LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0];
