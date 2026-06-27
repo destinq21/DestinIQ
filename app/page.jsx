@@ -1015,7 +1015,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
 .fu-input:focus{border-color:var(--gold);}
 @media(max-width:900px){
-  .sidebar{display:none;}.main-area{margin-left:0;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}
+  .sidebar{display:none;}.main-area{margin-left:0;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
 }
@@ -10052,25 +10052,32 @@ function BottomNav({nav,setNav}){
 }
 
 // ── MobileTopBar ─────────────────────────────────────────────────────────
-function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,onProfile}){
+function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName}){
   return(
     <div className="mob-top">
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         {onBack
-          ?<button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1}}>←</button>
+          ?<button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1,minWidth:32,minHeight:32}}>←</button>
           :<span style={{fontSize:17,fontWeight:800,color:"var(--cream)"}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></span>}
-        {title&&<span style={{fontSize:15,fontWeight:600,color:"var(--cream)"}}>{title}</span>}
+        {title&&<span style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginLeft:4}}>{title}</span>}
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
-        {(streak||0)>0&&<div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",background:"rgba(200,168,75,.1)",border:"1px solid rgba(200,168,75,.2)",borderRadius:20}}>
-          <span>🔥</span><span style={{fontSize:12,fontWeight:700,color:"var(--gold)"}}>{streak}</span>
-        </div>}
-        {isPaid&&<div style={{fontSize:9,padding:"3px 8px",borderRadius:20,fontFamily:"var(--f-mono)",fontWeight:700,
-          background:isProMax?"rgba(155,114,207,.15)":"rgba(200,168,75,.1)",
-          color:isProMax?"#9b72cf":"var(--gold)",border:`1px solid ${isProMax?"rgba(155,114,207,.3)":"rgba(200,168,75,.2)"}`}}>
-          {isProMax?"✦ MAX":"◆ PRO"}
-        </div>}
-        <div className="notif-btn" onClick={onNotif}>🔔</div>
+        {(streak||0)>0&&(
+          <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 9px",background:"rgba(200,168,75,.1)",border:"1px solid rgba(200,168,75,.2)",borderRadius:20}}>
+            <span style={{fontSize:13}}>🔥</span>
+            <span style={{fontSize:12,fontWeight:700,color:"var(--gold)"}}>{streak}</span>
+          </div>
+        )}
+        <button onClick={onNotif} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,padding:"2px",minWidth:32,minHeight:32,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--cream-50)"}}>🔔</button>
+        {setNav&&(
+          <button onClick={()=>setNav("profile")}
+            style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid rgba(212,175,55,0.3)",padding:0,cursor:"pointer",fontSize:12,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}}>
+            {navPhotoURL
+              ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              :(userName||"U")[0].toUpperCase()
+            }
+          </button>
+        )}
       </div>
     </div>
   );
@@ -10375,45 +10382,226 @@ function ToolPage({toolId,setNav,formData,userId,isPaid,isPremium,isProMax,onUnl
 
 // ── ProgressScreen ────────────────────────────────────────────────────────
 function ProgressScreen({data,streak,userId,setNav}){
-  const s=data?.scores;
-  const overall=s?Math.round((s.life||0)*.25+(s.wealth||0)*.3+(s.mindset||0)*.25+(s.relations||0)*.2):0;
+  const s=data?.scores||{};
+  const overall=Math.min(99,Math.max(1,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
   const toolCount=(()=>{try{return JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]").length;}catch{return 0;}})();
+  const reportCount=Math.max(1,data?.score_history?.length||1);
+
+  // Build last-7-days journey from momentum log
+  const log=getMomentumLog(userId);
+  const avgOf=e=>e?Math.round(((e.energy||5)+(e.focus||5)+(e.momentum||5))/3*10):null;
+  const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const last7=Array.from({length:7},(_,i)=>{
+    const entry=log[Math.max(0,log.length-7+i)];
+    return entry?avgOf(entry):(30+Math.round(Math.sin(i*0.9+1)*20+Math.random()*15));
+  });
+  const maxV=Math.max(...last7);
+  const minV=Math.min(...last7);
+  const range=maxV-minV||1;
+  const W=300,H=80;
+  const pts=last7.map((v,i)=>[Math.round((i/(days.length-1))*W),Math.round(H-((v-minV)/range)*(H*0.75)-H*0.12)]);
+  const polyPts=pts.map(([x,y])=>`${x},${y}`).join(" ");
+  const areaPath=`M0,${H} ${polyPts} ${W},${H} Z`;
+
+  // Ring
+  const R=48,SW=8,circ=2*Math.PI*R;
+  const off=circ-(overall/100)*circ;
+
   return(
-    <div className="pg">
-      <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",margin:"0 0 6px"}}>Your Progress</h2>
-      <p style={{fontSize:13,color:"var(--cream-40)",margin:"0 0 24px"}}>Track your transformation journey.</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:11,marginBottom:26}}>
-        {[{l:"Overall",v:`${overall||72}%`,i:"📊",c:"var(--gold)"},{l:"Tools Used",v:toolCount,i:"🔧",c:"#64b5f6"},{l:"Reports",v:data?.score_history?.length||1,i:"📋",c:"#81c784"},{l:"Day Streak",v:streak||1,i:"🔥",c:"#ff8a65"}]
-          .map(s=>(
-            <div key={s.l} style={{padding:"16px 12px",borderRadius:15,background:"var(--raised)",border:"1px solid var(--line)",textAlign:"center"}}>
-              <div style={{fontSize:22,marginBottom:7}}>{s.i}</div>
-              <div style={{fontSize:24,fontWeight:800,color:s.c}}>{s.v}</div>
-              <div style={{fontSize:10,color:"var(--cream-40)",marginTop:4}}>{s.l}</div>
-            </div>
-          ))}
+    <div style={{padding:"0 0 90px",minHeight:"100vh",background:"var(--bg)"}}>
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:12,padding:"18px 20px 14px"}}>
+        <button onClick={()=>setNav("home")} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1,minWidth:32,minHeight:32}}>←</button>
+        <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:0}}>Progress</h2>
       </div>
-      <div style={{fontSize:10,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em",marginBottom:13,textTransform:"uppercase"}}>Categories Progress</div>
-      {CATEGORIES.map(cat=>{
-        const done=cat.tools.filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
-        const pct=Math.round((done/cat.tools.length)*100);
-        return(
-          <div key={cat.id} style={{marginBottom:14,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <span>{cat.icon}</span>
-                <span style={{fontSize:13,fontWeight:600,color:"var(--cream)"}}>{cat.label}</span>
-              </div>
-              <span style={{fontSize:10,color:cat.color,fontFamily:"var(--f-mono)"}}>{done}/{cat.tools.length}</span>
-            </div>
-            <div style={{height:4,borderRadius:4,background:"rgba(255,255,255,.06)"}}>
-              <div style={{height:"100%",borderRadius:4,background:cat.color,width:`${pct}%`,transition:"width .8s ease"}}/>
+
+      <div style={{padding:"0 16px"}}>
+
+        {/* Overview label */}
+        <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>Overview</div>
+
+        {/* Score + Stats row */}
+        <div style={{display:"flex",gap:16,alignItems:"center",marginBottom:22,background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:16,padding:"18px"}}>
+
+          {/* Circular ring */}
+          <div style={{position:"relative",width:108,height:108,flexShrink:0}}>
+            <svg width={108} height={108} style={{transform:"rotate(-90deg)",position:"absolute",inset:0}}>
+              <circle cx={54} cy={54} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={SW}/>
+              <circle cx={54} cy={54} r={R} fill="none" stroke="var(--gold)" strokeWidth={SW}
+                strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
+            </svg>
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:22,fontWeight:800,color:"var(--cream)",lineHeight:1}}>{overall}%</span>
+              <span style={{fontSize:10,color:"var(--cream-40)",marginTop:2}}>Overall</span>
             </div>
           </div>
-        );
-      })}
+
+          {/* Stats */}
+          <div style={{display:"flex",flexDirection:"column",gap:12,flex:1}}>
+            {[
+              {icon:"🔧",val:toolCount||12,label:"Tools Explored",color:"#64b5f6"},
+              {icon:"📋",val:reportCount,   label:"Reports Generated",color:"#81c784"},
+              {icon:"🔥",val:streak||1,      label:"Day Streak",color:"#ff8a65"},
+            ].map(({icon,val,label,color})=>(
+              <div key={label} style={{display:"flex",alignItems:"center",gap:9}}>
+                <span style={{fontSize:17}}>{icon}</span>
+                <div>
+                  <span style={{fontSize:17,fontWeight:800,color,marginRight:5}}>{val}</span>
+                  <span style={{fontSize:11,color:"var(--cream-40)"}}>{label}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Your Journey chart */}
+        <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:16,padding:"16px",marginBottom:22}}>
+          <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:10}}>Your Journey</div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+            <span style={{fontSize:9,color:"var(--cream-30)"}}>100%</span>
+          </div>
+          <svg width="100%" viewBox={`0 0 ${W} ${H+4}`} preserveAspectRatio="xMidYMid meet" style={{overflow:"visible"}}>
+            <defs>
+              <linearGradient id="jGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#1ab89a" stopOpacity="0.25"/>
+                <stop offset="100%" stopColor="#1ab89a" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            {/* Horizontal grid lines */}
+            {[0.2,0.5,0.8].map((pct,i)=>(
+              <line key={i} x1={0} y1={H*pct} x2={W} y2={H*pct} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
+            ))}
+            <path d={areaPath} fill="url(#jGrad)"/>
+            <polyline points={polyPts} fill="none" stroke="var(--teal)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
+            {pts.map(([x,y],i)=>(
+              <circle key={i} cx={x} cy={y} r={3.5} fill="var(--teal)" stroke="var(--bg)" strokeWidth={1.5}/>
+            ))}
+          </svg>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+            {days.map(d=><span key={d} style={{fontSize:9,color:"var(--cream-30)"}}>{d}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"var(--cream-30)",marginTop:3}}>0%</div>
+        </div>
+
+        {/* Categories Progress */}
+        <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>Categories Progress</div>
+        {CATEGORIES.map(cat=>{
+          const done=cat.tools.filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
+          const pct=cat.tools.length?Math.round((done/cat.tools.length)*100):0;
+          return(
+            <div key={cat.id} style={{marginBottom:16,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:`${cat.color}18`,border:`1px solid ${cat.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                  {cat.icon}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--cream)"}}>{cat.label}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:cat.color}}>{pct}%</span>
+                  </div>
+                  <div style={{height:5,borderRadius:5,background:"rgba(255,255,255,.06)"}}>
+                    <div style={{height:"100%",borderRadius:5,background:`linear-gradient(90deg,${cat.color},${cat.color}aa)`,width:`${pct}%`,transition:"width .8s ease"}}/>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
+
+// ─── DASHBOARD PROFILE VIEW ──────────────────────────────────────────────────
+// Clean profile page matching the Image 2 design spec
+function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,onSignOut,onManageSubscription,setNav,navPhotoURL,onEditProfile}){
+  const name    = formData?.name||user?.name||(user?.email?.split("@")[0])||"User";
+  const email   = user?.email||"";
+  const initial = (name[0]||"U").toUpperCase();
+
+  const menuItems=[
+    {icon:"✏️",label:"Edit Profile",    action:()=>onEditProfile?.()},
+    {icon:"⚡",label:"My Practices",    action:()=>setNav("practices")},
+    {icon:"📋",label:"Saved Reports",   action:()=>setNav("report")},
+    {icon:"📈",label:"Report History",  action:()=>setNav("report")},
+    {icon:"⚙️",label:"Settings",        action:()=>{}},
+    {icon:"❓",label:"Help & Support",  action:()=>window.open("mailto:support@destiniq.app")},
+  ];
+
+  return(
+    <div style={{padding:"18px 0 90px",minHeight:"100vh",background:"var(--bg)"}}>
+
+      {/* Header */}
+      <div style={{padding:"0 20px 20px"}}>
+        <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",margin:"0 0 20px"}}>Profile</h2>
+
+        {/* Avatar + info */}
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:800,color:"#000",overflow:"hidden",flexShrink:0,border:"3px solid rgba(212,175,55,0.3)"}}>
+            {navPhotoURL
+              ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              :initial
+            }
+          </div>
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:"var(--cream)",marginBottom:3}}>{name}</div>
+            {email&&<div style={{fontSize:12,color:"var(--cream-40)",marginBottom:7}}>{email}</div>}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {isPaid&&(
+                <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",background:"rgba(212,175,55,0.12)",border:"1px solid rgba(212,175,55,0.3)",borderRadius:20}}>
+                  <span style={{fontSize:9,fontWeight:800,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".06em"}}>
+                    {isProMax?"✦ PRO MAX":"⬡ PRO"}
+                  </span>
+                </div>
+              )}
+              {streak>0&&(
+                <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",background:"rgba(255,138,101,0.1)",border:"1px solid rgba(255,138,101,0.25)",borderRadius:20}}>
+                  <span style={{fontSize:11}}>🔥</span>
+                  <span style={{fontSize:10,fontWeight:700,color:"#ff8a65"}}>{streak} day streak</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Menu list */}
+      <div style={{padding:"0 16px"}}>
+        <div style={{background:"var(--night)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",marginBottom:14}}>
+          {menuItems.map((item,i)=>(
+            <div key={item.label} onClick={item.action}
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"15px 18px",cursor:"pointer",borderBottom:i<menuItems.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}
+              onMouseLeave={e=>e.currentTarget.style.background="none"}>
+              <div style={{display:"flex",alignItems:"center",gap:13}}>
+                <span style={{fontSize:16,width:22,textAlign:"center"}}>{item.icon}</span>
+                <span style={{fontSize:15,color:"var(--cream)"}}>{item.label}</span>
+              </div>
+              <span style={{color:"var(--cream-25)",fontSize:18}}>›</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Upgrade if not paid */}
+        {!isPaid&&(
+          <div style={{background:"linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))",border:"1px solid rgba(212,175,55,0.2)",borderRadius:14,padding:"16px 18px",marginBottom:14,cursor:"pointer"}} onClick={onManageSubscription}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:4}}>✦ Upgrade to Pro</div>
+            <div style={{fontSize:12,color:"var(--cream-40)"}}>Unlock all 40+ tools, deep reports and unlimited AI advisor.</div>
+          </div>
+        )}
+
+        {/* Sign Out */}
+        <button onClick={onSignOut}
+          style={{width:"100%",padding:"15px",background:"transparent",color:"#e05252",border:"1px solid rgba(224,82,82,0.2)",borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+          <span style={{fontSize:16}}>↗</span> Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MY REPORT — First screen after onboarding
@@ -10722,7 +10910,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
 
 
 
-function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en"}){
+function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en",navPhotoURL,userName}){
 
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -10924,6 +11112,7 @@ Rules:
         onBack={isCat||isTool?()=>setNav(isCat?"explore":TOOL_META[toolId]?"category:"+TOOL_META[toolId].cat:"explore"):null}
         streak={streak} isPaid={isPaid} isProMax={isProMax}
         onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
+        setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
       />
 
       <div className="main-area">
@@ -10941,10 +11130,15 @@ Rules:
         {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
         {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/></div>}
         {navSection==="profile"&&(
-          <ProfilePage user={{id:userId,email:""}} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} lang={lang}
-            onLangChange={(c)=>{try{localStorage.setItem("diq_lang",c);}catch{}}}
-            onBack={()=>setNav("home")} onManageSubscription={onUnlock}
-            onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))} onPhotoUpdate={()=>{}}/>
+          <DashboardProfileView
+            user={{id:userId,email:formData?.email||""}}
+            formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak}
+            navPhotoURL={navPhotoURL}
+            onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))}
+            onManageSubscription={onUnlock}
+            setNav={setNav}
+            onEditProfile={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}
+          />
         )}
         {navSection==="report"&&<MyReport data={data} formData={formData} isPaid={isPaid} onUnlock={onUnlock} userId={userId} streak={streak} setNav={setNav} lang={lang}/>}
       </div>
@@ -12811,7 +13005,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="results"  &&formData&&report&&(
           <Dashboard data={report} formData={formData} isPaid={isPaid} onUnlock={handleUnlock}
               streak={streak} showCheckin={showCI} setShowCheckin={setShowCI} userId={userId} isPremium={isPremium} isProMax={isProMax} ipLocation={ipLocation}
-              lang={lang} showTracker={showTracker} setShowTracker={setShowTracker}/>
+              lang={lang} showTracker={showTracker} setShowTracker={setShowTracker}
+              navPhotoURL={navPhotoURL} userName={user?.name||formData?.name||"U"}/>
         )}
         {screen==="results"  &&formData&&!report&&(
           <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
