@@ -4298,273 +4298,493 @@ function Landing({onStart,ipLocation}){
 // 4-step onboarding: Focus → Info → Goal → Blockers
 // ═══════════════════════════════════════════════════════════════════════════════
 function Intake({onSubmit, savedFormData, ipLocation}){
-  const FOCUS_AREAS=[
-    {id:"Relationships",icon:"❤️",sub:"Build stronger connections"},
-    {id:"Money",icon:"💲",sub:"Create financial freedom"},
-    {id:"Mindset",icon:"🧠",sub:"Develop a powerful mindset"},
-    {id:"Discipline",icon:"🔥",sub:"Build habits and self-control"},
-    {id:"Purpose",icon:"⭐",sub:"Find direction and live with purpose"},
+  // ── 8 steps (0-indexed: 0=name, 1=basics, 2-6=conversational, 7=done) ──
+  const TOTAL = 8; // steps 0-6 have questions, step 7 is "Almost there!"
+
+  const detectedCountry = savedFormData?.country || ipLocation?.country || "";
+
+  const [step, setStep]       = useState(()=>{try{return Math.min(parseInt(localStorage.getItem("diq_ob_step")||"0"),6);}catch{return 0;}});
+  const [err,  setErr]        = useState("");
+  const [showDrop, setShowDrop] = useState(false);
+
+  const [f, setF] = useState(()=>{
+    let draft = {};
+    try{ draft = JSON.parse(localStorage.getItem("diq_ob_draft")||"{}"); }catch{}
+    const sd = savedFormData || {};
+    return {
+      name:       sd.name       || draft.name       || "",
+      age:        sd.age        || draft.age         || "",
+      country:    sd.country    || draft.country     || detectedCountry || "Ghana",
+      cSearch:    sd.country    || draft.country     || detectedCountry || "Ghana",
+      occupation: sd.career     || draft.occupation  || "",
+      income:     sd.income     || draft.income      || "",
+      priorities: Array.isArray(sd.blockers)&&sd.priorities ? sd.priorities
+                  : Array.isArray(draft.priorities)  ? draft.priorities : [],
+      mindset:    sd.mindset    || draft.mindset     || "",
+      blockers:   Array.isArray(sd.blockers)         ? sd.blockers
+                  : Array.isArray(draft.blockers)    ? draft.blockers : [],
+      mood:       sd.mood       || draft.mood        || "",
+      vision:     sd.goals      || sd.bigGoal        || draft.vision || "",
+    };
+  });
+
+  // Autosave on every change
+  useEffect(()=>{ try{localStorage.setItem("diq_ob_draft", JSON.stringify(f));}catch{} },[f]);
+  useEffect(()=>{ if(step<7)try{localStorage.setItem("diq_ob_step", step.toString());}catch{} },[step]);
+
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
+
+  // ── Option data ───────────────────────────────────────────────────────────
+  const PRIORITIES = [
+    {id:"finances",      icon:"💰", label:"Improve my finances"},
+    {id:"habits",        icon:"⚡", label:"Build better habits"},
+    {id:"purpose",       icon:"⭐", label:"Find my purpose"},
+    {id:"relationships", icon:"❤️", label:"Better relationships"},
+    {id:"health",        icon:"💚", label:"Improve my health"},
+    {id:"business",      icon:"📈", label:"Grow my business"},
   ];
-  const BLOCKERS_LIST=[
-    "Overthinking","Lack of confidence","Past experiences",
-    "Fear of rejection","Poor communication","Don't know where to start","Other",
+  const MINDSETS = [
+    {id:"growth", icon:"🏆", label:"Growth mindset",  desc:"I believe I can improve and learn anything"},
+    {id:"fixed",  icon:"🔒", label:"Fixed mindset",   desc:"I often feel stuck and struggle to change"},
+    {id:"mixed",  icon:"🔄", label:"Mixed mindset",   desc:"I have good days and bad days"},
+  ];
+  const BLOCKERS_OPT = [
+    {id:"discipline",   icon:"🎯", label:"Lack of discipline"},
+    {id:"overthinking", icon:"🧠", label:"Overthinking"},
+    {id:"money",        icon:"💸", label:"Lack of money"},
+    {id:"fear",         icon:"😨", label:"Fear of failure"},
+    {id:"direction",    icon:"🧭", label:"Lack of direction"},
+    {id:"time",         icon:"⏰", label:"No time"},
+  ];
+  const MOODS = [
+    {id:"hopeful",   emoji:"😊", label:"Hopeful"},
+    {id:"stressed",  emoji:"😰", label:"Stressed"},
+    {id:"anxious",   emoji:"😟", label:"Anxious"},
+    {id:"tired",     emoji:"😴", label:"Tired"},
+    {id:"neutral",   emoji:"😐", label:"Neutral"},
+    {id:"motivated", emoji:"🔥", label:"Motivated"},
   ];
 
-  const detectedCountry=savedFormData?.country||ipLocation?.country||"";
-  const [step,setStep]=useState(0); // 0=Focus 1=Info 2=Goal 3=Blockers
-  const [err,setErr]=useState("");
-  const [showDrop,setShowDrop]=useState(false);
-  const [f,setF]=useState(()=>({
-    focus:      savedFormData?.focus||"",
-    name:       savedFormData?.name||"",
-    age:        savedFormData?.age||"",
-    country:    savedFormData?.country||detectedCountry||"Ghana",
-    countrySearch: savedFormData?.country||detectedCountry||"Ghana",
-    currency:   savedFormData?.currency||"GHS",
-    currencySymbol:savedFormData?.currencySymbol||"GH₵",
-    income:     savedFormData?.income||"",
-    skills:     savedFormData?.skills||"",
-    goal:       savedFormData?.goals||savedFormData?.goal||"",
-    blockers:   Array.isArray(savedFormData?.blockers)?savedFormData.blockers:[],
-  }));
+  const togglePriority = (id)=>setF(p=>{
+    const cur = Array.isArray(p.priorities)?p.priorities:[];
+    if(cur.includes(id)) return {...p,priorities:cur.filter(x=>x!==id)};
+    if(cur.length>=3)    return p;
+    return {...p,priorities:[...cur,id]};
+  });
+  const toggleBlocker = (id)=>setF(p=>{
+    const cur = Array.isArray(p.blockers)?p.blockers:[];
+    if(cur.includes(id)) return {...p,blockers:cur.filter(x=>x!==id)};
+    if(cur.length>=3)    return p;
+    return {...p,blockers:[...cur,id]};
+  });
 
-  useEffect(()=>{
-    if(ipLocation?.country&&!f.country){
-      const m=COUNTRIES_LIST.find(c=>
-        c.name.toLowerCase()===ipLocation.country.toLowerCase()||
-        c.name.toLowerCase().includes(ipLocation.country.toLowerCase())
-      );
-      if(m) setF(p=>({...p,country:m.name,countrySearch:m.name,currency:m.currency,currencySymbol:m.symbol}));
-      else  setF(p=>({...p,country:ipLocation.country,countrySearch:ipLocation.country}));
-    }
-  },[ipLocation?.country]);
-
-  const set=(k,v)=>setF(p=>({...p,[k]:v}));
-
-  const toggleBlocker=(b)=>setF(p=>({
-    ...p,
-    blockers:Array.isArray(p.blockers)
-      ?p.blockers.includes(b)?p.blockers.filter(x=>x!==b):[...p.blockers,b]
-      :[b],
-  }));
-
-  const validate=()=>{
-    if(step===0&&!f.focus)     return "Please select a focus area to continue.";
+  const validate = ()=>{
+    if(step===0 && !f.name.trim())                       return "Please tell us your name.";
     if(step===1){
-      if(!f.name?.trim())      return "Please enter your name.";
       const a=parseInt(f.age);
-      if(!f.age||isNaN(a)||a<13||a>99) return "Please enter a valid age (13–99).";
-      if(!f.country?.trim())   return "Please select your country.";
+      if(!f.age||isNaN(a)||a<13||a>99)                  return "Please enter a valid age (13–99).";
+      if(!f.country.trim())                              return "Please select your country.";
     }
-    if(step===2&&f.goal?.trim().length<8) return "Please describe your goal in more detail.";
-    if(step===3&&(!Array.isArray(f.blockers)||!f.blockers.length)) return "Please select at least one challenge.";
+    if(step===2 && (!Array.isArray(f.priorities)||f.priorities.length===0)) return "Please select at least one.";
+    if(step===3 && !f.mindset)                           return "Please choose your mindset.";
+    if(step===4 && (!Array.isArray(f.blockers)||f.blockers.length===0))     return "Please select at least one.";
+    if(step===5 && !f.mood)                              return "Please choose how you typically feel.";
+    if(step===6 && f.vision.trim().length<10)            return "Please describe what success looks like for you.";
     return "";
   };
 
-  const next=()=>{
+  const next = ()=>{
     const e=validate(); if(e){setErr(e);return;} setErr("");
-    if(step<3){ setStep(s=>s+1); return; }
-    // Submit — map fields to the shape the AI report engine expects
-    onSubmit({
-      ...f,
-      goals:    f.goal||"",
-      challenge:Array.isArray(f.blockers)&&f.blockers.length?f.blockers.join(", "):"",
-      bigGoal:  f.focus||"",
-      wantFrom: "all",
-      situation:f.situation||"employed",
-      career:   f.career||"",
-      education:f.education||"",
-      relationship:f.relationship||"",
-      habits:   f.habits||"",
-      support:  f.support||"",
-    });
+    setStep(s=>s+1);
   };
+  const back = ()=>{ setErr(""); setStep(s=>Math.max(0,s-1)); };
 
-  const back=()=>{setErr("");setStep(s=>Math.max(0,s-1));};
+  // Auto-submit on step 7 (Almost there!)
+  useEffect(()=>{
+    if(step!==7) return;
+    const priorityLabels = PRIORITIES.filter(p=>f.priorities.includes(p.id)).map(p=>p.label);
+    const blockerLabels  = BLOCKERS_OPT.filter(b=>f.blockers.includes(b.id)).map(b=>b.label);
+    const mindsetObj     = MINDSETS.find(m=>m.id===f.mindset);
+    const moodObj        = MOODS.find(m=>m.id===f.mood);
+    const currData       = getCurrencyForCountry(f.country)||{currency:"USD",symbol:"$"};
 
-  // ── Shared styles ────────────────────────────────────────────────────────
-  const iStyle={width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"13px 16px",color:"var(--cream)",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"};
-  const btnGold={width:"100%",padding:"15px",background:"var(--gold)",color:"#000",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"};
+    const timer = setTimeout(()=>{
+      // Clear draft on successful submit
+      try{localStorage.removeItem("diq_ob_draft");localStorage.removeItem("diq_ob_step");}catch{}
+      onSubmit({
+        name:            f.name,
+        age:             f.age,
+        country:         f.country,
+        career:          f.occupation||"",
+        income:          f.income||"",
+        currency:        currData.currency,
+        currencySymbol:  currData.symbol,
+        focus:           priorityLabels[0]||"",
+        interests:       priorityLabels.join(", "),
+        wantFrom:        "all",
+        situation:       `${mindsetObj?.label||""}. Feeling ${moodObj?.label||""}. Priorities: ${priorityLabels.join(", ")}`,
+        goals:           f.vision,
+        bigGoal:         f.vision,
+        challenge:       blockerLabels.join(", "),
+        blockers:        blockerLabels,
+        skills:          "",
+        habits:          "",
+        support:         "",
+        relationship:    "",
+        education:       "",
+      });
+    }, 1800);
+    return ()=>clearTimeout(timer);
+  },[step]);
 
-  // ── Progress bar (4 segments, one per step) ──────────────────────────────
-  const ProgBar=()=>(
-    <div style={{display:"flex",gap:4,marginBottom:26}}>
-      {[0,1,2,3].map(i=>(
-        <div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=step?"var(--gold)":"var(--cream-10)",transition:"background .3s"}}/>
-      ))}
+  // ── Design tokens ─────────────────────────────────────────────────────────
+  const G = {
+    gold:"#f0b429", bg:"#0a0800", card:"#131008", cardSel:"#1a1408",
+    border:"rgba(232,220,200,0.08)", cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)", dimmer:"rgba(232,220,200,0.25)",
+    inp:"#0f0c03", inpBorder:"rgba(232,220,200,0.13)",
+  };
+  const iStyle={width:"100%",padding:"14px 16px",background:G.inp,
+    border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
+    fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"};
+
+  // ── Screen: Almost there! ─────────────────────────────────────────────────
+  if(step===7) return(
+    <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      textAlign:"center",padding:"40px 24px"}}>
+
+      {/* Pulsing sparkle ring */}
+      <div style={{position:"relative",width:130,height:130,marginBottom:32}}>
+        <div style={{position:"absolute",inset:0,borderRadius:"50%",
+          border:"3px solid "+G.gold,
+          boxShadow:"0 0 40px rgba(240,180,41,0.35),0 0 80px rgba(240,180,41,0.15)",
+          animation:"obPulse 2s ease-in-out infinite"}}/>
+        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
+          justifyContent:"center",fontSize:56,color:G.gold}}>✦</div>
+      </div>
+
+      <h1 style={{fontSize:32,fontWeight:800,color:G.cream,marginBottom:14,lineHeight:1.2}}>
+        Almost there!
+      </h1>
+      <p style={{fontSize:15,color:G.dim,lineHeight:1.7,marginBottom:10,maxWidth:300}}>
+        We'll analyze your answers and generate your personalized report.
+      </p>
+      <p style={{fontSize:13,color:G.dimmer,margin:0}}>This will only take a few seconds…</p>
+
+      <style>{`
+        @keyframes obPulse{
+          0%,100%{transform:scale(1);opacity:1}
+          50%{transform:scale(1.07);opacity:.75}
+        }
+      `}</style>
     </div>
   );
 
-  const BackBtn=()=>(
-    <button onClick={back} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:22,padding:"0 0 10px",display:"block",lineHeight:1}}>←</button>
-  );
-
-  const ErrMsg=()=>err?<div style={{color:"#F87171",fontSize:13,marginBottom:11}}>⚠ {err}</div>:null;
+  // ── Progress calc (steps 0–6 are questions) ───────────────────────────────
+  const progress = (step+1)/7;
 
   return(
-    <div style={{minHeight:"100vh",background:"var(--bg)",color:"var(--cream)",fontFamily:"inherit",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      display:"flex",flexDirection:"column"}}>
 
-      <div style={{flex:1,padding:"22px 24px 56px",maxWidth:500,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
-        <BackBtn/>
-        <ProgBar/>
+      {/* ── Top bar: back + progress bar ─── */}
+      <div style={{padding:"max(16px,env(safe-area-inset-top)) 20px 0"}}>
+        <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+          {step>0
+            ?<button onClick={back} style={{background:"none",border:"none",color:G.dim,
+                cursor:"pointer",fontSize:22,padding:0,minWidth:32,minHeight:32,lineHeight:1,marginRight:8}}>←</button>
+            :<div style={{width:32,marginRight:8}}/>
+          }
+          {/* Segmented progress */}
+          <div style={{flex:1,display:"flex",gap:4}}>
+            {[0,1,2,3,4,5,6].map(i=>(
+              <div key={i} style={{flex:1,height:3,borderRadius:2,
+                background:i<=step?"#f0b429":"rgba(232,220,200,0.1)",
+                transition:"background 0.3s"}}/>
+            ))}
+          </div>
+        </div>
+      </div>
 
-        {/* ════════════════════════════════
-            STEP 0 — CHOOSE YOUR FOCUS
-        ════════════════════════════════ */}
+      {/* ── Main content ─── */}
+      <div style={{flex:1,padding:"24px 20px 140px",maxWidth:520,margin:"0 auto",
+        width:"100%",boxSizing:"border-box"}}>
+
+        {/* ════ STEP 0: Name ════ */}
         {step===0&&(
           <div>
-            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",lineHeight:1.2,marginBottom:6}}>
-              What do you want to improve first?
+            <h2 style={{fontSize:30,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.2,marginBottom:8}}>
+              What should<br/>we call you?
             </h2>
-            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:22,lineHeight:1.5}}>
-              Choose the area that matters most to you right now.
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:32}}>
+              This is how we'll address you in your report.
             </p>
-
-            {/* 2×2 grid */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:11}}>
-              {FOCUS_AREAS.filter((_,i)=>i<4).map(fa=>(
-                <div key={fa.id} onClick={()=>set("focus",fa.id)}
-                  style={{background:f.focus===fa.id?"rgba(212,175,55,0.1)":"var(--night)",border:`2px solid ${f.focus===fa.id?"var(--gold)":"var(--cream-10)"}`,borderRadius:13,padding:"17px 13px",cursor:"pointer",transition:"all .18s"}}>
-                  <div style={{fontSize:26,marginBottom:9}}>{fa.icon}</div>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--cream)",marginBottom:3}}>{fa.id}</div>
-                  <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.4}}>{fa.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Purpose — full width */}
-            {(()=>{const fa=FOCUS_AREAS[4];return(
-              <div onClick={()=>set("focus",fa.id)}
-                style={{display:"flex",alignItems:"center",gap:14,background:f.focus===fa.id?"rgba(212,175,55,0.1)":"var(--night)",border:`2px solid ${f.focus===fa.id?"var(--gold)":"var(--cream-10)"}`,borderRadius:13,padding:"14px 18px",cursor:"pointer",marginBottom:20,transition:"all .18s"}}>
-                <span style={{fontSize:22}}>{fa.icon}</span>
-                <div>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--cream)",marginBottom:2}}>{fa.id}</div>
-                  <div style={{fontSize:11,color:"var(--cream-40)"}}>{fa.sub}</div>
-                </div>
-                {f.focus===fa.id&&<span style={{marginLeft:"auto",color:"var(--gold)",fontWeight:700}}>✓</span>}
-              </div>
-            );})()}
-
-            <ErrMsg/>
-            <button onClick={next} style={btnGold}>Continue</button>
+            <input autoFocus value={f.name} onChange={e=>set("name",e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&next()}
+              placeholder="Your first name" maxLength={60}
+              style={{...iStyle,fontSize:18,textAlign:"center",padding:"18px",
+                border:"1px solid "+(f.name?G.gold:G.inpBorder),letterSpacing:".5px"}}/>
           </div>
         )}
 
-        {/* ════════════════════════════════
-            STEP 1 — LET'S GET TO KNOW YOU
-        ════════════════════════════════ */}
+        {/* ════ STEP 1: Basics ════ */}
         {step===1&&(
           <div>
-            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:5}}>Let's get to know you</h2>
-            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:26}}>This helps our AI generate personalized insights.</p>
+            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.25,marginBottom:8}}>
+              Let's personalize<br/>your journey
+            </h2>
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:28}}>
+              You can change these later.
+            </p>
 
-            <div style={{marginBottom:16}}>
-              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT SHOULD WE CALL YOU?</label>
-              <input autoFocus value={f.name||""} onChange={e=>set("name",e.target.value)}
-                placeholder="John" maxLength={60}
-                style={iStyle} onKeyDown={e=>e.key==="Enter"&&next()}/>
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:11,color:G.dim,fontWeight:700,
+                letterSpacing:".08em",marginBottom:7,textTransform:"uppercase"}}>How old are you?</label>
+              <input type="number" min="13" max="99" value={f.age}
+                onChange={e=>set("age",e.target.value)} placeholder="25"
+                style={{...iStyle,border:"1px solid "+(f.age?G.gold:G.inpBorder)}}/>
             </div>
 
-            <div style={{marginBottom:16}}>
-              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>HOW OLD ARE YOU?</label>
-              <input type="number" min="13" max="99" value={f.age||""} onChange={e=>set("age",e.target.value)} placeholder="25" style={iStyle}/>
+            <div style={{marginBottom:14,position:"relative"}}>
+              <label style={{display:"block",fontSize:11,color:G.dim,fontWeight:700,
+                letterSpacing:".08em",marginBottom:7,textTransform:"uppercase"}}>What's your country?</label>
+              <input value={f.cSearch}
+                onChange={e=>{set("cSearch",e.target.value);setShowDrop(true);if(!e.target.value)set("country","");}}
+                onFocus={()=>setShowDrop(true)}
+                onBlur={()=>setTimeout(()=>setShowDrop(false),200)}
+                placeholder="Search country…"
+                style={{...iStyle,border:"1px solid "+(f.country?G.gold:G.inpBorder)}}/>
+              {showDrop&&f.cSearch&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1a1408",
+                  border:"1px solid rgba(240,180,41,0.2)",borderRadius:12,zIndex:100,
+                  maxHeight:200,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}}>
+                  {COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(f.cSearch.toLowerCase())).slice(0,8).map(c=>(
+                    <div key={c.name}
+                      onMouseDown={()=>{set("country",c.name);set("cSearch",c.name);setShowDrop(false);}}
+                      style={{padding:"12px 16px",cursor:"pointer",display:"flex",
+                        justifyContent:"space-between",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(240,180,41,0.07)"}
+                      onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                      <span style={{fontSize:14,color:G.cream}}>{c.name}</span>
+                      <span style={{fontSize:11,color:G.dim,fontFamily:"monospace"}}>{c.symbol}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div style={{marginBottom:16}}>
-              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>MONTHLY INCOME</label>
-              <select value={f.income||""} onChange={e=>set("income",e.target.value)}
-                style={{...iStyle,appearance:"none",color:f.income?"var(--cream)":"var(--cream-30)"}}>
+            <div style={{marginBottom:14}}>
+              <label style={{display:"block",fontSize:11,color:G.dim,fontWeight:700,
+                letterSpacing:".08em",marginBottom:7,textTransform:"uppercase"}}>
+                What do you do? <span style={{color:G.dimmer,textTransform:"none",fontWeight:400}}>optional</span>
+              </label>
+              <input value={f.occupation} onChange={e=>set("occupation",e.target.value)}
+                placeholder="e.g. Student, Engineer, Freelancer…"
+                style={iStyle}/>
+            </div>
+
+            <div>
+              <label style={{display:"block",fontSize:11,color:G.dim,fontWeight:700,
+                letterSpacing:".08em",marginBottom:7,textTransform:"uppercase"}}>
+                Monthly income <span style={{color:G.dimmer,textTransform:"none",fontWeight:400}}>optional</span>
+              </label>
+              <select value={f.income} onChange={e=>set("income",e.target.value)}
+                style={{...iStyle,appearance:"none",color:f.income?G.cream:G.dim}}>
                 <option value="">Select range…</option>
-                {getIncomeRanges((()=>getCurrencyForCountry(f.country).symbol)()).map(r=><option key={r}>{r}</option>)}
+                {getIncomeRanges((()=>(getCurrencyForCountry(f.country)||{symbol:"$"}).symbol)()).map(r=>(
+                  <option key={r} value={r}>{r}</option>
+                ))}
               </select>
             </div>
-
-            {/* Country — searchable */}
-            <div style={{marginBottom:24,position:"relative"}}>
-              <label style={{display:"block",fontSize:12,color:"var(--cream-40)",letterSpacing:".06em",fontWeight:600,marginBottom:7}}>WHAT'S YOUR COUNTRY?</label>
-              <div style={{position:"relative"}}>
-                <input
-                  value={f.countrySearch||f.country||""}
-                  onChange={e=>{set("countrySearch",e.target.value);setShowDrop(true);if(!e.target.value)set("country","");}}
-                  onFocus={()=>setShowDrop(true)}
-                  onBlur={()=>setTimeout(()=>setShowDrop(false),200)}
-                  placeholder="Search your country…"
-                  style={{...iStyle,border:`1px solid ${f.country?"var(--gold)":"var(--cream-15)"}`}}
-                />
-                {showDrop&&f.countrySearch&&(
-                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:12,zIndex:100,maxHeight:200,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
-                    {COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes((f.countrySearch||"").toLowerCase())).slice(0,8).map(c=>(
-                      <div key={c.name}
-                        onMouseDown={()=>{set("country",c.name);set("countrySearch",c.name);set("currency",c.currency);set("currencySymbol",c.symbol);setShowDrop(false);}}
-                        style={{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
-                        onMouseEnter={e=>e.currentTarget.style.background="rgba(212,175,55,0.08)"}
-                        onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                        <span style={{fontSize:14,color:"var(--cream)"}}>{c.name}</span>
-                        <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{c.symbol}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <ErrMsg/>
-            <button onClick={next} style={btnGold}>Continue</button>
           </div>
         )}
 
-        {/* ════════════════════════════════
-            STEP 2 — MAIN GOAL
-        ════════════════════════════════ */}
+        {/* ════ STEP 2: Priorities (multi-select up to 3) ════ */}
         {step===2&&(
           <div>
-            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:5}}>What's your main goal right now?</h2>
-            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:26}}>Be specific. The more honest you are, the better we can help.</p>
-
-            <textarea
-              autoFocus
-              value={f.goal||""}
-              onChange={e=>set("goal",e.target.value)}
-              placeholder="I want to build a meaningful relationship and become more confident in myself."
-              rows={6}
-              maxLength={600}
-              style={{...iStyle,resize:"vertical",lineHeight:1.65,marginBottom:6}}
-            />
-            <div style={{textAlign:"right",fontSize:11,color:"var(--cream-25)",marginBottom:20}}>{(f.goal||"").length}/600</div>
-
-            <ErrMsg/>
-            <button onClick={next} style={btnGold}>Continue</button>
-          </div>
-        )}
-
-        {/* ════════════════════════════════
-            STEP 3 — BLOCKERS
-        ════════════════════════════════ */}
-        {step===3&&(
-          <div>
-            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",marginBottom:5}}>What's holding you back the most?</h2>
-            <p style={{fontSize:13,color:"var(--cream-40)",marginBottom:22}}>Select all that apply.</p>
-
-            <div style={{display:"flex",flexDirection:"column",gap:9,marginBottom:22}}>
-              {BLOCKERS_LIST.map(b=>{
-                const chk=Array.isArray(f.blockers)&&f.blockers.includes(b);
+            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.2,marginBottom:8}}>
+              What's most<br/>important to you<br/>right now?
+            </h2>
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:24}}>Select up to 3</p>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {PRIORITIES.map(p=>{
+                const sel=Array.isArray(f.priorities)&&f.priorities.includes(p.id);
+                const maxed=Array.isArray(f.priorities)&&f.priorities.length>=3&&!sel;
                 return(
-                  <div key={b} onClick={()=>{toggleBlocker(b);setErr("");}}
-                    style={{display:"flex",alignItems:"center",gap:13,padding:"13px 15px",background:chk?"rgba(212,175,55,0.07)":"var(--night)",border:`1.5px solid ${chk?"var(--gold)":"var(--cream-10)"}`,borderRadius:10,cursor:"pointer",transition:"all .15s"}}>
-                    <div style={{width:19,height:19,borderRadius:5,border:`2px solid ${chk?"var(--gold)":"rgba(232,220,200,0.2)"}`,background:chk?"var(--gold)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
-                      {chk&&<span style={{color:"#000",fontSize:12,fontWeight:900,lineHeight:1}}>✓</span>}
+                  <div key={p.id} onClick={()=>!maxed&&togglePriority(p.id)}
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                      padding:"14px 16px",
+                      background:sel?"rgba(240,180,41,0.07)":G.card,
+                      border:"1.5px solid "+(sel?G.gold:G.border),
+                      borderRadius:13,cursor:maxed?"default":"pointer",
+                      opacity:maxed?0.38:1,transition:"all .15s"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:13}}>
+                      <span style={{fontSize:20}}>{p.icon}</span>
+                      <span style={{fontSize:15,color:sel?G.cream:G.dim,fontWeight:sel?600:400}}>{p.label}</span>
                     </div>
-                    <span style={{fontSize:14,color:chk?"var(--cream)":"var(--cream-60)"}}>{b}</span>
+                    <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
+                      border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
+                      background:sel?G.gold:"transparent",
+                      display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {sel&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
+                    </div>
                   </div>
                 );
               })}
             </div>
-
-            <ErrMsg/>
-            <button onClick={next} style={btnGold}>Get My Report →</button>
           </div>
         )}
 
+        {/* ════ STEP 3: Mindset (radio) ════ */}
+        {step===3&&(
+          <div>
+            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.2,marginBottom:8}}>
+              How would you<br/>describe your<br/>mindset?
+            </h2>
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:24}}>Choose one</p>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {MINDSETS.map(m=>{
+                const sel=f.mindset===m.id;
+                return(
+                  <div key={m.id} onClick={()=>set("mindset",m.id)}
+                    style={{display:"flex",alignItems:"center",gap:14,padding:"18px",
+                      background:sel?"rgba(240,180,41,0.07)":G.card,
+                      border:"1.5px solid "+(sel?G.gold:G.border),
+                      borderRadius:14,cursor:"pointer",transition:"all .15s"}}>
+                    <span style={{fontSize:24,flexShrink:0}}>{m.icon}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:15,fontWeight:700,color:sel?G.cream:G.dim,marginBottom:4}}>{m.label}</div>
+                      <div style={{fontSize:12,color:"rgba(232,220,200,0.38)",lineHeight:1.5}}>{m.desc}</div>
+                    </div>
+                    <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,
+                      border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
+                      background:sel?G.gold:"transparent",
+                      display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {sel&&<div style={{width:8,height:8,borderRadius:"50%",background:"#000"}}/>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ════ STEP 4: Blockers (multi-select up to 3) ════ */}
+        {step===4&&(
+          <div>
+            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.2,marginBottom:8}}>
+              What's holding<br/>you back<br/>the most?
+            </h2>
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:24}}>Select up to 3</p>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {BLOCKERS_OPT.map(b=>{
+                const sel=Array.isArray(f.blockers)&&f.blockers.includes(b.id);
+                const maxed=Array.isArray(f.blockers)&&f.blockers.length>=3&&!sel;
+                return(
+                  <div key={b.id} onClick={()=>!maxed&&toggleBlocker(b.id)}
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                      padding:"14px 16px",
+                      background:sel?"rgba(240,180,41,0.07)":G.card,
+                      border:"1.5px solid "+(sel?G.gold:G.border),
+                      borderRadius:13,cursor:maxed?"default":"pointer",
+                      opacity:maxed?0.38:1,transition:"all .15s"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:13}}>
+                      <span style={{fontSize:20}}>{b.icon}</span>
+                      <span style={{fontSize:15,color:sel?G.cream:G.dim,fontWeight:sel?600:400}}>{b.label}</span>
+                    </div>
+                    <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
+                      border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
+                      background:sel?G.gold:"transparent",
+                      display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {sel&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ════ STEP 5: Mood (emoji grid) ════ */}
+        {step===5&&(
+          <div>
+            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.2,marginBottom:8}}>
+              How do you<br/>typically feel?
+            </h2>
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:28}}>Choose one</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+              {MOODS.map(m=>{
+                const sel=f.mood===m.id;
+                return(
+                  <div key={m.id} onClick={()=>set("mood",m.id)}
+                    style={{padding:"20px 8px",textAlign:"center",
+                      background:sel?"rgba(240,180,41,0.1)":G.card,
+                      border:"1.5px solid "+(sel?G.gold:G.border),
+                      borderRadius:14,cursor:"pointer",transition:"all .15s"}}>
+                    <div style={{fontSize:34,marginBottom:8}}>{m.emoji}</div>
+                    <div style={{fontSize:12,color:sel?G.cream:G.dim,fontWeight:sel?600:400,lineHeight:1.3}}>{m.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ════ STEP 6: Vision / Success ════ */}
+        {step===6&&(
+          <div>
+            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+              lineHeight:1.2,marginBottom:8}}>
+              What does<br/>success look<br/>like to you?
+            </h2>
+            <p style={{fontSize:13,color:G.dim,textAlign:"center",marginBottom:24}}>
+              Describe it in a few lines.
+            </p>
+            <textarea
+              autoFocus
+              value={f.vision}
+              onChange={e=>set("vision",e.target.value)}
+              placeholder="I want to be financially free, help my family, and live a life of purpose and impact."
+              rows={6}
+              maxLength={500}
+              style={{width:"100%",padding:"16px",background:G.inp,
+                border:"1px solid "+(f.vision.length>10?G.gold:G.inpBorder),
+                borderRadius:13,color:G.cream,fontSize:15,lineHeight:1.7,
+                resize:"none",fontFamily:"inherit",outline:"none",
+                boxSizing:"border-box",marginBottom:6}}
+            />
+            <div style={{textAlign:"right",fontSize:11,color:G.dimmer}}>{f.vision.length}/500</div>
+          </div>
+        )}
+
+        {/* Validation error */}
+        {err&&(
+          <div style={{color:"#e05252",fontSize:13,marginTop:14,textAlign:"center"}}>⚠ {err}</div>
+        )}
+      </div>
+
+      {/* ── Fixed Continue button ─── */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,
+        padding:"12px 20px max(16px,env(safe-area-inset-bottom))",
+        background:"linear-gradient(transparent,rgba(10,8,0,0.98) 28%)"}}>
+        <div style={{maxWidth:520,margin:"0 auto"}}>
+          <button onClick={next}
+            style={{width:"100%",padding:"17px",background:"#f0b429",color:"#000",
+              border:"none",borderRadius:13,fontSize:16,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+              boxShadow:"0 0 30px rgba(240,180,41,0.2)"}}>
+            Continue <span style={{fontSize:18}}>→</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -4572,13 +4792,6 @@ function Intake({onSubmit, savedFormData, ipLocation}){
 
 
 
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// COMPLETE PROFILE
-// Shown to existing accounts whose profile is saved but incomplete or whose
-// report was never generated. Detects exactly which fields are missing and
-// shows only those — keeping the flow as short as possible.
-// ═══════════════════════════════════════════════════════════════════════════════
 function getProfileGaps(fd){
   if(!fd) return {name:true,age:true,country:true,goal:true,blockers:true};
   return {
