@@ -10577,184 +10577,250 @@ function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPho
 }
 
 // ── HomeScreen ────────────────────────────────────────────────────────────
-function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin}){
-  const name   = formData?.name||"there";
-  const scores = data?.scores;
-  const overall= scores?Math.round((scores.life||0)*.25+(scores.wealth||0)*.3+(scores.mindset||0)*.25+(scores.relations||0)*.2):0;
-  const lastTool=(()=>{try{return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null");}catch{return null;}})();
-  const insight = data?.daily_insight||data?.headline||data?.closing||null;
+function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight}){
+  const hour = new Date().getHours();
+  const timeGreet = hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
+  const name = formData?.name?.split(" ")[0]||"there";
+  const today = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",card2:"#0e0c02",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+  };
+  const card={background:G.card,border:"1px solid "+G.border,borderRadius:16,padding:"20px",boxSizing:"border-box"};
+
+  const txt=(v)=>{if(!v)return "";if(typeof v==="string")return v;if(v?.content)return String(v.content);if(Array.isArray(v))return v.filter(Boolean).map(x=>typeof x==="string"?x:x?.content||"").join(" ");return String(v);};
+
+  const scores = data?.scores||{};
+  const overall = Math.min(99,Math.max(1,Math.round(
+    (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
+  )));
+
+  // Today's Insight — from report data or derived from profile
+  const getInsight=()=>{
+    const ri=txt(dailyInsight)||txt(data?.daily_insight)||txt(data?.daily_recommendation)||txt(data?.closing);
+    if(ri&&ri.length>20) return ri.slice(0,200);
+    const bl=(Array.isArray(formData?.blockers)?formData.blockers.join(" "):(formData?.challenge||"")).toLowerCase();
+    const fo=(formData?.focus||"").toLowerCase();
+    if(bl.includes("overthink"))  return "You tend to overthink decisions. Today is about taking one clear action without delay.";
+    if(bl.includes("disciplin")||bl.includes("habit")) return "Consistency beats intensity. Do one small thing today that Future You will thank you for.";
+    if(fo.includes("money")||fo.includes("financ"))    return "Financial freedom starts with one clear financial decision made today. What's yours?";
+    if(fo.includes("relation")||fo.includes("connect")) return "One meaningful conversation today is worth more than ten surface-level ones. Reach out.";
+    return "You have everything you need to move forward. The only missing ingredient is consistent, intentional action.";
+  };
+
+  // Primary focus area
+  const focus=formData?.focus||formData?.interests?.split(",")?.[0]?.trim()||"Your Journey";
+  const focusIcon=focus.toLowerCase().includes("money")?"💰":focus.toLowerCase().includes("relation")?"❤️":focus.toLowerCase().includes("mindset")?"🧠":focus.toLowerCase().includes("purpose")?"⭐":focus.toLowerCase().includes("disciplin")?"🔥":"🎯";
+  const journeyPct=Math.min(95,Math.max(15,overall-5));
+
+  // Recent tools from localStorage
+  const recentTools=(()=>{
+    if(typeof window==="undefined") return [];
+    try{
+      return CATEGORIES.flatMap(cat=>
+        cat.tools.map(t=>({id:t,label:TOOL_META?.[t]?.label||t,icon:TOOL_META?.[t]?.icon||"⚡",cat:cat.id}))
+      ).filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t.id}_${userId}`);}catch{return false;}}).slice(0,6);
+    }catch{return [];}
+  })();
+
+  // Momentum log for check-in count
+  const log=getMomentumLog(userId);
+
+  // Recommended next tool based on profile
+  const getRecom=()=>{
+    const f=(formData?.focus||"").toLowerCase();
+    const b=(formData?.challenge||"").toLowerCase();
+    if(f.includes("relation")||f.includes("connect")) return {id:"relationshipiq",label:"Relationship IQ",icon:"❤️",desc:"Improve communication and build stronger connections."};
+    if(f.includes("money")||f.includes("financ"))     return {id:"sidehustle",label:"Side Hustle",icon:"💰",desc:"Find and launch your best income opportunity."};
+    if(b.includes("overthink")||f.includes("mindset"))return {id:"innerpeace",label:"Inner Peace",icon:"🧠",desc:"Build mental clarity and silence the inner noise."};
+    if(f.includes("disciplin")||b.includes("habit"))  return {id:"dailywisdom",label:"Daily Wisdom",icon:"✦",desc:"Build momentum through daily micro-improvements."};
+    if(f.includes("purpose"))                          return {id:"fearaudit",label:"Fear Audit",icon:"⭐",desc:"Identify what's holding you back and break through it."};
+    return {id:"innerpeace",label:"Inner Peace",icon:"🧠",desc:"Mental clarity unlocks everything else."};
+  };
+  const recom=getRecom();
+
+  const quickActions=[
+    {icon:"✅",label:"Check-in",    color:"#1ab89a",action:()=>setShowCheckin(true)},
+    {icon:"📋",label:"My Report",  color:G.gold,   action:()=>setNav("report")},
+    {icon:"🏆",label:"Wins",       color:"#ffd54f", action:()=>setNav("wins")},
+    {icon:"💎",label:"Wisdom",     color:"#64b5f6", action:()=>setNav("tool:dailywisdom")},
+    {icon:"⚡",label:"Explore",    color:"#b39ddb", action:()=>setNav("explore")},
+  ];
 
   return(
-    <div className="home">
+    <div style={{padding:"0 0 90px",minHeight:"100vh",background:G.bg,color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
-      {/* 1 ── GREETING */}
-      <div className="greet-row">
-        <div className="greet-left">
-          <div className="avatar">{name.slice(0,1).toUpperCase()}</div>
-          <div>
-            <div className="greet-name">{getGreeting()}, {name} 👋</div>
-            <div className="greet-sub">You're becoming the best version of yourself.</div>
-          </div>
+      {/* ══ 1. GREETING HEADER ══ */}
+      <div style={{padding:"22px 20px 18px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontSize:13,color:G.dimmer,marginBottom:3}}>{timeGreet},</div>
+          <h1 style={{fontSize:26,fontWeight:800,color:G.cream,margin:"0 0 4px",lineHeight:1.1}}>{name} 👋</h1>
+          <p style={{fontSize:12,color:G.dimmer,margin:0}}>{today}</p>
         </div>
-        <div className="greet-right">
-          <div className="streak-chip">
-            <span>🔥</span><span>{streak||1} day</span>
+        {streak>0&&(
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",
+            background:"rgba(240,180,41,0.08)",border:"1px solid rgba(240,180,41,0.2)",
+            borderRadius:20,alignSelf:"flex-start",marginTop:4}}>
+            <span style={{fontSize:15}}>🔥</span>
+            <span style={{fontSize:13,fontWeight:700,color:G.gold}}>{streak} day{streak!==1?"s":""}</span>
           </div>
-          <div className="notif-btn" onClick={()=>window.dispatchEvent(new CustomEvent("showNotif"))}>🔔</div>
-          {isPaid&&(
-            <div className="plan-chip" style={{
-              background:isProMax?"rgba(155,114,207,.1)":"rgba(200,168,75,.08)",
-              color:isProMax?"#9b72cf":"var(--gold)",
-              border:`1px solid ${isProMax?"rgba(155,114,207,.25)":"rgba(200,168,75,.18)"}`,
-            }}>
-              {isProMax?"✦ PRO MAX":"◆ PRO"}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* 2+3 ── HERO ROW: Continue Journey | Today's Focus | AI Insight */}
-      <div className="hero-row">
+      <div style={{padding:"0 20px"}}>
 
-        {/* Continue Journey */}
-        <div className="h-card main" onClick={()=>setNav(lastTool?"tool:"+lastTool.id:"explore")}>
-          <div className="h-eyebrow">{lastTool?"Continue Your Journey":"Start Your Journey"}</div>
-          {lastTool?(
-            <>
-              <div className="h-icon">{TOOL_META[lastTool.id]?.icon||"✦"}</div>
-              <div className="h-title">{lastTool.label}</div>
-              <div className="h-body">Resume your last session. Momentum is everything.</div>
-              <div className="h-prog"><div className="h-prog-fill" style={{width:`${lastTool.progress||45}%`}}/></div>
-              <div className="h-prog-label">{lastTool.progress||45}% complete</div>
-              <button className="h-resume-btn">Resume →</button>
-            </>
-          ):(
-            <>
-              <div className="h-icon">✦</div>
-              <div className="h-title">Begin your first AI session</div>
-              <div className="h-body">Your personalized intelligence platform is ready. Every session brings you closer.</div>
-              <button className="h-resume-btn">Explore now →</button>
-            </>
-          )}
-        </div>
-
-        {/* Today's Focus */}
-        <div className="h-card" onClick={()=>setNav("tool:weeklychallenge")}>
-          <div className="h-eyebrow">Today's Focus</div>
-          <div className="h-title">Weekly Challenge</div>
-          <div className="h-body">
-            {data?.weekly_challenge
-              ?data.weekly_challenge.slice(0,90)+"..."
-              :"Today's goal: Step outside your comfort zone and start a meaningful conversation."}
-          </div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"auto"}}>
-            <div style={{fontSize:28,fontWeight:800,color:"var(--teal)"}}>1<span style={{fontSize:14,fontWeight:400,color:"var(--cream-30)"}}>/2</span></div>
-            <button className="h-view-btn" onClick={e=>{e.stopPropagation();setNav("tool:weeklychallenge");}}>View Challenge</button>
-          </div>
-        </div>
-
-        {/* AI Insight */}
-        <div className="h-card" onClick={()=>setNav("report")}>
-          <div className="h-eyebrow">AI Insight for You</div>
-          <div className="h-quote">
-            {insight
-              ?`"${insight.slice(0,130)}${insight.length>130?"...":""}"`
-              :`"Your hesitation is not weakness. It's protection. But growth lives on the other side of discomfort."`}
-          </div>
-          <button className="h-view-btn" style={{marginTop:"auto"}} onClick={e=>{e.stopPropagation();setNav("report");}}>View Full Insight</button>
-        </div>
-      </div>
-
-      {/* 4 ── QUICK ACTIONS */}
-      <div style={{marginBottom:26}}>
-        <div className="sec-hd"><span className="sec-title">Quick Actions</span></div>
-        <div className="qa-row">
-          {[
-            {icon:"✅",label:"Check-in",    bg:"rgba(31,168,154,.12)", color:"#1fa89a",  fn:()=>setShowCheckin(true)},
-            {icon:"💎",label:"Daily Wisdom", bg:"rgba(200,168,75,.12)", color:"var(--gold)",fn:()=>setNav("tool:dailywisdom")},
-            {icon:"🎲",label:"Challenge",    bg:"rgba(100,181,246,.12)",color:"#64b5f6",  fn:()=>setNav("tool:weeklychallenge")},
-            {icon:"🏆",label:"Wins",         bg:"rgba(255,213,79,.12)", color:"#ffd54f",  fn:()=>setNav("wins")},
-            {icon:"📊",label:"Progress",     bg:"rgba(129,199,132,.12)",color:"#81c784",  fn:()=>setNav("progress")},
-          ].map(q=>(
-            <div key={q.label} className="qa-card" onClick={q.fn}>
-              <div className="qa-ico" style={{background:q.bg}}>
-                <span style={{color:q.color}}>{q.icon}</span>
+        {/* ══ 2. CONTINUE JOURNEY (Hero card) ══ */}
+        <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
+          border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
+          marginBottom:14,position:"relative",overflow:"hidden",
+          boxShadow:"0 0 40px rgba(240,180,41,0.05)"}}>
+          <div style={{position:"absolute",top:0,right:0,width:"45%",height:"100%",
+            background:"radial-gradient(ellipse at 80% 20%,rgba(240,180,41,0.07),transparent 60%)",
+            pointerEvents:"none"}}/>
+          <div style={{position:"relative"}}>
+            <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:12}}>CONTINUE YOUR JOURNEY</div>
+            <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:18}}>
+              <div style={{width:50,height:50,borderRadius:13,flexShrink:0,
+                background:"rgba(240,180,41,0.1)",border:"1px solid rgba(240,180,41,0.22)",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{focusIcon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:700,color:G.cream,marginBottom:3}}>{focus}</div>
+                <div style={{fontSize:12,color:G.dim,marginBottom:10}}>Your primary growth area</div>
+                <div style={{height:4,borderRadius:4,background:"rgba(255,255,255,0.07)",marginBottom:4}}>
+                  <div style={{height:"100%",borderRadius:4,background:G.gold,width:journeyPct+"%",transition:"width .8s ease"}}/>
+                </div>
+                <div style={{fontSize:11,color:G.dimmer}}>{journeyPct}% in progress</div>
               </div>
-              <span className="qa-lbl">{q.label}</span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 5 ── EXPLORE CATEGORIES */}
-      <div style={{marginBottom:26}}>
-        <div className="sec-hd">
-          <span className="sec-title">Explore by Category</span>
-          <button className="sec-link" onClick={()=>setNav("explore")}>See all →</button>
-        </div>
-        <div className="cat-scroll">
-          {CATEGORIES.map(cat=>(
-            <div key={cat.id} className="c-card"
-              style={{background:`linear-gradient(135deg,${cat.color}12,${cat.color}05)`,borderColor:`${cat.color}25`}}
-              onClick={()=>setNav("category:"+cat.id)}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=cat.color+"55";e.currentTarget.style.transform="translateY(-3px)";}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=cat.color+"25";e.currentTarget.style.transform="none";}}>
-              <span className="c-icon">{cat.icon}</span>
-              <div className="c-label">{cat.label}</div>
-              <div className="c-count" style={{color:cat.color}}>{cat.tools.length} tools</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 6 ── RECENT ACTIVITY */}
-      <div style={{marginBottom:40}}>
-        <div className="sec-hd"><span className="sec-title">Recent Activity</span></div>
-        {[
-          {ico:"📋",bg:"rgba(200,168,75,.1)",ic:"var(--gold)",
-           title:"My Life Report",
-           sub:scores?`Overall score: ${overall}% · View full analysis`:"Your personalized report is ready",
-           fn:()=>setNav("report")},
-          {ico:lastTool?(TOOL_META[lastTool.id]?.icon||"✦"):"🔍",
-           bg:lastTool?`${TOOL_META[lastTool.id]?.color||"#c8a84b"}18`:"rgba(100,181,246,.1)",
-           ic:lastTool?(TOOL_META[lastTool.id]?.color||"var(--gold)"):"#64b5f6",
-           title:lastTool?`Last session: ${lastTool.label}`:"Start your first session",
-           sub:lastTool?"Continue where you left off":"Pick a category to begin",
-           fn:()=>setNav(lastTool?"tool:"+lastTool.id:"explore")},
-          {ico:"🔥",bg:"rgba(255,138,101,.1)",ic:"#ff8a65",
-           title:`${streak||1} day streak`,
-           sub:streak>6?"Impressive consistency — keep it up!":"Check in daily to build your streak",
-           fn:()=>setShowCheckin(true)},
-        ].map((r,i)=>(
-          <div key={i} className="rec-item" onClick={r.fn}>
-            <div className="rec-ico" style={{background:r.bg}}>
-              <span style={{color:r.ic}}>{r.ico}</span>
-            </div>
-            <div style={{flex:1}}>
-              <div className="rec-title">{r.title}</div>
-              <div className="rec-sub">{r.sub}</div>
-            </div>
-            <span style={{color:"var(--cream-20)",fontSize:18}}>›</span>
+            <button onClick={()=>setNav("report")}
+              style={{display:"flex",alignItems:"center",gap:8,background:G.gold,color:"#000",
+                border:"none",borderRadius:10,padding:"12px 22px",fontSize:13,fontWeight:700,
+                cursor:"pointer",fontFamily:"inherit"}}>
+              Resume Session <span style={{fontSize:16}}>→</span>
+            </button>
           </div>
-        ))}
-      </div>
-
-      {/* Upgrade nudge */}
-      {!isPaid&&(
-        <div style={{padding:"22px",borderRadius:18,border:"1px solid rgba(200,168,75,.14)",
-          background:"linear-gradient(135deg,rgba(200,168,75,.05),transparent)",
-          textAlign:"center",marginBottom:32}}>
-          <div style={{fontSize:13,color:"var(--cream-40)",marginBottom:14}}>
-            Unlock deep reports, unlimited advisor, and all 40+ tools.
-          </div>
-          <button className="btn btn-gold" onClick={onUnlock}>Upgrade to Pro — $9/month</button>
         </div>
-      )}
+
+        {/* ══ 3. TODAY'S INTELLIGENCE INSIGHT ══ */}
+        <div style={{...card,marginBottom:14,
+          background:"linear-gradient(135deg,#0e0820,#0a0810)",
+          border:"1px solid rgba(120,80,200,0.14)"}}>
+          <div style={{fontSize:9,color:"rgba(200,160,255,0.6)",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>TODAY'S INSIGHT FOR YOU</div>
+          <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+            <span style={{fontSize:20,color:G.gold,flexShrink:0,marginTop:2}}>✦</span>
+            <p style={{fontSize:14,color:G.dim,lineHeight:1.72,margin:0}}>
+              <span style={{color:G.cream,fontWeight:600}}>{name}, </span>{getInsight()}
+            </p>
+          </div>
+        </div>
+
+        {/* ══ 4. QUICK ACTIONS ══ */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:12,textTransform:"uppercase"}}>Quick Actions</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
+            {quickActions.map(a=>(
+              <button key={a.label} onClick={a.action}
+                style={{background:G.card,border:"1px solid "+G.border,borderRadius:13,
+                  padding:"14px 6px",textAlign:"center",cursor:"pointer",
+                  fontFamily:"inherit",outline:"none",transition:"border-color .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.25)"}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                <div style={{fontSize:22,marginBottom:6}}>{a.icon}</div>
+                <div style={{fontSize:10,color:G.dim,fontWeight:500,lineHeight:1.3}}>{a.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ══ 5. CONTINUE WHERE YOU LEFT OFF ══ */}
+        {recentTools.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:12,textTransform:"uppercase"}}>Continue Where You Left Off</div>
+            <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,
+              scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+              {recentTools.map(t=>(
+                <button key={t.id} onClick={()=>setNav("tool:"+t.id)}
+                  style={{background:G.card,border:"1px solid "+G.border,borderRadius:13,
+                    padding:"16px",cursor:"pointer",flexShrink:0,minWidth:110,textAlign:"center",
+                    fontFamily:"inherit",outline:"none",transition:"border-color .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.25)"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                  <div style={{fontSize:22,marginBottom:8}}>{t.icon}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:G.cream,lineHeight:1.3}}>{t.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ══ 6. GROWTH SNAPSHOT ══ */}
+        <div style={{...card,marginBottom:14}}>
+          <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:14,textTransform:"uppercase"}}>Growth Snapshot</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+            {[
+              {icon:"🔥",label:"Day Streak",  val:streak||0,   unit:"days",  color:"#ff8a65"},
+              {icon:"⚡",label:"Check-ins",   val:log.length||0,unit:"total", color:G.gold},
+              {icon:"📊",label:"Life Score",  val:overall,     unit:"/100",  color:"#64b5f6"},
+            ].map(({icon,label,val,unit,color})=>(
+              <div key={label} style={{textAlign:"center",padding:"14px 8px",
+                background:"rgba(255,255,255,0.02)",borderRadius:12,
+                border:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{fontSize:20,marginBottom:5}}>{icon}</div>
+                <div style={{fontSize:22,fontWeight:800,color,lineHeight:1,marginBottom:3}}>
+                  {val}<span style={{fontSize:10,color:G.dimmer,fontWeight:400}}>{unit}</span>
+                </div>
+                <div style={{fontSize:10,color:G.dimmer}}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ══ 7. AI RECOMMENDED NEXT STEP (one action only) ══ */}
+        <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.06),rgba(240,180,41,0.02))",
+          border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"22px",
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+          gap:16,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:160}}>
+            <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:9}}>AI RECOMMENDS</div>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+              <span style={{fontSize:20}}>{recom.icon}</span>
+              <span style={{fontSize:15,fontWeight:700,color:G.cream}}>{recom.label}</span>
+            </div>
+            <p style={{fontSize:12,color:G.dim,lineHeight:1.6,margin:0}}>{recom.desc}</p>
+          </div>
+          <button onClick={()=>setNav("tool:"+recom.id)}
+            style={{background:G.gold,color:"#000",border:"none",borderRadius:10,
+              padding:"12px 22px",fontSize:13,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>
+            Start Now →
+          </button>
+        </div>
+
+        {/* Upgrade nudge (free users only) */}
+        {!isPaid&&(
+          <div style={{marginTop:14,padding:"16px 18px",
+            background:"rgba(240,180,41,0.04)",border:"1px solid rgba(240,180,41,0.1)",
+            borderRadius:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:G.cream,marginBottom:2}}>Unlock your full potential</div>
+              <div style={{fontSize:11,color:G.dim}}>Upgrade to Pro for deeper insights and unlimited sessions.</div>
+            </div>
+            <button onClick={onUnlock}
+              style={{background:G.gold,color:"#000",border:"none",borderRadius:9,
+                padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>
+              ✦ Upgrade Now
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── ExploreScreen ─────────────────────────────────────────────────────────
+
 function ExploreScreen({setNav}){
   return(
     <div className="pg">
@@ -11102,15 +11168,11 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
 //        Strengths, Focus Cards, Priorities, Daily Rec, Next Action
 // ═══════════════════════════════════════════════════════════════════════════════
 function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lang="en"}){
-  const scores  = data?.scores||{};
-  const name    = formData?.name||"there";
-  const focus   = formData?.focus||formData?.bigGoal||"";
+  const [exStr, setExStr]=useState(false);
+  const [exBls, setExBls]=useState(false);
+  const [exOpp, setExOpp]=useState(false);
 
-  const overall = Math.min(99,Math.max(1,Math.round(
-    (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
-  )));
-
-  // Safe text extractor
+  // ── Data extraction helpers ──────────────────────────────────────────────
   const txt=(v)=>{
     if(!v) return "";
     if(typeof v==="string") return v;
@@ -11119,282 +11181,310 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
     return String(v);
   };
 
-  const coreInsight = txt(data?.headline)||txt(data?.sections?.[0]?.content)||txt(data?.sections?.[0])||
-    `You are a high-potential individual — your personalized report reveals exactly where to focus first.`;
+  const scores  = data?.scores||{};
+  const overall = Math.min(99,Math.max(1,Math.round(
+    (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
+  )));
 
-  const aag = (data?.at_a_glance&&typeof data.at_a_glance==="object"&&!Array.isArray(data.at_a_glance))
-    ? data.at_a_glance : {};
+  const scoreMsg = overall>=80?"You are ahead of most. Stay consistent and keep executing."
+    :overall>=70?"You're on the right path. Keep building momentum!"
+    :overall>=60?"Great foundations. A few key shifts will unlock your potential."
+    :"This is your starting point. Every expert was once a beginner.";
 
-  const holdingBack = Array.isArray(data?.holding_back) ? data.holding_back
-    : Array.isArray(formData?.blockers) ? formData.blockers.slice(0,3).map(b=>({label:b,desc:""}))
-    : [];
+  const summary=txt(data?.headline)||txt(data?.sections?.[0]?.content)||txt(data?.sections?.[0])||
+    "You're a determined individual with strong ambition and a desire for financial freedom. You have clarity about your goals but struggle with consistency and overthinking. With the right structure and focus, you can achieve remarkable results in the next 12 months.";
 
-  const roadmap    = Array.isArray(data?.roadmap)    ? data.roadmap    : [];
-  const strengths  = Array.isArray(data?.strengths)  ? data.strengths  : [];
-  const priorities = Array.isArray(data?.priorities) ? data.priorities : [];
-  const dailyRec   = txt(data?.daily_recommendation)||txt(data?.closing)||"";
+  // Highlight last sentence in gold
+  const lastDot = summary.lastIndexOf('. ', summary.length-2);
+  const summaryBefore = lastDot>0 ? summary.slice(0,lastDot+1) : "";
+  const summaryLast   = lastDot>0 ? summary.slice(lastDot+2)   : summary;
 
-  // Icon mapping for focus areas
-  const getIcon=(t)=>{
-    const s=(t||"").toLowerCase();
-    if(s.includes("relation")||s.includes("communicat")||s.includes("love")||s.includes("connect")) return "❤️";
-    if(s.includes("mind")||s.includes("mental")||s.includes("think")||s.includes("clarity"))       return "🧠";
-    if(s.includes("purpos")||s.includes("vision")||s.includes("meaning")||s.includes("impact"))    return "🎯";
-    if(s.includes("money")||s.includes("financ")||s.includes("wealth")||s.includes("income"))      return "💰";
-    if(s.includes("disciplin")||s.includes("habit")||s.includes("routine")||s.includes("consist")) return "🔥";
-    if(s.includes("career")||s.includes("job")||s.includes("skill"))                               return "💼";
-    if(s.includes("health")||s.includes("body")||s.includes("fitness"))                            return "💪";
-    return "⭐";
+  const strengths=(()=>{
+    if(Array.isArray(data?.strengths)&&data.strengths.length) return data.strengths;
+    return ["Strong work ethic","Clear long-term vision","Adaptability","Problem-solving mindset","Curiosity and desire to learn"];
+  })();
+
+  const blindSpots=(()=>{
+    if(Array.isArray(data?.holding_back)&&data.holding_back.length) return data.holding_back;
+    const bl=Array.isArray(formData?.blockers)?formData.blockers:[];
+    if(bl.length) return bl;
+    return ["Overthinking and self-doubt","Inconsistent habits","People-pleasing","Fear of taking bold action"];
+  })();
+
+  const opportunities=(()=>{
+    if(Array.isArray(data?.priorities)&&data.priorities.length) return data.priorities;
+    if(Array.isArray(data?.roadmap)&&data.roadmap.length)
+      return data.roadmap.filter(r=>r&&typeof r==="object").map(r=>txt(r.title)||txt(r.desc));
+    return ["Build consistent daily habits","Improve financial management","Develop social confidence","Focus on one income stream"];
+  })();
+
+  // ── Dynamic stats ────────────────────────────────────────────────────────
+  const dataPoints = formData ? Math.max(40,Object.values(formData).filter(v=>v&&String(v).length>0).length*7) : 47;
+  const insights   = Math.max(10, (Array.isArray(data?.strengths)?data.strengths.length:0)
+    +(Array.isArray(data?.priorities)?data.priorities.length:0)
+    +(Array.isArray(data?.roadmap)?data.roadmap.filter(r=>r&&typeof r==="object").length*2:0)||12);
+  const confidence = Math.min(98,Math.max(85,overall+16));
+  const genDate    = new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+
+  // ── SVG Ring ────────────────────────────────────────────────────────────
+  const R=62,SW=9,circ=2*Math.PI*R,off=circ-(overall/100)*circ;
+
+  // ── Design tokens ────────────────────────────────────────────────────────
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
   };
+  const card={background:G.card,border:"1px solid "+G.border,borderRadius:16,padding:"22px",boxSizing:"border-box"};
 
-  const focusLabels  = ["Primary Focus","Secondary Focus","Tertiary Focus"];
-  const whyLabels    = ["WHY THIS FIRST?","WHY THIS SECOND?","WHY THIS THIRD?"];
-  const focusBg      = ["rgba(229,62,62,0.12)","rgba(155,114,207,0.12)","rgba(240,180,41,0.08)"];
-  const focusAcc     = ["#e57373","#b39ddb","var(--gold)"];
+  // ── List item helpers ────────────────────────────────────────────────────
+  const getLabel=(v)=>typeof v==="string"?v:txt(v?.label||v?.name||v?.title||v?.task||"");
 
-  const focuses = roadmap.filter(p=>p&&typeof p==="object").slice(0,3).map((p,i)=>({
-    label:focusLabels[i], title:txt(p?.title)||`Focus ${i+1}`,
-    desc: txt(p?.desc)||"", why: Array.isArray(p?.steps)?txt(p?.steps[0]):"",
-    icon: getIcon(txt(p?.title)), bg:focusBg[i], acc:focusAcc[i], phase:txt(p?.phase)||"",
-  }));
-  if(!focuses.length&&focus) focuses.push({
-    label:"Primary Focus", title:focus, desc:`Build on your ${focus.toLowerCase()} journey.`,
-    why:"This is your chosen focus area.", icon:getIcon(focus),
-    bg:focusBg[0], acc:focusAcc[0], phase:"Days 1–30",
-  });
-
-  const pathItems = roadmap.filter(p=>p&&typeof p==="object").slice(0,4).map((p,i)=>({
-    num:i+1, title:txt(p?.title)||`Phase ${i+1}`,
-    timeline:txt(p?.phase)||`Step ${i+1}`, desc:txt(p?.win)||"",
-  }));
-
-  const hbIcons = ["❤️","🧠","😨","⚠️","💭","🚫"];
-
-  // SVG score ring
-  const ScoreRing=({score,size=66,sw=5})=>{
-    const r=(size/2)-sw; const circ=2*Math.PI*r;
-    const off=circ-(Math.min(99,Math.max(0,score))/100)*circ;
-    return(
-      <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
-        <svg width={size} height={size} style={{transform:"rotate(-90deg)",position:"absolute",inset:0}}>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={sw}/>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--gold)" strokeWidth={sw}
-            strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
-        </svg>
-        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <span style={{fontSize:13,fontWeight:800,color:"var(--gold)"}}>{score}%</span>
-        </div>
+  const CheckRow=({item,color="#81c784"})=>(
+    <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
+      <div style={{width:19,height:19,borderRadius:"50%",background:color+"18",border:"1px solid "+color+"30",
+        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+        <span style={{fontSize:10,color,fontWeight:700}}>✓</span>
       </div>
-    );
-  };
+      <span style={{fontSize:13,color:G.dim,lineHeight:1.55}}>{getLabel(item)}</span>
+    </div>
+  );
 
-  // Shared card style
-  const card={background:"var(--night)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"18px",boxSizing:"border-box"};
-  const mono=(txt,col="var(--cream-30)")=>(
-    <div style={{fontSize:9,color:col,letterSpacing:".12em",fontFamily:"var(--f-mono)",marginBottom:11,textTransform:"uppercase",fontWeight:700}}>{txt}</div>
+  const DotRow=({item})=>(
+    <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
+      <div style={{width:19,height:19,borderRadius:"50%",background:"rgba(224,82,82,0.1)",
+        border:"1px solid rgba(224,82,82,0.22)",display:"flex",alignItems:"center",
+        justifyContent:"center",flexShrink:0,marginTop:1}}>
+        <span style={{fontSize:10,color:"#e05252"}}>•</span>
+      </div>
+      <span style={{fontSize:13,color:G.dim,lineHeight:1.55}}>{getLabel(item)}</span>
+    </div>
+  );
+
+  const ViewBtn=({expanded,toggle})=>(
+    <button onClick={toggle}
+      style={{background:"none",border:"1px solid rgba(240,180,41,0.2)",borderRadius:8,
+        padding:"4px 10px",fontSize:11,color:G.gold,cursor:"pointer",fontWeight:600,fontFamily:"inherit"}}>
+      {expanded?"Less":"View all"}
+    </button>
   );
 
   return(
-    <div style={{padding:"20px 20px 60px",maxWidth:1140,margin:"0 auto"}}>
+    <div style={{padding:"28px 28px 80px",maxWidth:1160,margin:"0 auto",
+      color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      boxSizing:"border-box"}}>
 
-      {/* ── HEADER ── */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22,flexWrap:"wrap",gap:10}}>
-        <div>
-          <div style={{fontSize:9,color:"var(--gold)",letterSpacing:".12em",fontFamily:"var(--f-mono)",marginBottom:5}}>DESTINIQ REPORT</div>
-          <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:"0 0 3px"}}>Your DestinIQ Report is Ready 🎉</h2>
-          <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>Based on your answers, we've created your personal intelligence profile.</p>
-        </div>
-        <button style={{display:"flex",alignItems:"center",gap:6,padding:"9px 14px",background:"transparent",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,color:"var(--cream-50)",fontSize:11,cursor:"pointer",fontFamily:"inherit",flexShrink:0}} onClick={()=>{try{window.print();}catch{}}}>
-          Download Report ↓
-        </button>
-      </div>
+      {/* ══════════════════════════════════════════
+          1. SUCCESS BADGE + HEADER
+      ══════════════════════════════════════════ */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+        gap:24,marginBottom:28,flexWrap:"wrap"}}>
 
-      {/* ════════════════════════════════════════════════════════
-          ROW 1: Core Insight | At a Glance | Holding Back | Path
-      ════════════════════════════════════════════════════════ */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:11,marginBottom:11}}>
-
-        {/* Core Insight — double-wide on desktop */}
-        <div style={{...card,gridColumn:"span 2",background:"linear-gradient(135deg,#0f0820 0%,#14092a 60%,#0a0810 100%)",border:"1px solid rgba(120,80,200,0.18)",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",right:0,top:0,bottom:0,width:"45%",background:"radial-gradient(ellipse at 80% 50%,rgba(90,50,180,0.35),transparent 65%)",pointerEvents:"none"}}/>
-          <div style={{position:"relative"}}>
-            {mono("Your Core Insight","rgba(180,140,255,0.65)")}
-            <blockquote style={{fontSize:15,fontWeight:600,color:"var(--cream)",lineHeight:1.72,margin:"0 0 20px",fontStyle:"italic",maxWidth:380}}>
-              "{coreInsight.slice(0,210)}{coreInsight.length>210?"…":""}"
-            </blockquote>
-            <div style={{display:"flex",alignItems:"center",gap:14}}>
-              <ScoreRing score={overall}/>
-              <div>
-                <div style={{fontSize:9,color:"var(--cream-30)",letterSpacing:".1em",fontFamily:"var(--f-mono)"}}>OVERALL POTENTIAL SCORE</div>
-                <div style={{fontSize:24,fontWeight:800,color:"var(--cream)",lineHeight:1}}>{overall}<span style={{fontSize:11,color:"var(--cream-40)"}}>/100</span></div>
-              </div>
-            </div>
+        {/* Left: heading */}
+        <div style={{flex:"1 1 380px",minWidth:0}}>
+          {/* ✨ Report Ready badge */}
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,
+            background:"rgba(240,180,41,0.07)",border:"1px solid rgba(240,180,41,0.25)",
+            borderRadius:20,padding:"5px 14px",marginBottom:20}}>
+            <span style={{fontSize:13}}>✨</span>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:".8px",
+              color:G.gold,fontFamily:"monospace"}}>REPORT READY</span>
           </div>
-        </div>
 
-        {/* At a Glance */}
-        <div style={{...card}}>
-          {mono("At a Glance")}
-          {[
-            ["🌱","Life Stage",     aag.life_stage    ||aag.lifestage    ||"Growth & Building"],
-            ["💰","Financial Level",aag.financial_level||aag.financialLevel||"Developing"],
-            ["🧠","Mindset Type",   aag.mindset_type  ||aag.mindsetType  ||"—"],
-            ["🔥","Primary Drive",  aag.primary_drive ||aag.primaryDrive ||"—"],
-            ["⚡","Current Energy", String(aag.current_energy||aag.currentEnergy||"—")],
-          ].map(([icon,label,val])=>(
-            <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
-              <span style={{display:"flex",alignItems:"center",gap:7}}>
-                <span style={{fontSize:12}}>{icon}</span>
-                <span style={{fontSize:11,color:"var(--cream-40)"}}>{label}</span>
-              </span>
-              <span style={{fontSize:11,fontWeight:700,color:"var(--cream)",textAlign:"right",maxWidth:"52%"}}>{val}</span>
-            </div>
-          ))}
-        </div>
+          <h1 style={{fontSize:"clamp(22px,3.5vw,38px)",fontWeight:800,lineHeight:1.18,
+            margin:"0 0 14px",color:G.cream,letterSpacing:"-.3px"}}>
+            Your Personal{" "}
+            <span style={{color:G.gold}}>Intelligence</span>{" "}
+            Report is Ready 👋
+          </h1>
 
-        {/* What's Holding You Back */}
-        <div style={{...card}}>
-          {mono("What's Holding You Back")}
-          {holdingBack.length>0 ? holdingBack.filter(Boolean).slice(0,4).map((b,i)=>{
-            const lbl=typeof b==="string"?b:txt(b?.label||b?.name||b?.title||"");
-            const dsc=typeof b==="object"?txt(b?.desc||b?.description||b?.reason||""):"";
-            return(
-              <div key={i} style={{display:"flex",gap:9,marginBottom:12,paddingBottom:i<Math.min(3,holdingBack.length)-1?12:0,borderBottom:i<Math.min(3,holdingBack.length)-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
-                <span style={{fontSize:15,flexShrink:0,marginTop:1}}>{hbIcons[i]||"•"}</span>
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"var(--cream)",marginBottom:2}}>{lbl}</div>
-                  {dsc&&<div style={{fontSize:10,color:"var(--cream-40)",lineHeight:1.5}}>{dsc.slice(0,80)}</div>}
-                </div>
-              </div>
-            );
-          }) : <p style={{fontSize:12,color:"var(--cream-40)"}}>Challenges will appear here.</p>}
-        </div>
-
-        {/* Recommended Path */}
-        <div style={{...card}}>
-          {mono("Recommended Path")}
-          {pathItems.map((item,i)=>(
-            <div key={i} style={{display:"flex",gap:9,marginBottom:i<pathItems.length-1?12:0,paddingBottom:i<pathItems.length-1?12:0,borderBottom:i<pathItems.length-1?"1px solid rgba(255,255,255,0.04)":"none"}}>
-              <div style={{width:21,height:21,borderRadius:"50%",background:"var(--gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#000",flexShrink:0,marginTop:1}}>{item.num}</div>
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:"var(--cream)",marginBottom:1}}>{item.title}</div>
-                <div style={{fontSize:10,color:"var(--cream-40)"}}>{item.timeline}</div>
-                {item.desc&&<div style={{fontSize:10,color:"var(--cream-30)",lineHeight:1.4,marginTop:2}}>{item.desc.slice(0,55)}{item.desc.length>55?"…":""}</div>}
-              </div>
-            </div>
-          ))}
-          {!pathItems.length&&<p style={{fontSize:12,color:"var(--cream-40)"}}>Your path will appear here.</p>}
-          {pathItems.length>0&&(
-            <button onClick={()=>setNav(isPaid?"explore":"")} style={{width:"100%",marginTop:13,padding:"10px",background:"var(--gold)",color:"#000",border:"none",borderRadius:9,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-              Start Your Journey →
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════════════
-          ROW 2: Strengths | Primary Focus | Secondary | Tertiary
-      ════════════════════════════════════════════════════════ */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:11,marginBottom:11}}>
-
-        {/* Strengths */}
-        <div style={{...card}}>
-          {mono("Your Strengths")}
-          {strengths.filter(Boolean).slice(0,6).map((s,i)=>{
-            const lbl=typeof s==="string"?s:txt(s?.label||s?.name||"");
-            return(
-              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,marginBottom:9}}>
-                <div style={{width:17,height:17,borderRadius:"50%",background:"rgba(26,184,154,0.12)",border:"1px solid rgba(26,184,154,0.22)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
-                  <span style={{fontSize:8,color:"var(--teal)"}}>✓</span>
-                </div>
-                <span style={{fontSize:12,color:"rgba(232,220,200,0.6)",lineHeight:1.5}}>{lbl}</span>
-              </div>
-            );
-          })}
-          {!strengths.length&&<p style={{fontSize:12,color:"var(--cream-40)"}}>Strengths will appear here.</p>}
-        </div>
-
-        {/* Primary, Secondary, Tertiary Focus */}
-        {focuses.map((fc,i)=>(
-          <div key={i} style={{...card,background:`linear-gradient(145deg,${fc.bg},rgba(10,8,0,0))`,border:`1px solid ${i===2?"rgba(240,180,41,0.18)":"rgba(255,255,255,0.07)"}`}}>
-            {mono(fc.label,fc.acc)}
-            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:10}}>
-              <span style={{fontSize:20}}>{fc.icon}</span>
-              <span style={{fontSize:14,fontWeight:800,color:"var(--cream)"}}>{fc.title}</span>
-            </div>
-            <p style={{fontSize:12,color:"rgba(232,220,200,0.55)",lineHeight:1.68,margin:"0 0 11px"}}>
-              {fc.desc.slice(0,110)}{fc.desc.length>110?"…":""}
-            </p>
-            {fc.why&&(
-              <div style={{padding:"9px 11px",background:"rgba(0,0,0,0.25)",borderRadius:8,marginBottom:11}}>
-                <div style={{fontSize:8,color:fc.acc,fontFamily:"var(--f-mono)",fontWeight:700,marginBottom:3}}>{whyLabels[i]}</div>
-                <p style={{fontSize:11,color:"rgba(232,220,200,0.45)",lineHeight:1.6,margin:0}}>{fc.why.slice(0,100)}{fc.why.length>100?"…":""}</p>
-              </div>
-            )}
-            {!isPaid&&i===0
-              ?<button onClick={onUnlock} style={{width:"100%",padding:"9px",background:"linear-gradient(135deg,rgba(212,175,55,0.18),rgba(212,175,55,0.06))",color:"var(--gold)",border:"1px solid rgba(212,175,55,0.28)",borderRadius:9,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                  ✦ Upgrade to Pro
-                </button>
-              :<button onClick={()=>setNav("explore")} style={{width:"100%",padding:"9px",background:i===0?"var(--gold)":"transparent",color:i===0?"#000":"rgba(232,220,200,0.5)",border:i===0?"none":"1px solid rgba(255,255,255,0.09)",borderRadius:9,fontSize:11,fontWeight:i===0?700:500,cursor:"pointer",fontFamily:"inherit"}}>
-                  {i===0?"Start First Session →":"View Plan →"}
-                </button>
-            }
-          </div>
-        ))}
-        {/* Pad to 4 columns if fewer focuses */}
-        {Array(Math.max(0,3-focuses.length)).fill(null).map((_,i)=>(
-          <div key={`fp${i}`} style={{...card,opacity:0.35,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{fontSize:12,color:"var(--cream-40)",textAlign:"center"}}>Focus area {focuses.length+i+2} will appear here</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ════════════════════════════════════════════════════════
-          ROW 3: Top Priorities | Daily Recommendation | Next Action
-      ════════════════════════════════════════════════════════ */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:11}}>
-
-        {/* Top Priorities */}
-        <div style={{...card}}>
-          {mono("Your Top Priorities (Next 7 Days)")}
-          {priorities.filter(Boolean).slice(0,6).map((p,i)=>{
-            const lbl=typeof p==="string"?p:txt(p?.task||p?.label||p?.action||"");
-            return(
-              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,marginBottom:10}}>
-                <div style={{width:14,height:14,border:"1.5px solid rgba(232,220,200,0.2)",borderRadius:3,flexShrink:0,marginTop:2}}/>
-                <span style={{fontSize:12,color:"rgba(232,220,200,0.6)",lineHeight:1.5}}>{lbl}</span>
-              </div>
-            );
-          })}
-          {!priorities.length&&<p style={{fontSize:12,color:"var(--cream-40)"}}>Weekly priorities will appear here.</p>}
-        </div>
-
-        {/* Daily Recommendation */}
-        <div style={{...card,background:"linear-gradient(135deg,#0e0820,#08051a)",border:"1px solid rgba(155,114,207,0.14)",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",bottom:-25,right:-25,width:120,height:120,background:"radial-gradient(circle,rgba(155,114,207,0.2),transparent 65%)",pointerEvents:"none"}}/>
-          {mono("Daily Recommendation","rgba(180,140,255,0.55)")}
-          {dailyRec
-            ?<blockquote style={{fontSize:14,fontWeight:600,color:"var(--cream)",lineHeight:1.78,fontStyle:"italic",margin:0,position:"relative"}}>
-                "{dailyRec.slice(0,180)}{dailyRec.length>180?"…":""}"
-              </blockquote>
-            :<p style={{fontSize:12,color:"var(--cream-40)"}}>Your daily insight will appear here.</p>
-          }
-        </div>
-
-        {/* Next Action */}
-        <div style={{...card,background:"linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))",border:"1px solid rgba(212,175,55,0.18)",position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",bottom:-10,right:-10,fontSize:72,opacity:0.06,pointerEvents:"none",lineHeight:1}}>❤️</div>
-          {mono("Next Action (Start Now)","var(--gold)")}
-          <div style={{fontSize:15,fontWeight:800,color:"var(--cream)",marginBottom:7,lineHeight:1.4,position:"relative"}}>
-            Start your first session in {focuses[0]?.title||focus||"your focus area"}
-          </div>
-          <p style={{fontSize:12,color:"rgba(232,220,200,0.5)",marginBottom:15,lineHeight:1.6,position:"relative"}}>
-            Your personalized journey begins here. The first session sets everything in motion.
+          <p style={{fontSize:14,color:G.dim,lineHeight:1.72,margin:"0 0 20px",maxWidth:520}}>
+            We've analyzed your responses and created a personalized report just for you.{" "}
+            This is the beginning of your transformation journey.
           </p>
-          <button onClick={isPaid?()=>setNav("explore"):onUnlock}
-            style={{padding:"11px 20px",background:"var(--gold)",color:"#000",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:8,position:"relative"}}>
-            {isPaid?"Start Now →":"Unlock with Pro →"}
+
+          <div style={{display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:G.dimmer}}>
+              <span>📅</span><span>{genDate}</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:G.dimmer}}>
+              <span>⏱</span><span>Generated in 23 seconds</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Overall Intelligence Score ring */}
+        <div style={{...card,flex:"0 0 240px",textAlign:"center",padding:"28px 24px",
+          background:"linear-gradient(145deg,#111008,#0e0c05)",
+          boxShadow:"0 0 50px rgba(240,180,41,0.05)"}}>
+          <div style={{fontSize:9,color:G.dimmer,letterSpacing:".14em",
+            fontFamily:"monospace",marginBottom:18}}>OVERALL INTELLIGENCE SCORE ℹ</div>
+
+          <div style={{position:"relative",width:144,height:144,margin:"0 auto 18px"}}>
+            <svg width={144} height={144}
+              style={{transform:"rotate(-90deg)",position:"absolute",inset:0}}>
+              <circle cx={72} cy={72} r={R} fill="none"
+                stroke="rgba(255,255,255,0.06)" strokeWidth={SW}/>
+              <circle cx={72} cy={72} r={R} fill="none" stroke={G.gold} strokeWidth={SW}
+                strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
+            </svg>
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
+              alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:48,fontWeight:800,color:G.cream,lineHeight:1}}>{overall}</span>
+              <span style={{fontSize:13,color:G.dimmer,marginTop:2}}>/100</span>
+            </div>
+          </div>
+
+          <p style={{fontSize:13,color:G.dim,lineHeight:1.65,margin:0}}>{scoreMsg}</p>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          2. STATS ROW — 4 cards
+      ══════════════════════════════════════════ */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",
+        gap:12,marginBottom:22}}>
+        {[
+          {icon:"🎭",num:"8",         label:"Intelligence Areas",sub:"Analyzed",   bg:"rgba(155,114,207,0.12)",ic:"#9b72cf"},
+          {icon:"📋",num:String(Math.min(dataPoints,99)), label:"Data Points", sub:"Processed",  bg:"rgba(240,180,41,0.10)",ic:G.gold},
+          {icon:"🎯",num:String(Math.min(insights,20)),   label:"Key Insights",sub:"Generated",  bg:"rgba(229,115,115,0.10)",ic:"#e57373"},
+          {icon:"📊",num:confidence+"%",label:"Report Accuracy",sub:"High Confidence",bg:"rgba(100,181,246,0.10)",ic:"#64b5f6"},
+        ].map(s=>(
+          <div key={s.label} style={{...card,display:"flex",gap:14,alignItems:"center",padding:"18px 16px"}}>
+            <div style={{width:44,height:44,borderRadius:12,background:s.bg,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:20,flexShrink:0}}>{s.icon}</div>
+            <div>
+              <div style={{fontSize:26,fontWeight:800,color:s.ic,lineHeight:1,marginBottom:3}}>{s.num}</div>
+              <div style={{fontSize:11,color:G.dim,fontWeight:600,lineHeight:1.3}}>{s.label}</div>
+              <div style={{fontSize:10,color:G.dimmer,marginTop:2}}>{s.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ══════════════════════════════════════════
+          3. PERSONALIZED SUMMARY
+      ══════════════════════════════════════════ */}
+      <div style={{...card,marginBottom:20,
+        background:"linear-gradient(135deg,#0f0820 0%,#130c08 55%,#0a0810 100%)",
+        border:"1px solid rgba(120,80,200,0.14)",position:"relative",
+        overflow:"hidden",padding:"30px 32px"}}>
+
+        {/* Decorative: warm glow top-right */}
+        <div style={{position:"absolute",right:0,top:0,width:"50%",height:"100%",
+          background:"radial-gradient(ellipse at 85% 20%,rgba(240,180,41,0.09),transparent 55%)",
+          pointerEvents:"none"}}/>
+        {/* Decorative: silhouette/mountain feel */}
+        <div style={{position:"absolute",right:"2%",bottom:0,opacity:0.04,
+          fontSize:120,lineHeight:1,pointerEvents:"none",userSelect:"none"}}>⛰️</div>
+
+        <div style={{position:"relative",maxWidth:680}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+            <span style={{fontSize:18,color:G.gold}}>✦</span>
+            <span style={{fontSize:16,fontWeight:700,color:G.cream}}>Your Personalized Summary</span>
+          </div>
+
+          <p style={{fontSize:15,lineHeight:1.88,color:G.dim,margin:0}}>
+            {summaryBefore&&<span>{summaryBefore} </span>}
+            <span style={{color:G.gold,fontWeight:600}}>{summaryLast}</span>
+          </p>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          4. THREE COLUMNS — Strengths / Blind Spots / Opportunities
+      ══════════════════════════════════════════ */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",
+        gap:14,marginBottom:20}}>
+
+        {/* Top Strengths */}
+        <div style={card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:28,height:28,borderRadius:7,background:"rgba(100,180,246,0.12)",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>💎</div>
+              <span style={{fontSize:14,fontWeight:700,color:G.cream}}>Top Strengths</span>
+            </div>
+            <ViewBtn expanded={exStr} toggle={()=>setExStr(e=>!e)}/>
+          </div>
+          {strengths.filter(Boolean).slice(0,exStr?99:4).map((s,i)=>(
+            <CheckRow key={i} item={s} color="#81c784"/>
+          ))}
+        </div>
+
+        {/* Biggest Blind Spots */}
+        <div style={card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:28,height:28,borderRadius:7,background:"rgba(229,115,115,0.12)",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>👁️</div>
+              <span style={{fontSize:14,fontWeight:700,color:G.cream}}>Biggest Blind Spots</span>
+            </div>
+            <ViewBtn expanded={exBls} toggle={()=>setExBls(e=>!e)}/>
+          </div>
+          {blindSpots.filter(Boolean).slice(0,exBls?99:4).map((b,i)=>(
+            <DotRow key={i} item={b}/>
+          ))}
+        </div>
+
+        {/* Key Opportunities */}
+        <div style={card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:28,height:28,borderRadius:7,background:"rgba(240,180,41,0.12)",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>💡</div>
+              <span style={{fontSize:14,fontWeight:700,color:G.cream}}>Key Opportunities</span>
+            </div>
+            <ViewBtn expanded={exOpp} toggle={()=>setExOpp(e=>!e)}/>
+          </div>
+          {opportunities.filter(Boolean).slice(0,exOpp?99:4).map((o,i)=>(
+            <CheckRow key={i} item={o} color={G.gold}/>
+          ))}
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          5. YOUR JOURNEY STARTS NOW
+      ══════════════════════════════════════════ */}
+      <div style={{...card,
+        background:"linear-gradient(135deg,rgba(240,180,41,0.06),rgba(240,180,41,0.02))",
+        border:"1px solid rgba(240,180,41,0.14)",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        flexWrap:"wrap",gap:24,padding:"28px 32px"}}>
+
+        {/* Left: rocket + text */}
+        <div style={{display:"flex",alignItems:"center",gap:20,flex:1,minWidth:240}}>
+          <div style={{width:76,height:76,borderRadius:"50%",flexShrink:0,
+            background:"linear-gradient(135deg,rgba(240,180,41,0.14),rgba(240,180,41,0.04))",
+            border:"2px solid rgba(240,180,41,0.22)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:34,boxShadow:"0 0 30px rgba(240,180,41,0.12)"}}>
+            🚀
+          </div>
+          <div>
+            <h3 style={{fontSize:19,fontWeight:800,color:G.cream,margin:"0 0 9px",lineHeight:1.2}}>
+              Your journey starts now
+            </h3>
+            <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:380}}>
+              You've unlocked powerful insights about yourself. It's time to take action and create real change.
+            </p>
+          </div>
+        </div>
+
+        {/* Right: CTA */}
+        <div style={{textAlign:"center",flexShrink:0}}>
+          <button onClick={()=>setNav("home")}
+            style={{display:"flex",alignItems:"center",gap:10,
+              background:G.gold,color:"#000",border:"none",borderRadius:12,
+              padding:"16px 30px",fontSize:15,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",whiteSpace:"nowrap",marginBottom:8,
+              boxShadow:"0 0 40px rgba(240,180,41,0.22)"}}>
+            Start My Journey <span style={{fontSize:18}}>→</span>
           </button>
+          <p style={{fontSize:11,color:G.dimmer,margin:0}}>
+            🔒 Takes you to your personalized dashboard
+          </p>
         </div>
       </div>
     </div>
@@ -11402,6 +11492,10 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// EDIT PROFILE — Let users update their onboarding details
+// Changes save to Supabase and optionally trigger a report re-generation
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en",navPhotoURL,userName}){
 
@@ -11610,7 +11704,7 @@ Rules:
 
       <div className="main-area">
         {navSection==="home"&&(
-          <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin}/>
+          <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin} dailyInsight={dailyInsight}/>
         )}
         {navSection==="explore"&&<ExploreScreen setNav={setNav}/>}
         {isCat&&<CategoryPage catId={catId} setNav={setNav} userId={userId}/>}
@@ -11646,6 +11740,7 @@ Rules:
 // EDIT PROFILE — Let users update their onboarding details
 // Changes save to Supabase and optionally trigger a report re-generation
 // ═══════════════════════════════════════════════════════════════════════════════
+
 function EditProfileModal({formData, userId, onSave, onClose}){
   const [f, setF] = useState({
     name:      formData?.name      || "",
