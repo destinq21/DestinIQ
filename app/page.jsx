@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -301,10 +301,10 @@ const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 // in the world are accepted and settle automatically. We just SHOW the price
 // converted to the user's local currency so it feels native to them.
 const PLANS = {
-  pro:          { name:"Pro",          amount:9,   label:"$9/month",    currency:"USD", tier:"pro"    },
-  promax:       { name:"Pro Max",      amount:19,  label:"$19/month",   currency:"USD", tier:"promax" },
-  pro_annual:   { name:"Pro Annual",   amount:79,  label:"$79/year",    currency:"USD", tier:"pro"    },
-  promax_annual:{ name:"Pro Max Annual",amount:149, label:"$149/year",  currency:"USD", tier:"promax" },
+  pro:          { name:"Pro",          amount:9.99,   label:"$9.99/month",  currency:"USD", tier:"pro"    },
+  promax:       { name:"Pro Max",      amount:24.99,  label:"$24.99/month", currency:"USD", tier:"promax" },
+  pro_annual:   { name:"Pro Annual",   amount:79.99,  label:"$79.99/year",  currency:"USD", tier:"pro"    },
+  promax_annual:{ name:"Pro Max Annual",amount:199.99, label:"$199.99/year",  currency:"USD", tier:"promax" },
 };
 
 // Approximate USD exchange rates for display purposes only — actual charge
@@ -939,7 +939,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 /* reloc responsive handled in main block above */
 /* ─── APP SHELL ─── */
 .app-shell{display:flex;min-height:100vh;background:var(--void);}
-.sidebar{width:220px;min-height:100vh;position:fixed;left:0;top:0;bottom:0;background:var(--night);border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:200;overflow-y:auto;}
+.sidebar{width:220px;min-height:100vh;position:fixed;left:0;top:0;bottom:0;background:var(--night);border-right:1px solid var(--line);display:none;flex-direction:column;z-index:200;overflow-y:auto;}
 .sidebar-logo{padding:22px 20px 14px;border-bottom:1px solid var(--line-dim);}
 .sidebar-items{padding:8px 0;flex:1;}
 .s-item{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;font-size:13.5px;color:var(--cream-50);font-weight:500;border:none;background:none;width:100%;text-align:left;transition:all .15s;border-left:3px solid transparent;}
@@ -947,7 +947,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .s-item.active{background:rgba(200,168,75,.08);color:var(--gold);border-left-color:var(--gold);}
 .s-streak{padding:14px 20px;border-top:1px solid var(--line-dim);}
 .s-upgrade{padding:0 16px 18px;}
-.main-area{margin-left:220px;flex:1;}
+.main-area{margin-left:0;flex:1;}
 .bot-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
 .bot-items{display:flex;justify-content:space-around;}
 .bot-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border:none;background:none;color:var(--cream-30);cursor:pointer;flex:1;transition:color .15s;}
@@ -1014,8 +1014,10 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .fu-row{display:flex;gap:8px;}
 .fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
 .fu-input:focus{border-color:var(--gold);}
+@media(min-width:901px){
+  .sidebar{display:flex!important;}.main-area{margin-left:220px!important;}}
 @media(max-width:900px){
-  .sidebar{display:none!important;}.main-area{margin-left:0!important;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
+  .bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
 }
@@ -3007,35 +3009,50 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
   };
 
   const FREE_FEATURES=[
-    {text:"Full personalized clarity report",inc:true},
-    {text:"Life pillar scores & roadmap",inc:true},
-    {text:"Daily check-ins & win tracker",inc:true},
-    {text:"Life hacks & mindset insights",inc:true},
-    {text:"3 advisor messages per day",inc:true},
-    {text:"Unlimited advisor conversations",inc:false},
-    {text:"Money, business & online income",inc:false},
-    {text:"Career & relocation intel",inc:false},
-  ];
+  {text:"1 intelligence report (your profile)",        inc:true},
+  {text:"5 starter tools (Career, Decisions, Confidence, Inner Peace, Side Hustle)", inc:true},
+  {text:"AI Advisor — 3 short messages/day",           inc:true},
+  {text:"Daily check-in — basic reflection",           inc:true},
+  {text:"Win tracker — up to 5 wins",                  inc:true},
+  {text:"Journal — 1 entry",                           inc:true},
+  {text:"Streak tracking",                             inc:true},
+  {text:"All 42 tools",                                inc:false},
+  {text:"Audio on reports 🔊",                         inc:false},
+  {text:"Practices & habit tracking",                  inc:false},
+  {text:"Progress analytics",                          inc:false},
+  {text:"Saved reports",                               inc:false},
+];
 
   const PRO_FEATURES=[
-    {text:"Everything in Free, unlimited",inc:true},
-    {text:"Full deep-dive report — all sections",inc:true},
-    {text:"My Roadmap, Career Path, Big Decisions",inc:true},
-    {text:"Weekly Pulse — your week, analyzed",inc:true},
-    {text:"Relocate — explore any country",inc:true},
-    {text:"All module refreshes anytime",inc:true},
-    {text:"My Advisor — 10 messages/day",inc:true}, // Pro limit
-    {text:"Edit profile & re-generate report",inc:true},
-  ];
+  {text:"Everything in Free",                          inc:true},
+  {text:"All 42 intelligence tools unlocked 🔓",       inc:true},
+  {text:"3 intelligence reports per month",            inc:true},
+  {text:"AI Advisor — full daily conversations",       inc:true},
+  {text:"Daily check-in with deep reflections",        inc:true},
+  {text:"Win tracker — unlimited",                     inc:true},
+  {text:"Journal — unlimited entries + full history",  inc:true},
+  {text:"Practices & habit tracking",                  inc:true},
+  {text:"Progress analytics (7-day & 30-day)",         inc:true},
+  {text:"Audio on all reports 🔊",                     inc:true},
+  {text:"Saved reports",                               inc:true},
+  {text:"Tool refresh & regenerate",                   inc:true},
+  {text:"PDF export",                                  inc:false},
+  {text:"Weekly AI digest",                            inc:false},
+  {text:"Score comparison mode",                       inc:false},
+];
 
   const PROMAX_FEATURES=[
-    {text:"Everything in Pro, plus:",inc:true},
-    {text:"Unlimited advisor — no daily limit",inc:true},
-    {text:"Deep AI responses (2.5× more detailed)",inc:true},
-    {text:"PDF download — full branded report",inc:true},
-    {text:"Priority AI speed",inc:true},
-    {text:"✦ Pro Max badge in dashboard",inc:true},
-  ];
+  {text:"Everything in Pro",                                    inc:true},
+  {text:"Unlimited intelligence reports",                       inc:true},
+  {text:"AI Advisor — truly unlimited, deepest responses",      inc:true},
+  {text:"6,000 token AI responses (2.5× longer & deeper)",      inc:true},
+  {text:"📄 PDF export — branded, downloadable report",         inc:true},
+  {text:"✦ Weekly AI digest — personalised every Monday",       inc:true},
+  {text:"📈 Score comparison — track growth between reports",   inc:true},
+  {text:"Priority AI speed",                                    inc:true},
+  {text:"Pro Max badge ✦ (purple)",                             inc:true},
+  {text:"Early access to new features",                         inc:true},
+];
 
   return(
     <div style={{padding:"60px 0"}}>
@@ -9606,6 +9623,7 @@ function PracticesView({userId}){
     </div>
   );
 }
+}
 
 const DISCIPLINE_SECTIONS=[
   {
@@ -11129,8 +11147,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       </div>
 
       <div style={{padding:"0 20px"}}>
-        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
-        {/* CONTINUE JOURNEY (Hero card) ══ */}
+        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>. CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -13157,7 +13174,7 @@ Rules:
   return(
     <div className="app-shell">
 
-      <div style={{display:isMobile?"none":"block",width:220,flexShrink:0}}><SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/></div>
+      <SidebarNav nav={navSection}
 
       <MobileTopBar
         title={(()=>{
@@ -13172,7 +13189,7 @@ Rules:
         setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
       />
 
-      <div className="main-area" style={{marginLeft:isMobile?0:220,transition:"margin .2s"}}>
+      <div className="main-area">
         {navSection==="home"&&(
           <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin} dailyInsight={dailyInsight}/>
         )}
