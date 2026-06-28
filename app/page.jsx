@@ -10889,29 +10889,418 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 }
 
 
-function ExploreScreen({setNav}){
+function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
+  const [query,   setQuery]   = useState("");
+  const [expanded,setExpanded]= useState(null); // expanded category id
+
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+  };
+  const card={background:G.card,border:"1px solid "+G.border,borderRadius:16,padding:"20px",boxSizing:"border-box"};
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const getCatPct=(cat)=>{
+    const done=cat.tools.filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
+    return cat.tools.length?Math.round((done/cat.tools.length)*100):0;
+  };
+
+  const recentTools=(()=>{
+    try{
+      return CATEGORIES.flatMap(cat=>cat.tools.map(t=>({
+        id:t,label:TOOL_META?.[t]?.label||t,icon:TOOL_META?.[t]?.icon||"⚡",color:TOOL_META?.[t]?.color||G.gold,cat:cat.id,catLabel:cat.label,
+      }))).filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t.id}_${userId}`);}catch{return false;}}).slice(0,8);
+    }catch{return [];}
+  })();
+
+  // ── AI Spotlight pick ─────────────────────────────────────────────────────
+  const spotlight=(()=>{
+    const f=(formData?.focus||"").toLowerCase();
+    const b=(formData?.challenge||"").toLowerCase();
+    const map=[
+      {match:["money","financ","wealth"],     id:"sidehustle",   reason:"Perfect for building a new income stream around your financial goals."},
+      {match:["relation","connect","social"],  id:"relationshipiq",reason:"Designed to strengthen every connection in your life."},
+      {match:["mindset","confidence","belief"],id:"mindsettenx",  reason:"Rewire how you think and unlock the version of yourself you know exists."},
+      {match:["disciplin","habit","consistent"],id:"discipline",  reason:"Build the daily habits that separate where you are from where you want to be."},
+      {match:["purpose","meaning","why"],      id:"fearaudit",    reason:"Identify what's holding you back and take the single most important next step."},
+      {match:["overthink","anxiety","stress"], id:"innerpeace",   reason:"Quiet the mental noise and make clearer decisions every day."},
+      {match:["career","job","work","skill"],  id:"career",       reason:"Accelerate your career with a strategy built around your actual situation."},
+      {match:["body","health","energy","fit"], id:"nogym",        reason:"Full-body results without a gym — built around your lifestyle."},
+    ];
+    for(const entry of map){
+      if(entry.match.some(k=>f.includes(k)||b.includes(k))){
+        const meta=TOOL_META?.[entry.id]; if(!meta) continue;
+        return {id:entry.id,label:meta.label,icon:meta.icon,color:meta.color,reason:entry.reason};
+      }
+    }
+    const def=TOOL_META?.["fearaudit"]||{label:"Fear Audit",icon:"⭐",color:G.gold};
+    return {id:"fearaudit",label:def.label,icon:def.icon,color:def.color,reason:"The single best starting point for personal transformation."};
+  })();
+
+  // ── Curated for your goals ────────────────────────────────────────────────
+  const curated=(()=>{
+    const f=(formData?.focus||"").toLowerCase();
+    const b=(formData?.challenge||"").toLowerCase();
+    const g=(formData?.goals||formData?.bigGoal||"").toLowerCase();
+    const picks=[];
+    const add=(id,why)=>{const m=TOOL_META?.[id];if(m&&!picks.find(p=>p.id===id))picks.push({id,label:m.label,icon:m.icon,color:m.color,why});};
+    if(f.includes("money")||f.includes("financ")||g.includes("financ"))  add("sidehustle","Matches your goal of building financial freedom");
+    if(f.includes("relation")||g.includes("relation"))                    add("relationshipiq","Aligned with your focus on building better connections");
+    if(b.includes("overthink")||b.includes("thinking"))                   add("innerpeace","Directly addresses your overthinking challenge");
+    if(b.includes("disciplin")||b.includes("habit")||b.includes("consistent")) add("discipline","Tackles the consistency issue you're working on");
+    if(f.includes("career")||f.includes("skill")||g.includes("career"))   add("career","Fits your career growth goal perfectly");
+    if(f.includes("mindset")||b.includes("fear")||b.includes("doubt"))    add("mindsettenx","Rewires the limiting beliefs that are slowing you down");
+    if(f.includes("purpose")||g.includes("purpose"))                      add("fearaudit","Helps you find clarity on what you truly want");
+    if(f.includes("body")||f.includes("health"))                          add("nogym","Builds the physical energy your goals require");
+    // Fill to 4 if needed
+    const defaults=["fearaudit","discipline","innerpeace","career","sidehustle","mindsettenx"];
+    for(const id of defaults){ if(picks.length>=4) break; add(id,"Recommended based on your profile"); }
+    return picks.slice(0,4);
+  })();
+
+  // ── Trending in region ─────────────────────────────────────────────────────
+  const regional=(()=>{
+    const country=(formData?.country||"").toLowerCase();
+    const regionMap=[
+      {match:["ghana","nigeria","kenya","cameroon","uganda","tanzania","ethiopia","ivory","senegal","ghana"],
+       ids:["sidehustle","earnonline","money","career"],label:"West & East Africa"},
+      {match:["south africa","zimbabwe","zambia","mozambique"],
+       ids:["career","sidehustle","investment101","business"],label:"Southern Africa"},
+      {match:["india","pakistan","bangladesh","sri lanka","nepal"],
+       ids:["career","investment101","negotiation","digitallife"],label:"South Asia"},
+      {match:["united states","usa","canada","australia","new zealand"],
+       ids:["sidehustle","investment101","negotiation","discipline"],label:"North America & Oceania"},
+      {match:["united kingdom","england","ireland","scotland"],
+       ids:["career","discipline","negotiation","investment101"],label:"United Kingdom"},
+      {match:["germany","france","spain","italy","netherlands","sweden","norway","denmark","poland"],
+       ids:["career","negotiation","digitallife","discipline"],label:"Europe"},
+    ];
+    for(const r of regionMap){
+      if(r.match.some(m=>country.includes(m))){
+        const tools=r.ids.map(id=>{const meta=TOOL_META?.[id];return meta?{id,label:meta.label,icon:meta.icon,color:meta.color}:null;}).filter(Boolean);
+        return {tools,region:formData?.country||r.label};
+      }
+    }
+    const fallback=["money","career","mindsettenx","sidehustle"];
+    return {tools:fallback.map(id=>{const m=TOOL_META?.[id];return m?{id,label:m.label,icon:m.icon,color:m.color}:null;}).filter(Boolean),region:formData?.country||"Your Region"};
+  })();
+
+  // ── Live search ───────────────────────────────────────────────────────────
+  const searchResults=(()=>{
+    if(!query.trim()) return null;
+    const q=query.toLowerCase();
+    const tools=CATEGORIES.flatMap(cat=>
+      cat.tools.filter(t=>{const m=TOOL_META?.[t];return m&&(m.label.toLowerCase().includes(q)||t.includes(q)||cat.label.toLowerCase().includes(q));})
+        .map(t=>{const m=TOOL_META?.[t];return{id:t,label:m.label,icon:m.icon,color:m.color,catLabel:cat.label,catColor:cat.color};})
+    );
+    const cats=CATEGORIES.filter(cat=>cat.label.toLowerCase().includes(q)||cat.desc.toLowerCase().includes(q));
+    return {tools,cats};
+  })();
+
+  // ── Section label helper ──────────────────────────────────────────────────
+  const SectionLabel=({text,sub})=>(
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",textTransform:"uppercase",marginBottom:sub?3:0}}>{text}</div>
+      {sub&&<div style={{fontSize:13,fontWeight:700,color:G.cream}}>{sub}</div>}
+    </div>
+  );
+
+  const SmallToolCard=({t})=>(
+    <button onClick={()=>setNav("tool:"+t.id)}
+      style={{background:G.card,border:"1px solid "+G.border,borderRadius:12,
+        padding:"14px",cursor:"pointer",flexShrink:0,minWidth:100,textAlign:"center",
+        fontFamily:"inherit",outline:"none",transition:"all .15s"}}
+      onMouseEnter={e=>{e.currentTarget.style.borderColor=t.color||G.gold+"55";e.currentTarget.style.transform="translateY(-2px)";}}
+      onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.transform="";}}>
+      <div style={{fontSize:24,marginBottom:7}}>{t.icon}</div>
+      <div style={{fontSize:11,fontWeight:600,color:G.cream,lineHeight:1.3}}>{t.label}</div>
+    </button>
+  );
+
   return(
-    <div className="pg">
-      <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",margin:"0 0 6px"}}>Explore</h2>
-      <p style={{fontSize:13,color:"var(--cream-40)",margin:"0 0 24px"}}>All tools, organized by what matters to you.</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:12}}>
-        {CATEGORIES.map(cat=>(
-          <div key={cat.id}
-            style={{padding:20,borderRadius:18,cursor:"pointer",transition:"all .2s",
-              border:`1px solid ${cat.color}25`,background:`linear-gradient(135deg,${cat.color}10,${cat.color}04)`}}
-            onClick={()=>setNav("category:"+cat.id)}
-            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor=cat.color+"50";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor=cat.color+"25";}}>
-            <div style={{fontSize:30,marginBottom:10}}>{cat.icon}</div>
-            <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{cat.label}</div>
-            <div style={{fontSize:11,color:cat.color,marginBottom:5,fontFamily:"var(--f-mono)"}}>{cat.tools.length} tools</div>
-            <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.6}}>{cat.desc}</div>
-          </div>
-        ))}
+    <div style={{padding:"24px 20px 90px",minHeight:"100vh",background:G.bg,
+      color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      maxWidth:900,margin:"0 auto",boxSizing:"border-box"}}>
+
+      {/* ══ PAGE TITLE ══ */}
+      <div style={{marginBottom:20}}>
+        <h1 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>Explore</h1>
+        <p style={{fontSize:13,color:G.dimmer,margin:0}}>Every tool, personalized to your situation.</p>
       </div>
+
+      {/* ══ 1. SEARCH BAR ══ */}
+      <div style={{position:"relative",marginBottom:24}}>
+        <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",
+          fontSize:16,color:G.dimmer,pointerEvents:"none"}}>🔍</div>
+        <input
+          value={query}
+          onChange={e=>setQuery(e.target.value)}
+          placeholder="Search tools, categories, goals…"
+          style={{width:"100%",padding:"14px 16px 14px 46px",
+            background:"#0e0c02",border:"1px solid "+G.border,borderRadius:14,
+            color:G.cream,fontSize:14,outline:"none",boxSizing:"border-box",
+            fontFamily:"inherit",transition:"border-color .2s"}}
+          onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+          onBlur={e=>e.target.style.borderColor=G.border}
+        />
+        {query&&(
+          <button onClick={()=>setQuery("")}
+            style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+              background:"none",border:"none",color:G.dimmer,cursor:"pointer",fontSize:18,
+              padding:"2px 6px"}}>✕</button>
+        )}
+      </div>
+
+      {/* ══ SEARCH RESULTS ══ */}
+      {searchResults&&(
+        <div style={{marginBottom:24}}>
+          {searchResults.tools.length===0&&searchResults.cats.length===0&&(
+            <div style={{...card,textAlign:"center",padding:"32px"}}>
+              <div style={{fontSize:32,marginBottom:10}}>🔍</div>
+              <p style={{color:G.dim,margin:0}}>No results for "{query}"</p>
+            </div>
+          )}
+          {searchResults.cats.length>0&&(
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",marginBottom:10,textTransform:"uppercase",fontFamily:"monospace"}}>Categories</div>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                {searchResults.cats.map(cat=>(
+                  <button key={cat.id} onClick={()=>setNav("category:"+cat.id)}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",
+                      background:`${cat.color}12`,border:`1px solid ${cat.color}30`,
+                      borderRadius:12,cursor:"pointer",fontFamily:"inherit",color:G.cream,fontSize:13,fontWeight:600}}>
+                    <span>{cat.icon}</span>{cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {searchResults.tools.length>0&&(
+            <div>
+              <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",marginBottom:10,textTransform:"uppercase",fontFamily:"monospace"}}>{searchResults.tools.length} tools found</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+                {searchResults.tools.map(t=>(
+                  <div key={t.id} onClick={()=>setNav("tool:"+t.id)}
+                    style={{...card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",padding:"14px 16px"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=t.color+"40"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                    <div style={{width:36,height:36,borderRadius:10,
+                      background:t.color+"15",border:"1px solid "+t.color+"25",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                      {t.icon}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:G.cream,marginBottom:2}}>{t.label}</div>
+                      <div style={{fontSize:10,color:t.catColor||G.dimmer}}>{t.catLabel}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!searchResults&&(<>
+
+      {/* ══ 2. AI SPOTLIGHT ══ */}
+      <div style={{marginBottom:24,background:"linear-gradient(135deg,#0e0820,#130c08)",
+        border:"1px solid rgba(120,80,200,0.2)",borderRadius:18,padding:"24px",
+        position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:0,right:0,width:"40%",height:"100%",
+          background:"radial-gradient(ellipse at 80% 30%,rgba(155,114,207,0.15),transparent 60%)",
+          pointerEvents:"none"}}/>
+        <div style={{position:"relative",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:9,color:"rgba(200,160,255,0.7)",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>✦ RECOMMENDED FOR YOU TODAY</div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+              <div style={{width:48,height:48,borderRadius:13,
+                background:(spotlight.color||G.gold)+"15",border:"1px solid "+(spotlight.color||G.gold)+"30",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>
+                {spotlight.icon}
+              </div>
+              <div>
+                <div style={{fontSize:16,fontWeight:700,color:G.cream,marginBottom:3}}>{spotlight.label}</div>
+                <div style={{fontSize:12,color:G.dim,lineHeight:1.5,maxWidth:320}}>{spotlight.reason}</div>
+              </div>
+            </div>
+          </div>
+          <button onClick={()=>setNav("tool:"+spotlight.id)}
+            style={{background:G.gold,color:"#000",border:"none",borderRadius:11,
+              padding:"12px 22px",fontSize:13,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0,marginLeft:"auto"}}>
+            Start Now →
+          </button>
+        </div>
+      </div>
+
+      {/* ══ 4. QUICK ACCESS (if history exists) ══ */}
+      {recentTools.length>0&&(
+        <div style={{marginBottom:24}}>
+          <SectionLabel text="Jump Back In" sub="Continue where you left off"/>
+          <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:6,
+            scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            {recentTools.map(t=><SmallToolCard key={t.id} t={t}/>)}
+          </div>
+        </div>
+      )}
+
+      {/* ══ 3. CATEGORY GRID ══ */}
+      <div style={{marginBottom:24}}>
+        <SectionLabel text="All Categories" sub="Everything DestinIQ offers"/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+          {CATEGORIES.map(cat=>{
+            const pct=getCatPct(cat);
+            const isOpen=expanded===cat.id;
+            return(
+              <div key={cat.id}>
+                <div
+                  style={{...card,cursor:"pointer",transition:"all .2s",padding:"18px",
+                    border:"1px solid "+(isOpen?cat.color+"50":G.border),
+                    background:isOpen?cat.color+"08":G.card}}
+                  onClick={()=>setExpanded(isOpen?null:cat.id)}
+                  onMouseEnter={e=>{ if(!isOpen){e.currentTarget.style.borderColor=cat.color+"40";e.currentTarget.style.transform="translateY(-2px)";} }}
+                  onMouseLeave={e=>{ if(!isOpen){e.currentTarget.style.borderColor=G.border;e.currentTarget.style.transform="";} }}>
+                  {/* Card header */}
+                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:12}}>
+                    <div style={{width:40,height:40,borderRadius:11,
+                      background:cat.color+"18",border:"1px solid "+cat.color+"28",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+                      {cat.icon}
+                    </div>
+                    <div style={{fontSize:9,padding:"3px 8px",
+                      background:cat.color+"15",border:"1px solid "+cat.color+"25",
+                      borderRadius:20,color:cat.color,fontWeight:700,fontFamily:"monospace",
+                      letterSpacing:".06em",whiteSpace:"nowrap"}}>
+                      {cat.tools.length} tools
+                    </div>
+                  </div>
+                  <div style={{fontSize:14,fontWeight:700,color:G.cream,marginBottom:3}}>{cat.label}</div>
+                  <div style={{fontSize:11,color:G.dim,marginBottom:12,lineHeight:1.4}}>{cat.desc}</div>
+                  {/* Progress bar */}
+                  <div style={{marginBottom:6}}>
+                    <div style={{height:3,borderRadius:3,background:"rgba(255,255,255,0.06)"}}>
+                      <div style={{height:"100%",borderRadius:3,background:cat.color,
+                        width:pct+"%",transition:"width .8s ease"}}/>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:10,color:G.dimmer}}>{pct>0?`${pct}% explored`:"Not started"}</span>
+                    <span style={{fontSize:11,color:isOpen?cat.color:G.dimmer,fontWeight:600,transition:"color .2s"}}>{isOpen?"▲ Close":"▼ Open"}</span>
+                  </div>
+                </div>
+
+                {/* ── Expanded tool list ── */}
+                {isOpen&&(
+                  <div style={{background:cat.color+"06",border:"1px solid "+cat.color+"20",
+                    borderTop:"none",borderRadius:"0 0 14px 14px",padding:"12px",
+                    display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {cat.tools.map(t=>{
+                      const meta=TOOL_META?.[t];if(!meta)return null;
+                      const visited=!!(()=>{try{return localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}})();
+                      return(
+                        <div key={t} onClick={()=>setNav("tool:"+t)}
+                          style={{display:"flex",alignItems:"center",gap:9,padding:"10px 12px",
+                            background:visited?"rgba(255,255,255,0.03)":"transparent",
+                            border:"1px solid rgba(255,255,255,0.05)",borderRadius:10,cursor:"pointer",
+                            transition:"all .15s"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}
+                          onMouseLeave={e=>e.currentTarget.style.background=visited?"rgba(255,255,255,0.03)":"transparent"}>
+                          <span style={{fontSize:18,flexShrink:0}}>{meta.icon}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:11,fontWeight:600,color:G.cream,
+                              whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{meta.label}</div>
+                            {visited&&<div style={{fontSize:9,color:cat.color,marginTop:1}}>✓ Explored</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ══ 5. CURATED FOR YOUR GOALS ══ */}
+      {curated.length>0&&(
+        <div style={{marginBottom:24}}>
+          <SectionLabel text="Built for you" sub="Matched to your goals and blockers"/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+            {curated.map(t=>(
+              <div key={t.id} onClick={()=>setNav("tool:"+t.id)}
+                style={{...card,cursor:"pointer",transition:"all .15s",padding:"18px"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=t.color+"40";e.currentTarget.style.transform="translateY(-2px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.transform="";}}>
+                <div style={{width:38,height:38,borderRadius:10,
+                  background:t.color+"15",border:"1px solid "+t.color+"25",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:20,marginBottom:12}}>
+                  {t.icon}
+                </div>
+                <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:6}}>{t.label}</div>
+                <div style={{fontSize:11,color:G.dim,lineHeight:1.55}}>{t.why}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══ 6. TRENDING IN YOUR REGION ══ */}
+      <div style={{marginBottom:24}}>
+        <SectionLabel text={`Trending in ${regional.region}`} sub="Popular tools for people in your area"/>
+        <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:6,
+          scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+          {regional.tools.map(t=><SmallToolCard key={t.id} t={t}/>)}
+        </div>
+      </div>
+
+      {/* ══ 7. PRO UNLOCK BANNER (free users only) ══ */}
+      {!isPaid&&(
+        <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.06),rgba(240,180,41,0.02))",
+          border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,
+          padding:"28px 24px",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",
+            background:"radial-gradient(ellipse at 80% 50%,rgba(240,180,41,0.06),transparent 60%)",
+            pointerEvents:"none"}}/>
+          <div style={{position:"relative"}}>
+            <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:8}}>✦ DESTINIQ PRO</div>
+            <h3 style={{fontSize:17,fontWeight:800,color:G.cream,margin:"0 0 6px"}}>Unlock your full potential</h3>
+            <p style={{fontSize:13,color:G.dim,lineHeight:1.6,margin:"0 0 18px",maxWidth:400}}>
+              Upgrade to Pro for unlimited AI sessions, deeper reports, and access to every tool in every category.
+            </p>
+            {/* Blurred locked tool previews */}
+            <div style={{display:"flex",gap:10,marginBottom:18,overflowX:"auto",scrollbarWidth:"none"}}>
+              {["advisor","roadmap","relocate"].map(id=>{
+                const m=TOOL_META?.[id];if(!m)return null;
+                return(
+                  <div key={id} style={{flexShrink:0,background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,
+                    padding:"14px 18px",filter:"blur(3px)",userSelect:"none",minWidth:120,textAlign:"center"}}>
+                    <div style={{fontSize:24,marginBottom:8}}>{m.icon}</div>
+                    <div style={{fontSize:12,color:G.cream,fontWeight:600}}>{m.label}</div>
+                    <div style={{fontSize:10,color:G.dimmer,marginTop:3}}>🔒 Pro only</div>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={onUnlock}
+              style={{background:G.gold,color:"#000",border:"none",borderRadius:11,
+                padding:"14px 28px",fontSize:14,fontWeight:700,cursor:"pointer",
+                fontFamily:"inherit",boxShadow:"0 0 30px rgba(240,180,41,0.2)"}}>
+              ✦ Upgrade to Pro →
+            </button>
+          </div>
+        </div>
+      )}
+
+      </>)}
     </div>
   );
 }
+
 
 // ── CategoryPage ──────────────────────────────────────────────────────────
 function CategoryPage({catId,setNav,userId}){
@@ -11775,7 +12164,7 @@ Rules:
         {navSection==="home"&&(
           <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin} dailyInsight={dailyInsight}/>
         )}
-        {navSection==="explore"&&<ExploreScreen setNav={setNav}/>}
+        {navSection==="explore"&&<ExploreScreen setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
         {isCat&&<CategoryPage catId={catId} setNav={setNav} userId={userId}/>}
         {isTool&&MODULE_CONFIGS?.[toolId]&&(
           <ToolPage toolId={toolId} setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>
