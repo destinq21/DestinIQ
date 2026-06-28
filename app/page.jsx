@@ -3230,6 +3230,25 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
       pushToMemory(userId,"assistant",reply);
       try{localStorage.setItem(ciResultKey,reply);}catch{}
       setResult(reply);
+      // ── Update streak tracking ─────────────────────────────────────────
+      const ciToday = new Date().toISOString().slice(0,10);
+      if(userId){
+        // Write last_checkin_date so the streak calc on next load works
+        supabase.from("user_profiles").upsert({
+          user_id: userId,
+          last_checkin_date: ciToday,
+          updated_at: new Date().toISOString(),
+        },{onConflict:"user_id"}).catch(()=>{});
+        // Update localStorage immediately
+        try{ localStorage.setItem(`destiniq_checkin_${userId}`, ciToday); }catch{}
+        // Log momentum entry (feeds Progress chart + Growth Snapshot)
+        try{ addMomentumEntry(userId,{
+          energy:score, focus:score, momentum:score,
+          feeling, note:did, date:new Date().toDateString()
+        }); }catch{}
+        // Fire event so DestinIQ can update streak counter in real-time
+        window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
+      }
     }catch(e){
       const fb=`${profile.name}, you showed up today — that matters more than most people realise. Score ${score}/10 is data, not judgment. The next 24 hours are a fresh calculation.`;
       if(e.message==="API_KEY_MISSING"){setError("API key not configured.");return;}
@@ -3254,34 +3273,143 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
     </div>
   );
 
+
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.12)",
+  };
+  const FEELINGS=[
+    {id:"energised",emoji:"⚡",label:"Energised"},
+    {id:"focused",  emoji:"🎯",label:"Focused"},
+    {id:"okay",     emoji:"😐",label:"Okay"},
+    {id:"stressed", emoji:"😰",label:"Stressed"},
+    {id:"tired",    emoji:"😴",label:"Tired"},
+    {id:"motivated",emoji:"🔥",label:"Motivated"},
+  ];
+  const iStyle={width:"100%",padding:"13px 16px",background:G.inp,
+    border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
+    fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit",
+    lineHeight:1.6,resize:"none",transition:"border-color .2s"};
+
   return(
-    <div className="fu">
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <div className="streak-badge"><span className="streak-fire">🔥</span>{streak} day streak</div>
-        <div className="mono" style={{fontSize:"9px"}}>Check in</div>
-      </div>
-      <h3 className="d3" style={{marginBottom:6}}>Hey {profile.name}. How's today actually going?</h3>
-      <p className="body" style={{marginBottom:24}}>No need to put a brave face on it. This is just for you.</p>
-      <div className="field"><label className="fl">How are you feeling right now?</label>
-        <div className="feeling-grid">{FEELINGS.map(f=><button key={f} className={`feeling-pill ${feeling===f?"sel":""}`} onClick={()=>setFeeling(f)}>{f}</button>)}</div>
-      </div>
-      <div className="field"><label className="fl">Rate your day so far — 1 to 10</label>
-        <div style={{display:"flex",alignItems:"center",gap:16}}>
-          <input type="range" min={1} max={10} value={score} onChange={e=>setScore(+e.target.value)} style={{flex:1,accentColor:"var(--gold)"}}/>
-          <span style={{fontFamily:"var(--f-display)",fontSize:24,color:"var(--gold)",minWidth:28}}>{score}</span>
+    <div style={{padding:"24px 20px 80px",maxWidth:560,margin:"0 auto",
+      color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+
+      {result?(
+        /* ── RESULT VIEW ── */
+        <div>
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,
+            background:"rgba(26,184,154,0.08)",border:"1px solid rgba(26,184,154,0.25)",
+            borderRadius:20,padding:"5px 14px",marginBottom:20}}>
+            <span style={{fontSize:12}}>✅</span>
+            <span style={{fontSize:10,fontWeight:700,letterSpacing:".8px",color:"#1ab89a",fontFamily:"monospace"}}>CHECK-IN COMPLETE</span>
+          </div>
+          <h2 style={{fontSize:20,fontWeight:800,color:G.cream,margin:"0 0 20px"}}>
+            Today's reflection
+          </h2>
+          <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:16,padding:"20px",marginBottom:14}}>
+            <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>YOUR COACH SAYS</div>
+            <p style={{fontSize:14,color:G.dim,lineHeight:1.8,margin:0,whiteSpace:"pre-wrap"}}>{result}</p>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>{try{localStorage.removeItem(ciResultKey);}catch{}setResult(null);}}
+              style={{flex:1,padding:"13px",background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,
+                borderRadius:12,color:G.dim,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+              ↺ Check in again
+            </button>
+            <button onClick={onComplete}
+              style={{flex:1,padding:"13px",background:G.gold,color:"#000",border:"none",
+                borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+              Done →
+            </button>
+          </div>
         </div>
-      </div>
-      <div className="field"><label className="fl">Most important thing you did today?</label><textarea className="ft" rows={2} placeholder="Doesn't have to be big. Even showing up counts." value={did} onChange={e=>setDid(e.target.value)}/></div>
-      <div className="field"><label className="fl">What did you keep putting off?</label><textarea className="ft" rows={2} placeholder="Be real — no one's watching. This is how you learn about yourself." value={avoided} onChange={e=>setAvoided(e.target.value)}/></div>
-      {error&&<div className="err-box">⚠ {error}</div>}
-      <button className="btn btn-gold btn-full" onClick={submit} disabled={!feeling||!did.trim()||loading} style={{marginTop:8}}>{loading?"Reading what you shared…":"Get your reflection →"}</button>
+      ):(
+        /* ── CHECK-IN FORM ── */
+        <>
+          <div style={{marginBottom:24}}>
+            <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:6}}>DAILY CHECK-IN</div>
+            <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>
+              How are you today{profile?.name?`, ${profile.name.split(" ")[0]}`:""}?
+            </h2>
+            <p style={{fontSize:13,color:G.dimmer,margin:0}}>Takes 60 seconds. Your coach is listening.</p>
+          </div>
+
+          {/* How are you feeling */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:10}}>How are you feeling right now?</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              {FEELINGS.map(f=>(
+                <button key={f.id} onClick={()=>setFeeling(f.id)}
+                  style={{padding:"14px 8px",textAlign:"center",cursor:"pointer",
+                    background:feeling===f.id?"rgba(240,180,41,0.08)":G.card,
+                    border:`1.5px solid ${feeling===f.id?"#f0b429":G.border}`,
+                    borderRadius:12,fontFamily:"inherit",transition:"all .15s"}}>
+                  <div style={{fontSize:24,marginBottom:5}}>{f.emoji}</div>
+                  <div style={{fontSize:11,color:feeling===f.id?G.cream:G.dim,fontWeight:feeling===f.id?600:400}}>{f.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Energy score */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:10}}>
+              Energy & focus today: <span style={{color:G.gold,fontWeight:700}}>{score}/10</span>
+            </div>
+            <input type="range" min={1} max={10} value={score} onChange={e=>setScore(Number(e.target.value))}
+              style={{width:"100%",accentColor:G.gold,cursor:"pointer"}}/>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:G.dimmer,marginTop:4}}>
+              <span>Low</span><span>High</span>
+            </div>
+          </div>
+
+          {/* What did you do */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:8}}>
+              What's one thing you did or are doing today?
+            </div>
+            <textarea value={did} onChange={e=>setDid(e.target.value)} rows={3}
+              placeholder="Worked on my side project, had a hard conversation, started the task I was avoiding…"
+              style={iStyle}
+              onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+              onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+          </div>
+
+          {/* What did you avoid */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:8}}>
+              Anything you're avoiding? <span style={{color:G.dimmer,fontWeight:400}}>(optional)</span>
+            </div>
+            <textarea value={avoided} onChange={e=>setAvoided(e.target.value)} rows={2}
+              placeholder="Procrastinating on something? A hard decision? Leave it blank if not."
+              style={iStyle}
+              onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+              onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+          </div>
+
+          {error&&<p style={{color:"#e05252",fontSize:13,marginBottom:12}}>{error}</p>}
+
+          <button onClick={submit} disabled={loading||!feeling||!did.trim()}
+            style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
+              borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+              opacity:loading||!feeling||!did.trim()?0.6:1,
+              boxShadow:"0 0 30px rgba(240,180,41,0.15)"}}>
+            {loading?"Your coach is thinking…":"Get My Reflection →"}
+          </button>
+
+          {streak>0&&(
+            <div style={{textAlign:"center",marginTop:14,fontSize:12,color:G.dimmer}}>
+              🔥 {streak} day streak — keep it going
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ADVISOR CHAT — Warm, emotionally intelligent human coach tone
-// ═══════════════════════════════════════════════════════════════════════════════
 function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
   const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
@@ -3345,88 +3473,128 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
     "How do I stop overthinking and just act?",
   ];
 
+
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.12)",
+  };
+
   return(
-    <div className="fu">
-      <div style={{marginBottom:20}}>
-        <div className="d3" style={{marginBottom:6}}>Say what's actually on your mind</div>
-        <p className="body" style={{color:"var(--cream-60)"}}>This is a judgement-free conversation. Share what's really going on — not just the polished version. {isPremium&&<span style={{color:"var(--gold)"}}>✦ Unlimited access — Pro Max.</span>}{isPaid&&!isPremium&&<span style={{color:"var(--cream-40)"}}> {remaining} of {PRO_DAILY_LIMIT} messages today.</span>}{!isPaid&&<span style={{color:"var(--cream-40)"}}> Free: {remaining} of {FREE_DAILY_LIMIT} message today. <button onClick={onUnlock} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:"inherit",padding:0}}>Upgrade →</button></span>}</p>
-      </div>
-      <div className="card">
-        <div className="chat-scroll" ref={scrollRef}>
-          {msgs.map((m,i)=>(
-            <div key={i} className={`chat-msg msg-in ${m.role==="user"?"me":""}`}>
-              <div className={`av ${m.role==="user"?"av-u":"av-d"}`}>{m.role==="user"?(profile?.name?.[0]?.toUpperCase()||"U"):"IQ"}</div>
-              <div className={`bubble ${m.role==="user"?"bubble-u":"bubble-d"}`}>
-                {m.role==="user"
-                  ?<span style={{whiteSpace:"pre-wrap"}}>{m.content}</span>
-                  :<><RenderMD text={m.content}/><AudioPlayer text={m.content} label="Listen"/></>
-                }
-              </div>
-            </div>
-          ))}
-          {loading&&(
-            <div className="chat-msg msg-in">
-              <div className="av av-d">IQ</div>
-              <div className="bubble bubble-d" style={{color:"var(--cream-30)",fontStyle:"italic",fontSize:13}}>
-                <div className="typing-dot"><span/><span/><span/></div>
-              </div>
-            </div>
-          )}
-        </div>
-        {error&&<div className="err-box" style={{marginTop:10}}>⚠ {error}</div>}
-        {limitReached?(
-          <div style={{textAlign:"center",padding:"16px",background:"rgba(210,175,90,0.06)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,marginTop:10}}>
-            <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:10}}>{isPaid?`You've used your ${PRO_DAILY_LIMIT} Pro messages for today. Upgrade to Pro Max for unlimited.`:`You've used your ${FREE_DAILY_LIMIT} free message for today. Upgrade to Pro for 10/day.`}</p>
-            <button className="btn btn-gold" onClick={onUnlock} style={{fontSize:13,padding:"8px 20px"}}>Upgrade now</button>
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 100px)",maxHeight:700,
+      padding:"0 20px 20px",maxWidth:700,margin:"0 auto",color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+
+      {/* Header */}
+      <div style={{padding:"16px 0 14px",borderBottom:"1px solid "+G.border,marginBottom:16,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:"50%",
+            background:"linear-gradient(135deg,rgba(155,114,207,0.3),rgba(240,180,41,0.1))",
+            border:"1px solid rgba(155,114,207,0.3)",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:18}}>🤖</div>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:G.cream,lineHeight:1.2}}>AI Coach</div>
+            <div style={{fontSize:11,color:"rgba(100,181,246,0.8)"}}>● Online · Powered by DestinIQ</div>
           </div>
-        ):(
-          <div className="chat-in-row">
-            <input className="chat-in" placeholder="What's on your mind? Be honest…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} maxLength={1000}/>
-            <button className="chat-send" onClick={send} disabled={loading||!input.trim()}>→</button>
+        </div>
+      </div>
+
+      {/* Message thread */}
+      <div ref={threadRef} style={{flex:1,overflowY:"auto",scrollbarWidth:"none",display:"flex",flexDirection:"column",gap:12,paddingRight:4}}>
+        {/* Welcome bubble */}
+        {thread.length===0&&(
+          <div style={{textAlign:"center",padding:"32px 16px"}}>
+            <div style={{fontSize:40,marginBottom:12}}>🤖</div>
+            <h3 style={{fontSize:16,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>Your AI Coach</h3>
+            <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:300,marginInline:"auto"}}>
+              Ask me anything about your goals, challenges, or decisions. I know your profile and report.
+            </p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:16}}>
+              {["What should I focus on today?","What's my biggest blind spot?","How do I build better habits?","What career move should I make?"]
+                .map(q=>(
+                <button key={q} onClick={()=>setInput(q)}
+                  style={{padding:"8px 14px",background:G.card,border:"1px solid "+G.border,
+                    borderRadius:20,fontSize:12,color:G.dim,cursor:"pointer",fontFamily:"inherit",
+                    transition:"border-color .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.3)"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {thread.map((msg,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start",gap:10}}>
+            {msg.role==="assistant"&&(
+              <div style={{width:28,height:28,borderRadius:"50%",flexShrink:0,
+                background:"linear-gradient(135deg,rgba(155,114,207,0.3),rgba(240,180,41,0.1))",
+                border:"1px solid rgba(155,114,207,0.25)",display:"flex",alignItems:"center",
+                justifyContent:"center",fontSize:12,marginTop:4}}>🤖</div>
+            )}
+            <div style={{maxWidth:"80%",padding:"12px 16px",
+              background:msg.role==="user"?"rgba(240,180,41,0.1)":"rgba(255,255,255,0.04)",
+              border:`1px solid ${msg.role==="user"?"rgba(240,180,41,0.2)":G.border}`,
+              borderRadius:msg.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px"}}>
+              <p style={{fontSize:13,color:msg.role==="user"?G.cream:G.dim,
+                lineHeight:1.75,margin:0,whiteSpace:"pre-wrap"}}>{msg.content}</p>
+            </div>
+          </div>
+        ))}
+
+        {aiLoading&&(
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:28,height:28,borderRadius:"50%",
+              background:"rgba(155,114,207,0.2)",border:"1px solid rgba(155,114,207,0.25)",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>🤖</div>
+            <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.04)",
+              border:"1px solid "+G.border,borderRadius:"16px 16px 16px 4px"}}>
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                {[0,1,2].map(i=>(
+                  <div key={i} style={{width:6,height:6,borderRadius:"50%",
+                    background:G.gold,animation:`bounce 1s ease-in-out ${i*0.15}s infinite`}}/>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
-      <div style={{marginTop:12}}>
-        <div className="mono" style={{marginBottom:8,fontSize:"9px"}}>Not sure what to ask? A few starting points:</div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-          {QUICK.map(q=>(
-            <button key={q} className="btn-text" style={{border:"1px solid var(--line)",borderRadius:20,padding:"6px 14px",fontSize:12,color:"var(--cream-60)"}} onClick={()=>setInput(q)}>{q}</button>
-          ))}
+
+      {/* Input bar */}
+      <div style={{flexShrink:0,paddingTop:12,borderTop:"1px solid "+G.border}}>
+        {error&&<p style={{color:"#e05252",fontSize:12,margin:"0 0 8px"}}>{error}</p>}
+        <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+          <textarea value={input} onChange={e=>setInput(e.target.value)} rows={2}
+            placeholder="Ask your coach anything…"
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+            style={{flex:1,padding:"12px 16px",background:G.inp,
+              border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
+              fontSize:14,outline:"none",fontFamily:"inherit",
+              resize:"none",lineHeight:1.6,transition:"border-color .2s"}}
+            onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+            onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+          <button onClick={send} disabled={!input.trim()||aiLoading}
+            style={{width:44,height:44,borderRadius:"50%",flexShrink:0,
+              background:input.trim()&&!aiLoading?G.gold:"rgba(255,255,255,0.06)",
+              color:input.trim()&&!aiLoading?"#000":G.dimmer,
+              border:"none",cursor:input.trim()&&!aiLoading?"pointer":"default",
+              fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",
+              transition:"all .2s"}}>
+            →
+          </button>
         </div>
+        <p style={{fontSize:10,color:G.dimmer,margin:"8px 0 0",textAlign:"center"}}>
+          Press Enter to send · Shift+Enter for new line
+        </p>
       </div>
+      <style>{`
+        @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+      `}</style>
     </div>
   );
 }
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LANDING — Live animated preview scores + rotating testimonials
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// All real testimonials pool — rotates live
-const ALL_TESTIMONIALS = [
-  {quote:"I've tried journaling apps, coaching apps, everything. DestinIQ is the first thing that felt like it actually understood my specific situation.",name:"Amara, 27 · Ghana"},
-  {quote:"The career section alone was worth it. Found a remote role paying 4× what I earned locally within 3 months of following the roadmap.",name:"Rafael, 31 · Brazil"},
-  {quote:"The daily check-in has genuinely changed how I think about progress. I haven't missed a day in 6 weeks.",name:"Priya, 24 · India"},
-  {quote:"The relocation module showed me options I'd never considered. I'm now in Portugal on a D7 visa. Life is completely different.",name:"Kwame, 33 · UK via Ghana"},
-  {quote:"The scores went up every week. It felt like the AI actually remembered who I was and adjusted its advice accordingly.",name:"Sofia, 29 · Argentina"},
-  {quote:"My mindset score was 41 when I started. Three months later it's 74. I can feel the difference in how I make decisions.",name:"James, 35 · Nigeria"},
-  {quote:"The Decisions is the feature I use most. I've made 3 major life decisions with it and every framework was exactly right.",name:"Mei, 26 · Malaysia"},
-  {quote:"The weekly pulse report called out a pattern I'd had for years but never named. That alone was worth the subscription.",name:"Carlos, 30 · Colombia"},
-  {quote:"DestinIQ told me my wealth score was 34 because I was in the wrong market for my skills. I changed markets. Score is now 67.",name:"Aisha, 28 · Kenya"},
-  {quote:"The step-by-step roadmap was the most specific advice I'd ever received. No fluff, just exactly what to do next.",name:"Ravi, 32 · India"},
-];
-
-// Simulated "live" score profiles cycling in the preview card
-const LIVE_PROFILES = [
-  {name:"Kwame",scores:{life:62,wealth:38,mindset:71,relations:55},energy:8,focus:7,momentum:6,streak:14,insight:"Your technical skills are priced for the local market but built for the global one."},
-  {name:"Sofia",scores:{life:78,wealth:55,mindset:48,relations:82},energy:6,focus:8,momentum:7,streak:23,insight:"The relationship strength is your biggest untapped resource. People want to help you more than you allow."},
-  {name:"James",scores:{life:51,wealth:72,mindset:44,relations:67},energy:7,focus:5,momentum:9,streak:8,insight:"You have income but not direction. That's a sequencing problem, not a success problem."},
-  {name:"Mei",scores:{life:84,wealth:61,mindset:77,relations:59},energy:9,focus:9,momentum:8,streak:31,insight:"Your clarity is unusually high for your age. The bottleneck is execution speed, not vision."},
-  {name:"Carlos",scores:{life:43,wealth:29,mindset:68,relations:74},energy:5,focus:7,momentum:5,streak:4,insight:"The mindset is ready. The environment isn't. Changing one external variable changes everything."},
-];
-
-// ─── TESTIMONIAL SUBMIT FORM ─────────────────────────────────────────────────
 function TestimonialForm(){
   const [open,setOpen]=useState(false);
   const [name,setName]=useState("");
@@ -6108,176 +6276,251 @@ function AuthScreen({onAuth, onBack}){
     );
   }
 
-  return(
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
-      <div style={{width:"100%",maxWidth:420}}>
 
-        {/* Back to landing */}
-        {onBack&&(
-          <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:16,display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}>
-            ← Back to home
-          </button>
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",surface:"#0e0c02",
+    border:"rgba(232,220,200,0.08)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.13)",
+  };
+
+  const iStyle={width:"100%",padding:"14px 16px",background:G.inp,
+    border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
+    fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit",
+    transition:"border-color .2s"};
+
+  const showEmailForm = tab==="email" && (mode==="login"||mode==="signup");
+
+  return(
+    <div style={{minHeight:"100vh",background:G.bg,display:"flex",flexDirection:"column",
+      alignItems:"center",justifyContent:"center",padding:"24px",
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",color:G.cream}}>
+
+      {/* Back */}
+      {onBack&&mode==="login"&&!showEmailForm&&(
+        <button onClick={onBack}
+          style={{position:"absolute",top:20,left:20,background:"none",border:"none",
+            color:G.dimmer,cursor:"pointer",fontSize:22,lineHeight:1}}>←</button>
+      )}
+
+      <div style={{width:"100%",maxWidth:400}}>
+
+        {/* ── Logo ── */}
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{fontSize:26,fontWeight:800,color:G.cream,marginBottom:8,letterSpacing:"-.3px"}}>
+            Destin<span style={{color:G.gold}}>IQ</span>
+          </div>
+          <h1 style={{fontSize:24,fontWeight:800,color:G.cream,margin:"0 0 6px",lineHeight:1.2}}>
+            {mode==="forgot"||mode==="forgot_sent"?"Reset your password"
+             :mode==="reset"?"Set new password"
+             :"Start your transformation"}
+          </h1>
+          <p style={{fontSize:13,color:G.dim,margin:0}}>
+            {mode==="forgot"?"We'll send you a reset link"
+             :mode==="forgot_sent"?"Check your email for the link"
+             :mode==="reset"?"Choose a new secure password"
+             :mode==="signup"?"Create your account":"Welcome back"}
+          </p>
+        </div>
+
+        {/* ── FORGOT / RESET flows ── */}
+        {(mode==="forgot"||mode==="forgot_sent"||mode==="reset")&&(
+          <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:18,padding:"28px 24px"}}>
+            {mode==="forgot_sent"?(
+              <div style={{textAlign:"center",padding:"12px 0"}}>
+                <div style={{fontSize:40,marginBottom:14}}>📬</div>
+                <p style={{color:G.dim,fontSize:14,lineHeight:1.7,margin:"0 0 20px"}}>Check your inbox — the reset link expires in 1 hour.</p>
+                <button onClick={()=>setMode("login")}
+                  style={{background:G.gold,color:"#000",border:"none",borderRadius:11,
+                    padding:"13px 28px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%"}}>
+                  Back to Sign In
+                </button>
+              </div>
+            ):mode==="forgot"?(
+              <>
+                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                  placeholder="your@email.com" style={iStyle}
+                  onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+                  onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+                {error&&<p style={{color:"#e05252",fontSize:13,margin:"10px 0 0"}}>{error}</p>}
+                <button onClick={handleForgot} disabled={loading||!email.trim()}
+                  style={{marginTop:16,width:"100%",padding:"14px",background:G.gold,color:"#000",
+                    border:"none",borderRadius:11,fontSize:14,fontWeight:700,cursor:"pointer",
+                    opacity:loading||!email.trim()?.8:1}}>
+                  {loading?"Sending…":"Send Reset Link"}
+                </button>
+                <button onClick={()=>setMode("login")}
+                  style={{marginTop:12,width:"100%",padding:"10px",background:"none",
+                    color:G.dimmer,border:"none",fontSize:13,cursor:"pointer"}}>← Back to Sign In</button>
+              </>
+            ):(
+              <>
+                <div style={{position:"relative",marginBottom:12}}>
+                  <input type={showPass?"text":"password"} value={newPassword}
+                    onChange={e=>setNewPassword(e.target.value)} placeholder="New password (min 8 chars)"
+                    style={iStyle} onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+                    onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+                  <button onClick={()=>setShowPass(p=>!p)}
+                    style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                      background:"none",border:"none",color:G.dimmer,cursor:"pointer",fontSize:13}}>
+                    {showPass?"Hide":"Show"}
+                  </button>
+                </div>
+                {error&&<p style={{color:"#e05252",fontSize:13,margin:"0 0 10px"}}>{error}</p>}
+                <button onClick={handleReset} disabled={loading||newPassword.length<8}
+                  style={{width:"100%",padding:"14px",background:G.gold,color:"#000",
+                    border:"none",borderRadius:11,fontSize:14,fontWeight:700,cursor:"pointer",
+                    opacity:loading||newPassword.length<8?0.7:1}}>
+                  {loading?"Updating…":"Set New Password"}
+                </button>
+              </>
+            )}
+          </div>
         )}
 
-        {/* Logo */}
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontSize:28,fontWeight:800,letterSpacing:"-0.5px",color:"var(--cream)",marginBottom:8}}>
-            Destin<b style={{color:"var(--gold)"}}>IQ</b>
-          </div>
-          <div style={{fontSize:15,color:"var(--cream-60)"}}>
-            {mode==="signup"?"Create your free account":"Welcome back"}
-          </div>
-        </div>
+        {/* ── MAIN AUTH VIEW ── */}
+        {(mode==="login"||mode==="signup")&&(
+          <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:18,padding:"28px 24px"}}>
 
-        {/* Card */}
-        <div style={{background:"var(--night)",border:"1px solid var(--cream-10)",borderRadius:20,padding:"28px 24px"}}>
+            {/* Google */}
+            <button onClick={handleGoogle} disabled={loading}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+                padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+                borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
+                color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Continue with Google
+            </button>
 
-          {/* Google OAuth */}
-          <button style={{...btnStyle}} onClick={handleGoogle} disabled={loading}
-            onMouseEnter={e=>e.currentTarget.style.background="var(--midnight)"}
-            onMouseLeave={e=>e.currentTarget.style.background="var(--night)"}>
-            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            Continue with Google
-          </button>
+            {/* Apple */}
+            <button onClick={handleApple} disabled={loading}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+                padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+                borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
+                color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
+              <svg width="16" height="18" viewBox="0 0 814 1000" fill={G.cream}>
+                <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105-37.5-150.9-99.2C-33.2 753.2 0 571.5 0 570c0-0.4 0-0.8 0-1.2 0.3-140.1 89.4-214.2 177.3-214.2 61.2 0 112.2 38.7 151.7 38.7 37.7 0 98.4-40.8 165.2-40.8 27.4 0 108.2 2.3 162.9 86.4zm-137.4-195.7c5.8-27.4 15.4-52.5 30.4-76.5 33-48.7 93.1-85.5 148.5-85.5 2.9 0 5.8 0 8.7 0.3-3.2 30.4-14.8 58.2-30.4 82.5-32.4 49.4-90.9 84.5-157.2 79.2z"/>
+              </svg>
+              Continue with Apple
+            </button>
 
-          {/* Divider */}
-          <div style={{display:"flex",alignItems:"center",gap:12,margin:"4px 0 16px"}}>
-            <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
-            <span style={{fontSize:12,color:"var(--cream-30)"}}>or</span>
-            <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
-          </div>
-
-          {/* Email / Phone tabs */}
-          <div style={{display:"flex",background:"var(--midnight)",borderRadius:10,padding:3,gap:3,marginBottom:20}}>
-            {["email","phone"].map(t=>(
-              <button key={t} onClick={()=>{setTab(t);setError("");setOtpSent(false);setOtp(["","","","","",""]);}}
-                style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:500,
-                  background:tab===t?"var(--night)":"transparent",
-                  color:tab===t?"var(--cream)":"var(--cream-30)",transition:"all .2s"}}>
-                {t.charAt(0).toUpperCase()+t.slice(1)}
+            {/* Email toggle button */}
+            {!showEmailForm&&(
+              <button onClick={()=>setTab("email")}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+                  padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+                  borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:20,
+                  color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+                onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
+                <span style={{fontSize:16}}>✉️</span>
+                Continue with Email
               </button>
-            ))}
+            )}
+
+            {/* OR divider */}
+            {!showEmailForm&&(
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{flex:1,height:1,background:"rgba(232,220,200,0.08)"}}/>
+                <span style={{fontSize:11,color:G.dimmer,letterSpacing:".08em"}}>OR</span>
+                <div style={{flex:1,height:1,background:"rgba(232,220,200,0.08)"}}/>
+              </div>
+            )}
+
+            {/* Email form (expands when email button clicked) */}
+            {showEmailForm&&(
+              <>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+                  <button onClick={()=>setTab("")}
+                    style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",fontSize:18,padding:0,lineHeight:1}}>←</button>
+                  <span style={{fontSize:14,fontWeight:600,color:G.cream}}>Continue with Email</span>
+                </div>
+
+                {mode==="signup"&&(
+                  <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your first name"
+                    style={{...iStyle,marginBottom:10}}
+                    onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+                    onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+                )}
+                <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email address"
+                  style={{...iStyle,marginBottom:10}}
+                  onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+                  onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+                <div style={{position:"relative",marginBottom:8}}>
+                  <input type={showPass?"text":"password"} value={password}
+                    onChange={e=>setPassword(e.target.value)}
+                    placeholder={mode==="signup"?"Create a password (8+ chars)":"Password"}
+                    style={{...iStyle,paddingRight:56}}
+                    onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+                    onBlur={e=>e.target.style.borderColor=G.inpBorder}
+                    onKeyDown={e=>{if(e.key==="Enter") mode==="signup"?handleSignup():handleLogin();}}/>
+                  <button onClick={()=>setShowPass(p=>!p)}
+                    style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                      background:"none",border:"none",color:G.dimmer,cursor:"pointer",fontSize:12,padding:0}}>
+                    {showPass?"Hide":"Show"}
+                  </button>
+                </div>
+
+                {error&&<p style={{color:"#e05252",fontSize:13,margin:"4px 0 10px",lineHeight:1.5}}>{error}</p>}
+
+                <button onClick={mode==="signup"?handleSignup:handleLogin} disabled={loading}
+                  style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
+                    borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:14,
+                    opacity:loading?.7:1,boxShadow:"0 0 30px rgba(240,180,41,0.15)"}}>
+                  {loading?"Please wait…":mode==="signup"?"Create Account →":"Sign In →"}
+                </button>
+
+                {mode==="login"&&(
+                  <button onClick={()=>setMode("forgot")}
+                    style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",
+                      fontSize:12,display:"block",textAlign:"center",width:"100%",marginBottom:6}}>
+                    Forgot your password?
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Toggle login / signup */}
+            <div style={{textAlign:"center",fontSize:13,color:G.dimmer}}>
+              {mode==="signup"?(
+                <>Already have an account?{" "}
+                <button onClick={()=>{setMode("login");setTab("");setError("");}}
+                  style={{background:"none",border:"none",color:G.gold,cursor:"pointer",fontSize:13,fontWeight:600,padding:0}}>
+                  Sign in
+                </button></>
+              ):(
+                <>Don't have an account?{" "}
+                <button onClick={()=>{setMode("signup");setTab("email");setError("");}}
+                  style={{background:"none",border:"none",color:G.gold,cursor:"pointer",fontSize:13,fontWeight:600,padding:0}}>
+                  Create one free
+                </button></>
+              )}
+            </div>
           </div>
+        )}
 
-          {/* Name field (signup only) */}
-          {tab==="email"&&mode==="signup"&&(
-            <input style={{...inputStyle}} placeholder="Your name" value={name} onChange={e=>setName(e.target.value)}/>
-          )}
-
-          {/* Email fields */}
-          {tab==="email"&&(
-            <>
-              <input style={{...inputStyle}} type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
-              <div style={{position:"relative",marginBottom:12}}>
-                <input style={{...inputStyle,marginBottom:0,paddingRight:44}} type={showPass?"text":"password"} placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleEmail()}/>
-                <button onClick={()=>setShowPass(p=>!p)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--cream-30)",cursor:"pointer",fontSize:13}}>{showPass?"Hide":"Show"}</button>
-              </div>
-            </>
-          )}
-
-          {/* Phone fields */}
-          {tab==="phone"&&!otpSent&&(
-            <input style={{...inputStyle}} type="tel" placeholder="+1 234 567 8900" value={phone} onChange={e=>setPhone(e.target.value)}/>
-          )}
-
-          {/* OTP input */}
-          {tab==="phone"&&otpSent&&(
-            <div>
-              <p style={{fontSize:13,color:"var(--cream-60)",marginBottom:14,textAlign:"center"}}>Enter the 6-digit code sent to {phone}</p>
-              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:14}}>
-                {otp.map((v,i)=>(
-                  <input key={i} ref={otpRefs[i]} value={v}
-                    onChange={e=>handleOTPInput(i,e.target.value)}
-                    onKeyDown={e=>handleOTPKey(i,e)}
-                    maxLength={1} type="text" inputMode="numeric"
-                    style={{width:44,height:52,textAlign:"center",fontSize:20,fontWeight:700,background:"var(--midnight)",border:`1px solid ${v?"var(--gold)":"var(--cream-15)"}`,borderRadius:10,color:"var(--cream)",outline:"none"}}/>
-                ))}
-              </div>
-              <div style={{textAlign:"center",marginBottom:8}}>
-                <span onClick={()=>{setOtpSent(false);setOtp(["","","","","",""]);}} style={{fontSize:12,color:"var(--gold)",cursor:"pointer"}}>Change number</span>
-              </div>
-            </div>
-          )}
-
-          {/* Error */}
-          {error&&<div style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:10,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#F87171"}}>{error}</div>}
-
-          {/* Main CTA button */}
-          <button onClick={tab==="email"?handleEmail:otpSent?handleVerifyOTP:handleSendOTP}
-            disabled={loading}
-            style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"var(--cream-15)":"var(--gold)",color:loading?"var(--cream-40)":"#000",fontSize:15,fontWeight:700,cursor:loading?"not-allowed":"pointer",transition:"all 0.2s",marginBottom:16}}>
-            {loading?"One moment…":
-             tab==="phone"&&!otpSent?"Send verification code":
-             tab==="phone"&&otpSent?"Verify & continue":
-             mode==="login"?"Sign in":"Create account"}
-          </button>
-
-          {/* Toggle login/signup + forgot password */}
-          {mode==="login"&&(
-            <div style={{textAlign:"center",fontSize:13,color:"var(--cream-50)"}}>
-              <>Don't have an account?{" "}
-                <span onClick={()=>{setMode("signup");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600}}>Sign up free</span>
-              </>
-            </div>
-          )}
-          {mode==="signup"&&(
-            <div style={{textAlign:"center",fontSize:13,color:"var(--cream-50)"}}>
-              <>Already have an account?{" "}
-                <span onClick={()=>{setMode("login");setError("");}} style={{color:"var(--gold)",cursor:"pointer",fontWeight:600}}>Sign in</span>
-              </>
-            </div>
-          )}
-          {mode==="login"&&tab==="email"&&(
-            <div style={{textAlign:"center",marginTop:10,fontSize:13}}>
-              <span onClick={()=>{setMode("forgot");setError("");}} style={{color:"var(--cream-40)",cursor:"pointer",textDecoration:"underline"}}>Forgot password?</span>
-            </div>
-          )}
-        </div>
-
-        <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"var(--cream-30)"}}>
-          By continuing you agree to our{" "}
-          <span onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"terms"}))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>Terms of Service</span>
-          {" "}and{" "}
-          <span onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>Privacy Policy</span>
-          {" "}·{" "}
-          <span onClick={()=>window.dispatchEvent(new CustomEvent("showAbout"))} style={{color:"var(--cream-50)",cursor:"pointer",textDecoration:"underline"}}>About Us</span>
-        </div>
+        {/* Terms */}
+        {(mode==="login"||mode==="signup")&&(
+          <p style={{textAlign:"center",fontSize:11,color:G.dimmer,margin:"18px 0 0",lineHeight:1.6}}>
+            By continuing, you agree to our{" "}
+            <span style={{color:G.gold,cursor:"pointer"}}>Terms of Service</span>{" "}and{" "}
+            <span style={{color:G.gold,cursor:"pointer"}}>Privacy Policy</span>
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-// ── FORGOT PASSWORD SCREENS (rendered inside AuthScreen return) ─────────────
-// These replace the main card when mode is "forgot", "forgot_sent", or "reset".
-
-
-// ── RelocCard: defined OUTSIDE RelocationExplorer so it never gets recreated
-// on every parent render — this was causing state loss and crashes.
-// ── WORLD COUNTRIES LIST for the relocation search dropdown ──────────────────
-const WORLD_COUNTRIES=[
-  "Afghanistan","Albania","Algeria","Andorra","Angola","Argentina","Armenia","Australia",
-  "Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Belarus","Belgium","Belize",
-  "Benin","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria",
-  "Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Chile","China",
-  "Colombia","Congo","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark",
-  "Dominican Republic","DR Congo","Ecuador","Egypt","El Salvador","Estonia","Ethiopia",
-  "Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Guatemala",
-  "Guinea","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq",
-  "Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan",
-  "Kenya","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Libya","Lithuania",
-  "Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Mauritania",
-  "Mauritius","Mexico","Moldova","Mongolia","Montenegro","Morocco","Mozambique","Myanmar",
-  "Namibia","Nepal","Netherlands","New Zealand","Nicaragua","Niger","Nigeria","North Macedonia",
-  "Norway","Oman","Pakistan","Palestine","Panama","Papua New Guinea","Paraguay","Peru",
-  "Philippines","Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saudi Arabia",
-  "Senegal","Serbia","Sierra Leone","Singapore","Slovakia","Slovenia","Somalia",
-  "South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Sweden",
-  "Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Trinidad and Tobago",
-  "Tunisia","Turkey","Uganda","Ukraine","United Arab Emirates","United Kingdom",
-  "United States","Uruguay","Uzbekistan","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe",
-];
-
-// ── RELOCATION PROMPT BUILDER ─────────────────────────────────────────────────
 function buildSingleCountryRelocationPrompt(formData, country, isPremium){
   const name    = formData?.name    || "the user";
   const from    = formData?.country || "their current country";
@@ -8572,6 +8815,19 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         }).catch(()=>{});
     }
     setInput("");setMood(null);
+    // Update last_checkin_date if first win today (keeps streak alive)
+    const winToday = new Date().toISOString().slice(0,10);
+    const winLastKey = `destiniq_win_checkin_${userId}`;
+    try{
+      if(localStorage.getItem(winLastKey)!==winToday){
+        localStorage.setItem(winLastKey, winToday);
+        // Mark today as active — keeps streak alive
+        supabase.from("user_profiles").upsert({
+          user_id:userId, last_checkin_date:winToday,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"user_id"}).catch(()=>{});
+      }
+    }catch{}
     // AI celebration
     setLoading(true);
     try{
@@ -11306,32 +11562,68 @@ function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
 function CategoryPage({catId,setNav,userId}){
   const cat=CATEGORIES.find(c=>c.id===catId);
   if(!cat) return null;
-  const lastTool=(()=>{try{return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null");}catch{return null;}})();
+
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+  };
+
   return(
-    <div className="pg">
-      <button className="pg-back" onClick={()=>setNav("explore")}>← Back to Explore</button>
-      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24,padding:"20px",borderRadius:18,
-        background:`linear-gradient(135deg,${cat.color}10,${cat.color}04)`,border:`1px solid ${cat.color}25`}}>
-        <div style={{width:52,height:52,borderRadius:16,background:`${cat.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>{cat.icon}</div>
+    <div style={{padding:"20px 20px 90px",minHeight:"100vh",background:G.bg,
+      color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+
+      {/* Back */}
+      <button onClick={()=>setNav("explore")}
+        style={{background:"none",border:"none",color:G.dim,cursor:"pointer",
+          fontSize:13,padding:"0 0 18px",display:"flex",alignItems:"center",gap:6}}>
+        ← Explore
+      </button>
+
+      {/* Hero */}
+      <div style={{background:`linear-gradient(135deg,${cat.color}12,${cat.color}04)`,
+        border:`1px solid ${cat.color}28`,borderRadius:18,padding:"22px",
+        marginBottom:24,display:"flex",alignItems:"center",gap:16}}>
+        <div style={{width:56,height:56,borderRadius:16,
+          background:`${cat.color}20`,border:`1px solid ${cat.color}30`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:28,flexShrink:0}}>{cat.icon}</div>
         <div>
-          <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:"0 0 3px"}}>{cat.label}</h2>
-          <p style={{fontSize:12,color:"var(--cream-40)",margin:0}}>{cat.desc}</p>
+          <h2 style={{fontSize:20,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>{cat.label}</h2>
+          <p style={{fontSize:12,color:cat.color,margin:"0 0 2px",fontWeight:600}}>
+            {cat.tools.length} intelligence tools
+          </p>
+          <p style={{fontSize:12,color:G.dim,margin:0,lineHeight:1.5}}>{cat.desc}</p>
         </div>
       </div>
-      {cat.tools.map(tid=>{
-        const m=TOOL_META[tid]; if(!m) return null;
-        const isLast=lastTool?.id===tid;
-        return(
-          <div key={tid} className="tool-row" onClick={()=>setNav("tool:"+tid)}>
-            <div className="tr-ico" style={{background:`${m.color}18`}}>{m.icon}</div>
-            <div style={{flex:1}}>
-              <div className="tr-lbl">{m.label}</div>
-              {isLast&&<div style={{fontSize:10,color:m.color,marginTop:1}}>Continue where you left off</div>}
+
+      {/* Tools */}
+      <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",
+        textTransform:"uppercase",marginBottom:14}}>All Tools</div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {cat.tools.map(tid=>{
+          const m=TOOL_META[tid]; if(!m) return null;
+          const visited=(()=>{try{return!!localStorage.getItem(`diq_mod_${tid}_${userId}`);}catch{return false;}})();
+          return(
+            <div key={tid} onClick={()=>setNav("tool:"+tid)}
+              style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",
+                background:G.card,border:`1px solid ${visited?cat.color+"25":G.border}`,
+                borderRadius:14,cursor:"pointer",transition:"all .15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=cat.color+"45";e.currentTarget.style.background=cat.color+"07";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=visited?cat.color+"25":G.border;e.currentTarget.style.background=G.card;}}>
+              <div style={{width:44,height:44,borderRadius:12,
+                background:`${m.color||cat.color}15`,border:`1px solid ${m.color||cat.color}25`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:20,flexShrink:0}}>{m.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:G.cream,marginBottom:2}}>{m.label}</div>
+                {visited&&<div style={{fontSize:10,color:cat.color,fontWeight:600}}>✓ Explored</div>}
+              </div>
+              <span style={{color:G.dimmer,fontSize:20,flexShrink:0}}>›</span>
             </div>
-            <span style={{color:"var(--cream-20)",fontSize:18}}>›</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -12128,7 +12420,7 @@ Rules:
               </div>
             </div>
           )}
-          {mod==="wins"      &&<WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
+          {mod==="wins"      &&<WinTracker profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} onUnlock={onUnlock}/>}
           {mod==="progress"  &&<ProgressFeed userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="practices" &&<PracticesView userId={userId} formData={formData}/>}
           {mod==="weekly"    &&<WeeklyModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
@@ -12171,7 +12463,7 @@ Rules:
         )}
         {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
         {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav}/>}
-        {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker userId={userId} isPaid={isPaid} onUnlock={onUnlock}/></div>}
+        {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} onUnlock={onUnlock}/></div>}
         {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
         {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/></div>}
         {navSection==="savedreports"&&(
@@ -13417,8 +13709,15 @@ export default function DestinIQ(){
             // Already checked in today — show current streak as-is
             setStreak(bestStreak);
           } else if (lastSeen === yesterday) {
-            // Checked in yesterday — streak is still alive
-            setStreak(bestStreak);
+            // Checked in yesterday — streak is still alive, increment it for today
+            const newStreak = bestStreak + 1;
+            setStreak(newStreak);
+            // Persist incremented streak immediately so refresh shows correct value
+            supabase.from("user_profiles").upsert({
+              user_id: u.id, streak: newStreak,
+              updated_at: new Date().toISOString(),
+            },{onConflict:"user_id"}).catch(()=>{});
+            try{ localStorage.setItem(`diq_streak_${u.id}`, String(newStreak)); }catch{}
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
@@ -13640,7 +13939,24 @@ export default function DestinIQ(){
     window.addEventListener("showPolicy",handler);
     window.addEventListener("showAbout",handleAbout);
     window.addEventListener("showEditProfile",handleEditProfile);
-    return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);};
+    const handleSignOutEv=async()=>{
+          try{explicitSignOut.current=true;}catch{}
+          await supabase.auth.signOut();
+          setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
+          setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
+          try{Object.keys(localStorage).forEach(k=>{if(k.startsWith("diq_")||k.startsWith("destiniq_"))localStorage.removeItem(k);});}catch{}
+        };
+        window.addEventListener("signOut",handleSignOutEv);
+        const handleCI=(e)=>{
+          // Bump the visible streak counter immediately after check-in
+          setStreak(s=>{
+            const next=s+1;
+            if(e.detail?.userId) try{localStorage.setItem(`diq_streak_${e.detail.userId}`,String(next));}catch{}
+            return next;
+          });
+        };
+        window.addEventListener("checkinComplete",handleCI);
+        return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("checkinComplete",handleCI);};
   },[]);
 
   // ── BROWSER BACK BUTTON ──────────────────────────────────────────────
@@ -13973,7 +14289,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {!profileLoading&&<>
 
         <SupportWidget/>
-        <nav className="nav">
+        <nav className="nav" style={{display:screen==="results"?"none":"flex"}}>
           <div className="logo" onClick={()=>{
             if(report) setScreen("results");
             else setScreen("intake");
