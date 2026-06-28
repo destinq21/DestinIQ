@@ -2752,7 +2752,7 @@ function DecisionModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-const NotificationPanel = React.memo(function NotificationPanel({profile,userId,streak,onClose}){
+function NotificationPanel({profile,userId,streak,onClose}){
   const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
   const [times,   setTimes  ]=useState({morning:"07:00",afternoon:"13:00",evening:"20:00"});
   const [status,  setStatus ]=useState("idle"); // idle | scheduling | done | error
@@ -3219,7 +3219,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHECK-IN
 // ═══════════════════════════════════════════════════════════════════════════════
-const CheckIn = React.memo(function CheckIn({profile,reportData,onComplete,streak,userId,isPremium});){
+function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
   const [loading,setLoading]=useState(false);const [error,setError]=useState("");
@@ -3421,7 +3421,7 @@ const CheckIn = React.memo(function CheckIn({profile,reportData,onComplete,strea
     </div>
   );
 }
-const AdvisorChat = React.memo(function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock});){
+function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
   const openingMessage = `Hey ${profile?.name?.split(" ")[0]||"there"} 👋 Good to see you.\n\nI'm your AI companion — I've gone through everything you shared and I know your situation well. I'm here whether you want to think something through, talk something out, or just need someone to check in with.\n\nWhat's on your mind?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
@@ -5897,7 +5897,7 @@ Cover: Their decision-making style and blind spots, a personal decision framewor
 };
 
 // ── GenericAIModule renderer ────────────────────────────────────────────────
-const GenericAIModule = React.memo(function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, onUnlock, lang="en"});){
+function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, onUnlock, lang="en"}){
   const cfg   = MODULE_CONFIGS[modId];
   if(!cfg) return null;
 
@@ -7380,18 +7380,21 @@ function resolveLiveVoice(voiceRef){
 function loadVoices(){
   return new Promise(res=>{
     try{
-    if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
-    const attempt=()=>{
-      const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-      if(vs.length>0){res(vs);return;}
-      window.speechSynthesis.onvoiceschanged=()=>{
-        const vs2=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-        res(vs2);
+      if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
+      const attempt=()=>{
+        const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+        if(vs.length>0){res(vs);return;}
+        window.speechSynthesis.onvoiceschanged=()=>{
+          const vs2=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+          res(vs2);
+        };
+        // Fallback timeout
+        setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
       };
-      // Fallback timeout
-      setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
-    };
-    attempt();
+      attempt();
+    }catch(e){
+      res([]);
+    }
   });
 }
 
@@ -8849,7 +8852,7 @@ const PRO_REPORT_LIMIT   = 3;   // Pro: 3 reports/month
 const FREE_TOOLS = ["career","decisions","confidencelab","innerpeace","sidehustle"];
 // ─────────────────────────────────────────────────────────────────────────────
 
-const WinTracker = React.memo(function WinTracker({profile,userId,isPremium,isPaid,onUnlock});){
+function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const [wins,setWins]=useState(()=>loadWins(userId));
   // Load wins from Supabase on mount (in case localStorage was cleared)
   useEffect(()=>{
@@ -9400,7 +9403,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
 // wake-up times, routines, focus, grind — deeply explained.
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── PracticesView — the "My Practices" tab — full embedded tracker ────────────
-const PracticesView = React.memo(function PracticesView({userId});){
+function PracticesView({userId}){
   const ht = useHabitTracker(userId);
   const [filter,setFilter]=useState("all");
   const [expandKey,setExpandKey]=useState(null);
@@ -9611,7 +9614,6 @@ const PracticesView = React.memo(function PracticesView({userId});){
       )}
     </div>
   );
-}
 }
 
 const DISCIPLINE_SECTIONS=[
@@ -10906,7 +10908,7 @@ function StreakCelebration({streak, onClose}){
 
 
 // ── SidebarNav ───────────────────────────────────────────────────────────
-const SidebarNav = React.memo(function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formData,navPhotoURL,onNotif});){
+function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formData,navPhotoURL,onNotif}){
   const ITEMS=[
     {id:"home",    icon:"🏠",label:"Home"},
     {id:"explore", icon:"🔍",label:"Explore"},
@@ -11015,7 +11017,7 @@ function BottomNav({nav,setNav}){
 }
 
 // ── MobileTopBar ─────────────────────────────────────────────────────────
-const MobileTopBar = React.memo(function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName});){
+function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName}){
   return(
     <div className="mob-top">
       <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -11047,7 +11049,7 @@ const MobileTopBar = React.memo(function MobileTopBar({title,onBack,streak,isPai
 }
 
 // ── HomeScreen ────────────────────────────────────────────────────────────
-const HomeScreen = React.memo(function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight});){
+function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight}){
   const hour = new Date().getHours();
   const timeGreet = hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
   const name = formData?.name?.split(" ")[0]||"there";
@@ -11136,7 +11138,8 @@ const HomeScreen = React.memo(function HomeScreen({data,formData,streak,isPaid,i
       </div>
 
       <div style={{padding:"0 20px"}}>
-        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>. CONTINUE JOURNEY (Hero card) ══ */}
+        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
+        {/* CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -11285,7 +11288,7 @@ const HomeScreen = React.memo(function HomeScreen({data,formData,streak,isPaid,i
 }
 
 
-const ExploreScreen = React.memo(function ExploreScreen({setNav, formData, userId, isPaid, onUnlock});){
+function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
   const [query,   setQuery]   = useState("");
   const [expanded,setExpanded]= useState(null); // expanded category id
 
@@ -11699,7 +11702,7 @@ const ExploreScreen = React.memo(function ExploreScreen({setNav, formData, userI
 
 
 // ── CategoryPage ──────────────────────────────────────────────────────────
-const CategoryPage = React.memo(function CategoryPage({catId,setNav,goBack,userId});){
+function CategoryPage({catId,setNav,goBack,userId}){
   const cat=CATEGORIES.find(c=>c.id===catId);
   if(!cat) return null;
 
@@ -11867,7 +11870,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
 }
 
 // ── ProgressScreen ────────────────────────────────────────────────────────
-const ProgressScreen = React.memo(function ProgressScreen({data,streak,userId,setNav,goBack});){
+function ProgressScreen({data,streak,userId,setNav,goBack}){
   const s=data?.scores||{};
   const overall=Math.min(99,Math.max(1,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
   const toolCount=(()=>{try{return JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]").length;}catch{return 0;}})();
@@ -12001,7 +12004,7 @@ const ProgressScreen = React.memo(function ProgressScreen({data,streak,userId,se
 
 // ─── DASHBOARD PROFILE VIEW ──────────────────────────────────────────────────
 // Clean profile page matching the Image 2 design spec
-const DashboardProfileView = React.memo(function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,onSignOut,onManageSubscription,setNav,navPhotoURL,onEditProfile});){
+function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,onSignOut,onManageSubscription,setNav,navPhotoURL,onEditProfile}){
   const name    = formData?.name||user?.name||(user?.email?.split("@")[0])||"User";
   const email   = user?.email||"";
   const initial = (name[0]||"U").toUpperCase();
@@ -12176,7 +12179,7 @@ const DashboardProfileView = React.memo(function DashboardProfileView({user,form
 }
 
 
-const MyReport = React.memo(function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lang="en"});){
+function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lang="en"}){
   const [exStr, setExStr]=useState(false);
   const [exBls, setExBls]=useState(false);
   const [exOpp, setExOpp]=useState(false);
@@ -12521,7 +12524,7 @@ const MyReport = React.memo(function MyReport({data, formData, isPaid, onUnlock,
 
 
 
-const JournalScreen = React.memo(function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,onUnlock});){
+function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,onUnlock}){
   const G={
     gold:"#f0b429",bg:"#0a0800",card:"#111008",
     border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
