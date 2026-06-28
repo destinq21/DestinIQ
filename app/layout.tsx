@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "DestinIQ — Personal Intelligence Platform",
   description:
-    "DestinIQ analyses your life profile and delivers a daily intelligence layer — covering direction, finances, mindset, career, and your global options. Free to start. Results in 60 seconds.",
+    "DestinIQ analyses your life profile and delivers a daily intelligence layer — covering direction, money, mindset, and relationships.",
   keywords: [
     "personal development",
     "life intelligence",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DestinIQ — The system that knows your next move",
     description:
-      "Get a personalised life intelligence report in 60 seconds. Career, mindset, finances, relocation — all specific to you.",
+      "Get a personalised life intelligence report in 60 seconds. Career, mindset, finances, relationships — all in one place.",
     url: "https://destiniq.vercel.app",
     siteName: "DestinIQ",
     type: "website",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "DestinIQ — Personal Intelligence Platform",
     description:
-      "Get a personalised life intelligence report in 60 seconds. Free to start.",
+      "Get a personalised life intelligence report in 60 seconds.",
   },
   icons: {
     icon: "/favicon.ico",
@@ -36,10 +36,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-}
+};
 
 export default function RootLayout({
   children,
