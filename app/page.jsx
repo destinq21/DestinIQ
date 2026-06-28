@@ -6018,10 +6018,12 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
         </div>
       ) : content2 ? (
         <div>
-          {/* 🔊 Listen button */}
+          {/* 🔊 Listen button — Pro+ only */}
+          {isPaid&&(
           <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
             <AudioPlayer text={content2} label="Listen to this"/>
           </div>
+          )}
           <div className="card" style={{lineHeight:1.9,fontSize:14,color:"var(--cream-70)",whiteSpace:"pre-wrap"}}>
             {content2}
           </div>
@@ -8874,7 +8876,10 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const streakDays=[...new Set(wins.map(w=>w.date))].sort().reverse();
   const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
 
-  const FREE_WIN_LIMIT=10;
+  const FREE_WIN_LIMIT=5;
+const FREE_JOURNAL_LIMIT=1;
+// 5 free tools — one from each major area, chosen to hook users
+const FREE_TOOLS=["career","decisions","confidencelab","innerpeace","sidehustle"];
   const addWin=async()=>{
     if(!input.trim()) return;
     if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
@@ -11054,6 +11059,10 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   const overall = Math.min(99,Math.max(1,Math.round(
     (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
   )));
+  // Save snapshot for comparison mode (runs once per report load)
+  useEffect(()=>{
+    if(userId && scores && Object.keys(scores).length>0) saveScoreSnapshot(userId,scores,overall);
+  },[userId]);
 
   // Today's Insight — from report data or derived from profile
   const getInsight=()=>{
@@ -11120,8 +11129,8 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       </div>
 
       <div style={{padding:"0 20px"}}>
-
-        {/* ══ 2. CONTINUE JOURNEY (Hero card) ══ */}
+        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
+        {/* CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -11757,6 +11766,44 @@ function CategoryPage({catId,setNav,goBack,userId}){
 function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMax,onUnlock,lang}){
   const meta=TOOL_META[toolId];
   const cat=meta?CATEGORIES.find(c=>c.id===meta.cat):null;
+  const isToolFree = FREE_TOOLS.includes(toolId)||toolId==="advisor";
+  if(!isPaid && !isToolFree){
+    return(
+      <div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",
+        color:"#e8dcc8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+        <div style={{fontSize:52,marginBottom:16}}>{meta?.icon||"🔒"}</div>
+        <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:"#e8dcc8"}}>{meta?.label||"This Tool"}</h2>
+        <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",lineHeight:1.7,margin:"0 0 24px"}}>
+          This tool is part of the Pro plan. Upgrade to unlock all 42 intelligence tools.
+        </p>
+        <button onClick={onUnlock}
+          style={{width:"100%",padding:"15px",background:"#f0b429",color:"#000",border:"none",
+            borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+            marginBottom:12}}>
+          ✦ Unlock All 42 Tools
+        </button>
+        <button onClick={()=>goBack?goBack():setNav("explore")}
+          style={{background:"none",border:"none",color:"rgba(232,220,200,0.4)",
+            cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+          ← Go back
+        </button>
+        <div style={{marginTop:24,padding:"14px 16px",background:"rgba(240,180,41,0.06)",
+          border:"1px solid rgba(240,180,41,0.15)",borderRadius:12}}>
+          <div style={{fontSize:11,color:"#f0b429",fontWeight:700,marginBottom:6}}>FREE TOOLS AVAILABLE</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+            {FREE_TOOLS.map(t=>(
+              <span key={t} onClick={()=>setNav("tool:"+t)}
+                style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",
+                  border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
+                  fontSize:11,color:"rgba(232,220,200,0.6)",cursor:"pointer"}}>
+                {TOOL_META[t]?.icon} {TOOL_META[t]?.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   const [fu,setFu]=useState(""); const [fuRes,setFuRes]=useState(""); const [fuL,setFuL]=useState(false); const [bm,setBm]=useState(false);
   useEffect(()=>{
     if(!userId||!toolId) return;
@@ -12265,6 +12312,19 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
           </div>
         </div>
 
+        {/* Export PDF + Comparison (Pro Max) */}
+        <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+          {isPaid&&(
+            <button onClick={()=>exportReportPDF(formData,data,scores,overall)}
+              style={{padding:"7px 15px",background:isProMax?"rgba(155,114,207,0.12)":"rgba(255,255,255,0.05)",
+                border:`1px solid ${isProMax?"rgba(155,114,207,0.35)":"rgba(255,255,255,0.1)"}`,
+                borderRadius:20,color:isProMax?"#9b72cf":"rgba(232,220,200,0.4)",
+                fontSize:12,cursor:isProMax?"pointer":"default",fontFamily:"inherit"}}>
+              {isProMax?"📄 Export PDF":"🔒 Export PDF (Pro Max)"}
+            </button>
+          )}
+        </div>
+        {isProMax&&<ScoreComparisonCard userId={userId} currentScores={scores} currentOverall={overall}/>}
         {/* Right: Overall Intelligence Score ring */}
         <div style={{...card,flex:"0 0 240px",textAlign:"center",padding:"28px 24px",
           background:"linear-gradient(145deg,#111008,#0e0c05)",
@@ -12336,7 +12396,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
             <span style={{fontSize:18,color:G.gold}}>✦</span>
             <span style={{fontSize:16,fontWeight:700,color:G.cream}}>Your Personalized Summary</span>
           </div>
-          {summary&&(
+          {summary&&isPaid&&(
             <div style={{display:"flex",justifyContent:"flex-end",margin:"8px 0"}}>
               <AudioPlayer
                 text={[summary, strengths?.length?`Key strengths: ${strengths.slice(0,3).join(". ")}`:"", opps?.length?`Opportunities: ${opps.slice(0,2).join(". ")}`:""].filter(Boolean).join(" ")}
@@ -12451,7 +12511,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
 
 
 
-function JournalScreen({profile,userId,isPremium,setNav,goBack}){
+function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,onUnlock}){
   const G={
     gold:"#f0b429",bg:"#0a0800",card:"#111008",
     border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
@@ -12460,6 +12520,7 @@ function JournalScreen({profile,userId,isPremium,setNav,goBack}){
   };
   const STORE_KEY=`diq_journal_${userId}`;
   const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY)||"[]");}catch{return [];}});
+  const canWriteToday = isPremium || isPaid || entries.length < FREE_JOURNAL_LIMIT;
   const [letter,setLetter]=useState("");
   const [aiReply,setAiReply]=useState("");
   const [loading,setLoading]=useState(false);
@@ -12571,7 +12632,19 @@ function JournalScreen({profile,userId,isPremium,setNav,goBack}){
                 onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
                 <span style={{fontSize:11,color:G.dimmer}}>{letter.length}/2000 chars</span>
-                <button onClick={submit} disabled={!letter.trim()||loading||letter.length<20}
+                {!canWriteToday&&(
+                <div style={{padding:"14px 16px",background:"rgba(240,180,41,0.07)",
+                  border:"1px solid rgba(240,180,41,0.2)",borderRadius:12,marginBottom:12,
+                  textAlign:"center"}}>
+                  <p style={{fontSize:13,color:"#f0b429",margin:"0 0 8px",fontWeight:600}}>Free limit reached</p>
+                  <p style={{fontSize:12,color:"rgba(232,220,200,0.5)",margin:"0 0 10px"}}>Upgrade to Pro for unlimited journal entries and full history.</p>
+                  <button onClick={onUnlock} style={{padding:"9px 20px",background:"#f0b429",color:"#000",
+                    border:"none",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                    ✦ Upgrade to Pro
+                  </button>
+                </div>
+              )}
+              <button onClick={submit} disabled={!letter.trim()||loading||letter.length<20||!canWriteToday}
                   style={{padding:"12px 24px",background:G.gold,color:"#000",border:"none",
                     borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
                     opacity:!letter.trim()||loading||letter.length<20?0.5:1}}>
@@ -12627,6 +12700,248 @@ function JournalScreen({profile,userId,isPremium,setNav,goBack}){
           )}
         </>
       )}
+    </div>
+  );
+}
+
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// PDF EXPORT — Pro Max feature
+// ═══════════════════════════════════════════════════════════════
+function exportReportPDF(formData, data, scores, overall){
+  const name     = formData?.name||"User";
+  const date     = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+  const summary  = data?.headline||data?.sections?.[0]?.content||"Your personalised intelligence report.";
+  const strengths= (data?.strengths||[]).slice(0,5);
+  const blinds   = (data?.blindSpots||data?.blind_spots||[]).slice(0,3);
+  const opps     = (data?.opportunities||[]).slice(0,3);
+
+  const html = `<!DOCTYPE html><html>
+<head>
+<meta charset="UTF-8"/>
+<title>DestinIQ Report — ${name}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#fff;color:#1a1a1a;padding:48px;}
+  .header{border-bottom:3px solid #f0b429;padding-bottom:24px;margin-bottom:32px;}
+  .logo{font-size:22px;font-weight:900;color:#1a1a1a;letter-spacing:-.5px;}
+  .logo span{color:#f0b429;}
+  .badge{display:inline-block;background:#f0b429;color:#000;font-size:9px;font-weight:800;
+    padding:3px 10px;border-radius:20px;letter-spacing:.1em;margin-top:8px;}
+  h1{font-size:28px;font-weight:800;margin:24px 0 6px;}
+  .meta{font-size:12px;color:#888;margin-bottom:32px;}
+  .score-row{display:flex;gap:16px;margin-bottom:32px;flex-wrap:wrap;}
+  .score-box{flex:1;min-width:100px;border:2px solid #f0b429;border-radius:12px;padding:16px;text-align:center;}
+  .score-num{font-size:32px;font-weight:900;color:#f0b429;}
+  .score-lbl{font-size:10px;color:#888;font-weight:700;letter-spacing:.1em;margin-top:4px;}
+  .section{margin-bottom:28px;}
+  .section-title{font-size:10px;font-weight:800;color:#f0b429;letter-spacing:.12em;
+    text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #f0b42930;}
+  p{font-size:14px;line-height:1.8;color:#444;}
+  ul{padding-left:20px;}
+  li{font-size:14px;line-height:1.8;color:#444;margin-bottom:4px;}
+  .footer{margin-top:48px;padding-top:16px;border-top:1px solid #eee;
+    font-size:11px;color:#aaa;text-align:center;}
+  @media print{body{padding:24px;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">Destin<span>IQ</span></div>
+  <div class="badge">PERSONAL INTELLIGENCE REPORT</div>
+</div>
+<h1>${name}'s Intelligence Report</h1>
+<div class="meta">Generated ${date} · Confidential</div>
+<div class="score-row">
+  <div class="score-box"><div class="score-num">${overall||"--"}</div><div class="score-lbl">Overall Score</div></div>
+  <div class="score-box"><div class="score-num">${scores?.life||"--"}</div><div class="score-lbl">Life</div></div>
+  <div class="score-box"><div class="score-num">${scores?.wealth||"--"}</div><div class="score-lbl">Wealth</div></div>
+  <div class="score-box"><div class="score-num">${scores?.mindset||"--"}</div><div class="score-lbl">Mindset</div></div>
+  <div class="score-box"><div class="score-num">${scores?.relations||"--"}</div><div class="score-lbl">Relationships</div></div>
+</div>
+<div class="section">
+  <div class="section-title">Personalised Summary</div>
+  <p>${summary}</p>
+</div>
+${strengths.length?`<div class="section"><div class="section-title">Your Top Strengths</div><ul>${strengths.map(s=>`<li>${s}</li>`).join("")}</ul></div>`:""}
+${blinds.length?`<div class="section"><div class="section-title">Blind Spots to Address</div><ul>${blinds.map(s=>`<li>${s}</li>`).join("")}</ul></div>`:""}
+${opps.length?`<div class="section"><div class="section-title">Key Opportunities</div><ul>${opps.map(s=>`<li>${s}</li>`).join("")}</ul></div>`:""}
+<div class="footer">DestinIQ · Personal Intelligence Platform · destiniq.vercel.app · Generated for ${name} only</div>
+</body></html>`;
+
+  const w = window.open("","_blank","width=900,height=700");
+  if(!w){ alert("Please allow popups to export your PDF."); return; }
+  w.document.write(html);
+  w.document.close();
+  w.onload = ()=>{ w.focus(); w.print(); };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCORE HISTORY — stores last 5 reports for comparison
+// ═══════════════════════════════════════════════════════════════
+function saveScoreSnapshot(userId, scores, overall){
+  if(!userId||!scores) return;
+  try{
+    const key  = `diq_score_history_${userId}`;
+    const prev = JSON.parse(localStorage.getItem(key)||"[]");
+    const snap = { date:new Date().toISOString().slice(0,10), scores:{...scores}, overall };
+    const updated = [snap, ...prev].slice(0,5);
+    localStorage.setItem(key, JSON.stringify(updated));
+  }catch{}
+}
+
+function getScoreHistory(userId){
+  try{ return JSON.parse(localStorage.getItem(`diq_score_history_${userId}`)||"[]"); }
+  catch{ return []; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCORE COMPARISON CARD — shows in MyReport for Pro Max
+// ═══════════════════════════════════════════════════════════════
+function ScoreComparisonCard({userId, currentScores, currentOverall}){
+  const history = getScoreHistory(userId);
+  if(history.length < 2) return null;
+  const prev = history[1]; // second entry = previous report
+  const G = {gold:"#f0b429",card:"#111008",border:"rgba(232,220,200,0.07)",
+    cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)"};
+
+  const diff = (a,b)=>Math.round((a||0)-(b||0));
+  const fmt  = n=>n>0?`+${n}`:String(n);
+  const col  = n=>n>0?"#1ab89a":n<0?"#e05252":G.dim;
+
+  const metrics=[
+    {label:"Overall", cur:currentOverall, prv:prev.overall},
+    {label:"Life",    cur:currentScores?.life,    prv:prev.scores?.life},
+    {label:"Wealth",  cur:currentScores?.wealth,  prv:prev.scores?.wealth},
+    {label:"Mindset", cur:currentScores?.mindset, prv:prev.scores?.mindset},
+    {label:"Relations",cur:currentScores?.relations,prv:prev.scores?.relations},
+  ];
+
+  const daysBetween=Math.round((new Date()-new Date(prev.date))/(86400000));
+
+  return(
+    <div style={{background:"rgba(155,114,207,0.06)",border:"1px solid rgba(155,114,207,0.2)",
+      borderRadius:16,padding:"18px 20px",marginBottom:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div>
+          <div style={{fontSize:10,color:"#9b72cf",fontWeight:800,letterSpacing:".1em",fontFamily:"monospace"}}>
+            ✦ PRO MAX · COMPARISON
+          </div>
+          <div style={{fontSize:13,fontWeight:700,color:G.cream,marginTop:3}}>
+            Since your last report ({daysBetween} days ago)
+          </div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8}}>
+        {metrics.map(m=>{
+          const d=diff(m.cur,m.prv);
+          return(
+            <div key={m.label} style={{textAlign:"center",padding:"10px 4px",
+              background:"rgba(255,255,255,0.03)",borderRadius:10}}>
+              <div style={{fontSize:11,color:G.dimmer,marginBottom:4}}>{m.label}</div>
+              <div style={{fontSize:18,fontWeight:800,color:G.cream}}>{m.cur||"—"}</div>
+              {d!==0&&<div style={{fontSize:11,fontWeight:700,color:col(d),marginTop:2}}>{fmt(d)}</div>}
+            </div>
+          );
+        })}
+      </div>
+      {metrics.find(m=>diff(m.cur,m.prv)>0)&&(
+        <div style={{marginTop:12,fontSize:12,color:G.dim,lineHeight:1.6}}>
+          📈 {metrics.filter(m=>diff(m.cur,m.prv)>0).map(m=>m.label).join(", ")} improved since last time.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WEEKLY DIGEST — Pro Max: AI summary every week
+// ═══════════════════════════════════════════════════════════════
+function WeeklyDigestCard({profile,userId,streak,isPremium,isProMax}){
+  const G={gold:"#f0b429",card:"#111008",border:"rgba(232,220,200,0.07)",
+    cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)"};
+  const DIGEST_KEY=`diq_weekly_digest_${userId}`;
+  const [digest,setDigest]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(DIGEST_KEY)||"null"); }catch{ return null; }
+  });
+  const [loading,setLoading]=useState(false);
+  const [dismissed,setDismissed]=useState(false);
+
+  // Auto-generate if Pro Max + more than 7 days since last digest
+  useEffect(()=>{
+    if(!isProMax||!userId||loading) return;
+    const lastDate = digest?.date ? new Date(digest.date) : null;
+    const daysSince = lastDate ? Math.floor((Date.now()-lastDate.getTime())/86400000) : 999;
+    if(daysSince >= 7) generateDigest();
+  },[isProMax, userId]);
+
+  const generateDigest=async()=>{
+    if(loading) return;
+    setLoading(true);
+    try{
+      const wins=[];
+      try{
+        const w=JSON.parse(localStorage.getItem(`diq_wins_${userId}`)||"[]");
+        const week=new Date(); week.setDate(week.getDate()-7);
+        wins.push(...w.filter(x=>new Date(x.date)>week).map(x=>x.text||x.win).slice(0,5));
+      }catch{}
+      const reply = await callAPI({
+        messages:[{role:"user",content:`Generate a powerful, concise weekly intelligence digest for ${profile?.name||"this person"}.
+Their situation: ${profile?.goals||profile?.bigGoal||"personal growth"}. Country: ${profile?.country||""}. Streak: ${streak} days.
+Recent wins this week: ${wins.length?wins.join("; "):"not tracked"}.
+Write a personal weekly review (4-6 sentences max):
+1. One honest reflection on where they are right now
+2. The single most important thing to focus on this week
+3. One behaviour to stop or start
+4. An encouraging but grounded closing line.
+Write it directly to them. Use their name. No bullet points. No generic advice.`}],
+        system:"You write powerful, personal weekly reviews. Warm but direct. Like a coach who knows you well.",
+        userId, isPremium:true,
+      });
+      const newDigest={text:reply.trim(), date:new Date().toISOString(), week:getWeekNumber()};
+      setDigest(newDigest);
+      try{localStorage.setItem(DIGEST_KEY,JSON.stringify(newDigest));}catch{}
+    }catch(e){ console.warn("Weekly digest failed:",e); }
+    setLoading(false);
+  };
+
+  const getWeekNumber=()=>{
+    const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+3-(d.getDay()+6)%7);
+    return Math.ceil(((d-new Date(d.getFullYear(),0,1))/86400000)/7);
+  };
+
+  if(!isProMax||dismissed) return null;
+  if(loading) return(
+    <div style={{background:G.card,border:"1px solid rgba(155,114,207,0.2)",borderRadius:16,
+      padding:"20px",marginBottom:16,textAlign:"center"}}>
+      <div style={{fontSize:12,color:"#9b72cf"}}>✦ Generating your weekly digest…</div>
+    </div>
+  );
+  if(!digest) return null;
+
+  return(
+    <div style={{background:"linear-gradient(135deg,rgba(155,114,207,0.08),rgba(155,114,207,0.03))",
+      border:"1px solid rgba(155,114,207,0.25)",borderRadius:16,padding:"18px 20px",marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+        <div>
+          <div style={{fontSize:10,color:"#9b72cf",fontWeight:800,letterSpacing:".1em",fontFamily:"monospace"}}>
+            ✦ WEEKLY INTELLIGENCE DIGEST
+          </div>
+          <div style={{fontSize:11,color:G.dimmer,marginTop:2}}>
+            {new Date(digest.date).toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}
+          </div>
+        </div>
+        <button onClick={()=>setDismissed(true)}
+          style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",fontSize:18,lineHeight:1}}>×</button>
+      </div>
+      <p style={{fontSize:14,color:G.dim,lineHeight:1.8,margin:"0 0 14px",whiteSpace:"pre-wrap"}}>{digest.text}</p>
+      <button onClick={generateDigest}
+        style={{background:"none",border:"1px solid rgba(155,114,207,0.25)",borderRadius:20,
+          padding:"6px 14px",color:"#9b72cf",fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>
+        ↺ Regenerate
+      </button>
     </div>
   );
 }
@@ -12769,6 +13084,12 @@ Rules:
 
   // ── nav routing ──────────────────────────────────────────────────────
   const [navSection,setNavSection]=useState(()=>{try{return localStorage.getItem("diq_nav")||"home";}catch{return "home";}});
+  const [isMobile,setIsMobile]=useState(()=>typeof window!=="undefined"&&window.innerWidth<900);
+  useEffect(()=>{
+    const onResize=()=>setIsMobile(window.innerWidth<900);
+    window.addEventListener("resize",onResize);
+    return()=>window.removeEventListener("resize",onResize);
+  },[]);
   const [navHistory,setNavHistory]=useState([]);
   const setNav=(s)=>{
     if(s!==navSection) setNavHistory(h=>[...h.slice(-19),navSection]);
@@ -12836,7 +13157,7 @@ Rules:
   return(
     <div className="app-shell">
 
-      <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
+      <div style={{display:isMobile?"none":"block",width:220,flexShrink:0}}><SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/></div>
 
       <MobileTopBar
         title={(()=>{
@@ -12851,7 +13172,7 @@ Rules:
         setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
       />
 
-      <div className="main-area">
+      <div className="main-area" style={{marginLeft:isMobile?0:220,transition:"margin .2s"}}>
         {navSection==="home"&&(
           <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin} dailyInsight={dailyInsight}/>
         )}
@@ -12862,9 +13183,18 @@ Rules:
         )}
         {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
         {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav} goBack={goBack}/>}
-        {navSection==="journal"&&<JournalScreen profile={formData} userId={userId} isPremium={isPremium} setNav={setNav} goBack={goBack}/>}
+        {navSection==="journal"&&<JournalScreen profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} setNav={setNav} goBack={goBack} onUnlock={onUnlock}/>}
         {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} onUnlock={onUnlock}/></div>}
-        {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
+        {navSection==="practices"&&(
+          isPaid
+            ?<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>
+            :<div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",color:"#e8dcc8",fontFamily:"-apple-system,sans-serif"}}>
+              <div style={{fontSize:48,marginBottom:14}}>⚡</div>
+              <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px"}}>My Practices</h2>
+              <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",lineHeight:1.7,margin:"0 0 24px"}}>Track habits and build the practices that compound over time. Available on Pro.</p>
+              <button onClick={onUnlock} style={{width:"100%",padding:"15px",background:"#f0b429",color:"#000",border:"none",borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>✦ Upgrade to Pro</button>
+            </div>
+        )}
         {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>setNav("home")}/></div>}
         {navSection==="savedreports"&&(
           <div style={{padding:"28px 24px 80px",maxWidth:860,margin:"0 auto"}}>
@@ -13864,7 +14194,9 @@ function LoadingSkeleton(){
 // ═══════════════════════════════════════════════════════════════════════════════
 const RATE_LIMIT_KEY="destiniq_report_count";
 const RATE_LIMIT_DATE_KEY="destiniq_report_date";
-const FREE_REPORT_LIMIT=3; // free users get 3 reports total
+const FREE_REPORT_LIMIT=1;   // Free: 1 report total
+const PRO_REPORT_LIMIT=3;    // Pro: 3 reports/month
+// Pro Max: unlimited // free users get 3 reports total
 
 function getRateLimit(){
   if(typeof window==="undefined") return{count:0,date:null};
