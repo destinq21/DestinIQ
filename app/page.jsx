@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -295,24 +295,19 @@ async function saveWeeklyReport(userId, report) {
 }
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
-// Lemon Squeezy: lemonsqueezy.com → Your Store → Products → copy Variant IDs above
-// ── LEMON SQUEEZY — paste your variant IDs from your LS dashboard ─────────
-// How to get: lemonsqueezy.com → Your Store → Products → click each plan → copy Variant ID
-const LS_STORE = "destiniq"; // ← your store slug from lemonsqueezy.com/your-store-name
-const LS_VARIANTS = {
-  pro:          "000000", // ← Pro Monthly variant ID
-  promax:       "000001", // ← Pro Max Monthly variant ID
-  pro_annual:   "000002", // ← Pro Annual variant ID
-  promax_annual:"000003", // ← Pro Max Annual variant ID
-};
+// Paystack: paystack.com → Your Store → Products → copy Variant IDs above
+// ── PAYSTACK ────────────────────────────────────────────────────────────────
+// Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
+// Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
-// All charges handled by Lemon Squeezy — they manage tax + billing worldwide
+// All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
 // converted to the user's local currency so it feels native to them.
 const PLANS = {
-  pro:          { name:"Pro",          amount:9.99,   label:"$9.99/month",   currency:"USD", tier:"pro",    ls:()=>LS_VARIANTS.pro },
-  promax:       { name:"Pro Max",      amount:24.99,  label:"$24.99/month",  currency:"USD", tier:"promax", ls:()=>LS_VARIANTS.promax },
-  pro_annual:   { name:"Pro Annual",   amount:79.99,  label:"$79.99/year",   currency:"USD", tier:"pro",    ls:()=>LS_VARIANTS.pro_annual },
+  pro:          { name:"Pro",          amount:9.99,   label:"$9.99/month",   currency:"USD", tier:"pro" },
+  promax:       { name:"Pro Max",      amount:24.99,  label:"$24.99/month",  currency:"USD", tier:"promax" },
+  pro_annual:   { name:"Pro Annual",   amount:79.99,  label:"$79.99/year",   currency:"USD", tier:"pro" },
   promax_annual:{ name:"Pro Max Annual",amount:199.99, label:"$199.99/year",  currency:"USD", tier:"promax" },
 };
 
@@ -2635,7 +2630,7 @@ function WeeklyModule({profile,userId,isPremium,isProMax,isPaid,onUnlock}){
           <div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
               <div className="mono" style={{fontSize:"9px"}}>Week of {report.weekOf}</div>
-              <button className="btn btn-ghost btn-sm" onClick={generate} disabled={loading}>{loading?"Refreshing…":"↺ Refresh"}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>{try{localStorage.removeItem(cacheKey);}catch{}generate();}} disabled={loading}>{loading?"Refreshing…":"↺ Refresh"}</button>
             </div>
             <div className="card" style={{background:"var(--lift)"}}>
               <RenderMD text={report.text} style={{fontSize:15,lineHeight:1.85,fontWeight:300}}/>
@@ -2896,16 +2891,13 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
   const [error,setError]=useState("");
   const [scriptReady,setScriptReady]=useState(false);
 
-  // Load Lemon Squeezy script once
+  // Load Paystack script once
   useEffect(()=>{
-    if(window.LemonSqueezy){setScriptReady(true);return;}
+    if(window.PaystackPop){setScriptReady(true);return;}
     const script=document.createElement("script");
-    script.src="https://assets.lemonsqueezy.com/lemon.js";
-    script.defer=true;
-    script.onload=()=>{
-      if(window.createLemonSqueezy) window.createLemonSqueezy();
-      setScriptReady(true);
-    };
+    script.src="https://js.paystack.co/v1/inline.js";
+    script.async=true;
+    script.onload=()=>setScriptReady(true);
     script.onerror=()=>setError("Could not load payment system. Check your connection and try again.");
     document.head.appendChild(script);
     return()=>{};
@@ -2925,61 +2917,61 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
   const baseAnnual  = tier==="promax"?PLANS.promax_annual.amount:PLANS.pro_annual.amount;
   const monthlyEquivalent=billing==="annual"?Math.round((baseAnnual/12)*100)/100:baseMonthly;
 
-  // ── LEMON SQUEEZY CHECKOUT ─────────────────────────────────────────────────
-  const handleLemonSqueezy=()=>{
+  // ── PAYSTACK CHECKOUT ────────────────────────────────────────────────────────
+  const handlePaystack=()=>{
     if(!email.trim()||!email.includes("@")){
       setError("Please enter a valid email address to continue.");
       return;
     }
     setLoading(true); setError("");
+    const ref="diq_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
     try{
-      const variantId = plan.ls();
-      const checkoutUrl = new URL(
-        `https://${LS_STORE}.lemonsqueezy.com/checkout/buy/${variantId}`
-      );
-      // Pre-fill email and pass user info via custom data
-      checkoutUrl.searchParams.set("checkout[email]", email.trim());
-      checkoutUrl.searchParams.set("checkout[custom][user_id]", userId||"");
-      checkoutUrl.searchParams.set("checkout[custom][plan]", planKey);
-
-      // Listen for successful payment from LS overlay
-      window.LemonSqueezy.Setup({
-        eventHandler:(event)=>{
-          if(event.event==="Checkout.Success"){
-            const orderId = event.data?.order?.data?.id||"";
-            handlePaySuccess(orderId, planKey);
+      const handler=window.PaystackPop.setup({
+        key:      PAYSTACK_PUBLIC_KEY,
+        email:    email.trim(),
+        amount:   Math.round(plan.amount*100),
+        currency: "USD",
+        ref,
+        label:    "DestinIQ "+plan.name,
+        channels: ["card","bank","ussd","qr","mobile_money","bank_transfer"],
+        metadata: {
+          userId:  userId||"",
+          plan:    planKey,
+          custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}],
+        },
+        callback: async(response)=>{
+          if(userId){
+            try{
+              localStorage.setItem("diq_paid_"+userId,"1");
+              if(tier==="promax"||tier==="promax_annual") localStorage.setItem("diq_prem_"+userId,"1");
+              else localStorage.removeItem("diq_prem_"+userId);
+              localStorage.setItem("diq_paystack_ref_"+userId,response.reference);
+            }catch{}
           }
-        }
+          try{
+            let uid=userId;
+            if(!uid){ const{data}=await supabase.auth.getSession(); uid=data?.session?.user?.id; }
+            if(uid){
+              await supabase.from("user_profiles").upsert({
+                user_id:uid, is_paid:true,
+                is_premium: tier==="promax"||tier==="promax_annual",
+                paystack_ref:response.reference,
+                paid_plan:planKey,
+                paid_at:new Date().toISOString(),
+                updated_at:new Date().toISOString(),
+              },{onConflict:"user_id"});
+            }
+          }catch(e){ console.warn("Supabase save failed — localStorage backup active"); }
+          setLoading(false);
+          onUnlock(response.reference, planKey);
+        },
+        onClose:()=>setLoading(false),
       });
-
-      // Open the overlay checkout
-      window.LemonSqueezy.Url.Open(checkoutUrl.toString());
+      handler.openIframe();
     }catch(e){
-      setError("Could not open checkout. Please try again.");
       setLoading(false);
+      setError("Something went wrong opening the payment window. Try again.");
     }
-  };
-
-  const handlePaySuccess=async(orderId, planKey)=>{
-    if(userId){
-      try{
-        localStorage.setItem(`diq_paid_${userId}`,"1");
-        if(tier==="promax") localStorage.setItem(`diq_prem_${userId}`,"1");
-        else localStorage.removeItem(`diq_prem_${userId}`);
-        localStorage.setItem(`diq_ls_order_${userId}`, orderId);
-      }catch{}
-      try{
-        await supabase.from("user_profiles").upsert({
-          user_id:userId, is_paid:true,
-          is_premium:(tier==="promax"||tier==="promax_annual"),
-          ls_order_id:orderId, paid_plan:planKey,
-          paid_at:new Date().toISOString(),
-          updated_at:new Date().toISOString(),
-        },{onConflict:"user_id"});
-      }catch(e){ console.warn("Supabase save failed — localStorage backup active"); }
-    }
-    setLoading(false);
-    onUnlock(orderId, planKey);
   };
 
   const FREE_FEATURES=[
@@ -3154,7 +3146,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
 
           <button
             className="btn btn-lg btn-full"
-            onClick={handleLemonSqueezy}
+            onClick={handlePaystack}
             disabled={loading||!scriptReady}
             style={{marginBottom:10,
               background:tier==="promax"?"#9b72cf":"var(--gold)",
@@ -3761,7 +3753,7 @@ function SupportWidget(){
 
   const FAQS=[
     {q:"How does the momentum score work?",a:"Your score (0-100) is calculated from 5 signals: quality of your last 7 check-ins (40pts), your streak (25pts), whether you logged today (10pts), decisions made this week (10pts), and your 7-day consistency (15pts)."},
-    {q:"How do I upgrade to premium?",a:"Go to your dashboard and click Upgrade in the top right corner. We accept card card and international payments via Lemon Squeezy."},
+    {q:"How do I upgrade to premium?",a:"Go to your dashboard and click Upgrade in the top right corner. We accept card card and international payments via Paystack."},
     {q:"My report doesn't feel personalised - why?",a:"The report is built from what you shared during onboarding. The more honest and specific you are, the better it gets. You can regenerate by starting a new session."},
     {q:"Can I change my onboarding answers?",a:"Yes - sign out and sign back in to go through onboarding again with updated information."},
     {q:"Is my data private?",a:"Yes. Your data is stored securely and is never shared with third parties. Only you can see your reports and logs."},
@@ -4115,6 +4107,83 @@ function getIncomeRanges(currencySymbol){
   return ["Under $500","$500–$1,500","$1,500–$4,000","$4,000–$10,000","$10,000+"];
 }
 
+
+function ShareCard({report, formData, onClose}){
+  const score = report?.overall || report?.score || 0;
+  const name  = formData?.name || "You";
+  const [copied, setCopied] = React.useState(false);
+  const [sent,   setSent]   = React.useState(false);
+
+  const shareText = `I just got my DestinIQ Intelligence Score: ${score}/100 🔥\n\nDestinIQ analysed my life, career & mindset and gave me a full personalised action plan.\n\nGet yours free 👉 destiniq.vercel.app`;
+
+  const copy = ()=>{
+    try{ navigator.clipboard.writeText(shareText); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch{}
+  };
+  const shareWhatsApp = ()=> window.open("https://wa.me/?text="+encodeURIComponent(shareText),"_blank");
+  const shareTwitter  = ()=> window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(shareText),"_blank");
+
+  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)"};
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
+      <div style={{background:"#111008",border:"1px solid rgba(240,180,41,0.2)",borderRadius:20,padding:"28px 24px",maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div style={{fontSize:16,fontWeight:800,color:G.cream}}>Share your score</div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:G.dim,cursor:"pointer",fontSize:20,lineHeight:1}}>×</button>
+        </div>
+
+        {/* Score card preview */}
+        <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.1),rgba(155,114,207,0.08))",border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
+          <div style={{fontSize:11,color:G.gold,letterSpacing:".15em",fontFamily:"monospace",marginBottom:8}}>MY DESTINIQ SCORE</div>
+          <div style={{fontSize:64,fontWeight:900,color:G.cream,lineHeight:1}}>{score}</div>
+          <div style={{fontSize:12,color:G.dim,marginTop:4}}>out of 100 · destiniq.vercel.app</div>
+        </div>
+
+        {/* Share text preview */}
+        <div style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"12px 14px",fontSize:12,color:G.dim,lineHeight:1.6,marginBottom:16,whiteSpace:"pre-line"}}>
+          {shareText}
+        </div>
+
+        {/* Share buttons */}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button onClick={shareWhatsApp}
+            style={{background:"#25D366",border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            Share on WhatsApp
+          </button>
+          <button onClick={shareTwitter}
+            style={{background:"#1DA1F2",border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            Share on Twitter / X
+          </button>
+          <button onClick={copy}
+            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px",color:G.cream,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            {copied?"✅ Copied!":"Copy text"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FAQItem({q, a, G}){
+  const [open,setOpen] = React.useState(false);
+  return(
+    <div style={{borderBottom:"1px solid rgba(255,255,255,0.06)",overflow:"hidden"}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{width:"100%",background:"none",border:"none",padding:"18px 0",
+          cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,textAlign:"left",fontFamily:"inherit"}}>
+        <span style={{fontSize:15,fontWeight:600,color:G.cream,lineHeight:1.4}}>{q}</span>
+        <span style={{fontSize:18,color:G.gold,flexShrink:0,transition:"transform .2s",
+          transform:open?"rotate(45deg)":"rotate(0deg)"}}>+</span>
+      </button>
+      {open&&(
+        <div style={{fontSize:14,color:"rgba(232,220,200,0.6)",lineHeight:1.8,paddingBottom:18}}>
+          {a}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Landing({onStart,ipLocation}){
   const [scrolled,setScrolled]=useState(false);
   const [userCount,setUserCount]=useState(25847);
@@ -4227,9 +4296,8 @@ function Landing({onStart,ipLocation}){
             style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
               background:"transparent",color:G.dim,
               border:"1px solid rgba(232,220,200,0.14)",
-              borderRadius:13,padding:"15px 28px",fontSize:14,fontWeight:500,cursor:"default"}}>
+              borderRadius:13,padding:"15px 28px",fontSize:14,fontWeight:500,cursor:"pointer",opacity:.85}} onClick={()=>window.open("https://www.loom.com/share/destiniq-demo","_blank")}>
             <span style={{fontSize:12,opacity:.7}}>▶</span> Watch Demo
-            <span style={{fontSize:10,padding:"2px 7px",background:"rgba(240,180,41,0.1)",borderRadius:6,color:G.gold,marginLeft:4}}>Soon</span>
           </button>
         </div>
 
@@ -4426,6 +4494,80 @@ function Landing({onStart,ipLocation}){
         </div>
       </section>
 
+
+      {/* ══════════════════════════════════════════
+          PRICING
+      ══════════════════════════════════════════ */}
+      <section style={{...sec,paddingBottom:80,paddingTop:80}}>
+        <div style={{textAlign:"center",marginBottom:48}}>
+          <div style={{fontSize:11,color:G.gold,fontWeight:700,letterSpacing:".15em",fontFamily:"monospace",marginBottom:12}}>SIMPLE PRICING</div>
+          <h2 style={{fontSize:"clamp(28px,5vw,42px)",fontWeight:900,color:G.cream,margin:"0 0 12px",lineHeight:1.2}}>Start free. Upgrade when ready.</h2>
+          <p style={{fontSize:15,color:G.dim,maxWidth:480,margin:"0 auto"}}>No hidden fees. Cancel anytime. Works for Ghana, Nigeria, UK, Canada, Australia and everywhere in between.</p>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,maxWidth:900,margin:"0 auto"}}>
+          {[
+            {name:"Free",price:"$0",period:"forever",color:"rgba(255,255,255,0.06)",border:"rgba(255,255,255,0.1)",badge:null,
+             features:["1 Intelligence Report","5 starter AI tools","Daily Check-in","Win Tracker (5/day)","AI Advisor (limited)"],
+             cta:"Get Started Free",ctaStyle:{background:"rgba(255,255,255,0.08)",color:G.cream},
+             action:()=>onStart()},
+            {name:"Pro",price:"$9.99",period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
+             features:["3 Intelligence Reports/month","All 42 AI tools","Unlimited Check-ins","Unlimited Win Tracker","AI Advisor (6,000 chars/day)","Practices & habits","Progress tracking","Audio report read-aloud"],
+             cta:"Start Pro →",ctaStyle:{background:G.gold,color:"#000"},
+             action:()=>onStart()},
+            {name:"Pro Max",price:"$24.99",period:"per month",color:"rgba(155,114,207,0.06)",border:"rgba(155,114,207,0.3)",badge:"Everything",
+             features:["Unlimited Intelligence Reports","All 42 AI tools","Unlimited AI Advisor","Weekly AI Digest","PDF export","Score comparison history","Priority everything"],
+             cta:"Start Pro Max →",ctaStyle:{background:"#9b72cf",color:"#fff"},
+             action:()=>onStart()},
+          ].map(plan=>(
+            <div key={plan.name} style={{background:plan.color,border:"1px solid "+plan.border,borderRadius:20,padding:"28px 24px",position:"relative",display:"flex",flexDirection:"column"}}>
+              {plan.badge&&(
+                <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:plan.name==="Pro"?G.gold:"#9b72cf",color:plan.name==="Pro"?"#000":"#fff",fontSize:10,fontWeight:700,padding:"3px 12px",borderRadius:20,letterSpacing:".08em",whiteSpace:"nowrap"}}>
+                  {plan.badge}
+                </div>
+              )}
+              <div style={{fontSize:13,fontWeight:700,color:G.dim,letterSpacing:".05em",marginBottom:4}}>{plan.name.toUpperCase()}</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:4}}>
+                <span style={{fontSize:36,fontWeight:900,color:G.cream}}>{plan.price}</span>
+                <span style={{fontSize:12,color:G.dim}}>{plan.period}</span>
+              </div>
+              <div style={{height:1,background:"rgba(255,255,255,0.07)",margin:"16px 0"}}/>
+              <div style={{flex:1,display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+                {plan.features.map(f=>(
+                  <div key={f} style={{display:"flex",gap:8,alignItems:"flex-start",fontSize:13,color:G.dim}}>
+                    <span style={{color:G.gold,flexShrink:0,marginTop:1}}>✓</span>{f}
+                  </div>
+                ))}
+              </div>
+              <button onClick={plan.action} style={{...plan.ctaStyle,border:"none",borderRadius:12,padding:"12px 20px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",width:"100%"}}>
+                {plan.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+        <p style={{textAlign:"center",fontSize:12,color:G.dimmer,marginTop:24}}>All plans include a 7-day satisfaction guarantee. Pay by card worldwide via Paystack.</p>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          FAQ
+      ══════════════════════════════════════════ */}
+      <section style={{...sec,paddingBottom:80}}>
+        <div style={{textAlign:"center",marginBottom:40}}>
+          <div style={{fontSize:11,color:G.gold,fontWeight:700,letterSpacing:".15em",fontFamily:"monospace",marginBottom:12}}>FAQ</div>
+          <h2 style={{fontSize:"clamp(24px,4vw,36px)",fontWeight:900,color:G.cream,margin:0}}>Questions you probably have</h2>
+        </div>
+        <div style={{maxWidth:680,margin:"0 auto",display:"flex",flexDirection:"column",gap:2}}>
+          {[
+            ["What exactly is DestinIQ?","DestinIQ is an AI personal intelligence platform. You answer questions about your life, goals, income and challenges during a short onboarding. The AI then generates a deep personalised intelligence report covering your career path, blind spots, financial situation, mindset patterns, and a step-by-step action plan. You also get access to 42 AI tools covering every area of your life."],
+            ["How is this different from just asking ChatGPT?","ChatGPT gives generic answers to generic questions. DestinIQ knows your specific name, age, country, income level, goals and challenges — and everything it generates is built around your actual situation. It remembers your profile and builds on it. It's the difference between talking to a stranger and talking to someone who has studied you."],
+            ["Is my data private and safe?","Yes. Your data is stored encrypted on Supabase (AWS infrastructure). We never sell or share your personal information with anyone. Your AI reports are only accessible from your account. We use Paystack for payments — we never see your card details."],
+            ["Can I cancel anytime?","Yes, completely. No contracts, no tricks. Email support@destiniq.app and we'll cancel your subscription immediately. If you're within 7 days of a charge, email us and we'll look at a refund."],
+            ["Does it work if I'm in Ghana, Nigeria, UK, Canada, or Australia?","Yes. DestinIQ is designed for English-speaking users globally. The AI knows about local job markets, visa options, salary ranges, and economic realities in your specific country. It gives you locally relevant advice, not generic Western answers."],
+            ["How accurate is the AI report?","The report is as accurate as the information you provide. The more honest and detailed your onboarding answers, the sharper your report. Users consistently say it surfaces things about themselves they hadn't consciously put into words. That said — it's AI guidance, not a substitute for professional financial, legal, or medical advice."],
+          ].map(([q,a],i)=>(
+            <FAQItem key={i} q={q} a={a} G={G}/>
+          ))}
+        </div>
+      </section>
       {/* ══════════════════════════════════════════
           FINAL CTA
       ══════════════════════════════════════════ */}
@@ -6341,28 +6483,14 @@ function AuthScreen({onAuth, onBack}){
   relocate: {
     title:"Relocation Intelligence",icon:"🌍",subtitle:"Find the best country for your next chapter",
     prompt:(p)=>{
-      const name=p.name||"this person";
-      const age=p.age||"an adult";
-      const country=p.country||"their country";
-      const goals=p.goals||p.bigGoal||"better opportunities and a better life";
-      const income=p.income||"not stated";
-      const challenge=p.challenge||"not stated";
-      const job=p.occupation||"not stated";
-      return `You are DestinIQ's relocation expert giving ${name} (${age}, currently in ${country}) a deeply personalised relocation analysis.
-
-Their goals: ${goals}. Income: ${income}. Main challenge: ${challenge}. Work: ${job}.
-
-Write a full relocation intelligence report in natural flowing paragraphs — no bullet points, no headers, no markdown. Cover all of this:
-
-First tell them honestly whether they should relocate or stay based on their specific situation. Factor in their income, age, country of origin, and what they are trying to achieve. Be direct and honest, not generic.
-
-Then walk them through the top 3 countries that specifically match their situation. For each country explain why it suits them personally, what the visa pathway actually looks like (the specific visa name, requirements, and realistic timeline), what they would actually spend per month in USD covering rent, food, and transport, and what salary they could realistically earn in their field. Name actual cities, not just countries.
-
-Then give them a clear 6-month action plan starting from today. What to save, what documents to get ready, what skills to build, what communities to find online before they move.
-
-End with the single most important thing people from ${country} miss when they try to relocate — the insight that separates people who make it from those who don't.
-
-Use real numbers. Be specific. This person needs a real plan, not inspiration.`;
+      const name = p?.name || "this person";
+      const age = p?.age || "an adult";
+      const from = p?.country || "their country";
+      const goals = p?.goals || p?.bigGoal || "better opportunities";
+      const income = p?.income || "unknown";
+      const job = p?.occupation || "not specified";
+      const challenge = p?.challenge || "not specified";
+      return "Write a personal relocation intelligence report for " + name + " who is " + age + " from " + from + ". Their career: " + job + ". Income level: " + income + ". Main life goal: " + goals + ". Biggest challenge: " + challenge + ". Write in flowing paragraphs with no bullet points or headers. Include: an honest verdict on whether they should stay or relocate and why, three specific countries that match their background with actual visa options and monthly living costs in USD, a practical 6-month step-by-step plan to make the move happen, and the most important thing people from " + from + " overlook when relocating. Be specific, use real numbers and real city names.";
     }
   },
 
@@ -7390,22 +7518,18 @@ function resolveLiveVoice(voiceRef){
 // Loads all voices — returns a promise that resolves when voices are ready
 function loadVoices(){
   return new Promise(res=>{
-    try{
-      if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
-      const attempt=()=>{
-        const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-        if(vs.length>0){res(vs);return;}
-        window.speechSynthesis.onvoiceschanged=()=>{
-          const vs2=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-          res(vs2);
-        };
-        // Fallback timeout
-        setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
+    if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
+    const attempt=()=>{
+      const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+      if(vs.length>0){res(vs);return;}
+      window.speechSynthesis.onvoiceschanged=()=>{
+        const vs2=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
+        res(vs2);
       };
-      attempt();
-    }catch(e){
-      res([]);
-    }
+      // Fallback timeout
+      setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
+    };
+    attempt();
   });
 }
 
@@ -11015,7 +11139,7 @@ function BottomNav({nav,setNav}){
   return(
     <div className="bot-nav">
       <div className="bot-items">
-        {[{id:"home",icon:"🏠",label:"Home"},{id:"explore",icon:"🔍",label:"Explore"},{id:"progress",icon:"📊",label:"Progress"},{id:"profile",icon:"👤",label:"Profile"}]
+        {[{id:"home",icon:"🏠",label:"Home"},{id:"explore",icon:"🔍",label:"Explore"},{id:"checkin",icon:"✅",label:"Check-in"},{id:"progress",icon:"📊",label:"Progress"},{id:"profile",icon:"👤",label:"Profile"}]
           .map(t=>(
             <button key={t.id} className={`bot-item ${nav===t.id||nav?.startsWith(t.id)?"active":""}`} onClick={()=>setNav(t.id)}>
               <span className="bot-icon">{t.icon}</span>
@@ -11149,7 +11273,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       </div>
 
       <div style={{padding:"0 20px"}}>
-        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>{/* CONTINUE JOURNEY (Hero card) */}
+        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -13603,7 +13727,7 @@ function PolicyPage({type,onBack}){
                 <div><span style={{color:G.cream,fontWeight:600}}>Product:</span> AI-powered personal intelligence platform</div>
                 <div><span style={{color:G.cream,fontWeight:600}}>Based in:</span> Ghana, West Africa</div>
                 <div><span style={{color:G.cream,fontWeight:600}}>Business type:</span> Software as a Service (SaaS)</div>
-                <div><span style={{color:G.cream,fontWeight:600}}>Payments:</span> Processed by Lemon Squeezy</div>
+                <div><span style={{color:G.cream,fontWeight:600}}>Payments:</span> Processed by Paystack</div>
               </div>
             </div>
 
@@ -13623,11 +13747,11 @@ function PolicyPage({type,onBack}){
         {isPrivacy&&(
           <div style={{display:"flex",flexDirection:"column",gap:24,fontSize:14,color:G.dim,lineHeight:1.9}}>
             {[
-              ["What We Collect","We collect the information you provide during onboarding: name, age, country, goals, and challenges. We also collect daily check-in data, wins you log, journal entries, and your email address. Payment information is processed securely by Lemon Squeezy — we never see or store your card details."],
+              ["What We Collect","We collect the information you provide during onboarding: name, age, country, goals, and challenges. We also collect daily check-in data, wins you log, journal entries, and your email address. Payment information is processed securely by Paystack — we never see or store your card details."],
               ["How We Use Your Data","Your data is used exclusively to generate your personalised DestinIQ intelligence reports, power your AI advisor, and track your progress over time. We do not use your data for advertising. We do not sell, rent, or share your personal data with any third party, ever."],
               ["AI Processing","Your profile and check-in information is sent to Anthropic's Claude AI to generate your personalised reports and advisor responses. This is processed under Anthropic's enterprise data processing agreement. Anthropic does not use your data to train their models."],
               ["Data Storage","All personal data is stored securely on Supabase (hosted on AWS infrastructure). Data is encrypted in transit (TLS) and at rest. Only you can access your personal data through your authenticated account."],
-              ["Payments","Payments are processed by Lemon Squeezy Inc. We do not store card or bank details. Flutterwave's own privacy policy governs how they handle your payment information."],
+              ["Payments","Payments are processed by Paystack Inc. We do not store card or bank details. Flutterwave's own privacy policy governs how they handle your payment information."],
               ["Your Rights","You have the right to access, correct, or delete your personal data at any time. To request account deletion or a data export, email support@destiniq.app. We process all requests within 24 hours."],
               ["Cookies","We use only essential authentication cookies required for you to stay logged in. We do not use tracking, advertising, or analytics cookies."],
               ["Children","DestinIQ is not intended for users under 18. We do not knowingly collect data from minors."],
@@ -13650,7 +13774,7 @@ function PolicyPage({type,onBack}){
               ["2. Description of Service","DestinIQ is an AI-powered personal intelligence platform providing life, career, mindset, and financial guidance reports. The service is for personal self-development use only. It is not a substitute for professional financial, legal, medical, or psychological advice. Always consult a qualified professional for important life decisions."],
               ["3. Eligibility","You must be at least 18 years old to use DestinIQ. By using the service, you confirm that you meet this requirement and that the information you provide during onboarding is accurate."],
               ["4. Account Responsibility","You are responsible for maintaining the security of your account credentials. You agree not to share your account with others. Notify us immediately at support@destiniq.app if you suspect unauthorised access."],
-              ["5. Subscriptions & Payments","DestinIQ offers Free, Pro ($9.99/month or $79.99/year), and Pro Max ($24.99/month or $199.99/year) subscription tiers. Paid subscriptions are processed by Lemon Squeezy and renew automatically until cancelled. You may cancel at any time before your next billing date."],
+              ["5. Subscriptions & Payments","DestinIQ offers Free, Pro ($9.99/month or $79.99/year), and Pro Max ($24.99/month or $199.99/year) subscription tiers. Paid subscriptions are processed by Paystack and renew automatically until cancelled. You may cancel at any time before your next billing date."],
               ["6. Refund Policy","Refund requests made within 7 days of a charge will be considered on a case-by-case basis. To request a refund, email support@destiniq.app with your account email and reason. We aim to resolve all refund requests within 3 business days."],
               ["7. Acceptable Use","You agree not to use DestinIQ to facilitate illegal activities, attempt to reverse-engineer or copy the platform, create multiple accounts to circumvent limits, or harass others. Accounts found in violation will be terminated without refund."],
               ["8. AI-Generated Content","Reports and advisor responses are generated by AI and are for guidance purposes only. DestinIQ does not guarantee the accuracy, completeness, or applicability of AI-generated content to your specific situation."],
@@ -14395,6 +14519,15 @@ export default function DestinIQ(){
   const [user, setUser]=useState(null);
   const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
   const [screen,    setScreen   ]=useState("landing");
+  const [emailConfirmPending, setEmailConfirmPending] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstall, setShowInstall] = useState(false);
+  // Persist screen so refresh returns to correct place
+  useEffect(()=>{
+    if(screen!=="landing"&&screen!=="loading"){
+      try{localStorage.setItem("diq_screen",screen);}catch{}
+    }
+  },[screen]);
   const [formData,  setFormData ]=useState(null);
   const [report,    setReport   ]=useState(null);
   const [isPaid,    setIsPaid   ]=useState(false);
@@ -14571,7 +14704,21 @@ export default function DestinIQ(){
         // Save streak to localStorage as instant backup (so page refresh shows correct streak)
         try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
 
-        // ── OAUTH ERROR URL HANDLER ───────────────────────────────────────────────
+        // ── PWA INSTALL PROMPT ────────────────────────────────────────────────────
+  useEffect(()=>{
+    const handler=(e)=>{ e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return()=>window.removeEventListener("beforeinstallprompt", handler);
+  },[]);
+
+  const handleInstallApp = async()=>{
+    if(!installPrompt) return;
+    await installPrompt.prompt();
+    const{outcome}=await installPrompt.userChoice;
+    if(outcome==="accepted"){ setInstallPrompt(null); setShowInstall(false); }
+  };
+
+  // ── OAUTH ERROR URL HANDLER ───────────────────────────────────────────────
   useEffect(()=>{
     if(typeof window==="undefined") return;
     const params=new URLSearchParams(window.location.search);
@@ -14580,6 +14727,12 @@ export default function DestinIQ(){
       // OAuth redirect error (e.g. bad_oauth_state) — clean URL and show auth
       try{ window.history.replaceState({},"",window.location.pathname); }catch{}
       setScreen("auth");
+      return;
+    }
+    // Restore last screen for returning users (so refresh doesn't reset to landing)
+    const savedScreen = localStorage.getItem("diq_screen");
+    if(savedScreen&&savedScreen!=="loading"&&savedScreen!=="landing"){
+      setScreen(savedScreen);
     }
   },[]);
 
@@ -14648,7 +14801,18 @@ export default function DestinIQ(){
       }
     }catch(e){
       console.warn("restoreUserSession profile load error:",e.message);
-      setScreen("intake");
+      // Don't send returning users back to onboarding on network/load errors
+      // If we have a userId, they're authenticated — send to results or landing
+      if(userId||u?.id){
+        const savedScreen = typeof window!=="undefined"?localStorage.getItem("diq_screen"):null;
+        if(savedScreen&&savedScreen!=="intake"&&savedScreen!=="loading"){
+          setScreen(savedScreen);
+        } else {
+          setScreen("results"); // They're logged in — show dashboard
+        }
+      } else {
+        setScreen("landing");
+      }
     }finally{
       setProfileLoading(false);
     }
@@ -15143,7 +15307,22 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {!authLoading&&!user&&(
           <>
             {/* Show auth screen only when user explicitly clicked to begin/sign in */}
-            {screen==="auth"
+            {emailConfirmPending
+              ? <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
+                  justifyContent:"center",background:"#0a0800",padding:"0 24px",textAlign:"center",
+                  fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+                  <div style={{fontSize:48,marginBottom:20}}>📬</div>
+                  <h2 style={{fontSize:24,fontWeight:800,color:"#e8dcc8",margin:"0 0 12px"}}>Check your inbox</h2>
+                  <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",maxWidth:340,lineHeight:1.7,margin:"0 0 28px"}}>
+                    We sent a confirmation link to your email. Click it to activate your account and start your journey.
+                  </p>
+                  <button onClick={()=>{setEmailConfirmPending(false);setScreen("auth");}}
+                    style={{background:"none",border:"1px solid rgba(232,220,200,0.15)",borderRadius:10,
+                      padding:"10px 24px",color:"rgba(232,220,200,0.5)",cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+                    ← Back to sign in
+                  </button>
+                </div>
+              : screen==="auth"
               ? <AuthScreen onAuth={async(u)=>{
                     if(u.isNew) triggerWelcomeEmail(u);
                     await restoreUserSession({
@@ -15156,7 +15335,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                 />
               : <>
                   {/* Public nav for unauthenticated state */}
-                  <nav className="nav" style={{display:screen==="landing"?"none":"flex"}}>
+                  <nav className="nav" style={{display:["landing","results","intake","loading","complete-profile"].includes(screen)?"none":"flex"}}>
                     <div className="logo" onClick={()=>setScreen("landing")}>Destin<b>IQ</b></div>
                     <div className="nav-r">
                       <button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("auth")}>Sign in</button>
@@ -15265,6 +15444,29 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
 
         {/* Share card modal */}
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
+
+        {/* PWA Install Banner */}
+        {showInstall&&screen==="results"&&(
+          <div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",
+            background:"#1a1400",border:"1px solid rgba(240,180,41,0.3)",borderRadius:16,
+            padding:"14px 18px",display:"flex",alignItems:"center",gap:12,
+            boxShadow:"0 8px 32px rgba(0,0,0,0.5)",zIndex:500,maxWidth:340,width:"calc(100% - 32px)"}}>
+            <div style={{fontSize:28}}>📲</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#e8dcc8",marginBottom:2}}>Install DestinIQ</div>
+              <div style={{fontSize:11,color:"rgba(232,220,200,0.5)"}}>Add to home screen for quick access</div>
+            </div>
+            <button onClick={handleInstallApp}
+              style={{background:"#f0b429",border:"none",borderRadius:8,padding:"7px 14px",
+                fontSize:12,fontWeight:700,cursor:"pointer",color:"#000",fontFamily:"inherit",flexShrink:0}}>
+              Install
+            </button>
+            <button onClick={()=>setShowInstall(false)}
+              style={{background:"none",border:"none",color:"rgba(232,220,200,0.3)",cursor:"pointer",fontSize:18,padding:0,flexShrink:0}}>
+              ×
+            </button>
+          </div>
+        )}
 
         {!showPolicy&&!showProfile&&!showAdmin&&<>
         {/* ── SCREEN ROUTER ─────────────────────────────────────────────────────
