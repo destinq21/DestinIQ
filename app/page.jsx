@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -299,7 +299,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -7518,6 +7518,7 @@ function resolveLiveVoice(voiceRef){
 // Loads all voices — returns a promise that resolves when voices are ready
 function loadVoices(){
   return new Promise(res=>{
+    try{
     if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
     const attempt=()=>{
       const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
@@ -7530,6 +7531,10 @@ function loadVoices(){
       setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
     };
     attempt();
+    }catch(e){
+      // On any unexpected error, resolve with empty list
+      res([]);
+    }
   });
 }
 
@@ -11274,6 +11279,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
       <div style={{padding:"0 20px"}}>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
+        {/* CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -14115,85 +14121,6 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. SHARE REPORT CARD
-// ═══════════════════════════════════════════════════════════════════════════════
-function ShareCard({report,formData,onClose}){
-  const [copied,setCopied]=useState(false);
-
-  // Extract scores — handle both number scores and section-based reports
-  // Scores are stored under report.scores.X (same as dashboard PILLARS)
-  const sc = report?.scores || {};
-  const getScore=(field,def)=>{
-    const v = sc[field];
-    if(typeof v==="number") return v;
-    if(typeof v==="string"&&!isNaN(parseInt(v))) return parseInt(v);
-    return def;
-  };
-  const scores=[
-    {label:"Life",     val:getScore("life",52)},
-    {label:"Wealth",   val:getScore("wealth",38)},
-    {label:"Mindset",  val:getScore("mindset",61)},
-    {label:"Relations",val:getScore("relations",45)},
-  ];
-  // Same weighted formula as the dashboard Ring — guarantees they always match
-  const life=getScore("life",52), wealth=getScore("wealth",38), mindset=getScore("mindset",61), relations=getScore("relations",45);
-  const overall=Math.round(life*0.25+wealth*0.30+mindset*0.25+relations*0.20);
-
-  const shareText=`My DestinIQ Clarity Score: ${overall}/100
-
-Life: ${scores[0].val} · Wealth: ${scores[1].val} · Mindset: ${scores[2].val}
-
-Discover your own clarity score at destiniq.vercel.app`;
-
-  const copy=async()=>{
-    try{
-      await navigator.clipboard.writeText(shareText);
-    }catch{
-      // Fallback for browsers that block clipboard
-      const el=document.createElement("textarea");
-      el.value=shareText;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-    }
-    setCopied(true);setTimeout(()=>setCopied(false),2500);
-  };
-
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:24}}>
-      <div style={{background:"var(--night)",border:"1px solid var(--line-gold)",borderRadius:20,padding:28,maxWidth:400,width:"100%"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <div style={{fontSize:16,fontWeight:700,color:"var(--cream)"}}>Share your clarity score</div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:18}}>✕</button>
-        </div>
-
-        {/* Card preview */}
-        <div style={{background:"linear-gradient(135deg,#0d0b00,#1a1500)",border:"1px solid var(--line-gold)",borderRadius:16,padding:24,marginBottom:20,textAlign:"center"}}>
-          <div style={{fontFamily:"var(--f-display)",fontSize:13,color:"var(--gold)",letterSpacing:".1em",marginBottom:8}}>DESTINIQ CLARITY SCORE</div>
-          <div style={{fontFamily:"var(--f-display)",fontSize:56,color:"var(--gold)",fontWeight:400,lineHeight:1}}>{overall}</div>
-          <div style={{fontSize:11,color:"var(--cream-40)",marginBottom:16}}>/100</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-            {scores.map(s=>(
-              <div key={s.label} style={{background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"8px"}}>
-                <div style={{fontSize:18,fontWeight:700,color:"var(--cream)"}}>{s.val}</div>
-                <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{s.label.toUpperCase()}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{fontSize:11,color:"var(--cream-30)"}}>destiniq.vercel.app</div>
-        </div>
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={copy} style={{flex:1,background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-            {copied?"✓ Copied!":"Copy to share"}
-          </button>
-          {typeof navigator!=="undefined"&&navigator.share&&<button onClick={()=>navigator.share({title:"My DestinIQ Score",text:shareText,url:"https://destiniq.vercel.app"})} style={{flex:1,background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer"}}>Share →</button>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4. REFERRAL SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════════
