@@ -6406,6 +6406,17 @@ Give them a powerful, personalized coaching session. Ask one deep question that 
              :mode==="reset"?"Choose a new secure password"
              :mode==="signup"?"Create your account":"Welcome back"}
           </p>
+          {(()=>{
+            const p=new URLSearchParams(typeof window!=="undefined"?window.location.search:"");
+            const wasOAuthErr=p.get("error_code")||p.get("error");
+            return wasOAuthErr?(
+              <div style={{marginTop:12,padding:"10px 14px",background:"rgba(240,180,41,0.08)",
+                border:"1px solid rgba(240,180,41,0.2)",borderRadius:10,fontSize:12,
+                color:"rgba(240,180,41,0.9)"}}>
+                ⚠️ Sign-in session expired. Please try again.
+              </div>
+            ):null;
+          })()}
         </div>
 
         {/* ── FORGOT / RESET flows ── */}
@@ -11138,8 +11149,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       </div>
 
       <div style={{padding:"0 20px"}}>
-        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
-        {/* CONTINUE JOURNEY (Hero card) ══ */}
+        <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>{/* CONTINUE JOURNEY (Hero card) */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -13684,6 +13694,19 @@ function buildProfileContext(p){
 // Language instruction for AI prompts
 
 // ─── langPrompt ───────────────────────────────────────────────────────────────
+const LANGUAGES = [
+  {code:"en", label:"English",    native:"English",    flag:"🇬🇧"},
+  {code:"fr", label:"Français",   native:"Français",   flag:"🇫🇷"},
+  {code:"es", label:"Español",    native:"Español",    flag:"🇪🇸"},
+  {code:"pt", label:"Português",  native:"Português",  flag:"🇧🇷"},
+  {code:"ar", label:"Arabic",     native:"العربية",    flag:"🇸🇦"},
+  {code:"de", label:"Deutsch",    native:"Deutsch",    flag:"🇩🇪"},
+  {code:"hi", label:"Hindi",      native:"हिन्दी",      flag:"🇮🇳"},
+  {code:"yo", label:"Yoruba",     native:"Yorùbá",     flag:"🇳🇬"},
+  {code:"sw", label:"Kiswahili",  native:"Kiswahili",  flag:"🇰🇪"},
+  {code:"ha", label:"Hausa",      native:"Hausa",      flag:"🇳🇬"},
+];
+
 function langPrompt(langCode){
   // Read from localStorage if no code passed (works in standalone functions)
   const code = langCode ||
@@ -14548,7 +14571,19 @@ export default function DestinIQ(){
         // Save streak to localStorage as instant backup (so page refresh shows correct streak)
         try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
 
-        // ── HUBTEL RETURN URL HANDLER ─────────────────────────────────────────────
+        // ── OAUTH ERROR URL HANDLER ───────────────────────────────────────────────
+  useEffect(()=>{
+    if(typeof window==="undefined") return;
+    const params=new URLSearchParams(window.location.search);
+    const errCode=params.get("error_code")||params.get("error");
+    if(errCode){
+      // OAuth redirect error (e.g. bad_oauth_state) — clean URL and show auth
+      try{ window.history.replaceState({},"",window.location.pathname); }catch{}
+      setScreen("auth");
+    }
+  },[]);
+
+  // ── HUBTEL RETURN URL HANDLER ─────────────────────────────────────────────
   useEffect(()=>{
     if(typeof window==="undefined") return;
     const params=new URLSearchParams(window.location.search);
