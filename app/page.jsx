@@ -11089,7 +11089,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   // Today's Insight — from report data or derived from profile
   const getInsight=()=>{
     const ri=txt(dailyInsight)||txt(data?.daily_insight)||txt(data?.daily_recommendation)||txt(data?.closing);
-    if(ri&&ri.length>20){ const sents=ri.split(/(?<=[\.!?])\s+/); return sents.slice(0,2).join(' ').slice(0,220); }
+    if(ri&&ri.length>20){ const sents=ri.split(/(?<=[\.!?])\s+/); return sents.slice(0,4).join(' ').slice(0,400); }
     const bl=(Array.isArray(formData?.blockers)?formData.blockers.join(" "):(formData?.challenge||"")).toLowerCase();
     const fo=(formData?.focus||"").toLowerCase();
     if(bl.includes("overthink"))  return "You tend to overthink decisions. Today is about taking one clear action without delay.";
@@ -11152,7 +11152,6 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
       <div style={{padding:"0 20px"}}>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
-        {/* ══ 2. CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -13106,12 +13105,7 @@ Rules:
 
   // ── nav routing ──────────────────────────────────────────────────────
   const [navSection,setNavSection]=useState(()=>{try{return localStorage.getItem("diq_nav")||"home";}catch{return "home";}});
-  const [isMobile,setIsMobile]=useState(()=>typeof window!=="undefined"&&window.innerWidth<900);
-  useEffect(()=>{
-    const onResize=()=>setIsMobile(window.innerWidth<900);
-    window.addEventListener("resize",onResize);
-    return()=>window.removeEventListener("resize",onResize);
-  },[]);
+
   const [navHistory,setNavHistory]=useState([]);
   const setNav=(s)=>{
     if(s!==navSection) setNavHistory(h=>[...h.slice(-19),navSection]);
@@ -13179,7 +13173,7 @@ Rules:
   return(
     <div className="app-shell">
 
-      <SidebarNav nav={navSection}/>
+      <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 
       <MobileTopBar
         title={(()=>{
@@ -14700,6 +14694,8 @@ export default function DestinIQ(){
           try{Object.keys(localStorage).forEach(k=>{if(k.startsWith("diq_")||k.startsWith("destiniq_"))localStorage.removeItem(k);});}catch{}
         };
         window.addEventListener("signOut",handleSignOutEv);
+        const handleShowNotif=()=>setShowNotif(true);
+        window.addEventListener("showNotif",handleShowNotif);
         const handlePhotoUpdated=(e)=>{ if(e.detail?.url) setNavPhotoURL(e.detail.url); };
         window.addEventListener("photoUpdated",handlePhotoUpdated);
         const handleCI=(e)=>{
@@ -14711,7 +14707,7 @@ export default function DestinIQ(){
           });
         };
         window.addEventListener("checkinComplete",handleCI);
-        return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("photoUpdated",handlePhotoUpdated);window.removeEventListener("checkinComplete",handleCI);};
+        return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("showNotif",handleShowNotif);window.removeEventListener("photoUpdated",handlePhotoUpdated);window.removeEventListener("checkinComplete",handleCI);};
   },[]);
 
   // ── BROWSER BACK BUTTON ──────────────────────────────────────────────
