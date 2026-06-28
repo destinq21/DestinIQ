@@ -295,7 +295,7 @@ async function saveWeeklyReport(userId, report) {
 
 // ─── PAYSTACK CONFIG ─────────────────────────────────────────────────────────
 // Replace with your real Paystack public key from paystack.com → Settings → API Keys
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges happen in USD via Paystack — international cards from anywhere
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -1015,7 +1015,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
 .fu-input:focus{border-color:var(--gold);}
 @media(max-width:900px){
-  .sidebar{display:none;}.main-area{margin-left:0;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
+  .sidebar{display:none!important;}.main-area{margin-left:0!important;padding-bottom:74px;}.bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
 }
@@ -1574,17 +1574,24 @@ function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
     ?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`
     :"not yet generated";
   const {code:currCode,symbol:currSym} = getLocalCurrency(country);
-  return `You are ${name}'s personal advisor at DestinIQ. You know everything about them.
+  return `You are ${name}'s personal AI companion at DestinIQ — part close friend, part life coach. You know their full story from their profile.
 
-FULL PROFILE:
+THEIR PROFILE:
 ${buildProfileContext(profile)}
 
 THEIR SCORES: ${scoreStr}
-${memCtx?`\nPREVIOUS CONVERSATION:\n${memCtx}`:""}
+${memCtx?`\nEARLIER IN THIS CONVERSATION:\n${memCtx}`:""}
 
-CURRENCY: All local costs/prices = ${currSym} (${currCode}). Online/international income = USD + ${currSym} equivalent.
+CURRENCY: Local costs = ${currSym} (${currCode}). International income = USD + ${currSym} equivalent.
 
-You are a brilliant, warm, honest friend who has studied ${name}'s life deeply. You remember everything they shared. You speak directly to them, use their name naturally, give advice specific to ${country}, and never give generic responses.${isPremium?` Give your deepest most detailed guidance.`:""}`;
+HOW TO SHOW UP IN THIS CONVERSATION:
+- If they say hello, how are you, what's up, or just want to chat → respond warmly and casually like a real friend would. Ask how they're doing. Do NOT immediately jump into coaching or goals. Just be present.
+- If they share something difficult or emotional → listen first. Reflect back what you're hearing. Ask one good question before offering any advice.
+- If they ask for coaching, feedback, or what to do → give your most honest, specific, deeply personalised guidance. Reference their actual situation. Use their name naturally.
+- Match their energy. Short message → short reply. Deep question → go deep.
+- Never give generic advice. Everything is specific to ${name} in ${country}.
+- You remember everything said earlier in this conversation. Refer back to it naturally.
+${isPremium?`- Give your fullest, most detailed thinking. They have full access.`:`- Give real value, but let them know deeper analysis is available if they want to go further.`}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2741,6 +2748,15 @@ function NotificationPanel({profile,userId,streak,onClose}){
   const schedule=async()=>{
     setStatus("scheduling");
     try{
+      // Request browser notification permission first (web only)
+      if(!isNative && typeof Notification!=="undefined"){
+        const perm = await Notification.requestPermission();
+        if(perm!=="granted"){
+          setStatus("error");
+          setTestMsg("Permission denied — please allow notifications in your browser/device settings, then try again.");
+          return;
+        }
+      }
       await scheduleNotification(userId,profile?.name||"",profile?.goals||"",streak||1,times,null);
       setStatus("done");
     }catch(e){
@@ -3411,32 +3427,32 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   );
 }
 function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
-  const openingMessage = `Hey ${profile?.name||"there"}. I've read everything you shared — and I want you to know, I get it. You're not stuck because you're not capable. You're stuck because no one has helped you see the full picture clearly yet.\n\nThat's what I'm here for. Ask me anything — about your situation, what's weighing on you, what to do next. Nothing is off limits. Where do you want to start?`;
+  const openingMessage = `Hey ${profile?.name?.split(" ")[0]||"there"} 👋 Good to see you.\n\nI'm your AI companion — I've gone through everything you shared and I know your situation well. I'm here whether you want to think something through, talk something out, or just need someone to check in with.\n\nWhat's on your mind?`;
   const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
   // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
-  const FREE_DAILY_LIMIT = 1;  // Free: 1 message/day
-  const PRO_DAILY_LIMIT  = 10; // Pro: 10 messages/day (Pro Max = unlimited)ers: 2 advisor messages per day
+  // Limit by characters typed per day (not messages — "hello" ≠ a deep question)
+  const FREE_CHAR_LIMIT = 600;   // ~10 short messages or ~5 medium ones
+  const PRO_CHAR_LIMIT  = 6000;  // extended daily conversations
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
-  const [usedToday,setUsedToday]=useState(()=>{
+  const [charsUsed,setCharsUsed]=useState(()=>{
     if(typeof window==="undefined") return 0;
     return parseInt(localStorage.getItem(limitKey)||"0");
   });
-  // Tier-based limits: Free=1/day, Pro=10/day, ProMax=unlimited
-  const dailyLimit    = isPremium ? Infinity : isPaid ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
-  const remaining     = Math.max(0, dailyLimit === Infinity ? 999 : dailyLimit - usedToday);
-  const limitReached  = dailyLimit !== Infinity && remaining <= 0;
+  const dailyCharLimit = isPremium ? Infinity : isPaid ? PRO_CHAR_LIMIT : FREE_CHAR_LIMIT;
+  const charsRemaining = dailyCharLimit===Infinity ? 999999 : Math.max(0, dailyCharLimit - charsUsed);
+  const limitReached   = dailyCharLimit!==Infinity && charsRemaining<=0;
 
   const send=async()=>{
     if(!input.trim()||loading) return;
     if(limitReached){ onUnlock&&onUnlock(); return; }
     const msg=sanitize(input.trim());setInput("");setError("");
-    if(!isPaid){
-      const next=usedToday+1;
-      setUsedToday(next);
+    if(dailyCharLimit!==Infinity){
+      const next=charsUsed+msg.length;
+      setCharsUsed(next);
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
     }
     const updated=[...msgs,{role:"user",content:msg}];setMsgs(updated);setLoading(true);
@@ -3501,9 +3517,9 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
       </div>
 
       {/* Message thread */}
-      <div ref={threadRef} style={{flex:1,overflowY:"auto",scrollbarWidth:"none",display:"flex",flexDirection:"column",gap:12,paddingRight:4}}>
+      <div ref={scrollRef} style={{flex:1,overflowY:"auto",scrollbarWidth:"none",display:"flex",flexDirection:"column",gap:12,paddingRight:4}}>
         {/* Welcome bubble */}
-        {thread.length===0&&(
+        {msgs.length===0&&(
           <div style={{textAlign:"center",padding:"32px 16px"}}>
             <div style={{fontSize:40,marginBottom:12}}>🤖</div>
             <h3 style={{fontSize:16,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>Your AI Coach</h3>
@@ -3511,9 +3527,9 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
               Ask me anything about your goals, challenges, or decisions. I know your profile and report.
             </p>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:16}}>
-              {["What should I focus on today?","What's my biggest blind spot?","How do I build better habits?","What career move should I make?"]
-                .map(q=>(
-                <button key={q} onClick={()=>setInput(q)}
+              {["What should I actually focus on right now?","What's my biggest blind spot?","I’m scared to make the wrong move","How do I stop overthinking and just act?"]
+                .map((q,qi)=>(
+                <button key={qi} onClick={()=>setInput(q)}
                   style={{padding:"8px 14px",background:G.card,border:"1px solid "+G.border,
                     borderRadius:20,fontSize:12,color:G.dim,cursor:"pointer",fontFamily:"inherit",
                     transition:"border-color .15s"}}
@@ -3526,7 +3542,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
           </div>
         )}
 
-        {thread.map((msg,i)=>(
+        {msgs.map((msg,i)=>(
           <div key={i} style={{display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start",gap:10}}>
             {msg.role==="assistant"&&(
               <div style={{width:28,height:28,borderRadius:"50%",flexShrink:0,
@@ -3544,7 +3560,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
           </div>
         ))}
 
-        {aiLoading&&(
+        {loading&&(
           <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
             <div style={{width:28,height:28,borderRadius:"50%",
               background:"rgba(155,114,207,0.2)",border:"1px solid rgba(155,114,207,0.25)",
@@ -3575,19 +3591,25 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
               resize:"none",lineHeight:1.6,transition:"border-color .2s"}}
             onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
             onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
-          <button onClick={send} disabled={!input.trim()||aiLoading}
+          <button onClick={send} disabled={!input.trim()||loading}
             style={{width:44,height:44,borderRadius:"50%",flexShrink:0,
-              background:input.trim()&&!aiLoading?G.gold:"rgba(255,255,255,0.06)",
-              color:input.trim()&&!aiLoading?"#000":G.dimmer,
-              border:"none",cursor:input.trim()&&!aiLoading?"pointer":"default",
+              background:input.trim()&&!loading?G.gold:"rgba(255,255,255,0.06)",
+              color:input.trim()&&!loading?"#000":G.dimmer,
+              border:"none",cursor:input.trim()&&!loading?"pointer":"default",
               fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",
               transition:"all .2s"}}>
             →
           </button>
         </div>
-        <p style={{fontSize:10,color:G.dimmer,margin:"8px 0 0",textAlign:"center"}}>
-          Press Enter to send · Shift+Enter for new line
-        </p>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+          <p style={{fontSize:10,color:G.dimmer,margin:0}}>Enter to send · Shift+Enter for new line</p>
+          {dailyCharLimit!==Infinity&&(
+            <p style={{fontSize:10,margin:0,
+              color:charsRemaining<100?"#e05252":charsRemaining<300?"#f0b429":"rgba(232,220,200,0.3)"}}>
+              {limitReached?"Limit reached — upgrade for more":`~${Math.ceil(charsRemaining/80)} messages left`}
+            </p>
+          )}
+        </div>
       </div>
       <style>{`
         @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
@@ -5996,6 +6018,10 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
         </div>
       ) : content2 ? (
         <div>
+          {/* 🔊 Listen button */}
+          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+            <AudioPlayer text={content2} label="Listen to this"/>
+          </div>
           <div className="card" style={{lineHeight:1.9,fontSize:14,color:"var(--cream-70)",whiteSpace:"pre-wrap"}}>
             {content2}
           </div>
@@ -6303,7 +6329,48 @@ function AuthScreen({onAuth, onBack}){
   const iStyle={width:"100%",padding:"14px 16px",background:G.inp,
     border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
     fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit",
-    transition:"border-color .2s"};
+    transition:"border-color .2s",
+  relocate: {
+    title:"Relocation Intelligence",icon:"🌍",subtitle:"Find the best country for your next chapter",
+    prompt:(p)=>{
+      const name=p.name||"this person";
+      const age=p.age||"adult";
+      const country=p.country||"their country";
+      const goals=p.goals||p.bigGoal||"better opportunities";
+      const income=p.income||"not stated";
+      const challenge=p.challenge||"not stated";
+      const job=p.occupation||"not stated";
+      return `You are DestinIQ's relocation intelligence expert. Give ${name} (${age}, from ${country}) a brutally honest, specific, personalised relocation analysis.
+
+Their goals: ${goals}
+Income level: ${income}
+Main blocker: ${challenge}
+Occupation: ${job}
+
+Structure your response like this:
+
+SHOULD YOU RELOCATE?
+Honest 3-4 sentence verdict. Factor in their income, age, goals, and realities of leaving ${country}. Don't sugarcoat.
+
+TOP 3 COUNTRIES FOR THEM
+For each: Why it fits their specific situation. Visa pathway (exact visa name, requirements, timeline). Monthly costs in USD (rent + food + transport). Salary range in their field. One honest downside.
+
+6-MONTH ACTION PLAN
+Step-by-step from where they are now. Include: savings target, documents to prepare, skills to build, communities to join.
+
+THE ONE THING MOST PEOPLE MISS
+The single most overlooked reality of relocating from ${country} that makes or breaks the move.
+
+Use real numbers. Name real cities, real visa programs, real salary ranges. No generic advice.`;
+    }
+  },
+  advisor: {
+    title:"AI Coach",icon:"🤖",subtitle:"Your personal AI life coach — ask anything",
+    prompt:(p)=>`You are DestinIQ's personal AI coach having a deep 1-on-1 conversation with ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}).
+Their goals: ${p.goals||p.bigGoal||"personal growth"}. Main challenge: ${p.challenge||"not specified"}. Focus: ${p.focus||"life improvement"}.
+Give them a powerful, personalized coaching session. Ask one deep question that helps them see their situation more clearly. Then provide your honest coach assessment. Be direct, warm, and genuinely helpful.`
+  }
+};
 
   const showEmailForm = tab==="email" && (mode==="login"||mode==="signup");
 
@@ -9352,173 +9419,183 @@ function PracticesView({userId}){
     byModule[t.module].push(t);
   });
 
+  const G={
+    gold:"#f0b429",card:"#111008",border:"rgba(232,220,200,0.07)",
+    cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+  };
+
   return(
-    <div className="fu">
+    <div style={{padding:"20px 20px 90px",minHeight:"100vh",color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+
       {/* Header */}
-      <div style={{marginBottom:24}}>
-        <div className="d3" style={{marginBottom:6}}>My Practices</div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.65,marginBottom:16}}>
-          Every practice you commit to is tracked here. Mark things active, note your progress, and move them to Mastered when they become part of who you are.
-        </p>
+      <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>My Practices</h2>
+      <p style={{fontSize:13,color:G.dim,margin:"0 0 20px",lineHeight:1.6}}>
+        Commit to habits that compound over time. Track your progress daily.
+      </p>
 
-        {/* Overall progress bar */}
-        <div style={{background:"var(--lift)",borderRadius:16,padding:"18px 20px",border:"1px solid var(--line-gold)",marginBottom:16}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-            <div>
-              <div style={{fontSize:22,fontWeight:800,color:"var(--cream)"}}>{ht.committed.length}<span style={{fontSize:14,color:"var(--cream-40)",fontWeight:400}}>/{ht.total}</span></div>
-              <div style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>PRACTICES COMMITTED</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:22,fontWeight:800,color:"var(--gold)"}}>{ht.pct}%</div>
-              <div style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>OVERALL</div>
-            </div>
+      {/* Progress card */}
+      <div style={{background:G.card,border:"1px solid rgba(240,180,41,0.15)",
+        borderRadius:16,padding:"18px 20px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
+          <div>
+            <div style={{fontSize:26,fontWeight:800,color:G.cream,lineHeight:1}}>{ht.committed.length}</div>
+            <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>COMMITTED</div>
           </div>
-          <div style={{height:10,background:"rgba(255,255,255,0.06)",borderRadius:5,overflow:"hidden",marginBottom:10}}>
-            <div style={{height:"100%",width:`${ht.pct}%`,background:"linear-gradient(90deg,var(--teal),var(--gold))",borderRadius:5,transition:"width .8s ease"}}/>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:26,fontWeight:800,color:"#1ab89a",lineHeight:1}}>{ht.mastered?.length||0}</div>
+            <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>MASTERED</div>
           </div>
-          <div style={{display:"flex",gap:16}}>
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:"var(--teal)"}}/>
-              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{ht.active.length} active</span>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:"var(--gold)"}}/>
-              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{ht.mastered.length} mastered</span>
-            </div>
-            {ht.paused.length>0&&<div style={{display:"flex",alignItems:"center",gap:5}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:"rgba(255,255,255,0.2)"}}/>
-              <span style={{fontSize:11,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{ht.paused.length} paused</span>
-            </div>}
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:26,fontWeight:800,color:G.gold,lineHeight:1}}>{ht.pct}%</div>
+            <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>COMPLETE</div>
           </div>
         </div>
-
-        {/* Per-module mini progress */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginBottom:16}}>
-          {Object.entries(byModule).map(([mod,items])=>{
-            const done=items.filter(t=>ht.data[t.key]?.committed).length;
-            const pct=Math.round((done/items.length)*100);
-            return(
-              <div key={mod} onClick={()=>setFilter(f=>f===mod?"all":mod)}
-                style={{padding:"10px 12px",background:filter===mod?"var(--lift)":"var(--raised)",border:`1px solid ${filter===mod?"var(--line-gold)":"rgba(255,255,255,0.06)"}`,borderRadius:12,cursor:"pointer",transition:"all .2s"}}>
-                <div style={{fontSize:10,color:"var(--cream-40)",fontFamily:"var(--f-mono)",marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{MODULE_LABELS[mod]}</div>
-                <div style={{height:4,background:"rgba(255,255,255,0.06)",borderRadius:2,marginBottom:4}}>
-                  <div style={{height:"100%",width:`${pct}%`,background: pct===100?"var(--gold)":"var(--teal)",borderRadius:2,transition:"width .5s"}}/>
-                </div>
-                <div style={{fontSize:10,fontWeight:700,color:pct===100?"var(--gold)":"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{done}/{items.length}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Filter pills */}
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          {[["all","All 33"],["committed","Committed"],["mastered","Mastered ✦"],["not_started","Not started yet"],
-            ...Object.keys(byModule).map(m=>[m,MODULE_LABELS[m]])
-          ].map(([val,lbl])=>(
-            <button key={val} onClick={()=>setFilter(val)}
-              style={{padding:"5px 13px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,transition:"all .2s",
-                background:filter===val?"var(--gold)":"rgba(255,255,255,0.05)",
-                color:filter===val?"#000":"var(--cream-40)"}}>
-              {lbl}
-            </button>
-          ))}
+        <div style={{height:6,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${ht.pct}%`,
+            background:"linear-gradient(90deg,#1ab89a,#f0b429)",
+            borderRadius:3,transition:"width .4s ease"}}/>
         </div>
       </div>
 
-      {/* Items list */}
-      {displayed.length===0&&(
-        <div style={{textAlign:"center",padding:"48px 20px",background:"var(--raised)",borderRadius:16,border:"1px solid rgba(255,255,255,0.06)"}}>
-          <div style={{fontSize:32,marginBottom:12}}>
-            {filter==="not_started"?"🚀":filter==="mastered"?"✦":"📋"}
-          </div>
-          <div style={{fontSize:14,color:"var(--cream-50)",marginBottom:8}}>
-            {filter==="not_started"?"You've committed to everything! Incredible."
-             :filter==="mastered"?"Nothing mastered yet — keep going."
-             :filter==="committed"?"No practices committed yet."
-             :"No practices in this filter."}
-          </div>
-          {filter==="committed"&&<p style={{fontSize:12,color:"var(--cream-30)",maxWidth:320,margin:"0 auto"}}>
-            Open any module tab — Daily Discipline, Invest in Yourself, Get Successful, 10x Mindset — expand a section and tap "I'm doing this".
-          </p>}
-        </div>
-      )}
+      {/* Filter tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:18,overflowX:"auto",scrollbarWidth:"none"}}>
+        {[["all","All"],["active","Active"],["mastered","Mastered ✦"],["paused","Paused"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setFilter(id)}
+            style={{padding:"7px 16px",borderRadius:20,flexShrink:0,fontFamily:"inherit",
+              fontSize:12,cursor:"pointer",transition:"all .15s",
+              background:filter===id?"rgba(240,180,41,0.1)":"none",
+              border:`1px solid ${filter===id?"rgba(240,180,41,0.4)":"rgba(232,220,200,0.1)"}`,
+              color:filter===id?G.gold:G.dim}}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {/* Habit cards */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
         {displayed.map(item=>{
-          const entry=ht.data[item.key];
-          const isIn=entry?.committed;
-          const status=entry?.status||"active";
-          const sm=STATUS_META[status]||STATUS_META.active;
-          const days=daysActive(entry);
-          const isExp=expandKey===item.key;
+          const isIn    = ht.committed?.includes?.(item.key);
+          const isMast  = ht.mastered?.includes?.(item.key);
+          const isPaus  = ht.paused?.includes?.(item.key);
+          const status  = isMast?"mastered":isPaus?"paused":isIn?"active":null;
+          const sm      = status?STATUS_META[status]:null;
+          const isExp   = expandKey===item.key;
 
           return(
             <div key={item.key} style={{
-              background:isIn?sm.bg:"rgba(255,255,255,0.02)",
-              border:`1px solid ${isIn?sm.border:"rgba(255,255,255,0.06)"}`,
-              borderRadius:14,overflow:"hidden",transition:"all .25s",
-            }}>
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"13px 16px",cursor:"pointer"}}
+              background:isIn?`${item.color}08`:"rgba(255,255,255,0.02)",
+              border:`1px solid ${isIn?`${item.color}30`:G.border}`,
+              borderRadius:14,overflow:"hidden",transition:"all .2s"}}>
+
+              {/* Main row */}
+              <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:isIn?"pointer":"default"}}
                 onClick={()=>isIn&&setExpandKey(isExp?null:item.key)}>
 
                 {/* Commit toggle */}
                 <button onClick={e=>{e.stopPropagation();isIn?ht.uncommit(item.key):ht.commit(item.key);}}
-                  style={{width:32,height:32,borderRadius:"50%",flexShrink:0,cursor:"pointer",border:"none",
-                    background:isIn?sm.border:"rgba(255,255,255,0.06)",
-                    color:isIn?sm.color:"var(--cream-30)",
-                    fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}
-                  title={isIn?"Remove from tracker":"I'm doing this"}>
-                  {isIn?"✓":"○"}
+                  style={{width:28,height:28,borderRadius:"50%",flexShrink:0,border:"none",
+                    cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:isIn?(isMast?"rgba(240,180,41,0.2)":"rgba(26,184,154,0.2)"):"rgba(255,255,255,0.06)",
+                    color:isIn?(isMast?G.gold:"#1ab89a"):"rgba(232,220,200,0.3)",
+                    transition:"all .2s"}}>
+                  {isMast?"✦":isIn?"✓":"○"}
                 </button>
 
-                <span style={{fontSize:17,flexShrink:0}}>{item.icon}</span>
-
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:isIn?600:400,color:isIn?"var(--cream)":"var(--cream-40)",lineHeight:1.4,marginBottom:isIn?3:0}}>{item.label}</div>
-                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{MODULE_LABELS[item.module]}</span>
-                    {isIn&&<span style={{fontSize:9,fontFamily:"var(--f-mono)",color:sm.color,background:sm.bg,padding:"1px 7px",borderRadius:10,border:`1px solid ${sm.border}`}}>{sm.label}</span>}
-                    {isIn&&days>0&&<span style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{days}d in</span>}
-                    {isIn&&entry?.notes&&<span style={{fontSize:9,color:"var(--cream-30)"}}>📝 note</span>}
-                  </div>
+                <div style={{width:36,height:36,borderRadius:10,flexShrink:0,
+                  background:`${item.color}18`,border:`1px solid ${item.color}30`,
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                  {item.icon}
                 </div>
 
-                {isIn&&(
-                  <select value={status} onClick={e=>e.stopPropagation()} onChange={e=>ht.updateStatus(item.key,e.target.value)}
-                    style={{background:"var(--midnight)",border:`1px solid ${sm.border}`,borderRadius:8,padding:"4px 8px",color:sm.color,fontSize:10,fontFamily:"var(--f-mono)",cursor:"pointer",outline:"none",flexShrink:0}}>
-                    <option value="active">Active</option>
-                    <option value="mastered">Mastered ✦</option>
-                    <option value="paused">Paused</option>
-                  </select>
-                )}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:600,color:G.cream,
+                    textDecoration:isPaus?"line-through":"none",opacity:isPaus?.5:1}}>
+                    {item.label}
+                  </div>
+                  {sm&&(
+                    <div style={{fontSize:10,color:sm.color,fontWeight:700,
+                      letterSpacing:".06em",fontFamily:"monospace",marginTop:2}}>
+                      {sm.label}{isIn&&!isMast?` · ${daysActive(ht.getEntry?.(item.key))} days`:""}
+                    </div>
+                  )}
+                </div>
+
+                {isIn&&<span style={{color:G.dimmer,fontSize:16,flexShrink:0}}>{isExp?"↑":"↓"}</span>}
               </div>
 
-              {/* Note editor — shows when expanded */}
+              {/* Expanded controls */}
               {isIn&&isExp&&(
-                <div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
-                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".08em",marginBottom:6,marginTop:12}}>
-                    YOUR PROGRESS NOTE
+                <div style={{padding:"0 16px 14px",borderTop:"1px solid "+G.border}}>
+                  <div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}>
+                    {!isMast&&(
+                      <button onClick={()=>ht.markMastered?.(item.key)}
+                        style={{padding:"7px 14px",background:"rgba(240,180,41,0.08)",
+                          border:"1px solid rgba(240,180,41,0.25)",borderRadius:20,
+                          color:G.gold,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                        ✦ Mark as Mastered
+                      </button>
+                    )}
+                    {!isPaus?(
+                      <button onClick={()=>ht.pause?.(item.key)}
+                        style={{padding:"7px 14px",background:"rgba(255,255,255,0.04)",
+                          border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
+                          color:G.dim,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                        ⏸ Pause
+                      </button>
+                    ):(
+                      <button onClick={()=>ht.resume?.(item.key)}
+                        style={{padding:"7px 14px",background:"rgba(26,184,154,0.08)",
+                          border:"1px solid rgba(26,184,154,0.25)",borderRadius:20,
+                          color:"#1ab89a",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                        ▶ Resume
+                      </button>
+                    )}
+                    <button onClick={()=>{ht.uncommit(item.key);setExpandKey(null);}}
+                      style={{padding:"7px 14px",background:"rgba(224,82,82,0.06)",
+                        border:"1px solid rgba(224,82,82,0.15)",borderRadius:20,
+                        color:"#e05252",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                      Remove
+                    </button>
                   </div>
-                  <NoteEditor itemKey={item.key} ht={ht}/>
                 </div>
               )}
             </div>
           );
         })}
+
+        {displayed.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 20px",color:G.dimmer}}>
+            <div style={{fontSize:32,marginBottom:12}}>
+              {filter==="mastered"?"✦":filter==="active"?"⚡":"📋"}
+            </div>
+            <p style={{fontSize:14,lineHeight:1.7,margin:0}}>
+              {filter==="mastered"?"No mastered practices yet. Keep showing up."
+               :filter==="active"?"No active practices. Commit to one above."
+               :filter==="paused"?"Nothing paused. Good."
+               :"No practices to show."}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Motivational footer */}
-      {ht.committed.length>0&&(
-        <div style={{marginTop:24,padding:"20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
-          <div style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75}}>
-            {ht.mastered.length===0&&ht.committed.length<5&&"Every great life is built one committed practice at a time. Keep going."}
-            {ht.committed.length>=5&&ht.mastered.length===0&&"You're building something real. The first 21 days of any practice are the hardest."}
-            {ht.mastered.length>0&&ht.mastered.length<3&&`You've mastered ${ht.mastered.length} practice${ht.mastered.length>1?"s":""}. That's not a small thing. It means the habit is now part of you.`}
-            {ht.mastered.length>=3&&`${ht.mastered.length} practices mastered. You are not the same person who started. Keep compounding.`}
-          </div>
-          {ht.pct===100&&<div style={{marginTop:10,fontSize:15,color:"var(--gold)",fontWeight:700}}>
-            ✦ All 33 practices committed. You're playing a different game entirely.
-          </div>}
+      {ht.committed?.length>0&&(
+        <div style={{marginTop:24,padding:"18px 20px",
+          background:"rgba(240,180,41,0.05)",
+          border:"1px solid rgba(240,180,41,0.12)",borderRadius:14,textAlign:"center"}}>
+          <p style={{fontSize:13,color:G.dim,lineHeight:1.75,margin:0}}>
+            {ht.mastered?.length>=3
+              ?`${ht.mastered.length} practices mastered. You are not the same person who started. Keep compounding.`
+              :ht.committed.length>=5
+              ?"You're building something real. The first 21 days of any practice are the hardest."
+              :"Every great life is built one committed practice at a time. Keep going."}
+          </p>
+          {ht.pct===100&&(
+            <div style={{marginTop:10,fontSize:15,color:G.gold,fontWeight:700}}>
+              ✦ All practices committed. You're playing a different game entirely.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -10817,7 +10894,7 @@ function StreakCelebration({streak, onClose}){
 
 
 // ── SidebarNav ───────────────────────────────────────────────────────────
-function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock}){
+function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formData,navPhotoURL,onNotif}){
   const ITEMS=[
     {id:"home",    icon:"🏠",label:"Home"},
     {id:"explore", icon:"🔍",label:"Explore"},
@@ -10872,6 +10949,38 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock}){
           </button>
         </div>
       )}
+
+      {/* User info + notification bell at bottom */}
+      <div style={{borderTop:"1px solid rgba(232,220,200,0.07)",padding:"14px 16px",
+        display:"flex",alignItems:"center",gap:10,marginTop:"auto"}}>
+        <div onClick={()=>setNav("profile")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
+          <div style={{width:32,height:32,borderRadius:"50%",flexShrink:0,
+            background:"linear-gradient(135deg,#f0b429,#1ab89a)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:13,fontWeight:700,color:"#000",overflow:"hidden"}}>
+            {navPhotoURL
+              ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              :(formData?.name||"U")[0].toUpperCase()
+            }
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:700,color:"var(--cream)",
+              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              {formData?.name?.split(" ")[0]||"User"}
+            </div>
+            <div style={{fontSize:10,color:"rgba(232,220,200,0.4)"}}>
+              {isPaid?(isPremium?"✦ Pro Max":"◆ Pro"):"Free Plan"}
+            </div>
+          </div>
+        </div>
+        {onNotif&&(
+          <button onClick={onNotif}
+            style={{background:"none",border:"none",color:"rgba(232,220,200,0.4)",
+              cursor:"pointer",fontSize:16,padding:"4px",flexShrink:0,lineHeight:1}}>
+            🔔
+          </button>
+        )}
+      </div>
     </nav>
   );
 }
@@ -10949,7 +11058,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   // Today's Insight — from report data or derived from profile
   const getInsight=()=>{
     const ri=txt(dailyInsight)||txt(data?.daily_insight)||txt(data?.daily_recommendation)||txt(data?.closing);
-    if(ri&&ri.length>20) return ri;
+    if(ri&&ri.length>20){ const sents=ri.split(/(?<=[\.!?])\s+/); return sents.slice(0,2).join(' ').slice(0,220); }
     const bl=(Array.isArray(formData?.blockers)?formData.blockers.join(" "):(formData?.challenge||"")).toLowerCase();
     const fo=(formData?.focus||"").toLowerCase();
     if(bl.includes("overthink"))  return "You tend to overthink decisions. Today is about taking one clear action without delay.";
@@ -10995,7 +11104,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
     {icon:"🤖",label:"AI Coach",     bg:"rgba(155,114,207,.12)",brd:"rgba(155,114,207,.25)",color:"#9b72cf", action:()=>setNav("tool:advisor")},
     {icon:"⚡",label:"Challenge",    bg:"rgba(229,115,115,.12)",brd:"rgba(229,115,115,.25)",color:"#e57373", action:()=>setNav("tool:weeklychallenge")},
     {icon:"🏆",label:"My Wins",      bg:"rgba(255,213,79,.10)", brd:"rgba(255,213,79,.25)", color:"#ffd54f", action:()=>setNav("wins")},
-    {icon:"📓",label:"Journal",      bg:"rgba(100,181,246,.12)",brd:"rgba(100,181,246,.25)",color:"#64b5f6", action:()=>setNav("tool:lettertoself")},
+    {icon:"📓",label:"Journal",      bg:"rgba(100,181,246,.12)",brd:"rgba(100,181,246,.25)",color:"#64b5f6", action:()=>setNav("journal")},
   ]
 
   return(
@@ -11575,7 +11684,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
 
 
 // ── CategoryPage ──────────────────────────────────────────────────────────
-function CategoryPage({catId,setNav,userId}){
+function CategoryPage({catId,setNav,goBack,userId}){
   const cat=CATEGORIES.find(c=>c.id===catId);
   if(!cat) return null;
 
@@ -11590,10 +11699,10 @@ function CategoryPage({catId,setNav,userId}){
       color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
       {/* Back */}
-      <button onClick={()=>setNav("explore")}
+      <button onClick={()=>goBack?goBack():setNav("explore")}
         style={{background:"none",border:"none",color:G.dim,cursor:"pointer",
           fontSize:13,padding:"0 0 18px",display:"flex",alignItems:"center",gap:6}}>
-        ← Explore
+        ← Back
       </button>
 
       {/* Hero */}
@@ -11645,7 +11754,7 @@ function CategoryPage({catId,setNav,userId}){
 }
 
 // ── ToolPage ──────────────────────────────────────────────────────────────
-function ToolPage({toolId,setNav,formData,userId,isPaid,isPremium,isProMax,onUnlock,lang}){
+function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMax,onUnlock,lang}){
   const meta=TOOL_META[toolId];
   const cat=meta?CATEGORIES.find(c=>c.id===meta.cat):null;
   const [fu,setFu]=useState(""); const [fuRes,setFuRes]=useState(""); const [fuL,setFuL]=useState(false); const [bm,setBm]=useState(false);
@@ -11665,7 +11774,7 @@ function ToolPage({toolId,setNav,formData,userId,isPaid,isPremium,isProMax,onUnl
   const related=(cat?.tools||[]).filter(t=>t!==toolId).slice(0,3);
   return(
     <div className="pg">
-      <button className="pg-back" onClick={()=>setNav(cat?"category:"+cat.id:"explore")}>← {cat?.label||"Explore"}</button>
+      <button className="pg-back" onClick={()=>goBack?goBack():setNav(cat?"category:"+cat.id:"explore")} style={{cursor:"pointer"}}>← {cat?.label||"Back"}</button>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
         <div style={{width:46,height:46,borderRadius:13,background:`${meta?.color||"var(--gold)"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{meta?.icon||"✦"}</div>
         <div>
@@ -11705,7 +11814,7 @@ function ToolPage({toolId,setNav,formData,userId,isPaid,isPremium,isProMax,onUnl
 }
 
 // ── ProgressScreen ────────────────────────────────────────────────────────
-function ProgressScreen({data,streak,userId,setNav}){
+function ProgressScreen({data,streak,userId,setNav,goBack}){
   const s=data?.scores||{};
   const overall=Math.min(99,Math.max(1,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
   const toolCount=(()=>{try{return JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]").length;}catch{return 0;}})();
@@ -11736,7 +11845,7 @@ function ProgressScreen({data,streak,userId,setNav}){
 
       {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:12,padding:"18px 20px 14px"}}>
-        <button onClick={()=>setNav("home")} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1,minWidth:32,minHeight:32}}>←</button>
+        <button onClick={()=>goBack?goBack():setNav("home")} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1,minWidth:32,minHeight:32}}>←</button>
         <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:0}}>Progress</h2>
       </div>
 
@@ -11844,6 +11953,49 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
   const email   = user?.email||"";
   const initial = (name[0]||"U").toUpperCase();
 
+  const [photoURL,   setPhotoURL  ]=useState(navPhotoURL||null);
+  const [uploading,  setUploading ]=useState(false);
+  const fileRef = useRef(null);
+
+  // Keep in sync if navPhotoURL changes (e.g. on initial load)
+  useEffect(()=>{ if(navPhotoURL&&!photoURL) setPhotoURL(navPhotoURL); },[navPhotoURL]);
+
+  const handlePhotoChange=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file||!user?.id) return;
+    setUploading(true);
+    try{
+      const bitmap=await createImageBitmap(file);
+      const canvas=document.createElement("canvas");
+      canvas.width=240; canvas.height=240;
+      const ctx=canvas.getContext("2d");
+      // Centre-crop to square
+      const size=Math.min(bitmap.width,bitmap.height);
+      const ox=(bitmap.width-size)/2, oy=(bitmap.height-size)/2;
+      ctx.drawImage(bitmap,ox,oy,size,size,0,0,240,240);
+      const blob=await new Promise(res=>canvas.toBlob(res,"image/jpeg",0.87));
+      const{error}=await supabase.storage.from("avatars")
+        .upload(`${user.id}/avatar`,blob,{contentType:"image/jpeg",upsert:true});
+      if(error) throw error;
+      const{data}=supabase.storage.from("avatars").getPublicUrl(`${user.id}/avatar`);
+      const newUrl=data.publicUrl+"?t="+Date.now();
+      setPhotoURL(newUrl);
+      // Notify nav bar + sidebar to update avatar everywhere
+      window.dispatchEvent(new CustomEvent("photoUpdated",{detail:{url:newUrl}}));
+    }catch(err){
+      console.warn("Photo upload failed:",err?.message||err);
+    }
+    setUploading(false);
+    // Reset input so same file can be re-selected
+    e.target.value="";
+  };
+
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+  };
+
   const menuItems=[
     {icon:"✏️",label:"Edit Profile",    action:()=>onEditProfile?.()},
     {icon:"⚡",label:"My Practices",    action:()=>setNav("practices")},
@@ -11854,70 +12006,111 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
   ];
 
   return(
-    <div style={{padding:"18px 0 90px",minHeight:"100vh",background:"var(--bg)"}}>
+    <div style={{padding:"18px 0 90px",minHeight:"100vh",background:G.bg}}>
 
       {/* Header */}
       <div style={{padding:"0 20px 20px"}}>
-        <h2 style={{fontSize:22,fontWeight:800,color:"var(--cream)",margin:"0 0 20px"}}>Profile</h2>
+        <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 20px"}}>Profile</h2>
 
-        {/* Avatar + info */}
+        {/* Avatar + info row */}
         <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:800,color:"#000",overflow:"hidden",flexShrink:0,border:"3px solid rgba(212,175,55,0.3)"}}>
-            {navPhotoURL
-              ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              :initial
-            }
+
+          {/* Tappable avatar with camera overlay */}
+          <div style={{position:"relative",flexShrink:0,cursor:"pointer"}}
+            onClick={()=>!uploading&&fileRef.current?.click()}
+            title="Tap to change photo">
+            <div style={{width:70,height:70,borderRadius:"50%",
+              background:"linear-gradient(135deg,var(--gold),var(--teal))",
+              border:"3px solid rgba(212,175,55,0.3)",display:"flex",
+              alignItems:"center",justifyContent:"center",
+              fontSize:26,fontWeight:800,color:"#000",overflow:"hidden",
+              opacity:uploading?.6:1,transition:"opacity .2s"}}>
+              {(photoURL||navPhotoURL)
+                ?<img src={photoURL||navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                :initial
+              }
+            </div>
+            {/* Camera badge */}
+            <div style={{position:"absolute",bottom:1,right:1,
+              width:22,height:22,borderRadius:"50%",
+              background:uploading?"rgba(255,255,255,0.3)":G.gold,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:11,border:"2px solid "+G.bg,transition:"background .2s"}}>
+              {uploading?"⟳":"📷"}
+            </div>
+            {/* Hidden file input */}
+            <input ref={fileRef} type="file" accept="image/*,image/heic,image/heif"
+              style={{display:"none"}} onChange={handlePhotoChange}/>
           </div>
+
           <div>
-            <div style={{fontSize:18,fontWeight:800,color:"var(--cream)",marginBottom:3}}>{name}</div>
-            {email&&<div style={{fontSize:12,color:"var(--cream-40)",marginBottom:7}}>{email}</div>}
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            <div style={{fontSize:18,fontWeight:800,color:G.cream,marginBottom:3}}>{name}</div>
+            {email&&<div style={{fontSize:12,color:G.dim,marginBottom:7}}>{email}</div>}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
               {isPaid&&(
-                <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",background:"rgba(212,175,55,0.12)",border:"1px solid rgba(212,175,55,0.3)",borderRadius:20}}>
-                  <span style={{fontSize:9,fontWeight:800,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".06em"}}>
+                <div style={{display:"inline-flex",alignItems:"center",gap:4,
+                  padding:"3px 10px",background:"rgba(212,175,55,0.12)",
+                  border:"1px solid rgba(212,175,55,0.3)",borderRadius:20}}>
+                  <span style={{fontSize:9,fontWeight:800,color:G.gold,
+                    fontFamily:"var(--f-mono)",letterSpacing:".06em"}}>
                     {isProMax?"✦ PRO MAX":"⬡ PRO"}
                   </span>
                 </div>
               )}
               {streak>0&&(
-                <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 9px",background:"rgba(255,138,101,0.1)",border:"1px solid rgba(255,138,101,0.25)",borderRadius:20}}>
+                <div style={{display:"inline-flex",alignItems:"center",gap:4,
+                  padding:"3px 9px",background:"rgba(255,138,101,0.1)",
+                  border:"1px solid rgba(255,138,101,0.25)",borderRadius:20}}>
                   <span style={{fontSize:11}}>🔥</span>
                   <span style={{fontSize:10,fontWeight:700,color:"#ff8a65"}}>{streak} day streak</span>
                 </div>
               )}
             </div>
+            {/* Upload hint */}
+            <button onClick={()=>!uploading&&fileRef.current?.click()}
+              style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",
+                fontSize:11,padding:"4px 0 0",fontFamily:"inherit",textDecoration:"underline",
+                textDecorationColor:"rgba(232,220,200,0.15)"}}>
+              {uploading?"Uploading…":"Change photo"}
+            </button>
           </div>
         </div>
       </div>
 
       {/* Menu list */}
       <div style={{padding:"0 16px"}}>
-        <div style={{background:"var(--night)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,overflow:"hidden",marginBottom:14}}>
+        <div style={{background:G.card,border:"1px solid rgba(255,255,255,0.07)",
+          borderRadius:16,overflow:"hidden",marginBottom:14}}>
           {menuItems.map((item,i)=>(
             <div key={item.label} onClick={item.action}
-              style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"15px 18px",cursor:"pointer",borderBottom:i<menuItems.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"15px 18px",cursor:"pointer",
+                borderBottom:i<menuItems.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}
               onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}
               onMouseLeave={e=>e.currentTarget.style.background="none"}>
               <div style={{display:"flex",alignItems:"center",gap:13}}>
                 <span style={{fontSize:16,width:22,textAlign:"center"}}>{item.icon}</span>
-                <span style={{fontSize:15,color:"var(--cream)"}}>{item.label}</span>
+                <span style={{fontSize:15,color:G.cream}}>{item.label}</span>
               </div>
-              <span style={{color:"var(--cream-25)",fontSize:18}}>›</span>
+              <span style={{color:G.dimmer,fontSize:18}}>›</span>
             </div>
           ))}
         </div>
 
-        {/* Upgrade if not paid */}
         {!isPaid&&(
-          <div style={{background:"linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))",border:"1px solid rgba(212,175,55,0.2)",borderRadius:14,padding:"16px 18px",marginBottom:14,cursor:"pointer"}} onClick={onManageSubscription}>
-            <div style={{fontSize:13,fontWeight:700,color:"var(--gold)",marginBottom:4}}>✦ Upgrade to Pro</div>
-            <div style={{fontSize:12,color:"var(--cream-40)"}}>Unlock all 40+ tools, deep reports and unlimited AI advisor.</div>
+          <div style={{background:"linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))",
+            border:"1px solid rgba(212,175,55,0.2)",borderRadius:14,padding:"16px 18px",
+            marginBottom:14,cursor:"pointer"}} onClick={onManageSubscription}>
+            <div style={{fontSize:13,fontWeight:700,color:G.gold,marginBottom:4}}>✦ Upgrade to Pro</div>
+            <div style={{fontSize:12,color:G.dim}}>Unlock all 40+ tools, deep reports and unlimited AI advisor.</div>
           </div>
         )}
 
-        {/* Sign Out */}
         <button onClick={onSignOut}
-          style={{width:"100%",padding:"15px",background:"transparent",color:"#e05252",border:"1px solid rgba(224,82,82,0.2)",borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+          style={{width:"100%",padding:"15px",background:"transparent",color:"#e05252",
+            border:"1px solid rgba(224,82,82,0.2)",borderRadius:12,fontSize:14,
+            fontWeight:600,cursor:"pointer",fontFamily:"inherit",
+            display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
           <span style={{fontSize:16}}>↗</span> Sign Out
         </button>
       </div>
@@ -11926,12 +12119,6 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
 }
 
 
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// MY REPORT — First screen after onboarding
-// Shows: Core Insight, At a Glance, Holding Back, Recommended Path,
-//        Strengths, Focus Cards, Priorities, Daily Rec, Next Action
-// ═══════════════════════════════════════════════════════════════════════════════
 function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lang="en"}){
   const [exStr, setExStr]=useState(false);
   const [exBls, setExBls]=useState(false);
@@ -12149,7 +12336,13 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
             <span style={{fontSize:18,color:G.gold}}>✦</span>
             <span style={{fontSize:16,fontWeight:700,color:G.cream}}>Your Personalized Summary</span>
           </div>
-
+          {summary&&(
+            <div style={{display:"flex",justifyContent:"flex-end",margin:"8px 0"}}>
+              <AudioPlayer
+                text={[summary, strengths?.length?`Key strengths: ${strengths.slice(0,3).join(". ")}`:"", opps?.length?`Opportunities: ${opps.slice(0,2).join(". ")}`:""].filter(Boolean).join(" ")}
+                label="Listen to Report"/>
+            </div>
+          )}
           <p style={{fontSize:15,lineHeight:1.88,color:G.dim,margin:0}}>
             {summaryBefore&&<span>{summaryBefore} </span>}
             <span style={{color:G.gold,fontWeight:600}}>{summaryLast}</span>
@@ -12239,7 +12432,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
 
         {/* Right: CTA */}
         <div style={{textAlign:"center",flexShrink:0}}>
-          <button onClick={()=>setNav("explore")}
+          <button onClick={()=>setNav("home")}
             style={{display:"flex",alignItems:"center",gap:10,
               background:G.gold,color:"#000",border:"none",borderRadius:12,
               padding:"16px 30px",fontSize:15,fontWeight:700,cursor:"pointer",
@@ -12257,10 +12450,187 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
 }
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// EDIT PROFILE — Let users update their onboarding details
-// Changes save to Supabase and optionally trigger a report re-generation
-// ═══════════════════════════════════════════════════════════════════════════════
+
+function JournalScreen({profile,userId,isPremium,setNav,goBack}){
+  const G={
+    gold:"#f0b429",bg:"#0a0800",card:"#111008",
+    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
+    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
+    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.12)",
+  };
+  const STORE_KEY=`diq_journal_${userId}`;
+  const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY)||"[]");}catch{return [];}});
+  const [letter,setLetter]=useState("");
+  const [aiReply,setAiReply]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [view,setView]=useState("write"); // write | history | reading
+  const [reading,setReading]=useState(null);
+
+  const todayStr=new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+  const todayKey=new Date().toISOString().slice(0,10);
+
+  const save=(entry)=>{
+    const updated=[entry,...entries].slice(0,50);
+    setEntries(updated);
+    try{localStorage.setItem(STORE_KEY,JSON.stringify(updated));}catch{}
+  };
+
+  const submit=async()=>{
+    if(!letter.trim()||loading) return;
+    setLoading(true);
+    try{
+      const reply=await callAPI({
+        messages:[{role:"user",content:`Here is a personal letter I'm writing to my future self:\n\n"${letter.trim()}"\n\nI'm ${profile?.name||"someone"}, ${profile?.age||""} from ${profile?.country||""}. My goals: ${profile?.goals||profile?.bigGoal||""}. My main challenge: ${profile?.challenge||""}.\n\nRespond as a deeply wise, warm life coach who has read this letter. First, reflect back what you hear — what this person really wants, fears, and hopes for. Then write a brief response letter to them from their future self, 1 year from now, who made it through.`}],
+        system:"You write emotionally intelligent, deeply personal reflections. Warm, honest, not generic. No therapy-speak. No bullet points. Just real human writing.",
+        userId,isPremium,
+      });
+      const entry={
+        id:Date.now(),
+        date:todayKey,
+        dateLabel:todayStr,
+        letter:letter.trim(),
+        reply:reply.trim(),
+      };
+      save(entry);
+      setAiReply(reply.trim());
+    }catch{
+      setAiReply("Something went wrong. Your letter is saved — try getting a reflection again.");
+    }
+    setLoading(false);
+  };
+
+  const iStyle={width:"100%",background:G.inp,border:"1px solid "+G.inpBorder,
+    borderRadius:12,padding:"14px 16px",color:G.cream,fontSize:14,
+    outline:"none",fontFamily:"inherit",lineHeight:1.8,resize:"none",
+    transition:"border-color .2s",boxSizing:"border-box"};
+
+  if(reading){return(
+    <div style={{padding:"20px 20px 90px",maxWidth:620,margin:"0 auto",color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+      <button onClick={()=>setReading(null)}
+        style={{background:"none",border:"none",color:G.dim,cursor:"pointer",fontSize:13,
+          padding:"0 0 18px",display:"flex",alignItems:"center",gap:6}}>
+        ← Back to History
+      </button>
+      <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:6}}>{reading.dateLabel}</div>
+      <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:14,padding:"20px",marginBottom:16}}>
+        <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>YOUR LETTER</div>
+        <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{reading.letter}</p>
+      </div>
+      {reading.reply&&(
+        <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",borderRadius:14,padding:"20px"}}>
+          <div style={{fontSize:10,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>FROM YOUR FUTURE SELF</div>
+          <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{reading.reply}</p>
+        </div>
+      )}
+    </div>
+  );}
+
+  return(
+    <div style={{padding:"20px 20px 90px",maxWidth:620,margin:"0 auto",color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+
+      {/* Header */}
+      <div style={{marginBottom:24}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+          <span style={{fontSize:22}}>✉️</span>
+          <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:0}}>Journal</h2>
+        </div>
+        <p style={{fontSize:13,color:G.dimmer,margin:0}}>Write honestly. Your future self will thank you.</p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:6,marginBottom:20}}>
+        {[["write","Write"],["history","History ("+entries.length+")"]].map(([id,label])=>(
+          <button key={id} onClick={()=>{setView(id);setAiReply("");}}
+            style={{padding:"7px 16px",borderRadius:20,fontFamily:"inherit",fontSize:12,
+              cursor:"pointer",transition:"all .15s",
+              background:view===id?"rgba(240,180,41,0.1)":"none",
+              border:`1px solid ${view===id?"rgba(240,180,41,0.4)":"rgba(232,220,200,0.1)"}`,
+              color:view===id?G.gold:G.dim}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Write tab */}
+      {view==="write"&&(
+        <>
+          {!aiReply?(
+            <>
+              <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:6}}>
+                {todayStr}
+              </div>
+              <div style={{fontSize:12,color:G.dimmer,marginBottom:12,fontStyle:"italic"}}>
+                Dear future {profile?.name?.split(" ")[0]||"me"},
+              </div>
+              <textarea value={letter} onChange={e=>setLetter(e.target.value)} rows={10}
+                placeholder={"Right now I feel…\n\nThe thing I'm most afraid of is…\n\nWhat I really want is…\n\nOne year from now I hope to look back and…"}
+                style={iStyle}
+                onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+                onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+                <span style={{fontSize:11,color:G.dimmer}}>{letter.length}/2000 chars</span>
+                <button onClick={submit} disabled={!letter.trim()||loading||letter.length<20}
+                  style={{padding:"12px 24px",background:G.gold,color:"#000",border:"none",
+                    borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+                    opacity:!letter.trim()||loading||letter.length<20?0.5:1}}>
+                  {loading?"Reflecting…":"Get Reflection →"}
+                </button>
+              </div>
+            </>
+          ):(
+            <>
+              <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",
+                borderRadius:14,padding:"20px",marginBottom:14}}>
+                <div style={{fontSize:10,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:12}}>FROM YOUR FUTURE SELF</div>
+                <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{aiReply}</p>
+              </div>
+              <button onClick={()=>{setLetter("");setAiReply("");}}
+                style={{width:"100%",padding:"13px",background:"none",
+                  border:"1px solid "+G.border,borderRadius:12,color:G.dim,
+                  fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                ✏️ Write Another Entry
+              </button>
+            </>
+          )}
+        </>
+      )}
+
+      {/* History tab */}
+      {view==="history"&&(
+        <>
+          {entries.length===0?(
+            <div style={{textAlign:"center",padding:"40px 20px",color:G.dimmer}}>
+              <div style={{fontSize:36,marginBottom:12}}>✉️</div>
+              <p style={{fontSize:14,margin:0,lineHeight:1.7}}>No entries yet. Write your first letter.</p>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {entries.map(e=>(
+                <div key={e.id} onClick={()=>setReading(e)}
+                  style={{padding:"16px 18px",background:G.card,border:"1px solid "+G.border,
+                    borderRadius:13,cursor:"pointer",transition:"border-color .15s"}}
+                  onMouseEnter={ev=>ev.currentTarget.style.borderColor="rgba(240,180,41,0.25)"}
+                  onMouseLeave={ev=>ev.currentTarget.style.borderColor=G.border}>
+                  <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",marginBottom:6}}>{e.dateLabel}</div>
+                  <p style={{fontSize:13,color:G.dim,margin:"0 0 6px",lineHeight:1.5,
+                    overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+                    {e.letter}
+                  </p>
+                  <div style={{fontSize:11,color:"rgba(240,180,41,0.6)"}}>
+                    {e.reply?"Reply received →":"No reflection yet"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en",navPhotoURL,userName}){
 
@@ -12399,7 +12769,20 @@ Rules:
 
   // ── nav routing ──────────────────────────────────────────────────────
   const [navSection,setNavSection]=useState(()=>{try{return localStorage.getItem("diq_nav")||"home";}catch{return "home";}});
-  const setNav=(s)=>{setNavSection(s);try{localStorage.setItem("diq_nav",s);}catch{}};
+  const [navHistory,setNavHistory]=useState([]);
+  const setNav=(s)=>{
+    if(s!==navSection) setNavHistory(h=>[...h.slice(-19),navSection]);
+    setNavSection(s);
+    try{localStorage.setItem("diq_nav",s);}catch{}
+  };
+  const goBack=()=>{
+    if(!navHistory.length) return;
+    const prev=navHistory[navHistory.length-1];
+    setNavHistory(h=>h.slice(0,-1));
+    setNavSection(prev);
+    try{localStorage.setItem("diq_nav",prev);}catch{}
+  };
+  const canGoBack=navHistory.length>0;
   const isCat  = navSection?.startsWith("category:");
   const isTool = navSection?.startsWith("tool:");
   const catId  = isCat  ? navSection.slice(9)  : null;
@@ -12419,13 +12802,13 @@ Rules:
       {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
       {showCheckin&&(
         <div className="cx-md" style={{paddingTop:24,paddingBottom:24}}>
-          <CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
+          <CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
         </div>
       )}
       {!showCheckin&&(
         <div>
           <div className="cx-md" style={{paddingTop:24,paddingBottom:8}}>
-            <button onClick={()=>setNav("home")} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:16,display:"flex",alignItems:"center",gap:6}}>← Home</button>
+            <button onClick={()=>goBack?goBack():setNav("home")} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:16,display:"flex",alignItems:"center",gap:6}}>← Back</button>
           </div>
           {mod==="today"&&(
             <div className="cx-md" style={{paddingTop:8,paddingBottom:32}}>
@@ -12453,7 +12836,7 @@ Rules:
   return(
     <div className="app-shell">
 
-      <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock}/>
+      <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 
       <MobileTopBar
         title={(()=>{
@@ -12462,7 +12845,7 @@ Rules:
           if(isTool) return TOOL_META[toolId]?.label;
           return null;
         })()}
-        onBack={isCat||isTool?()=>setNav(isCat?"explore":TOOL_META[toolId]?"category:"+TOOL_META[toolId].cat:"explore"):null}
+        onBack={canGoBack?goBack:null}
         streak={streak} isPaid={isPaid} isProMax={isProMax}
         onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
         setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
@@ -12473,15 +12856,16 @@ Rules:
           <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin} dailyInsight={dailyInsight}/>
         )}
         {navSection==="explore"&&<ExploreScreen setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} onUnlock={onUnlock}/>}
-        {isCat&&<CategoryPage catId={catId} setNav={setNav} userId={userId}/>}
+        {isCat&&<CategoryPage catId={catId} setNav={setNav} goBack={goBack} userId={userId}/>}
         {isTool&&MODULE_CONFIGS?.[toolId]&&(
-          <ToolPage toolId={toolId} setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>
+          <ToolPage key={toolId} toolId={toolId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>
         )}
         {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
-        {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav}/>}
+        {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav} goBack={goBack}/>}
+        {navSection==="journal"&&<JournalScreen profile={formData} userId={userId} isPremium={isPremium} setNav={setNav} goBack={goBack}/>}
         {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} onUnlock={onUnlock}/></div>}
         {navSection==="practices"&&<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>}
-        {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} onComplete={()=>setNav("home")}/></div>}
+        {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>setNav("home")}/></div>}
         {navSection==="savedreports"&&(
           <div style={{padding:"28px 24px 80px",maxWidth:860,margin:"0 auto"}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(240,180,41,0.07)",border:"1px solid rgba(240,180,41,0.25)",borderRadius:20,padding:"5px 14px",marginBottom:20}}>
@@ -13963,6 +14347,8 @@ export default function DestinIQ(){
           try{Object.keys(localStorage).forEach(k=>{if(k.startsWith("diq_")||k.startsWith("destiniq_"))localStorage.removeItem(k);});}catch{}
         };
         window.addEventListener("signOut",handleSignOutEv);
+        const handlePhotoUpdated=(e)=>{ if(e.detail?.url) setNavPhotoURL(e.detail.url); };
+        window.addEventListener("photoUpdated",handlePhotoUpdated);
         const handleCI=(e)=>{
           // Bump the visible streak counter immediately after check-in
           setStreak(s=>{
@@ -13972,7 +14358,7 @@ export default function DestinIQ(){
           });
         };
         window.addEventListener("checkinComplete",handleCI);
-        return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("checkinComplete",handleCI);};
+        return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("photoUpdated",handlePhotoUpdated);window.removeEventListener("checkinComplete",handleCI);};
   },[]);
 
   // ── BROWSER BACK BUTTON ──────────────────────────────────────────────
@@ -14281,7 +14667,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                 />
               : <>
                   {/* Public nav for unauthenticated state */}
-                  <nav className="nav">
+                  <nav className="nav" style={{display:screen==="landing"?"none":"flex"}}>
                     <div className="logo" onClick={()=>setScreen("landing")}>Destin<b>IQ</b></div>
                     <div className="nav-r">
                       <button className="btn btn-ghost" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("auth")}>Sign in</button>
