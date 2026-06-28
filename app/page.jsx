@@ -6277,6 +6277,22 @@ function AuthScreen({onAuth, onBack}){
   }
 
 
+  // Apple OAuth (Supabase)
+  const handleApple=async()=>{
+    setLoading(true);setError("");
+    try{
+      const{error:err}=await supabase.auth.signInWithOAuth({
+        provider:"apple",
+        options:{redirectTo:typeof window!=="undefined"?window.location.origin:"/"}
+      });
+      if(err) setError(err.message);
+    }catch(e){setError("Apple sign-in unavailable. Please try email.");}
+    setLoading(false);
+  };
+  // Aliases — handleEmail already handles both modes
+  const handleLogin=handleEmail;
+  const handleSignup=handleEmail;
+
   const G={
     gold:"#f0b429",bg:"#0a0800",card:"#111008",surface:"#0e0c02",
     border:"rgba(232,220,200,0.08)",cream:"#e8dcc8",
