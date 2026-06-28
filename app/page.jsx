@@ -8,7 +8,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -8857,6 +8857,14 @@ const WIN_STORE_KEY=(uid)=>`diq_wins_${uid||"guest"}`;
 function loadWins(uid){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");}catch{return[];}}
 function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(w));}catch{}}
 
+// ─── FREE TIER LIMITS & TOOL LIST (module-level) ─────────────────────────────
+const FREE_JOURNAL_LIMIT = 1;   // Free: 1 journal entry
+const FREE_REPORT_LIMIT  = 1;   // Free: 1 intelligence report
+const PRO_REPORT_LIMIT   = 3;   // Pro: 3 reports/month
+// 5 free tools — one from each major area to hook users, Pro unlocks all 42
+const FREE_TOOLS = ["career","decisions","confidencelab","innerpeace","sidehustle"];
+// ─────────────────────────────────────────────────────────────────────────────
+
 function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const [wins,setWins]=useState(()=>loadWins(userId));
   // Load wins from Supabase on mount (in case localStorage was cleared)
@@ -8894,9 +8902,6 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
   const currentStreak=(()=>{let s=0;const today=new Date();for(let i=0;i<60;i++){const d=new Date(today);d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);if([...new Set(wins.map(w=>w.date))].includes(k))s++;else if(i>0)break;}return s;})();
 
   const FREE_WIN_LIMIT=5;
-const FREE_JOURNAL_LIMIT=1;
-// 5 free tools — one from each major area, chosen to hook users
-const FREE_TOOLS=["career","decisions","confidencelab","innerpeace","sidehustle"];
   const addWin=async()=>{
     if(!input.trim()) return;
     if(!isPaid && wins.length>=FREE_WIN_LIMIT){ onUnlock&&onUnlock(); return; }
@@ -11147,8 +11152,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
       <div style={{padding:"0 20px"}}>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
-
-        {/* ══ CONTINUE JOURNEY (Hero card) ══ */}
+        {/* ══ 2. CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -14212,8 +14216,7 @@ function LoadingSkeleton(){
 // ═══════════════════════════════════════════════════════════════════════════════
 const RATE_LIMIT_KEY="destiniq_report_count";
 const RATE_LIMIT_DATE_KEY="destiniq_report_date";
-const FREE_REPORT_LIMIT=1;   // Free: 1 report total
-const PRO_REPORT_LIMIT=3;    // Pro: 3 reports/month
+// FREE_REPORT_LIMIT and PRO_REPORT_LIMIT defined at module level above
 // Pro Max: unlimited // free users get 3 reports total
 
 function getRateLimit(){
