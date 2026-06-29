@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -661,6 +661,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .bg-grid{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black 20%,transparent 100%);}
 .root{position:relative;z-index:1;min-height:100vh;overflow-x:hidden;scroll-behavior:smooth;}
 .screen-fade{animation:screenFadeIn .25s ease;}
+@keyframes drawerSlideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes drawerSlideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes screenFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .cx{width:100%;max-width:1060px;margin:0 auto;padding:0 24px;}
@@ -7577,6 +7578,7 @@ function loadVoices(){
       setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
     };
     attempt();
+  }catch(_){}
   });
 }
 
@@ -9802,7 +9804,6 @@ function PracticesView({userId}){
       )}
     </div>
   );
-}
 }
 
 const DISCIPLINE_SECTIONS=[
@@ -14898,31 +14899,42 @@ export default function DestinIQ(){
   },[userId]);
 
   // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
-        // Users shouldn't have to configure anything — just works
-        try{
-          const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
-          const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
-          const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
-          const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
-          const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
-          setTimeout(()=>{
-            scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
-          }, 3000);
-        }catch(e){}
+  // Users shouldn't have to configure anything — just works
+  useEffect(()=>{
+    const restoreUserSession = async () => {
+      try{
+        const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
+        const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
+        const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
+        const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
+        const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
+        setTimeout(()=>{
+          scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
+        }, 3000);
+      }catch(e){}
 
-        if (profile.form_data && profile.report) {
-          // ── CASE 1: Complete profile + report → straight to Dashboard
-          setScreen("results");
-        } else if (profile.form_data) {
-          // ── CASE 2: Has profile data but missing report or incomplete fields
-          // Show a short "complete your profile" flow, then regenerate report
-          setScreen("complete-profile");
-        } else {
-          // ── CASE 3: Brand-new account — no profile data at all
-          setScreen("intake");
-        }
+      if (profile.form_data && profile.report) {
+        // ── CASE 1: Complete profile + report → straight to Dashboard
+        setScreen("results");
+      } else if (profile.form_data) {
+        // ── CASE 2: Has profile data but missing report or incomplete fields
+        // Show a short "complete your profile" flow, then regenerate report
+        setScreen("complete-profile");
       } else {
-        // No profile row at all → brand-new account → full onboarding
+        // ── CASE 3: Brand-new account — no profile data at all
+        setScreen("intake");
+      }
+    };
+    try{
+      if (profile.form_data && profile.report) {
+        // ── CASE 1: Complete profile + report → straight to Dashboard
+        setScreen("results");
+      } else if (profile.form_data) {
+        // ── CASE 2: Has profile data but missing report or incomplete fields
+        // Show a short "complete your profile" flow, then regenerate report
+        setScreen("complete-profile");
+      } else {
+        // ── CASE 3: Brand-new account — no profile data at all
         setScreen("intake");
       }
     }catch(e){
@@ -14942,7 +14954,7 @@ export default function DestinIQ(){
     }finally{
       setProfileLoading(false);
     }
-  };
+  },[userId, profile]);
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
   // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
