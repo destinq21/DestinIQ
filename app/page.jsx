@@ -661,6 +661,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .bg-grid{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black 20%,transparent 100%);}
 .root{position:relative;z-index:1;min-height:100vh;overflow-x:hidden;scroll-behavior:smooth;}
 .screen-fade{animation:screenFadeIn .25s ease;}
+@keyframes drawerSlideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes screenFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .cx{width:100%;max-width:1060px;margin:0 auto;padding:0 24px;}
 .cx-sm{width:100%;max-width:640px;margin:0 auto;padding:0 24px;}
@@ -7576,10 +7577,6 @@ function loadVoices(){
       setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
     };
     attempt();
-    }catch(err){
-      // On any unexpected error, resolve with empty list
-      res([]);
-    }
   });
 }
 
@@ -9806,6 +9803,7 @@ function PracticesView({userId}){
     </div>
   );
 }
+}
 
 const DISCIPLINE_SECTIONS=[
   {
@@ -11613,12 +11611,7 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
         )}
       </div>
 
-      <style>{`
-        @keyframes drawerSlideIn{
-          from{transform:translateX(-100%);opacity:0}
-          to{transform:translateX(0);opacity:1}
-        }
-      `}</style>
+
     </>
   );
 }
@@ -14904,16 +14897,7 @@ export default function DestinIQ(){
     }
   },[userId]);
 
-  const restoreUserSession = async () => {
-    setProfileLoading(true);
-    try {
-      const { data: { user: u } } = await supabase.auth.getUser();
-      const userId = u?.id;
-      if (!userId) return setScreen("landing");
-
-      const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
-      if (profile) {
-        // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
+  // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
         // Users shouldn't have to configure anything — just works
         try{
           const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
