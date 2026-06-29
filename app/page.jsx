@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -299,7 +299,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -14898,63 +14898,6 @@ export default function DestinIQ(){
     }
   },[userId]);
 
-  // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
-  // Users shouldn't have to configure anything — just works
-  useEffect(()=>{
-    const restoreUserSession = async () => {
-      try{
-        const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
-        const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
-        const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
-        const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
-        const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
-        setTimeout(()=>{
-          scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
-        }, 3000);
-      }catch(e){}
-
-      if (profile.form_data && profile.report) {
-        // ── CASE 1: Complete profile + report → straight to Dashboard
-        setScreen("results");
-      } else if (profile.form_data) {
-        // ── CASE 2: Has profile data but missing report or incomplete fields
-        // Show a short "complete your profile" flow, then regenerate report
-        setScreen("complete-profile");
-      } else {
-        // ── CASE 3: Brand-new account — no profile data at all
-        setScreen("intake");
-      }
-    };
-    try{
-      if (profile.form_data && profile.report) {
-        // ── CASE 1: Complete profile + report → straight to Dashboard
-        setScreen("results");
-      } else if (profile.form_data) {
-        // ── CASE 2: Has profile data but missing report or incomplete fields
-        // Show a short "complete your profile" flow, then regenerate report
-        setScreen("complete-profile");
-      } else {
-        // ── CASE 3: Brand-new account — no profile data at all
-        setScreen("intake");
-      }
-    }catch(e){
-      console.warn("restoreUserSession profile load error:",e.message);
-      // Don't send returning users back to onboarding on network/load errors
-      // If we have a userId, they're authenticated — send to results or landing
-      if(userId||u?.id){
-        const savedScreen = typeof window!=="undefined"?localStorage.getItem("diq_screen"):null;
-        if(savedScreen&&savedScreen!=="intake"&&savedScreen!=="loading"){
-          setScreen(savedScreen);
-        } else {
-          setScreen("results"); // They're logged in — show dashboard
-        }
-      } else {
-        setScreen("landing");
-      }
-    }finally{
-      setProfileLoading(false);
-    }
-  },[userId, profile]);
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
   // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
