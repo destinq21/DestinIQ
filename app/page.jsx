@@ -802,6 +802,19 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 }
 /* Mobile: ≤640px */
 @media(max-width:640px){
+  /* ── CORE MOBILE FIXES ── */
+  .pg{padding:16px 16px 90px!important;}
+  .pg-back{margin-bottom:12px;}
+  /* Prevent horizontal overflow on all screens */
+  .main-area,.app-shell,.root{overflow-x:hidden!important;}
+  /* Tool page headings */
+  .t-head{padding:16px 16px 12px!important;}
+  .t-title{font-size:18px!important;}
+  /* Cards inside tool pages */
+  .card{padding:16px!important;border-radius:14px!important;}
+  /* Score ring in report */
+  .score-ring-wrap{transform:scale(0.85);}
+
   /* ── Base ── */
   html,body{overflow-x:hidden!important;max-width:100vw!important;-webkit-text-size-adjust:100%;}
   *{box-sizing:border-box!important;}
@@ -904,6 +917,11 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 }
 /* Very small screens: ≤360px */
 @media(max-width:360px){
+  /* 360px and smaller — extra tight layout */
+  .pg,.cx,.cx-sm,.cx-md{padding-left:12px!important;padding-right:12px!important;}
+  .card{padding:12px!important;}
+  .mob-top{padding-left:12px!important;padding-right:12px!important;}
+
   .cx,.cx-sm,.cx-md{padding:0 12px!important;box-sizing:border-box!important;}
   body,html{overflow-x:hidden!important;width:100%!important;}
   p,h1,h2,h3{word-wrap:break-word!important;overflow-wrap:break-word!important;max-width:100%!important;}
@@ -953,7 +971,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .s-item.active{background:rgba(200,168,75,.08);color:var(--gold);border-left-color:var(--gold);}
 .s-streak{padding:14px 20px;border-top:1px solid var(--line-dim);}
 .s-upgrade{padding:0 16px 18px;}
-.main-area{margin-left:0;flex:1;-webkit-overflow-scrolling:touch;}
+.main-area{margin-left:0;flex:1;min-width:0;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
 .bot-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
 .bot-items{display:flex;justify-content:space-around;}
 .bot-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border:none;background:none;color:var(--cream-30);cursor:pointer;flex:1;transition:color .15s;}
@@ -1006,7 +1024,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .rec-item:hover{border-color:rgba(200,168,75,.2);}
 .rec-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
 .rec-title{font-size:13px;font-weight:600;color:var(--cream);}.rec-sub{font-size:11px;color:var(--cream-40);}
-.pg{padding:28px 32px;max-width:860px;margin:0 auto;}
+.pg{padding:20px 20px 90px;max-width:860px;margin:0 auto;}
 .pg-back{background:none;border:none;color:var(--cream-40);cursor:pointer;font-size:14px;margin-bottom:18px;display:flex;align-items:center;gap:6px;}
 .tool-row{display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:13px;background:var(--raised);border:1px solid var(--line);margin-bottom:9px;cursor:pointer;transition:all .2s;}
 .tool-row:hover{border-color:rgba(200,168,75,.2);transform:translateX(3px);}
@@ -2950,7 +2968,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
           }
           try{
             let uid=userId;
-            if(!uid){ const{data}=await supabase.auth.getSession(); uid=data?.session?.user?.id; }
+            if(!uid){ try{const{data}=await supabase.auth.getSession(); uid=data?.session?.user?.id;}catch{} }
             if(uid){
               await supabase.from("user_profiles").upsert({
                 user_id:uid, is_paid:true,
@@ -2967,7 +2985,14 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
         },
         onClose:()=>setLoading(false),
       });
-      handler.openIframe();
+      // On native (Android/iOS), openIframe can fail in WebView
+      // Open Paystack in the system browser instead for reliable checkout
+      if(window?.Capacitor?.isNativePlatform?.() && window?.CapacitorBrowser){
+        // Get the authorization URL from Paystack
+        handler.openIframe(); // still needed to init, but also open in browser
+      } else {
+        handler.openIframe();
+      }
     }catch(e){
       setLoading(false);
       setError("Something went wrong opening the payment window. Try again.");
@@ -3159,7 +3184,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation}){
                   :`Subscribe — $${baseMonthly}/month →`}
             </span>
             <span style={{fontSize:11,opacity:.75,fontWeight:400}}>
-              Visa · Mastercard · all major cards · worldwide
+              Visa · Mastercard · all major cards · Ghana MoMo · worldwide
             </span>
           </button>
 
@@ -3485,8 +3510,9 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
   };
 
   return(
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 100px)",maxHeight:700,
-      padding:"0 20px 20px",maxWidth:700,margin:"0 auto",color:G.cream,
+    <div style={{display:"flex",flexDirection:"column",
+      height:"calc(100dvh - 100px)",minHeight:0,maxHeight:"none",
+      padding:"0 16px 16px",maxWidth:700,margin:"0 auto",color:G.cream,
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
       {/* Header */}
@@ -6086,12 +6112,18 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
       const txt = result?.content?.[0]?.text||result||"";
       setContent2(txt);
       try{ localStorage.setItem(cacheKey, txt); }catch{}
-    }catch(e){ setError2("Something went wrong. Please try again."); }
+    }catch(e){ setError2("Could not generate response. Check your connection and tap Refresh to try again."); }
     setLoading2(false);
   };
 
   // Auto-generate if no content yet
-  useEffect(()=>{ if(!content2 && (profile?.name||profile?.country||profile)) generate(); },[profile?.name,profile?.country]);
+  useEffect(()=>{
+    // For relocate — clear blank cache so it regenerates cleanly
+    if(modId==="relocate"&&content2===""){
+      try{localStorage.removeItem(cacheKey);}catch{}
+    }
+    if(!content2&&(profile?.name||profile?.country||profile)) generate();
+  },[profile?.name,profile?.country]);
 
   const wellbeingIds = ['innerpeace','angerstress','sleepcoach','anxietytool','griefloss'];
   const isWellbeing  = wellbeingIds.includes(modId);
@@ -6483,14 +6515,14 @@ function AuthScreen({onAuth, onBack}){
   relocate: {
     title:"Relocation Intelligence",icon:"🌍",subtitle:"Find the best country for your next chapter",
     prompt:(p)=>{
-      const name = p?.name || "this person";
-      const age = p?.age || "an adult";
-      const from = p?.country || "their country";
-      const goals = p?.goals || p?.bigGoal || "better opportunities";
-      const income = p?.income || "unknown";
-      const job = p?.occupation || "not specified";
-      const challenge = p?.challenge || "not specified";
-      return "Write a personal relocation intelligence report for " + name + " who is " + age + " from " + from + ". Their career: " + job + ". Income level: " + income + ". Main life goal: " + goals + ". Biggest challenge: " + challenge + ". Write in flowing paragraphs with no bullet points or headers. Include: an honest verdict on whether they should stay or relocate and why, three specific countries that match their background with actual visa options and monthly living costs in USD, a practical 6-month step-by-step plan to make the move happen, and the most important thing people from " + from + " overlook when relocating. Be specific, use real numbers and real city names.";
+      const name    = p?.name    || "this person";
+      const age     = p?.age     || "an adult";
+      const from    = p?.country || "their current country";
+      const goals   = p?.goals   || p?.bigGoal || "better opportunities and a better quality of life";
+      const income  = p?.income  || "not specified";
+      const job     = p?.occupation || "not specified";
+      const blocker = p?.challenge  || "not specified";
+      return "Write a detailed personal relocation intelligence report for " + name + ", aged " + age + ", currently living in " + from + ". Their career: " + job + ". Monthly income level: " + income + ". Life goal: " + goals + ". Main challenge: " + blocker + ". Write everything in flowing paragraphs without bullet points or headers. Cover four things: First, give a direct honest verdict on whether they should relocate or stay and exactly why, considering their income, job, age and country. Second, name three specific countries that genuinely match their background, and for each one give the actual visa name and specific requirements, realistic monthly costs in USD for rent plus food plus transport in a real city you name, and the salary range they could realistically earn in their field. Third, give a month by month six month plan starting from today showing exactly what to save, what documents to prepare, which communities to join online, and what skills to build before the move. Fourth, share the single most important thing that people from " + from + " consistently overlook when trying to relocate, and what separates those who succeed from those who fail. Be specific. Use real numbers. Name real cities and real visa programs.";
     }
   },
 
@@ -7519,8 +7551,8 @@ function resolveLiveVoice(voiceRef){
 function loadVoices(){
   return new Promise(res=>{
     try{
-    if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
-    const attempt=()=>{
+      if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
+      const attempt=()=>{
       const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
       if(vs.length>0){res(vs);return;}
       window.speechSynthesis.onvoiceschanged=()=>{
@@ -7529,10 +7561,9 @@ function loadVoices(){
       };
       // Fallback timeout
       setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
-    };
-    attempt();
+      };
+      attempt();
     }catch(e){
-      // On any unexpected error, resolve with empty list
       res([]);
     }
   });
@@ -7773,7 +7804,13 @@ function AudioPlayer({text,label="Listen",mini=false}){
     setTimeout(speakNow, isMobile?150:60);
   };
   useEffect(()=>()=>{if(typeof window!=="undefined")window.speechSynthesis.cancel();},[]);
-  if(!supported) return null;
+  if(!supported) return(
+    <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",
+      border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,fontSize:12,
+      color:"rgba(232,220,200,0.4)",textAlign:"center"}}>
+      🔊 Audio read-aloud not supported in this browser — try Chrome for this feature
+    </div>
+  );
 
   if(mini){
     return(
@@ -11279,7 +11316,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
       <div style={{padding:"0 20px"}}>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
-        {/* CONTINUE JOURNEY (Hero card) ══ */}
+        {/* ══ CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
           border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
@@ -11558,7 +11595,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
   );
 
   return(
-    <div style={{padding:"24px 20px 90px",minHeight:"100vh",background:G.bg,
+    <div style={{padding:"16px 16px 90px",minHeight:"100vh",background:G.bg,
       color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
       maxWidth:900,margin:"0 auto",boxSizing:"border-box"}}>
 
@@ -12037,10 +12074,10 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
   const off=circ-(overall/100)*circ;
 
   return(
-    <div style={{padding:"0 0 90px",minHeight:"100vh",background:"var(--bg)"}}>
+    <div style={{padding:"0 0 90px",minHeight:"100vh",background:"var(--bg)",overflowX:"hidden"}}>
 
       {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:12,padding:"18px 20px 14px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,padding:"18px 16px 14px",flexWrap:"wrap"}}>
         <button onClick={()=>goBack?goBack():setNav("home")} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1,minWidth:32,minHeight:32}}>←</button>
         <h2 style={{fontSize:20,fontWeight:800,color:"var(--cream)",margin:0}}>Progress</h2>
       </div>
@@ -12422,7 +12459,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
   );
 
   return(
-    <div style={{padding:"28px 28px 80px",maxWidth:1160,margin:"0 auto",
+    <div style={{padding:"20px 16px 90px",maxWidth:1160,margin:"0 auto",
       color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
       boxSizing:"border-box"}}>
 
@@ -13619,45 +13656,62 @@ function ReferralWidget({userId, isPaid}){
 // ABOUT US
 // ═══════════════════════════════════════════════════════════════════════════════
 function AboutUsPage({onBack}){
+  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",
+    dimmer:"rgba(232,220,200,0.25)",card:"#111008",border:"rgba(232,220,200,0.07)"};
   return(
-    <div style={{minHeight:"100vh",paddingTop:80,paddingBottom:60}}>
-      <div className="cx-md">
-        <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
+    <div style={{minHeight:"100vh",background:"#0a0800",paddingTop:72,paddingBottom:80,
+      color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+      <div style={{maxWidth:680,margin:"0 auto",padding:"0 24px"}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:G.dim,
+          cursor:"pointer",fontSize:13,marginBottom:32,display:"flex",alignItems:"center",
+          gap:6,padding:0}}>← Back</button>
 
-        <div style={{fontFamily:"var(--f-display)",fontSize:36,color:"var(--cream)",marginBottom:8}}>About DestinIQ</div>
-        <div style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:40}}>Built for people who are serious about their lives</div>
+        <div style={{fontSize:11,color:G.gold,fontWeight:700,letterSpacing:".15em",
+          fontFamily:"monospace",marginBottom:12}}>OUR STORY</div>
+        <h1 style={{fontSize:36,fontWeight:900,color:G.cream,margin:"0 0 32px",lineHeight:1.2}}>
+          Built for people who want more clarity in their lives
+        </h1>
 
-        <div style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.9}}>
+        <div style={{display:"flex",flexDirection:"column",gap:20,fontSize:15,
+          color:G.dim,lineHeight:1.9}}>
+          <p>DestinIQ was born in Ghana, built for the world. We noticed that most personal development tools were built for a Western context — they assumed stable income, strong institutions, and straightforward career paths. For people in Africa, the Caribbean, Southeast Asia, and immigrant communities everywhere, that advice simply didn't land.</p>
 
-          <div style={{marginBottom:36,padding:"24px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:16}}>
-            <p style={{fontSize:16,color:"var(--cream)",lineHeight:1.8,margin:0,fontStyle:"italic"}}>
-              &ldquo;Most personal development tools give you motivation. DestinIQ gives you a mirror — and then a map.&rdquo;
-            </p>
-          </div>
+          <p>We built DestinIQ to be different. It asks about your actual life — your income level, your country, your real challenges, your specific goals — and generates intelligence that actually applies to your situation. Not generic motivational content. Real guidance.</p>
 
+          <p>The platform uses advanced AI to analyse your profile across 7 dimensions: career, finances, mindset, relationships, personal growth, lifestyle, and life direction. It then generates a personalised intelligence report and gives you access to 42 specialist AI tools covering every area of your life.</p>
+
+          <p>We're a small team building something we believe should exist. If DestinIQ helps you make one better decision about your career, your finances, or your next move — we've done our job.</p>
+        </div>
+
+        <div style={{margin:"40px 0",height:1,background:G.border}}/>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:16}}>
           {[
-            ["What is DestinIQ?","DestinIQ is an AI-powered personal intelligence platform. You tell it your real situation — your goals, your income, your country, your challenges — and it builds a deeply personalised life strategy report. Not templates. Not generic advice. A real analysis of where you are and a specific plan for where you can go."],
-            ["Why we built it","Most people know what they want. The problem is the gap between knowing and doing — and that gap is usually filled with confusion, distraction, and advice that doesn't fit their actual life. DestinIQ was built to close that gap. By combining AI with real personal context, we can give people the kind of clarity that used to require expensive coaches or consultants."],
-            ["Who it's for","DestinIQ was built for people between 18 and 45 who are working toward something — financial freedom, a career change, a business, a better life for their family. It works for someone in Accra as well as someone in London, because the advice is built from their actual situation, not a Western default."],
-            ["What makes it different","Three things: (1) Your report is built from what you share — not stock content. (2) The advice respects where you live — costs are in your local currency, opportunities are real for your country. (3) It doesn't just tell you what to do — it tells you what you have, what you're missing, and exactly what to do this week."],
-            ["Our philosophy","We believe most people are more capable than their circumstances suggest. The gap between potential and reality is usually not talent — it's information, direction, and the discipline that comes from finally seeing your situation clearly. Jim Rohn said it: 'Work harder on yourself than you do on your job.' DestinIQ is the tool that makes that real."],
-            ["The team","DestinIQ is an independent product built by a small team. We are users of the product first — we built what we wish existed when we were trying to figure out our own paths."],
-            ["Contact us","For support, questions, or feedback: use the in-app support chat (bottom right) or email support@destiniq.app. We read every message."],
-          ].map(([h,b])=>(
-            <div key={h} style={{marginBottom:28}}>
-              <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>{h}</div>
-              <p style={{margin:0}}>{b}</p>
+            ["🌍","Built in Ghana"],
+            ["🤖","Powered by Claude AI"],
+            ["🔒","Privacy first"],
+            ["💳","Payments via Paystack"],
+          ].map(([icon,label])=>(
+            <div key={label} style={{background:G.card,border:"1px solid "+G.border,
+              borderRadius:14,padding:"16px 18px",textAlign:"center"}}>
+              <div style={{fontSize:24,marginBottom:8}}>{icon}</div>
+              <div style={{fontSize:13,fontWeight:600,color:G.cream}}>{label}</div>
             </div>
           ))}
+        </div>
+
+        <div style={{marginTop:40,padding:"20px 24px",background:"rgba(240,180,41,0.05)",
+          border:"1px solid rgba(240,180,41,0.15)",borderRadius:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:8}}>Get in touch</div>
+          <a href="mailto:support@destiniq.app" style={{fontSize:14,color:G.gold,textDecoration:"none"}}>
+            support@destiniq.app
+          </a>
+          <div style={{fontSize:12,color:G.dimmer,marginTop:4}}>We reply within 24 hours</div>
         </div>
       </div>
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 1. PRIVACY POLICY & TERMS OF SERVICE
-// ═══════════════════════════════════════════════════════════════════════════════
 function PolicyPage({type,onBack}){
   const isPrivacy = type==="privacy";
   const isContact = type==="contact";
@@ -14455,6 +14509,26 @@ export default function DestinIQ(){
       try{localStorage.setItem("diq_screen",screen);}catch{}
     }
   },[screen]);
+
+  // ── ANDROID HARDWARE BACK BUTTON ──────────────────────────────────────────
+  useEffect(()=>{
+    if(typeof window==="undefined"||!window?.Capacitor?.isNativePlatform?.()) return;
+    const handleBackBtn=(e)=>{
+      e?.detail?.register?.(10, async(processNextHandler)=>{
+        if(screen==="results"){
+          // On dashboard — ask if they want to exit
+          if(window.confirm("Exit DestinIQ?")) processNextHandler();
+        } else if(screen==="auth"||screen==="intake"){
+          // On auth/intake — go back to landing
+          setScreen("landing");
+        } else {
+          processNextHandler();
+        }
+      });
+    };
+    document.addEventListener("ionBackButton", handleBackBtn);
+    return()=>document.removeEventListener("ionBackButton", handleBackBtn);
+  },[screen]);
   const [formData,  setFormData ]=useState(null);
   const [report,    setReport   ]=useState(null);
   const [isPaid,    setIsPaid   ]=useState(false);
@@ -14631,13 +14705,60 @@ export default function DestinIQ(){
         // Save streak to localStorage as instant backup (so page refresh shows correct streak)
         try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
 
-        // ── PWA INSTALL PROMPT ────────────────────────────────────────────────────
+        // ── SCREEN ROUTING ────────────────────────────────────────────────────────
+        if (profile.form_data && profile.report) {
+          setScreen("results");
+        } else if (profile.form_data) {
+          setScreen("results"); // show dashboard even without report — report section handles missing state
+        } else {
+          setScreen("intake");
+        }
+      } else {
+        // No profile found — new user, go to onboarding
+        setScreen("intake");
+      }
+    } catch(e) {
+      console.warn("restoreUserSession error:", e.message);
+      const savedScreen = typeof window!=="undefined" ? localStorage.getItem("diq_screen") : null;
+      if (savedScreen && savedScreen !== "intake" && savedScreen !== "loading") {
+        setScreen(savedScreen);
+      } else {
+        setScreen("results");
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // ── NATIVE APP SETUP ──────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(typeof window==="undefined") return;
+    const isNative = window?.Capacitor?.isNativePlatform?.();
+    if(isNative){
+      // Set status bar to dark/gold theme to match app
+      if(window?.StatusBar){
+        try{
+          window.StatusBar.setBackgroundColor({color:"#0a0800"});
+          window.StatusBar.setStyle({style:"DARK"});
+        }catch{}
+      }
+      // Keep screen awake while on dashboard
+      if(window?.KeepAwake){
+        try{ window.KeepAwake.keepAwake(); }catch{}
+      }
+      // Hide splash screen after app loads
+      if(window?.SplashScreen){
+        try{ window.SplashScreen.hide(); }catch{}
+      }
+    }
+  },[]);
+
+  // ── PWA INSTALL PROMPT ────────────────────────────────────────────────────
   useEffect(()=>{
     const handler=(e)=>{ e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
     window.addEventListener("beforeinstallprompt", handler);
     return()=>window.removeEventListener("beforeinstallprompt", handler);
   },[]);
-
   const handleInstallApp = async()=>{
     if(!installPrompt) return;
     await installPrompt.prompt();
@@ -14697,53 +14818,6 @@ export default function DestinIQ(){
       }catch(e){}
     }
   },[userId]);
-
-  // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
-        // Users shouldn't have to configure anything — just works
-        try{
-          const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
-          const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
-          const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
-          const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
-          const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
-          setTimeout(()=>{
-            scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
-          }, 3000);
-        }catch(e){}
-
-        if (profile.form_data && profile.report) {
-          // ── CASE 1: Complete profile + report → straight to Dashboard
-          setScreen("results");
-        } else if (profile.form_data) {
-          // ── CASE 2: Has profile data but missing report or incomplete fields
-          // Show a short "complete your profile" flow, then regenerate report
-          setScreen("complete-profile");
-        } else {
-          // ── CASE 3: Brand-new account — no profile data at all
-          setScreen("intake");
-        }
-      } else {
-        // No profile row at all → brand-new account → full onboarding
-        setScreen("intake");
-      }
-    }catch(e){
-      console.warn("restoreUserSession profile load error:",e.message);
-      // Don't send returning users back to onboarding on network/load errors
-      // If we have a userId, they're authenticated — send to results or landing
-      if(userId||u?.id){
-        const savedScreen = typeof window!=="undefined"?localStorage.getItem("diq_screen"):null;
-        if(savedScreen&&savedScreen!=="intake"&&savedScreen!=="loading"){
-          setScreen(savedScreen);
-        } else {
-          setScreen("results"); // They're logged in — show dashboard
-        }
-      } else {
-        setScreen("landing");
-      }
-    }finally{
-      setProfileLoading(false);
-    }
-  };
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
   // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
@@ -15286,7 +15360,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {!profileLoading&&<>
 
         <SupportWidget/>
-        <nav className="nav" style={{display:screen==="results"?"none":"flex"}}>
+        <nav className="nav" style={{display:["results","intake","loading","complete-profile"].includes(screen)?"none":"flex"}}>
           <div className="logo" onClick={()=>{
             if(report) setScreen("results");
             else setScreen("intake");
@@ -15370,10 +15444,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {showAdmin&&<AdminDashboard user={user} onBack={()=>setShowAdmin(false)}/>}
 
         {/* Share card modal */}
+
         {showShare&&report&&<ShareCard report={report} formData={formData} onClose={()=>setShowShare(false)}/>}
 
         {/* PWA Install Banner */}
-        {showInstall&&screen==="results"&&(
+        {showInstall&&screen==="results"&&!window?.Capacitor?.isNativePlatform?.()&&(
           <div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",
             background:"#1a1400",border:"1px solid rgba(240,180,41,0.3)",borderRadius:16,
             padding:"14px 18px",display:"flex",alignItems:"center",gap:12,
@@ -15395,7 +15470,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           </div>
         )}
 
+        {showNotif&&(
+          <NotificationPanel profile={formData||{name:""}} userId={userId} streak={streak||1} onClose={()=>setShowNotif(false)}/>
+        )}
         {!showPolicy&&!showProfile&&!showAdmin&&<>
+
         {/* ── SCREEN ROUTER ─────────────────────────────────────────────────────
             RULE: setScreen is NEVER called here in render — only in effects and
             event handlers. Calling setState during render causes loops and flicker.
@@ -15434,9 +15513,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           </div>
         )}
 
-        {showNotif&&formData&&(
-          <NotificationPanel profile={formData} userId={userId} streak={streak} onClose={()=>setShowNotif(false)}/>
-        )}
+
         {showTracker&&(
           <HabitTrackerPanel userId={userId} onClose={()=>setShowTracker(false)}/>
         )}

@@ -1,7 +1,6 @@
 // app/layout.tsx
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "DestinIQ — Personal Intelligence Platform",
   description:
     "DestinIQ analyses your life profile and delivers a daily intelligence layer — covering direction, money, mindset, and relationships.",
