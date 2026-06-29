@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -299,7 +299,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -962,8 +962,8 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .reloc-verdict{padding:14px 16px;border-left:2px solid var(--gold);background:var(--gold-glow);border-radius:0 9px 9px 0;font-size:13px;color:var(--cream-60);font-style:italic;line-height:1.7;}
 /* reloc responsive handled in main block above */
 /* ─── APP SHELL ─── */
-.app-shell{display:flex;min-height:100vh;background:var(--void);overflow-x:hidden;}
-.sidebar{width:220px;min-height:100vh;position:fixed;left:0;top:0;bottom:0;background:var(--night);border-right:1px solid var(--line);display:none;flex-direction:column;z-index:200;overflow-y:auto;}
+.app-shell{display:flex;min-height:100vh;background:var(--void);overflow-x:hidden;width:100%;max-width:100vw;}
+.sidebar{width:220px;min-height:100vh;position:fixed;left:0;top:0;bottom:0;background:var(--night);border-right:1px solid var(--line);display:none!important;flex-direction:column;z-index:200;overflow-y:auto;}
 .sidebar-logo{padding:22px 20px 14px;border-bottom:1px solid var(--line-dim);}
 .sidebar-items{padding:8px 0;flex:1;}
 .s-item{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;font-size:13.5px;color:var(--cream-50);font-weight:500;border:none;background:none;width:100%;text-align:left;transition:all .15s;border-left:3px solid transparent;}
@@ -971,7 +971,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .s-item.active{background:rgba(200,168,75,.08);color:var(--gold);border-left-color:var(--gold);}
 .s-streak{padding:14px 20px;border-top:1px solid var(--line-dim);}
 .s-upgrade{padding:0 16px 18px;}
-.main-area{margin-left:0;flex:1;min-width:0;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+.main-area{margin-left:0;flex:1;min-width:0;width:100%;max-width:100vw;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
 .bot-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
 .bot-items{display:flex;justify-content:space-around;}
 .bot-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border:none;background:none;color:var(--cream-30);cursor:pointer;flex:1;transition:color .15s;}
@@ -1041,6 +1041,8 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 @media(min-width:901px){
   .sidebar{display:flex!important;}.main-area{margin-left:220px!important;}}
 @media(max-width:900px){
+  .sidebar{display:none!important;width:0!important;}
+  .main-area{margin-left:0!important;width:100%!important;}
   .bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
@@ -4927,7 +4929,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                 <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1a1408",
                   border:"1px solid rgba(240,180,41,0.2)",borderRadius:12,zIndex:100,
                   maxHeight:200,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}}>
-                  {COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(f.cSearch.toLowerCase())).slice(0,8).map(c=>(
+                  {(Array.isArray(COUNTRIES_LIST)?COUNTRIES_LIST:[]).filter(c=>c.name.toLowerCase().includes(f.cSearch.toLowerCase())).slice(0,8).map(c=>(
                     <div key={c.name}
                       onMouseDown={()=>{set("country",c.name);set("cSearch",c.name);setShowDrop(false);}}
                       style={{padding:"12px 16px",cursor:"pointer",display:"flex",
@@ -5294,7 +5296,7 @@ function CompleteProfile({savedFormData, onSubmit}){
             />
             {showDrop&&cSearch&&(
               <div style={{position:"absolute",top:"100%",left:0,right:0,background:"var(--lift)",border:"1px solid var(--line)",borderRadius:12,zIndex:100,maxHeight:200,overflowY:"auto",marginTop:4,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
-                {COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(cSearch.toLowerCase())).slice(0,8).map(c=>(
+                {(Array.isArray(COUNTRIES_LIST)?COUNTRIES_LIST:[]).filter(c=>c.name.toLowerCase().includes(cSearch.toLowerCase())).slice(0,8).map(c=>(
                   <div key={c.name}
                     onMouseDown={()=>{setCountry(c.name);setCSearch(c.name);setShowDrop(false);}}
                     style={{padding:"11px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",borderBottom:"1px solid rgba(255,255,255,0.04)"}}
@@ -6109,7 +6111,9 @@ CURRENCY: ${currencySymbol&&currencySymbol!=="$"?`Use ${currencySymbol} (${curre
 ABSOLUTE RULE: Generate the full response NOW using whatever information is available. Never say you need more information, never ask them to update their profile, never refuse. If a specific detail is missing, make a reasonable assumption based on what you know and keep going.`,
         userId, isPremium, isProMax,
       });
-      const txt = result?.content?.[0]?.text||result||"";
+      const txt = Array.isArray(result?.content)
+        ? result.content.filter(x=>x?.type==="text").map(x=>x.text||"").join(" ")
+        : (typeof result==="string" ? result : result?.text || result?.content || "");
       setContent2(txt);
       try{ localStorage.setItem(cacheKey, txt); }catch{}
     }catch(e){ setError2("Could not generate response. Check your connection and tap Refresh to try again."); }
@@ -7553,17 +7557,17 @@ function loadVoices(){
     try{
       if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
       const attempt=()=>{
-      const vs=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-      if(vs.length>0){res(vs);return;}
-      window.speechSynthesis.onvoiceschanged=()=>{
-        const vs2=window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"));
-        res(vs2);
-      };
-      // Fallback timeout
-      setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
+        const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
+        if(vs.length>0){res(vs);return;}
+        window.speechSynthesis.onvoiceschanged=()=>{
+          const vs2=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
+          res(vs2);
+        };
+        // Fallback timeout
+        setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
       };
       attempt();
-    }catch(e){
+    } catch (err) {
       res([]);
     }
   });
@@ -11478,7 +11482,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const getCatPct=(cat)=>{
-    const done=cat.tools.filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
+    const done=(Array.isArray(cat?.tools)?cat.tools:[]).filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
     return cat.tools.length?Math.round((done/cat.tools.length)*100):0;
   };
 
@@ -11567,10 +11571,10 @@ function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
     if(!query.trim()) return null;
     const q=query.toLowerCase();
     const tools=CATEGORIES.flatMap(cat=>
-      cat.tools.filter(t=>{const m=TOOL_META?.[t];return m&&(m.label.toLowerCase().includes(q)||t.includes(q)||cat.label.toLowerCase().includes(q));})
+      (Array.isArray(cat?.tools)?cat.tools:[]).filter(t=>{const m=TOOL_META?.[t];return m&&(m.label.toLowerCase().includes(q)||t.includes(q)||cat.label.toLowerCase().includes(q));})
         .map(t=>{const m=TOOL_META?.[t];return{id:t,label:m.label,icon:m.icon,color:m.color,catLabel:cat.label,catColor:cat.color};})
     );
-    const cats=CATEGORIES.filter(cat=>cat.label.toLowerCase().includes(q)||cat.desc.toLowerCase().includes(q));
+    const cats=(Array.isArray(CATEGORIES)?CATEGORIES:[]).filter(cat=>cat.label.toLowerCase().includes(q)||cat.desc.toLowerCase().includes(q));
     return {tools,cats};
   })();
 
@@ -12153,7 +12157,7 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
         {/* Categories Progress */}
         <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>Categories Progress</div>
         {CATEGORIES.map(cat=>{
-          const done=cat.tools.filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
+          const done=(Array.isArray(cat?.tools)?cat.tools:[]).filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
           const pct=cat.tools.length?Math.round((done/cat.tools.length)*100):0;
           return(
             <div key={cat.id} style={{marginBottom:16,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
@@ -12356,7 +12360,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
 }
 
 
-function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lang="en"}){
+function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId, streak, setNav, lang="en"}){
   const [exStr, setExStr]=useState(false);
   const [exBls, setExBls]=useState(false);
   const [exOpp, setExOpp]=useState(false);
@@ -12403,7 +12407,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
   const opportunities=(()=>{
     if(Array.isArray(data?.priorities)&&data.priorities.length) return data.priorities;
     if(Array.isArray(data?.roadmap)&&data.roadmap.length)
-      return data.roadmap.filter(r=>r&&typeof r==="object").map(r=>txt(r.title)||txt(r.desc));
+      return (Array.isArray(data?.roadmap)?data.roadmap:[]).filter(r=>r&&typeof r==="object").map(r=>txt(r.title)||txt(r.desc));
     return ["Build consistent daily habits","Improve financial management","Develop social confidence","Focus on one income stream"];
   })();
 
@@ -12411,7 +12415,7 @@ function MyReport({data, formData, isPaid, onUnlock, userId, streak, setNav, lan
   const dataPoints = formData ? Math.max(40,Object.values(formData).filter(v=>v&&String(v).length>0).length*7) : 47;
   const insights   = Math.max(10, (Array.isArray(data?.strengths)?data.strengths.length:0)
     +(Array.isArray(data?.priorities)?data.priorities.length:0)
-    +(Array.isArray(data?.roadmap)?data.roadmap.filter(r=>r&&typeof r==="object").length*2:0)||12);
+    +(Array.isArray(data?.roadmap)?(Array.isArray(data?.roadmap)?data.roadmap:[]).filter(r=>r&&typeof r==="object").length*2:0)||12);
   const confidence = Math.min(98,Math.max(85,overall+16));
   const genDate    = new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
 
@@ -13422,7 +13426,7 @@ Rules:
           />
         )}
 
-        {navSection==="report"&&<MyReport data={data} formData={formData} isPaid={isPaid} onUnlock={onUnlock} userId={userId} streak={streak} setNav={setNav} lang={lang}/>}
+        {navSection==="report"&&<MyReport data={data} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} userId={userId} streak={streak} setNav={setNav} lang={lang}/>}
       </div>
 
       <BottomNav nav={navSection} setNav={setNav}/>
@@ -13502,7 +13506,7 @@ function EditProfileModal({formData, userId, onSave, onClose}){
             </label>
             {field.key==="country"
               ? (()=>{
-                  const filt=COUNTRIES_LIST.filter(c=>c.name.toLowerCase().includes(csearch.toLowerCase())).slice(0,6);
+                  const filt=(Array.isArray(COUNTRIES_LIST)?COUNTRIES_LIST:[]).filter(c=>c.name.toLowerCase().includes(csearch.toLowerCase())).slice(0,6);
                   return(
                     <div style={{position:"relative"}}>
                       <input
@@ -14706,6 +14710,21 @@ export default function DestinIQ(){
         try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
 
         // ── SCREEN ROUTING ────────────────────────────────────────────────────────
+        // Auto-schedule notifications on every login so users do not need any setup.
+        try {
+          const savedNotif = localStorage.getItem(NOTIF_SCHED_KEY);
+          const notifData = savedNotif ? JSON.parse(savedNotif) : null;
+          const times = notifData?.times || {morning:"07:00",afternoon:"13:00",evening:"20:00"};
+          const parsedFD = typeof profile.form_data === "string"
+            ? (() => { try { return JSON.parse(profile.form_data); } catch { return {}; } })()
+            : (profile.form_data || {});
+          const uName = parsedFD?.name || u.email?.split("@")[0] || "there";
+          const uGoal = parsedFD?.goals || parsedFD?.bigGoal || "your goals";
+          setTimeout(() => {
+            scheduleNotification(u.id, uName, uGoal, profile.streak || 1, times, null);
+          }, 3000);
+        } catch (_) {}
+
         if (profile.form_data && profile.report) {
           setScreen("results");
         } else if (profile.form_data) {
