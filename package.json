@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
@@ -22,9 +21,9 @@
     "@capacitor/status-bar": "^8.0.2",
     "@supabase/supabase-js": "^2.108.1",
     "dotenv": "^17.4.2",
-    "next": "^9.3.3",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "next": "^15.3.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "resend": "^6.12.3",
     "web-push": "^3.6.7"
   },
@@ -34,8 +33,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
