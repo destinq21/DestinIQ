@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -7566,16 +7566,16 @@ function loadVoices(){
     try{
       if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
       const attempt=()=>{
-        const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
-        if(vs.length>0){res(vs);return;}
-        window.speechSynthesis.onvoiceschanged=()=>{
-          const vs2=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
-          res(vs2);
-        };
-        // Fallback timeout
-        setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
+      const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
+      if(vs.length>0){res(vs);return;}
+      window.speechSynthesis.onvoiceschanged=()=>{
+        const vs2=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
+        res(vs2);
       };
-      attempt();
+      // Fallback timeout
+      setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
+    };
+    attempt();
     }catch(e){
       res([]);
     }
@@ -13409,31 +13409,14 @@ Rules:
     </div>
   );
 
-  // ── VIEWPORT META TAG (ensures mobile renders at correct width) ────────────
-  useEffect(()=>{
-    if(typeof document==="undefined") return;
-    let vp = document.querySelector('meta[name="viewport"]');
-    if(!vp){
-      vp = document.createElement("meta");
-      vp.name = "viewport";
-      document.head.appendChild(vp);
-    }
-    vp.content = "width=device-width, initial-scale=1, maximum-scale=5";
-  },[]);
 
-  // ── EXPLORE: full-page standalone (has its own nav + layout) ──────────────
+  // ── EXPLORE: full-page standalone ──────────────────────────────────────────
   if(navSection==="explore"){
     return(
       <ExploreScreen
-        setNav={setNav}
-        formData={formData}
-        userId={userId}
-        isPaid={isPaid}
-        isPremium={isPremium}
-        isProMax={isProMax}
-        onUnlock={onUnlock}
-        streak={streak}
-        navPhotoURL={navPhotoURL}
+        setNav={setNav} formData={formData} userId={userId}
+        isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
+        onUnlock={onUnlock} streak={streak} navPhotoURL={navPhotoURL}
       />
     );
   }
@@ -13443,27 +13426,9 @@ Rules:
 
       <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 
-      {/* MobileTopBar moved inside main-area below */}
-      {false&&(
-        <MobileTopBar
-          onHamburger={()=>setDrawerOpen(true)}
-        title={(()=>{
-          if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
-          if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
-          if(isTool) return TOOL_META[toolId]?.label;
-          return null;
-        })()}
-        onBack={canGoBack?goBack:null}
-        streak={streak} isPaid={isPaid} isProMax={isProMax}
-        onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
-        setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
-      />
-        )}
-
       <div className="main-area">
         {navSection!=="explore"&&(
         <MobileTopBar
-          onHamburger={()=>setDrawerOpen(true)}
           onHamburger={()=>setDrawerOpen(true)}
         title={(()=>{
           if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
@@ -14953,61 +14918,69 @@ export default function DestinIQ(){
   },[userId]);
 
   // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
+  // Restored session handler — load profile and determine next screen
   useEffect(()=>{
-    if(!profile||!u?.id) return;
-    // Users shouldn't have to configure anything — just works
-    try{
-      const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
-      const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
-      const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
-      const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
-      const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
-      setTimeout(()=>{
-        scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
-      }, 3000);
-    }catch(e){}
-  },[profile,u?.id]);
+    if(!userId && !u?.id) return;
+    
+    const restoreUserSession = async() => {
+      setProfileLoading(true);
+      try{
+        // Load or create user profile
+        const{data:profile, error}=await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("user_id",userId||u?.id)
+          .single();
+        
+        if(!error && profile){
+          // Users shouldn't have to configure anything — just works
+          try{
+            const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
+            const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
+            const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
+            const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
+            const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
+            setTimeout(()=>{
+              scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
+            }, 3000);
+          }catch(e){}
 
-  // ── RESTORE USER SESSION ──────────────────────────────────────────
-  const restoreUserSession = async ()=>{
-    setProfileLoading(true);
-    try{
-      if(!userId) return;
-      const {data:profile} = await supabase.from("user_profiles").select("*").eq("user_id",userId).single();
-      if(profile){
-        if (profile.form_data && profile.report) {
-          // ── CASE 1: Complete profile + report → straight to Dashboard
-          setScreen("results");
-        } else if (profile.form_data) {
-          // ── CASE 2: Has profile data but missing report or incomplete fields
-          // Show a short "complete your profile" flow, then regenerate report
-          setScreen("complete-profile");
+          if (profile.form_data && profile.report) {
+            // ── CASE 1: Complete profile + report → straight to Dashboard
+            setScreen("results");
+          } else if (profile.form_data) {
+            // ── CASE 2: Has profile data but missing report or incomplete fields
+            // Show a short "complete your profile" flow, then regenerate report
+            setScreen("complete-profile");
+          } else {
+            // ── CASE 3: Brand-new account — no profile data at all
+            setScreen("intake");
+          }
         } else {
-          // ── CASE 3: Brand-new account — no profile data at all
+          // No profile row at all → brand-new account → full onboarding
           setScreen("intake");
         }
-      } else {
-        // No profile row at all → brand-new account → full onboarding
-        setScreen("intake");
-      }
-    }catch(e){
-      console.warn("restoreUserSession profile load error:",e.message);
-      // Don't send returning users back to onboarding on network/load errors
-      // If we have a userId, they're authenticated — send to results or landing
-      if(userId||u?.id){
-        const savedScreen = typeof window!=="undefined"?localStorage.getItem("diq_screen"):null;
-        if(savedScreen&&savedScreen!=="intake"&&savedScreen!=="loading"){
-          setScreen(savedScreen);
+      }catch(e){
+        console.warn("restoreUserSession profile load error:",e.message);
+        // Don't send returning users back to onboarding on network/load errors
+        // If we have a userId, they're authenticated — send to results or landing
+        if(userId||u?.id){
+          const savedScreen = typeof window!=="undefined"?localStorage.getItem("diq_screen"):null;
+          if(savedScreen&&savedScreen!=="intake"&&savedScreen!=="loading"){
+            setScreen(savedScreen);
+          } else {
+            setScreen("results"); // They're logged in — show dashboard
+          }
         } else {
-          setScreen("results"); // They're logged in — show dashboard
+          setScreen("landing");
         }
-      } else {
-        setScreen("landing");
+      }finally{
+        setProfileLoading(false);
       }
-    }finally{
-      setProfileLoading(false);
-    }
-  };
+    };
+    
+    restoreUserSession();
+  },[userId,u?.id]);
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
   // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
