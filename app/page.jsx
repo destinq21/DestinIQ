@@ -165,7 +165,7 @@ class ErrorBoundary extends React.Component {
       <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0a0800"}}>
         <div style={{maxWidth:600,textAlign:"center"}}>
           <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
-          <div style={{fontSize:22,fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
+          <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
           <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
           <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:16}}>Refresh page</button>
           <div style={{textAlign:"left",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:16,fontSize:11,color:"#F87171",fontFamily:"monospace",overflow:"auto",maxHeight:300,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
@@ -803,6 +803,15 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 /* Mobile: ≤640px */
 @media(max-width:640px){
   /* ── CORE MOBILE FIXES ── */
+  /* Score ring scales down on small phones */
+  .score-ring-wrap{transform:scale(0.8);transform-origin:top center;}
+  /* Tool icon */
+  .t-icon{font-size:clamp(28px,8vw,48px)!important;}
+  /* All section headings */
+  h2,h3{font-size:clamp(16px,4.5vw,22px)!important;}
+  /* Card inner padding */
+  .card,.lift{padding:clamp(12px,3.5vw,18px)!important;}
+
   .pg{padding:16px 16px 90px!important;}
   .pg-back{margin-bottom:12px;}
   /* Prevent horizontal overflow on all screens */
@@ -1024,7 +1033,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .rec-item:hover{border-color:rgba(200,168,75,.2);}
 .rec-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
 .rec-title{font-size:13px;font-weight:600;color:var(--cream);}.rec-sub{font-size:11px;color:var(--cream-40);}
-.pg{padding:20px 20px 90px;max-width:860px;margin:0 auto;}
+.pg{padding:clamp(12px,4vw,20px) clamp(12px,4vw,20px) 90px;max-width:860px;margin:0 auto;}
 .pg-back{background:none;border:none;color:var(--cream-40);cursor:pointer;font-size:14px;margin-bottom:18px;display:flex;align-items:center;gap:6px;}
 .tool-row{display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:13px;background:var(--raised);border:1px solid var(--line);margin-bottom:9px;cursor:pointer;transition:all .2s;}
 .tool-row:hover{border-color:rgba(200,168,75,.2);transform:translateX(3px);}
@@ -2409,7 +2418,7 @@ function MomentumModule({profile,userId,isPremium,isProMax,streak}){
           <div>
             <div className="mono" style={{fontSize:"9px",marginBottom:6}}>YOUR MOMENTUM SCORE</div>
             <div style={{display:"flex",alignItems:"baseline",gap:10}}>
-              <span style={{fontSize:52,fontWeight:800,color:scoreColor(smartScore),fontFamily:"var(--f-display)",lineHeight:1}}>{smartScore}</span>
+              <span style={{fontSize:"clamp(32px,10vw,52px)",fontWeight:800,color:scoreColor(smartScore),fontFamily:"var(--f-display)",lineHeight:1}}>{smartScore}</span>
               <span style={{fontSize:14,color:"var(--cream-30)"}}>/100</span>
             </div>
             <div style={{fontSize:13,color:scoreColor(smartScore),fontWeight:600,marginTop:4}}>{scoreLabel(smartScore)}</div>
@@ -3361,7 +3370,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
         <>
           <div style={{marginBottom:24}}>
             <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:6}}>DAILY CHECK-IN</div>
-            <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>
+            <h2 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:"0 0 4px"}}>
               How are you today{profile?.name?`, ${profile.name.split(" ")[0]}`:""}?
             </h2>
             <p style={{fontSize:13,color:G.dimmer,margin:0}}>Takes 60 seconds. Your coach is listening.</p>
@@ -3536,7 +3545,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         {/* Welcome bubble */}
         {msgs.length===0&&(
           <div style={{textAlign:"center",padding:"32px 16px"}}>
-            <div style={{fontSize:40,marginBottom:12}}>🤖</div>
+            <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>🤖</div>
             <h3 style={{fontSize:16,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>Your AI Coach</h3>
             <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:300,marginInline:"auto"}}>
               Ask me anything about your goals, challenges, or decisions. I know your profile and report.
@@ -4377,7 +4386,7 @@ function Landing({onStart,ipLocation}){
           ].map(({num,label},i)=>(
             <div key={label} style={{padding:"28px 20px",textAlign:"center",
               borderRight:i<2?"1px solid rgba(240,180,41,0.1)":"none"}}>
-              <div style={{fontSize:32,fontWeight:800,color:G.gold,lineHeight:1,marginBottom:6}}>{num}</div>
+              <div style={{fontSize:"clamp(20px,6vw,32px)",fontWeight:800,color:G.gold,lineHeight:1,marginBottom:6}}>{num}</div>
               <div style={{fontSize:12,color:G.dim,lineHeight:1.4}}>{label}</div>
             </div>
           ))}
@@ -4458,7 +4467,7 @@ function Landing({onStart,ipLocation}){
               </div>
               <div>
                 <div style={{fontSize:9,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:4}}>OVERALL POTENTIAL SCORE</div>
-                <div style={{fontSize:22,fontWeight:800,color:G.cream}}>78<span style={{fontSize:12,color:G.dim}}>/100</span></div>
+                <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream}}>78<span style={{fontSize:12,color:G.dim}}>/100</span></div>
               </div>
             </div>
 
@@ -4555,7 +4564,7 @@ function Landing({onStart,ipLocation}){
               )}
               <div style={{fontSize:13,fontWeight:700,color:G.dim,letterSpacing:".05em",marginBottom:4}}>{plan.name.toUpperCase()}</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:4}}>
-                <span style={{fontSize:36,fontWeight:900,color:G.cream}}>{plan.price}</span>
+                <span style={{fontSize:"clamp(24px,7vw,36px)",fontWeight:900,color:G.cream}}>{plan.price}</span>
                 <span style={{fontSize:12,color:G.dim}}>{plan.period}</span>
               </div>
               <div style={{height:1,background:"rgba(255,255,255,0.07)",margin:"16px 0"}}/>
@@ -4831,7 +4840,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
           justifyContent:"center",fontSize:56,color:G.gold}}>✦</div>
       </div>
 
-      <h1 style={{fontSize:32,fontWeight:800,color:G.cream,marginBottom:14,lineHeight:1.2}}>
+      <h1 style={{fontSize:"clamp(20px,6vw,32px)",fontWeight:800,color:G.cream,marginBottom:14,lineHeight:1.2}}>
         Almost there!
       </h1>
       <p style={{fontSize:15,color:G.dim,lineHeight:1.7,marginBottom:10,maxWidth:300}}>
@@ -4900,7 +4909,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
         {/* ════ STEP 1: Basics ════ */}
         {step===1&&(
           <div>
-            <h2 style={{fontSize:28,fontWeight:800,color:G.cream,textAlign:"center",
+            <h2 style={{fontSize:"clamp(20px,5.5vw,28px)",fontWeight:800,color:G.cream,textAlign:"center",
               lineHeight:1.25,marginBottom:8}}>
               Let's personalize<br/>your journey
             </h2>
@@ -5255,7 +5264,7 @@ function CompleteProfile({savedFormData, onSubmit}){
             <span style={{fontSize:11}}>⚡</span>
             <span style={{fontSize:10,color:"var(--gold)",fontWeight:700,letterSpacing:".6px"}}>COMPLETE YOUR PROFILE</span>
           </div>
-          <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>
+          <h2 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>
             {userName?`Welcome back, ${userName}!`:"Welcome back!"}<br/>
             <span style={{color:"var(--gold)"}}>Let's finish setting you up.</span>
           </h2>
@@ -6219,7 +6228,7 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
         </div>
       ) : (
         <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
-          <div style={{fontSize:40,marginBottom:12}}>{cfg.icon}</div>
+          <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>{cfg.icon}</div>
           <p style={{color:"var(--cream-50)",fontSize:14,marginBottom:20}}>Your personalized {cfg.title} will be written based on your profile.</p>
           <button className="btn btn-gold" onClick={generate}>Generate My {cfg.title}</button>
         </div>
@@ -6556,10 +6565,10 @@ Give them a powerful, personalized coaching session. Ask one deep question that 
 
         {/* ── Logo ── */}
         <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{fontSize:26,fontWeight:800,color:G.cream,marginBottom:8,letterSpacing:"-.3px"}}>
+          <div style={{fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:G.cream,marginBottom:8,letterSpacing:"-.3px"}}>
             Destin<span style={{color:G.gold}}>IQ</span>
           </div>
-          <h1 style={{fontSize:24,fontWeight:800,color:G.cream,margin:"0 0 6px",lineHeight:1.2}}>
+          <h1 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:G.cream,margin:"0 0 6px",lineHeight:1.2}}>
             {mode==="forgot"||mode==="forgot_sent"?"Reset your password"
              :mode==="reset"?"Set new password"
              :"Start your transformation"}
@@ -7554,7 +7563,7 @@ function resolveLiveVoice(voiceRef){
 // Loads all voices — returns a promise that resolves when voices are ready
 function loadVoices(){
   return new Promise(res=>{
-    try{
+    try {
       if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
       const attempt=()=>{
         const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
@@ -8411,7 +8420,7 @@ function JimRohnTab({isPaid, onUnlock}){
           <div style={{fontSize:36,flexShrink:0}}>📜</div>
           <div>
             <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".16em",marginBottom:6}}>FINANCIAL PHILOSOPHY</div>
-            <div style={{fontSize:22,fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>Jim Rohn on Money</div>
+            <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>Jim Rohn on Money</div>
             <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.8,margin:0}}>
               Broke at 25. Self-made millionaire at 31. He spent the next 40 years explaining exactly what changed.
               These are the 5 principles he taught over and over — because they are the ones most people never apply.
@@ -9140,11 +9149,11 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10}}>
-            <div style={{fontSize:22,fontWeight:700,color:"var(--gold)",lineHeight:1}}>{currentStreak}</div>
+            <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"var(--gold)",lineHeight:1}}>{currentStreak}</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>DAY STREAK 🔥</div>
           </div>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(20,184,154,0.06)",border:"1px solid rgba(20,184,154,0.2)",borderRadius:10}}>
-            <div style={{fontSize:22,fontWeight:700,color:"var(--teal)",lineHeight:1}}>{totalWins}</div>
+            <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"var(--teal)",lineHeight:1}}>{totalWins}</div>
             <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>TOTAL WINS</div>
           </div>
         </div>
@@ -9471,7 +9480,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
       {filtered.length===0&&(
         <div style={{padding:"28px 0 8px"}}>
           <div style={{textAlign:"center",marginBottom:24}}>
-            <div style={{fontSize:40,marginBottom:12}}>📈</div>
+            <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>📈</div>
             <div className="d3" style={{marginBottom:8}}>Your progress story starts here</div>
             <p style={{fontSize:13,color:"rgba(255,255,255,0.35)",maxWidth:380,margin:"0 auto",lineHeight:1.7}}>
               Every time you try something from your roadmap, career path, or business plan — come back and tell your coach what happened. They&apos;ll help you adjust and keep moving.
@@ -9624,7 +9633,7 @@ function PracticesView({userId}){
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
       {/* Header */}
-      <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>My Practices</h2>
+      <h2 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:"0 0 4px"}}>My Practices</h2>
       <p style={{fontSize:13,color:G.dim,margin:"0 0 20px",lineHeight:1.6}}>
         Commit to habits that compound over time. Track your progress daily.
       </p>
@@ -9634,15 +9643,15 @@ function PracticesView({userId}){
         borderRadius:16,padding:"18px 20px",marginBottom:20}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
           <div>
-            <div style={{fontSize:26,fontWeight:800,color:G.cream,lineHeight:1}}>{ht.committed.length}</div>
+            <div style={{fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:G.cream,lineHeight:1}}>{ht.committed.length}</div>
             <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>COMMITTED</div>
           </div>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:26,fontWeight:800,color:"#1ab89a",lineHeight:1}}>{ht.mastered?.length||0}</div>
+            <div style={{fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:"#1ab89a",lineHeight:1}}>{ht.mastered?.length||0}</div>
             <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>MASTERED</div>
           </div>
           <div style={{textAlign:"right"}}>
-            <div style={{fontSize:26,fontWeight:800,color:G.gold,lineHeight:1}}>{ht.pct}%</div>
+            <div style={{fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:G.gold,lineHeight:1}}>{ht.pct}%</div>
             <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>COMPLETE</div>
           </div>
         </div>
@@ -11313,7 +11322,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       {/* ══ 1. GREETING (desktop content, mobile uses MobileTopBar) ══ */}
       <div style={{padding:"22px 20px 14px"}}>
         <p style={{fontSize:12,color:G.dimmer,margin:"0 0 3px"}}>{today}</p>
-        <h1 style={{fontSize:24,fontWeight:800,color:G.cream,margin:0,lineHeight:1.15}}>
+        <h1 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:G.cream,margin:0,lineHeight:1.15}}>
           {timeGreet}, <span style={{color:G.gold}}>{name}</span> 👋
         </h1>
       </div>
@@ -11368,7 +11377,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
         {/* ══ 4. QUICK ACTIONS ══ */}
         <div style={{marginBottom:20}}>
           <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:12,textTransform:"uppercase"}}>Quick Actions</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:"clamp(6px,2vw,10px)"}}>
             {quickActions.map(a=>(
               <button key={a.label} onClick={a.action}
                 style={{background:a.bg||G.card,border:"1px solid "+(a.brd||G.border),borderRadius:13,
@@ -11417,7 +11426,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
                 background:"rgba(255,255,255,0.02)",borderRadius:12,
                 border:"1px solid rgba(255,255,255,0.04)"}}>
                 <div style={{fontSize:20,marginBottom:5}}>{icon}</div>
-                <div style={{fontSize:22,fontWeight:800,color,lineHeight:1,marginBottom:3}}>
+                <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color,lineHeight:1,marginBottom:3}}>
                   {val}<span style={{fontSize:10,color:G.dimmer,fontWeight:400}}>{unit}</span>
                 </div>
                 <div style={{fontSize:10,color:G.dimmer}}>{label}</div>
@@ -11605,7 +11614,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, onUnlock}){
 
       {/* ══ PAGE TITLE ══ */}
       <div style={{marginBottom:20}}>
-        <h1 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 4px"}}>Explore</h1>
+        <h1 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:"0 0 4px"}}>Explore</h1>
         <p style={{fontSize:13,color:G.dimmer,margin:0}}>Every tool, personalized to your situation.</p>
       </div>
 
@@ -11961,7 +11970,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
     return(
       <div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",
         color:"#e8dcc8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
-        <div style={{fontSize:52,marginBottom:16}}>{meta?.icon||"🔒"}</div>
+        <div style={{fontSize:"clamp(32px,10vw,52px)",marginBottom:16}}>{meta?.icon||"🔒"}</div>
         <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:"#e8dcc8"}}>{meta?.label||"This Tool"}</h2>
         <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",lineHeight:1.7,margin:"0 0 24px"}}>
           This tool is part of the Pro plan. Upgrade to unlock all 42 intelligence tools.
@@ -12102,7 +12111,7 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
                 strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
             </svg>
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontSize:22,fontWeight:800,color:"var(--cream)",lineHeight:1}}>{overall}%</span>
+              <span style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:"var(--cream)",lineHeight:1}}>{overall}%</span>
               <span style={{fontSize:10,color:"var(--cream-40)",marginTop:2}}>Overall</span>
             </div>
           </div>
@@ -12251,7 +12260,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
 
       {/* Header */}
       <div style={{padding:"0 20px 20px"}}>
-        <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:"0 0 20px"}}>Profile</h2>
+        <h2 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:"0 0 20px"}}>Profile</h2>
 
         {/* Avatar + info row */}
         <div style={{display:"flex",alignItems:"center",gap:14}}>
@@ -12264,7 +12273,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
               background:"linear-gradient(135deg,var(--gold),var(--teal))",
               border:"3px solid rgba(212,175,55,0.3)",display:"flex",
               alignItems:"center",justifyContent:"center",
-              fontSize:26,fontWeight:800,color:"#000",overflow:"hidden",
+              fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:"#000",overflow:"hidden",
               opacity:uploading?.6:1,transition:"opacity .2s"}}>
               {(photoURL||navPhotoURL)
                 ?<img src={photoURL||navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
@@ -12536,7 +12545,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
             </svg>
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
               alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontSize:48,fontWeight:800,color:G.cream,lineHeight:1}}>{overall}</span>
+              <span style={{fontSize:"clamp(32px,9vw,48px)",fontWeight:800,color:G.cream,lineHeight:1}}>{overall}</span>
               <span style={{fontSize:13,color:G.dimmer,marginTop:2}}>/100</span>
             </div>
           </div>
@@ -12561,7 +12570,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
               display:"flex",alignItems:"center",justifyContent:"center",
               fontSize:20,flexShrink:0}}>{s.icon}</div>
             <div>
-              <div style={{fontSize:26,fontWeight:800,color:s.ic,lineHeight:1,marginBottom:3}}>{s.num}</div>
+              <div style={{fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:s.ic,lineHeight:1,marginBottom:3}}>{s.num}</div>
               <div style={{fontSize:11,color:G.dim,fontWeight:600,lineHeight:1.3}}>{s.label}</div>
               <div style={{fontSize:10,color:G.dimmer,marginTop:2}}>{s.sub}</div>
             </div>
@@ -12583,7 +12592,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           pointerEvents:"none"}}/>
         {/* Decorative: silhouette/mountain feel */}
         <div style={{position:"absolute",right:"2%",bottom:0,opacity:0.04,
-          fontSize:120,lineHeight:1,pointerEvents:"none",userSelect:"none"}}>⛰️</div>
+          fontSize:"clamp(56px,14vw,120px)",lineHeight:1,pointerEvents:"none",userSelect:"none"}}>⛰️</div>
 
         <div style={{position:"relative",maxWidth:680}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
@@ -12671,7 +12680,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
             background:"linear-gradient(135deg,rgba(240,180,41,0.14),rgba(240,180,41,0.04))",
             border:"2px solid rgba(240,180,41,0.22)",
             display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:34,boxShadow:"0 0 30px rgba(240,180,41,0.12)"}}>
+            fontSize:"clamp(22px,6.5vw,34px)",boxShadow:"0 0 30px rgba(240,180,41,0.12)"}}>
             🚀
           </div>
           <div>
@@ -12789,7 +12798,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
       <div style={{marginBottom:24}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{fontSize:22}}>✉️</span>
-          <h2 style={{fontSize:22,fontWeight:800,color:G.cream,margin:0}}>Journal</h2>
+          <h2 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:0}}>Journal</h2>
         </div>
         <p style={{fontSize:13,color:G.dimmer,margin:0}}>Write honestly. Your future self will thank you.</p>
       </div>
@@ -13391,7 +13400,7 @@ Rules:
               <span style={{fontSize:12}}>📋</span>
               <span style={{fontSize:9,fontWeight:700,letterSpacing:".8px",color:"var(--gold)",fontFamily:"monospace"}}>SAVED REPORTS</span>
             </div>
-            <h2 style={{fontSize:24,fontWeight:800,color:"var(--cream)",margin:"0 0 8px"}}>Your Saved Reports</h2>
+            <h2 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:"var(--cream)",margin:"0 0 8px"}}>Your Saved Reports</h2>
             <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",margin:"0 0 24px",lineHeight:1.6}}>Your intelligence reports are stored here for future reference.</p>
             <div style={{background:"var(--night)",border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"22px",marginBottom:14,cursor:"pointer"}} onClick={()=>setNav("report")}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
@@ -13672,7 +13681,7 @@ function AboutUsPage({onBack}){
 
         <div style={{fontSize:11,color:G.gold,fontWeight:700,letterSpacing:".15em",
           fontFamily:"monospace",marginBottom:12}}>OUR STORY</div>
-        <h1 style={{fontSize:36,fontWeight:900,color:G.cream,margin:"0 0 32px",lineHeight:1.2}}>
+        <h1 style={{fontSize:"clamp(24px,7vw,36px)",fontWeight:900,color:G.cream,margin:"0 0 32px",lineHeight:1.2}}>
           Built for people who want more clarity in their lives
         </h1>
 
@@ -13745,7 +13754,7 @@ function PolicyPage({type,onBack}){
           ))}
         </div>
 
-        <h1 style={{fontSize:32,fontWeight:800,color:G.cream,margin:"0 0 6px"}}>
+        <h1 style={{fontSize:"clamp(20px,6vw,32px)",fontWeight:800,color:G.cream,margin:"0 0 6px"}}>
           {isContact?"Contact Us":isPrivacy?"Privacy Policy":"Terms of Service"}
         </h1>
         <div style={{fontSize:11,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginBottom:40}}>
@@ -14249,7 +14258,7 @@ function AdminDashboard({user,onBack}){
               ].map(([icon,label,val])=>(
                 <div key={label} className="card" style={{textAlign:"center"}}>
                   <div style={{fontSize:24,marginBottom:4}}>{icon}</div>
-                  <div style={{fontSize:26,fontWeight:800,color:"var(--gold)"}}>{val}</div>
+                  <div style={{fontSize:"clamp(18px,5vw,26px)",fontWeight:800,color:"var(--gold)"}}>{val}</div>
                   <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{label.toUpperCase()}</div>
                 </div>
               ))}
@@ -14710,21 +14719,6 @@ export default function DestinIQ(){
         try{ localStorage.setItem(`diq_streak_${u.id}`, String(profile.streak||1)); }catch(_){}
 
         // ── SCREEN ROUTING ────────────────────────────────────────────────────────
-        // Auto-schedule notifications on every login so users do not need any setup.
-        try {
-          const savedNotif = localStorage.getItem(NOTIF_SCHED_KEY);
-          const notifData = savedNotif ? JSON.parse(savedNotif) : null;
-          const times = notifData?.times || {morning:"07:00",afternoon:"13:00",evening:"20:00"};
-          const parsedFD = typeof profile.form_data === "string"
-            ? (() => { try { return JSON.parse(profile.form_data); } catch { return {}; } })()
-            : (profile.form_data || {});
-          const uName = parsedFD?.name || u.email?.split("@")[0] || "there";
-          const uGoal = parsedFD?.goals || parsedFD?.bigGoal || "your goals";
-          setTimeout(() => {
-            scheduleNotification(u.id, uName, uGoal, profile.streak || 1, times, null);
-          }, 3000);
-        } catch (_) {}
-
         if (profile.form_data && profile.report) {
           setScreen("results");
         } else if (profile.form_data) {
@@ -15291,7 +15285,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             alignItems:"center",justifyContent:"center",background:"#0a0800",
             fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
             {/* Logo */}
-            <div style={{fontSize:32,fontWeight:900,color:"#e8dcc8",marginBottom:32,
+            <div style={{fontSize:"clamp(20px,6vw,32px)",fontWeight:900,color:"#e8dcc8",marginBottom:32,
               letterSpacing:"-.5px"}}>
               Destin<span style={{color:"#f0b429"}}>IQ</span>
             </div>
@@ -15332,7 +15326,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                   justifyContent:"center",background:"#0a0800",padding:"0 24px",textAlign:"center",
                   fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
                   <div style={{fontSize:48,marginBottom:20}}>📬</div>
-                  <h2 style={{fontSize:24,fontWeight:800,color:"#e8dcc8",margin:"0 0 12px"}}>Check your inbox</h2>
+                  <h2 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:"#e8dcc8",margin:"0 0 12px"}}>Check your inbox</h2>
                   <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",maxWidth:340,lineHeight:1.7,margin:"0 0 28px"}}>
                     We sent a confirmation link to your email. Click it to activate your account and start your journey.
                   </p>
