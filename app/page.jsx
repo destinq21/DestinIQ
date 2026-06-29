@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -981,7 +981,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .s-streak{padding:14px 20px;border-top:1px solid var(--line-dim);}
 .s-upgrade{padding:0 16px 18px;}
 .main-area{margin-left:0;flex:1;min-width:0;width:100%;max-width:100vw;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
-.bot-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
+.bot-nav{display:none!important;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
 .bot-items{display:flex;justify-content:space-around;}
 .bot-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border:none;background:none;color:var(--cream-30);cursor:pointer;flex:1;transition:color .15s;}
 .bot-item.active{color:var(--gold);}
@@ -1033,7 +1033,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .rec-item:hover{border-color:rgba(200,168,75,.2);}
 .rec-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
 .rec-title{font-size:13px;font-weight:600;color:var(--cream);}.rec-sub{font-size:11px;color:var(--cream-40);}
-.pg{padding:clamp(12px,4vw,20px) clamp(12px,4vw,20px) 90px;max-width:860px;margin:0 auto;}
+.pg{padding:clamp(12px,4vw,20px) clamp(12px,4vw,20px) 40px;max-width:860px;margin:0 auto;}
 .pg-back{background:none;border:none;color:var(--cream-40);cursor:pointer;font-size:14px;margin-bottom:18px;display:flex;align-items:center;gap:6px;}
 .tool-row{display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:13px;background:var(--raised);border:1px solid var(--line);margin-bottom:9px;cursor:pointer;transition:all .2s;}
 .tool-row:hover{border-color:rgba(200,168,75,.2);transform:translateX(3px);}
@@ -1047,12 +1047,12 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .fu-row{display:flex;gap:8px;}
 .fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
 .fu-input:focus{border-color:var(--gold);}
-@media(min-width:901px){
+@media(min-width:1025px){
   .sidebar{display:flex!important;}.main-area{margin-left:220px!important;}}
-@media(max-width:900px){
+@media(max-width:1024px){
   .sidebar{display:none!important;width:0!important;}
-  .main-area{margin-left:0!important;width:100%!important;}
-  .bot-nav{display:block;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
+  .main-area{margin-left:0!important;width:100%!important;max-width:100vw!important;}
+  .bot-nav{display:none!important;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
 }
@@ -7576,7 +7576,7 @@ function loadVoices(){
         setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
       };
       attempt();
-    }catch(err){
+    }catch(e){
       res([]);
     }
   });
@@ -9805,6 +9805,7 @@ function PracticesView({userId}){
     </div>
   );
 }
+
 const DISCIPLINE_SECTIONS=[
   {
     id:"wakeup",
@@ -11206,38 +11207,79 @@ function BottomNav({nav,setNav}){
 }
 
 // ── MobileTopBar ─────────────────────────────────────────────────────────
-function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName}){
+function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName,onHamburger}){
+  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)"};
   return(
-    <div className="mob-top">
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        {onBack
-          ?<button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-50)",cursor:"pointer",fontSize:22,padding:0,lineHeight:1,minWidth:32,minHeight:32}}>←</button>
-          :<span style={{fontSize:17,fontWeight:800,color:"var(--cream)"}}>Destin<b style={{color:"var(--gold)"}}>IQ</b></span>}
-        {title&&<span style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginLeft:4}}>{title}</span>}
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        {(streak||0)>0&&(
-          <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 9px",background:"rgba(200,168,75,.1)",border:"1px solid rgba(200,168,75,.2)",borderRadius:20}}>
-            <span style={{fontSize:13}}>🔥</span>
-            <span style={{fontSize:12,fontWeight:700,color:"var(--gold)"}}>{streak}</span>
-          </div>
-        )}
-        <button onClick={onNotif} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,padding:"2px",minWidth:32,minHeight:32,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--cream-50)"}}>🔔</button>
-        {setNav&&(
-          <button onClick={()=>setNav("profile")}
-            style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid rgba(212,175,55,0.3)",padding:0,cursor:"pointer",fontSize:12,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}}>
-            {navPhotoURL
-              ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              :(userName||"U")[0].toUpperCase()
-            }
+    <div className="mob-top" style={{display:"flex",alignItems:"center",
+      justifyContent:"space-between",padding:"max(14px,env(safe-area-inset-top)) 18px 12px",
+      background:"rgba(10,8,0,0.94)",backdropFilter:"blur(14px)",
+      borderBottom:"1px solid rgba(255,255,255,0.07)",
+      position:"sticky",top:0,zIndex:300,gap:12}}>
+
+      {/* Left: hamburger OR back button */}
+      {onBack
+        ? <button onClick={onBack} style={{background:"none",border:"none",
+            cursor:"pointer",color:G.dim,fontSize:20,padding:"4px 8px 4px 0",
+            display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+            <span>←</span>
           </button>
-        )}
+        : <button onClick={onHamburger}
+            style={{background:"none",border:"none",cursor:"pointer",
+              padding:"6px 4px",display:"flex",flexDirection:"column",gap:5}}>
+            {[0,1,2].map(i=>(
+              <span key={i} style={{display:"block",width:22,height:2,
+                background:G.cream,borderRadius:2}}/>
+            ))}
+          </button>
+      }
+
+      {/* Center: logo or title */}
+      <div style={{flex:1,textAlign:"center"}}>
+        {title
+          ? <span style={{fontSize:14,fontWeight:600,color:G.cream}}>{title}</span>
+          : <span style={{fontSize:17,fontWeight:900,color:G.cream,letterSpacing:"-.3px"}}>
+              Destin<span style={{color:G.gold}}>IQ</span>
+            </span>
+        }
       </div>
+
+      {/* Right: bell + avatar */}
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onNotif} style={{background:"none",border:"none",
+          cursor:"pointer",fontSize:18,color:G.dim,padding:4}}>
+          🔔
+        </button>
+        <div onClick={()=>setNav&&setNav("profile")}
+          style={{width:32,height:32,borderRadius:"50%",cursor:"pointer",
+            background:"linear-gradient(135deg,#f0b429,#c89010)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            overflow:"hidden",flexShrink:0}}>
+          {navPhotoURL
+            ? <img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            : <span style={{fontSize:13,fontWeight:800,color:"#000"}}>
+                {(userName||"U")[0].toUpperCase()}
+              </span>}
+        </div>
+      </div>
+
+      {/* Global SideDrawer for hamburger menu */}
+      <SideDrawer
+        open={drawerOpen}
+        onClose={()=>setDrawerOpen(false)}
+        nav={navSection}
+        setNav={setNav}
+        formData={formData}
+        isPaid={isPaid}
+        isProMax={isProMax}
+        streak={streak}
+        navPhotoURL={navPhotoURL}
+        onUnlock={onUnlock}
+        onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))}
+      />
     </div>
   );
 }
 
-// ── HomeScreen ────────────────────────────────────────────────────────────
 function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight}){
   const hour = new Date().getHours();
   const timeGreet = hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
@@ -13367,12 +13409,44 @@ Rules:
     </div>
   );
 
+  // ── VIEWPORT META TAG (ensures mobile renders at correct width) ────────────
+  useEffect(()=>{
+    if(typeof document==="undefined") return;
+    let vp = document.querySelector('meta[name="viewport"]');
+    if(!vp){
+      vp = document.createElement("meta");
+      vp.name = "viewport";
+      document.head.appendChild(vp);
+    }
+    vp.content = "width=device-width, initial-scale=1, maximum-scale=5";
+  },[]);
+
+  // ── EXPLORE: full-page standalone (has its own nav + layout) ──────────────
+  if(navSection==="explore"){
+    return(
+      <ExploreScreen
+        setNav={setNav}
+        formData={formData}
+        userId={userId}
+        isPaid={isPaid}
+        isPremium={isPremium}
+        isProMax={isProMax}
+        onUnlock={onUnlock}
+        streak={streak}
+        navPhotoURL={navPhotoURL}
+      />
+    );
+  }
+
   return(
     <div className="app-shell">
 
       <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 
-      <MobileTopBar
+      {/* MobileTopBar moved inside main-area below */}
+      {false&&(
+        <MobileTopBar
+          onHamburger={()=>setDrawerOpen(true)}
         title={(()=>{
           if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
           if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
@@ -13384,12 +13458,29 @@ Rules:
         onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
         setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
       />
+        )}
 
       <div className="main-area">
+        {navSection!=="explore"&&(
+        <MobileTopBar
+          onHamburger={()=>setDrawerOpen(true)}
+          onHamburger={()=>setDrawerOpen(true)}
+        title={(()=>{
+          if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
+          if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
+          if(isTool) return TOOL_META[toolId]?.label;
+          return null;
+        })()}
+        onBack={canGoBack?goBack:null}
+        streak={streak} isPaid={isPaid} isProMax={isProMax}
+        onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}
+        setNav={setNav} navPhotoURL={navPhotoURL} userName={userName}
+      />
+        )}
         {navSection==="home"&&(
           <HomeScreen data={data} formData={formData} streak={streak} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} userId={userId} onUnlock={onUnlock} setNav={setNav} setShowCheckin={setShowCheckin} dailyInsight={dailyInsight}/>
         )}
-        {navSection==="explore"&&<ExploreScreen setNav={setNav} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} streak={streak} navPhotoURL={navPhotoURL}/>}
+        {/* ExploreScreen handled by early return above */}
         {isCat&&<CategoryPage catId={catId} setNav={setNav} goBack={goBack} userId={userId}/>}
         {isTool&&MODULE_CONFIGS?.[toolId]&&(
           <ToolPage key={toolId} toolId={toolId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>
@@ -13453,6 +13544,20 @@ Rules:
         {navSection==="report"&&<MyReport data={data} formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} userId={userId} streak={streak} setNav={setNav} lang={lang}/>}
       </div>
 
+      {/* ── GLOBAL SIDE DRAWER ── */}
+      <SideDrawer
+        open={drawerOpen||false}
+        onClose={()=>setDrawerOpen&&setDrawerOpen(false)}
+        nav={navSection}
+        setNav={setNav}
+        formData={formData}
+        isPaid={isPaid}
+        isProMax={isProMax}
+        streak={streak}
+        navPhotoURL={navPhotoURL}
+        onUnlock={onUnlock}
+        onSignOut={()=>window.dispatchEvent(new CustomEvent("signOut"))}
+      />
       <BottomNav nav={navSection} setNav={setNav}/>
     </div>
   );
@@ -14846,6 +14951,63 @@ export default function DestinIQ(){
       }catch(e){}
     }
   },[userId]);
+
+  // ── AUTO-SCHEDULE NOTIFICATIONS on every login ───────────────────
+  useEffect(()=>{
+    if(!profile||!u?.id) return;
+    // Users shouldn't have to configure anything — just works
+    try{
+      const savedNotif  = localStorage.getItem(NOTIF_SCHED_KEY);
+      const notifData   = savedNotif ? JSON.parse(savedNotif) : null;
+      const times       = notifData?.times||{morning:"07:00",afternoon:"13:00",evening:"20:00"};
+      const uName       = profile.form_data?.name||u.email?.split("@")[0]||"there";
+      const uGoal       = profile.form_data?.goals||profile.form_data?.bigGoal||"your goals";
+      setTimeout(()=>{
+        scheduleNotification(u.id, uName, uGoal, profile.streak||1, times, null);
+      }, 3000);
+    }catch(e){}
+  },[profile,u?.id]);
+
+  // ── RESTORE USER SESSION ──────────────────────────────────────────
+  const restoreUserSession = async ()=>{
+    setProfileLoading(true);
+    try{
+      if(!userId) return;
+      const {data:profile} = await supabase.from("user_profiles").select("*").eq("user_id",userId).single();
+      if(profile){
+        if (profile.form_data && profile.report) {
+          // ── CASE 1: Complete profile + report → straight to Dashboard
+          setScreen("results");
+        } else if (profile.form_data) {
+          // ── CASE 2: Has profile data but missing report or incomplete fields
+          // Show a short "complete your profile" flow, then regenerate report
+          setScreen("complete-profile");
+        } else {
+          // ── CASE 3: Brand-new account — no profile data at all
+          setScreen("intake");
+        }
+      } else {
+        // No profile row at all → brand-new account → full onboarding
+        setScreen("intake");
+      }
+    }catch(e){
+      console.warn("restoreUserSession profile load error:",e.message);
+      // Don't send returning users back to onboarding on network/load errors
+      // If we have a userId, they're authenticated — send to results or landing
+      if(userId||u?.id){
+        const savedScreen = typeof window!=="undefined"?localStorage.getItem("diq_screen"):null;
+        if(savedScreen&&savedScreen!=="intake"&&savedScreen!=="loading"){
+          setScreen(savedScreen);
+        } else {
+          setScreen("results"); // They're logged in — show dashboard
+        }
+      } else {
+        setScreen("landing");
+      }
+    }finally{
+      setProfileLoading(false);
+    }
+  };
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
   // Uses window.Capacitor.Plugins directly — avoids Next.js bundling native modules
