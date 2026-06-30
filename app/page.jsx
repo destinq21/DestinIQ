@@ -150,8 +150,62 @@
  */
 
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THEME SYSTEM — Dark / Light mode, persisted, app-wide
+// ═══════════════════════════════════════════════════════════════════════════════
+const ThemeContext = createContext({theme:"dark", toggleTheme:()=>{}, setTheme:()=>{}});
+function useTheme(){ return useContext(ThemeContext); }
+
+function ThemeProvider({children}){
+  const [theme, setThemeState] = useState(()=>{
+    try{
+      const saved = localStorage.getItem("diq_theme");
+      if(saved==="light"||saved==="dark") return saved;
+      if(typeof window!=="undefined"&&window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+    }catch{}
+    return "dark";
+  });
+
+  useEffect(()=>{
+    try{
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("diq_theme", theme);
+    }catch{}
+  },[theme]);
+
+  const setTheme = (t)=>setThemeState(t==="light"?"light":"dark");
+  const toggleTheme = ()=>setThemeState(t=>t==="dark"?"light":"dark");
+
+  return(
+    <ThemeContext.Provider value={{theme, toggleTheme, setTheme}}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+// Returns the right hex/rgba palette object for components that use a local G={...}
+// instead of CSS variables directly. Mirrors the :root / [data-theme="light"] values above.
+function useThemeColors(){
+  const {theme} = useTheme();
+  const isDark = theme==="dark";
+  return {
+    isDark,
+    gold:      isDark? "#f0b429" : "#a87f1c",
+    goldBright:isDark? "#ffd166" : "#8a6817",
+    cream:     isDark? "#e8dcc8" : "#231c0c",
+    dim:       isDark? "rgba(232,220,200,0.5)"  : "rgba(35,28,12,0.55)",
+    dimmer:    isDark? "rgba(232,220,200,0.27)" : "rgba(35,28,12,0.32)",
+    bg:        isDark? "#0a0800" : "#f7f4ec",
+    card:      isDark? "#111008" : "#ffffff",
+    surface:   isDark? "#0e0c02" : "#fbf9f2",
+    border:    isDark? "rgba(232,220,200,0.07)" : "rgba(35,28,12,0.1)",
+    inp:       isDark? "rgba(255,255,255,0.04)" : "rgba(35,28,12,0.035)",
+    inpBorder: isDark? "rgba(232,220,200,0.13)" : "rgba(35,28,12,0.15)",
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ERROR BOUNDARY
@@ -637,8 +691,9 @@ if(typeof window!=="undefined"){
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Outfit:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-:root{
+:root,[data-theme="dark"]{
   --void:#05060f;--deep:#08091a;--base:#0d0f1e;--raised:#121526;--lift:#181b2e;--midnight:#0a0c1c;
+  --night:#0a0800;--card-bg:#111008;--surface:#0e0c02;
   --cream-80:rgba(237,232,216,0.8);--cream-70:rgba(237,232,216,0.7);--cream-50:rgba(237,232,216,0.5);--cream-40:rgba(237,232,216,0.4);--cream-20:rgba(237,232,216,0.2);--cream-15:rgba(237,232,216,0.12);
   --line:rgba(255,255,255,0.06);--line-gold:rgba(210,175,90,0.18);
   --gold:#d2af5a;--gold-bright:#e8cb7a;--gold-dim:rgba(210,175,90,0.12);--gold-glow:rgba(210,175,90,0.06);
@@ -649,7 +704,24 @@ const CSS = `
   --cream:#ede8d8;--cream-60:rgba(237,232,216,0.6);--cream-30:rgba(237,232,216,0.3);
   --cream-10:rgba(237,232,216,0.08);--cream-05:rgba(237,232,216,0.04);
   --f-display:'Playfair Display',serif;--f-body:'Outfit',sans-serif;--f-mono:'JetBrains Mono',monospace;
+  color-scheme:dark;
 }
+[data-theme="light"]{
+  --void:#f7f4ec;--deep:#f0ecdf;--base:#ffffff;--raised:#ffffff;--lift:#f5f1e6;--midnight:#ffffff;
+  --night:#f7f4ec;--card-bg:#ffffff;--surface:#fbf9f2;
+  --cream-80:rgba(35,28,12,0.82);--cream-70:rgba(35,28,12,0.72);--cream-50:rgba(35,28,12,0.55);--cream-40:rgba(35,28,12,0.45);--cream-20:rgba(35,28,12,0.22);--cream-15:rgba(35,28,12,0.14);
+  --line:rgba(35,28,12,0.1);--line-gold:rgba(168,128,40,0.3);
+  --gold:#a87f1c;--gold-bright:#8a6817;--gold-dim:rgba(168,128,40,0.1);--gold-glow:rgba(168,128,40,0.05);
+  --teal:#11806f;--teal-dim:rgba(17,128,111,0.08);
+  --rose:#a8473d;--rose-dim:rgba(168,71,61,0.08);
+  --violet:#5d3fa0;--violet-dim:rgba(93,63,160,0.08);
+  --emerald:#1b7e54;--emerald-dim:rgba(27,126,84,0.08);
+  --cream:#231c0c;--cream-60:rgba(35,28,12,0.65);--cream-30:rgba(35,28,12,0.32);
+  --cream-10:rgba(35,28,12,0.09);--cream-05:rgba(35,28,12,0.045);
+  --f-display:'Playfair Display',serif;--f-body:'Outfit',sans-serif;--f-mono:'JetBrains Mono',monospace;
+  color-scheme:light;
+}
+*{transition:background-color .25s ease,border-color .25s ease,color .25s ease;}
 html{scroll-behavior:smooth;}
 body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 /* Safe area for notched phones (iPhone X+, Android notch) */
@@ -1147,6 +1219,7 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"blender", title:"Portable Blender Business", badge:"Trending", badgeColor:"#64b5f6",
+            tags:["Trending","Online"],
             tagline:"High demand in fitness & travel niche",
             startupCost:"$50–$120", profitPerSale:"$10–$25", margin:"40–60%", profitability:"High",
             whyItWorks:"The health & fitness trend is growing fast. People love portable & rechargeable blenders for daily use, travel, and gym. TikTok content performs extremely well in this niche.",
@@ -1157,6 +1230,7 @@ const TOPIC_CONFIGS = {
           },
           {
             id:"phoneacc", title:"Phone Accessories Business", badge:"Always In Demand", badgeColor:"#81c784",
+            tags:["Low Capital","Trending"],
             tagline:"Always in demand, easy to start",
             startupCost:"$40–$100", profitPerSale:"$8–$20", margin:"35–55%", profitability:"High",
             whyItWorks:"Everyone has a phone. Cases, chargers, screen protectors, and holders are consumable products people buy repeatedly. Low competition at local level in most African and Asian markets.",
@@ -1167,6 +1241,7 @@ const TOPIC_CONFIGS = {
           },
           {
             id:"caraccbiz", title:"Car Accessories Business", badge:"High Profit", badgeColor:"#f0b429",
+            tags:["Low Capital","Trending"],
             tagline:"Large market, high profit potential",
             startupCost:"$60–$150", profitPerSale:"$15–$35", margin:"45–65%", profitability:"High",
             whyItWorks:"Car owners constantly upgrade their vehicles. Dash cams, seat covers, phone mounts, and LED lights are in constant demand. B2B sales to garages and car dealers are highly scalable.",
@@ -1177,6 +1252,7 @@ const TOPIC_CONFIGS = {
           },
           {
             id:"customgifts", title:"Customized Gifts Business", badge:"Medium", badgeColor:"#ff8a65",
+            tags:["Low Capital","Online"],
             tagline:"Perfect for online sales & branding",
             startupCost:"$30–$80", profitPerSale:"$10–$30", margin:"50–70%", profitability:"Medium",
             whyItWorks:"People will always pay premium for personalized items. Birthdays, Valentine's, graduations, and corporate gifting are recurring markets. Low competition with high emotional value.",
@@ -1194,6 +1270,7 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"fiverr", title:"Fiverr Freelancing", badge:"Fast Start", badgeColor:"#64b5f6",
+            tags:["Online","Freelancing"],
             tagline:"Offer services & get paid globally",
             incomeRange:"$200–$2,000/mo", setupTime:"1–3 days", difficulty:"Beginner",
             whyItWorks:"Fiverr has millions of buyers looking for skills you already have. Logo design, writing, video editing, voiceovers, data entry, and social media management are top earners.",
@@ -1203,6 +1280,7 @@ const TOPIC_CONFIGS = {
           },
           {
             id:"tiktokcreator", title:"TikTok Creator", badge:"High Potential", badgeColor:"#9b72cf",
+            tags:["Online","Content"],
             tagline:"Build audience & earn",
             incomeRange:"$100–$10,000/mo", setupTime:"1–7 days", difficulty:"Intermediate",
             whyItWorks:"TikTok pays creators through the Creator Fund, LIVE gifts, and brand deals. Faceless accounts in niches like motivation, finance, or education grow faster and earn more consistently.",
@@ -1212,6 +1290,7 @@ const TOPIC_CONFIGS = {
           },
           {
             id:"youtube", title:"YouTube Channel", badge:"Long-Term", badgeColor:"#f0b429",
+            tags:["Online","Content"],
             tagline:"Build audience & earn long term",
             incomeRange:"$300–$10,000/mo", setupTime:"7–14 days", difficulty:"Intermediate",
             whyItWorks:"YouTube ads pay $2–$15 per 1000 views. A channel with 100K subscribers can earn $2,000–$10,000/month from ads alone — plus sponsorships, affiliate income, and digital products.",
@@ -1221,6 +1300,7 @@ const TOPIC_CONFIGS = {
           },
           {
             id:"affiliate", title:"Affiliate Marketing", badge:"Passive", badgeColor:"#81c784",
+            tags:["Online","Passive"],
             tagline:"Promote & earn commission",
             incomeRange:"$500–$20,000/mo", setupTime:"3–7 days", difficulty:"Intermediate",
             whyItWorks:"You earn 5–50% commission for every sale you refer. Amazon, ClickBank, and high-ticket programs pay the most. Traffic from TikTok, YouTube, or a blog can generate income 24/7.",
@@ -1301,6 +1381,7 @@ const TOPIC_CONFIGS = {
   },
 
   // ─── SOCIAL & PEOPLE ─────────────────────────────────────────────────────
+  // ─── SOCIAL & PEOPLE ─────────────────────────────────────────────────────
   social: {
     topics: [
       {
@@ -1310,10 +1391,27 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"conflictres", title:"Conflict Resolution Mastery", badge:"Essential", badgeColor:"#e05c6e",
+            tags:["Romantic","Family"],
             tagline:"Turn every argument into a deeper understanding",
             whyItWorks:"90% of relationship conflicts are about needs not being communicated, not actual incompatibility. People who master conflict resolution report 3x higher relationship satisfaction.",
             steps:["Pause 20 minutes before responding to heated messages","Use 'I feel...' instead of 'You always...'","Ask: 'What do you need from me right now?'","Separate the problem from the person","Agree on a solution, not just an end to the argument"],
             actions:["Generate Conflict Script","Build Communication Plan","Identify My Conflict Style","Practice Difficult Conversation"],
+          },
+          {
+            id:"attachstyle", title:"Find Your Attachment Style", badge:"Self-Awareness", badgeColor:"#9b72cf",
+            tags:["Romantic","Friends"],
+            tagline:"Why you love the way you love — secure, anxious, avoidant, or disorganized",
+            whyItWorks:"Attachment theory, backed by 50+ years of psychology research, predicts how you respond to closeness and conflict. Knowing your style (and your partner's) prevents 80% of recurring relationship arguments.",
+            steps:["Notice your reaction when a partner needs space — anxious or relieved?","Notice your reaction to conflict — pursue, withdraw, or freeze?","Identify patterns from your last 2-3 relationships","Name your style: secure, anxious, avoidant, or disorganized","Learn your partner's style and adjust how you communicate"],
+            actions:["Build My Attachment Profile","Generate Compatibility Insights","Find Healing Exercises For My Style","Write Script For Talking About This With My Partner"],
+          },
+          {
+            id:"familyboundaries", title:"Family Boundaries Without Guilt", badge:"High Demand", badgeColor:"#64b5f6",
+            tags:["Family"],
+            tagline:"Protect your peace without losing the relationship",
+            whyItWorks:"Many people confuse boundaries with rejection. A clear boundary stated calmly preserves the relationship long-term — vague resentment destroys it. Family therapists report boundary clarity as the #1 fix for repeat family conflict.",
+            steps:["Identify the specific behavior that needs a boundary — not the person","Write the boundary in one sentence: 'I will... if...'","Choose a calm moment, not mid-conflict, to state it","State it once, clearly, without over-explaining or apologizing","Follow through consistently — the boundary only works if it's enforced"],
+            actions:["Write My Boundary Script","Build Family Conflict Plan","Prepare For Pushback","Find Words For My Specific Situation"],
           },
         ],
       },
@@ -1324,10 +1422,50 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"conversstart", title:"Conversation Starters That Work", badge:"High Impact", badgeColor:"#64b5f6",
+            tags:["Networking","Dating"],
             tagline:"Never say 'how are you' again — start conversations that stick",
             whyItWorks:"Memorable conversations start with curiosity, not pleasantries. The FORM method (Family, Occupation, Recreation, Motivation) gives you infinite material with anyone.",
             steps:["Lead with a genuine observation, not a question","Use the FORM method for natural depth","Ask follow-up questions that show you listened","Share a brief personal story to build reciprocity","End with a clear next step: 'Let's connect on LinkedIn'"],
             actions:["Generate Conversation Starters for My Industry","Build My Networking Script","Practice Pitch in 30 Seconds","Find Networking Events Near Me"],
+          },
+          {
+            id:"elevatorpitch", title:"30-Second Elevator Pitch", badge:"Professional", badgeColor:"#81c784",
+            tags:["Professional","Networking"],
+            tagline:"Introduce yourself in a way people actually remember",
+            whyItWorks:"You have about 8 seconds before someone decides whether to keep listening. A structured pitch (who you are, what you do, what makes you different, what you want) beats rambling every time, in interviews, events, or cold intros.",
+            steps:["Write one sentence: 'I help [who] do [what] by [how]'","Add one specific, memorable detail or result","Practice out loud until it takes under 30 seconds","End with a question that invites them to respond","Adjust the pitch slightly depending on who you're speaking to"],
+            actions:["Write My Elevator Pitch","Build LinkedIn Headline From This","Practice Pitch For A Specific Event","Generate 3 Versions For Different Audiences"],
+          },
+          {
+            id:"datingapp", title:"Dating App Profile Optimization", badge:"Data-Backed", badgeColor:"#f06292",
+            tags:["Dating"],
+            tagline:"What actually gets you matches, based on real platform data",
+            whyItWorks:"Profiles with a clear opening photo (face visible, smiling, good lighting) get 40% more matches. Bios that ask a question get 2x more first messages than ones that just list facts about yourself.",
+            steps:["Lead photo: solo, smiling, good lighting, face clearly visible","Add 1 photo doing an activity — gives people something to ask about","Write a 2-sentence bio: one fact about you, one question for them","Avoid clichés: 'love to laugh', 'looking for my partner in crime'","Update photos every 2-3 months — apps deprioritize stale profiles"],
+            actions:["Write My Bio","Critique My Photo Order","Generate Opening Lines I Can Send","Build Profile For A Specific App"],
+          },
+        ],
+      },
+      {
+        id:"confidence", label:"Confidence Lab", icon:"🦁",
+        desc:"Build unshakeable self-confidence in social situations, dating, and everyday life.",
+        tags:["All","Social","Public Speaking","Self-Esteem"],
+        cards:[
+          {
+            id:"socialanxiety", title:"Beat Social Anxiety In The Moment", badge:"Practical", badgeColor:"#81c784",
+            tags:["Social"],
+            tagline:"5 techniques to use right before or during a social situation",
+            whyItWorks:"Social anxiety is fear of judgment, not actual danger. These techniques work by interrupting the anxiety spiral before it builds — used by performers, public speakers, and therapists alike.",
+            steps:["Box breathing before entering: inhale 4, hold 4, exhale 4, hold 4","Reframe: 'I'm not on trial, I'm just here to connect'","Focus on being curious about others, not on being judged","Have 2-3 go-to questions ready so you're never stuck","Give yourself permission to leave early if needed — this removes pressure"],
+            actions:["Build My Personal Anxiety Toolkit","Generate Script For My Specific Situation","Create 30-Day Exposure Plan","Find Confidence-Building Exercises"],
+          },
+          {
+            id:"publicspeak", title:"Public Speaking Without Fear", badge:"Career Critical", badgeColor:"#ffd54f",
+            tags:["Public Speaking"],
+            tagline:"75% of people fear public speaking more than death — here's how to not be one of them",
+            whyItWorks:"Fear of public speaking comes from uncertainty, not the audience itself. Structured preparation (not memorization) reduces anxiety by giving your brain a map to follow even under stress.",
+            steps:["Open with a question or story, never 'today I'm going to talk about'","Structure: 1 main point, 3 supporting examples, 1 clear takeaway","Practice out loud 3 times — never just in your head","Plan your first 10 seconds word-for-word, improvise the rest","Use the 'pause and breathe' technique when you feel rushed"],
+            actions:["Build My Speech Outline","Practice For A Specific Presentation","Generate Opening Lines","Create Anxiety Management Plan For This"],
           },
         ],
       },
@@ -1344,10 +1482,19 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"tenxthink", title:"The 10x Thinking Method", badge:"Game Changer", badgeColor:"#9b72cf",
+            tags:["Thinking","Goals"],
             tagline:"Why 10x is easier than 2x — and how to get there",
             whyItWorks:"10x goals force completely different strategies. To earn 2x, you work harder. To earn 10x, you have to change what you do entirely. This eliminates small thinking and competition.",
             steps:["Write your current biggest goal","Now multiply it by 10 — what would that require?","List every assumption that would have to change","Identify the ONE bottleneck blocking 10x","Go all-in on removing that single constraint"],
             actions:["Generate My 10x Goal Roadmap","Find My Limiting Assumptions","Build 10x Strategy","Identify 10x Mentors in My Field"],
+          },
+          {
+            id:"identityshift", title:"Identity-Based Change", badge:"Foundational", badgeColor:"#9b72cf",
+            tags:["Thinking","Execution"],
+            tagline:"Stop trying to do more — become someone different",
+            whyItWorks:"James Clear's research shows behavior change driven by identity ('I am someone who...') sticks 3x longer than goal-based change ('I want to...'). You don't rise to your goals, you fall to the level of your identity.",
+            steps:["Write your current identity statement: 'I am someone who...'","Write the identity of the person who already has what you want","List 3 small actions that person would take today","Take ONE of those actions today, regardless of motivation","Each action is a vote for the new identity — repeat daily"],
+            actions:["Build My Identity Shift Plan","Find My Current Limiting Identity","Generate Daily Identity-Vote Actions","Create 90-Day Identity Tracker"],
           },
         ],
       },
@@ -1358,10 +1505,34 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"fearmap", title:"Map Your Fear Architecture", badge:"Self-Awareness", badgeColor:"#9b72cf",
+            tags:["Fear","Identity"],
             tagline:"You can't fight what you can't name — map your fears first",
             whyItWorks:"Most people have 3–5 core fears driving all their avoidance behavior. Once named and mapped, fears lose 60–70% of their power. This is the foundation of all confidence building.",
             steps:["List 10 things you've been avoiding for over 3 months","For each, ask: 'What am I afraid will happen?'","Identify the root fear behind each (rejection, failure, etc.)","Rate each fear: probability vs. actual impact if it happened","Create a 'minimum viable courage' action for your #1 fear"],
             actions:["Generate My Fear Audit","Build Courage Action Plan","Find My Core Fear Patterns","Create 30-Day Confidence Challenge"],
+          },
+          {
+            id:"failureresilience", title:"Reframe Failure As Data", badge:"Mindset Shift", badgeColor:"#81c784",
+            tags:["Fear","Courage"],
+            tagline:"The difference between people who succeed and people who quit",
+            whyItWorks:"High performers fail at the same rate as everyone else — the difference is how fast they recover and what they extract from it. Treating failure as information instead of identity removes most of its sting.",
+            steps:["Write down your most recent setback factually, no judgment","List 3 specific things it taught you, even if uncomfortable","Separate 'I failed at X' from 'I am a failure' — these are different","Identify the next smallest action you can take","Take that action within 48 hours to break the avoidance pattern"],
+            actions:["Process My Recent Setback","Build Resilience Routine","Generate Reframe For My Specific Situation","Find My Recovery Pattern"],
+          },
+        ],
+      },
+      {
+        id:"limitingbeliefs", label:"Limiting Beliefs", icon:"🔓",
+        desc:"Find and dismantle the invisible beliefs quietly running your life.",
+        tags:["All","Money","Relationships","Career"],
+        cards:[
+          {
+            id:"beliefaudit", title:"The Belief Audit", badge:"Deep Work", badgeColor:"#9b72cf",
+            tags:["Money","Career"],
+            tagline:"Most limiting beliefs were installed before age 10 — find yours",
+            whyItWorks:"Cognitive behavioral therapy research shows core beliefs operate below conscious awareness, shaping decisions automatically. Naming a belief immediately reduces its grip — you can't change what you can't see.",
+            steps:["Complete this sentence 5 times: 'People like me don't...'","For each answer, ask: where did I learn this?","Ask: is this universally true, or true for my specific past?","Find one counter-example — someone like you who did the thing","Write a new, evidence-based belief to replace the old one"],
+            actions:["Run My Full Belief Audit","Find Evidence Against My Limiting Belief","Build New Belief System","Generate Daily Affirmation Based On Real Evidence"],
           },
         ],
       },
@@ -1378,10 +1549,42 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"bodyweight", title:"Bodyweight Mastery Plan", badge:"Start Today", badgeColor:"#4db6ac",
+            tags:["Beginner"],
             tagline:"Build real strength with zero equipment — in 20 minutes/day",
             whyItWorks:"Calisthenics builds functional strength that gym machines can't replicate. Push-ups, squats, and dips activate more muscle groups simultaneously and can be done anywhere on earth.",
             steps:["Start with 3 rounds: 10 push-ups, 15 squats, 10 dips daily","Track reps weekly — increase by 10% every 7 days","Add a 20-minute walk to every workout day","Rest 1 day between strength sessions","Progress: add jump squats, diamond push-ups, pull-ups"],
             actions:["Generate My Personal Workout Plan","Build 30-Day Challenge","Calculate Calorie Burn","Find YouTube Workout Videos"],
+          },
+          {
+            id:"calisthenicsint", title:"Intermediate Calisthenics", badge:"Level Up", badgeColor:"#64b5f6",
+            tags:["Intermediate"],
+            tagline:"Push past the plateau — pull-ups, dips, pistol squats",
+            whyItWorks:"Once basic bodyweight strength is built, progressive overload requires harder leverage variations, not just more reps. This is the same principle elite gymnasts and calisthenics athletes use without weights.",
+            steps:["Add pull-ups: start with negatives if you can't do a full one yet","Progress push-ups to: decline, archer, then one-arm progressions","Add pistol squat practice — use a chair for balance assistance first","Train 4x/week with at least 1 full rest day","Track progression weekly, not daily — strength builds slowly and steadily"],
+            actions:["Build My Progression Plan","Generate Pull-Up Training Program","Create Weekly Split","Calculate My Strength Benchmarks"],
+          },
+          {
+            id:"homecardio", title:"Fat Loss Without Cardio Machines", badge:"High Demand", badgeColor:"#81c784",
+            tags:["Beginner","Intermediate"],
+            tagline:"HIIT and metabolic conditioning using nothing but your body",
+            whyItWorks:"High-intensity interval training burns calories during AND after the workout (the 'afterburn effect'), often more effectively than steady-state cardio, in a fraction of the time — research shows 15-20 minutes can outperform 45 minutes on a treadmill.",
+            steps:["20-second max effort, 10-second rest — burpees, mountain climbers, jump squats","Repeat 8 rounds = 4 minutes total (Tabata protocol)","Do 3 Tabata blocks with 1 minute rest between = 16 minutes total","Combine with a 20-minute walk on non-HIIT days","Track waist measurement weekly — more reliable than scale weight"],
+            actions:["Build My HIIT Routine","Generate Weekly Fat Loss Schedule","Calculate My Calorie Needs","Create Nutrition Plan To Match"],
+          },
+        ],
+      },
+      {
+        id:"nutrition", label:"Body Fuel & Nutrition", icon:"🥗",
+        desc:"Eat for energy and results without restrictive diets or expensive supplements.",
+        tags:["All","Budget","Muscle","Fat Loss"],
+        cards:[
+          {
+            id:"budgetnutrition", title:"High-Protein Eating On A Budget", badge:"Practical", badgeColor:"#81c784",
+            tags:["Budget"],
+            tagline:"Build muscle and stay lean without spending a fortune",
+            whyItWorks:"Protein is the most important macronutrient for body composition, but it's also the most expensive. Budget-friendly protein sources (eggs, beans, chicken thighs, canned fish) deliver the same results as premium options at a third of the cost.",
+            steps:["Target 1.6-2g protein per kg bodyweight daily","Build meals around eggs, chicken thighs, beans, lentils, canned tuna","Buy in bulk and meal prep 2-3 days at a time","Use a kitchen scale for the first 2 weeks to calibrate portion sizes by eye","Plan one cheat meal weekly to stay consistent long-term"],
+            actions:["Build My Meal Plan","Calculate My Protein Target","Find Budget Protein Sources In My Country","Generate Weekly Shopping List"],
           },
         ],
       },
@@ -1398,10 +1601,42 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"anxietyreset", title:"Anxiety Reset Protocol", badge:"Evidence-Based", badgeColor:"#81c784",
+            tags:["Anxiety"],
             tagline:"5 techniques that work in under 10 minutes",
             whyItWorks:"Anxiety activates the fight-or-flight nervous system. These 5 methods are clinically proven to activate the parasympathetic (calm) system within minutes, not days.",
             steps:["4-7-8 breathing: inhale 4s, hold 7s, exhale 8s — 4 rounds","Cold water on face for 30 seconds — activates diving reflex","5-4-3-2-1 grounding: name 5 things you see, 4 touch, 3 hear","Write the anxiety thought down — externalize it","Walk for 10 minutes — any direction, no phone"],
             actions:["Build My Anxiety Toolkit","Generate Personalized Calm Plan","Find Therapists in My Country","Create Daily Resilience Routine"],
+          },
+          {
+            id:"stressmgmt", title:"Chronic Stress Management", badge:"Long-Term", badgeColor:"#4db6ac",
+            tags:["Stress"],
+            tagline:"For when stress isn't a moment, it's your whole life right now",
+            whyItWorks:"Chronic stress elevates cortisol long-term, affecting sleep, digestion, and mood. Unlike acute stress techniques, chronic stress needs structural changes — not just in-the-moment coping.",
+            steps:["Identify your top 3 ongoing stressors — be specific, not vague","For each, ask: is this controllable, influenceable, or neither?","For controllable stressors, make one concrete change this week","Build a non-negotiable 15-minute daily decompression habit","Track sleep and mood for 2 weeks to spot patterns you're missing"],
+            actions:["Build My Stress Reduction Plan","Identify My Specific Stress Triggers","Generate Daily Decompression Routine","Find Resources In My Country"],
+          },
+          {
+            id:"lowmood", title:"Lifting Low Mood Naturally", badge:"Practical", badgeColor:"#81c784",
+            tags:["Mood"],
+            tagline:"Evidence-based ways to feel better when motivation is gone",
+            whyItWorks:"Behavioral activation — doing the action before the motivation arrives — is one of the most evidence-backed treatments for low mood, often as effective as medication for mild-moderate cases. Waiting to feel motivated first keeps people stuck.",
+            steps:["Pick one tiny action (5 minutes max) you can do right now","Get 10 minutes of natural sunlight within the first hour of waking","Move your body for at least 10 minutes — walking counts","Reach out to one person today, even with a short message","Track mood daily on a 1-10 scale to notice real patterns, not feelings in the moment"],
+            actions:["Build My Daily Mood Plan","Generate Behavioral Activation Schedule","Find Support Resources In My Country","Create Accountability Check-In System"],
+          },
+        ],
+      },
+      {
+        id:"sleep", label:"Sleep Optimization", icon:"🌙",
+        desc:"Fix your sleep without medication — using the science of circadian rhythm.",
+        tags:["All","Insomnia","Quality","Routine"],
+        cards:[
+          {
+            id:"sleepreset", title:"7-Day Sleep Reset", badge:"Science-Based", badgeColor:"#64b5f6",
+            tags:["Insomnia","Routine"],
+            tagline:"Reset your circadian rhythm in one week",
+            whyItWorks:"Your circadian rhythm is set primarily by light exposure timing, not willpower. Misaligned light exposure (bright light at night, no light in the morning) is the #1 cause of poor sleep in modern life — more than caffeine or screen time alone.",
+            steps:["Get sunlight within 30 minutes of waking — even 10 minutes helps","Stop caffeine after 12pm — it has a 6+ hour half-life","Dim lights and avoid screens 1 hour before your target bedtime","Keep bedroom temperature cool — around 18°C / 65°F is optimal","Wake at the same time every day, even weekends, for 7 days straight"],
+            actions:["Build My Personalized Sleep Schedule","Generate Wind-Down Routine","Calculate My Ideal Sleep Window","Create Morning Light Exposure Plan"],
           },
         ],
       },
@@ -1418,10 +1653,34 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"legacystate", title:"Write Your Legacy Statement", badge:"Life-Defining", badgeColor:"#64b5f6",
+            tags:["Vision","Values"],
             tagline:"What do you want people to say about you at your funeral?",
             whyItWorks:"Victor Frankl proved that people with a clear 'why' survive almost any 'how.' A personal legacy statement acts as a north star for every major decision. It takes 20 minutes to write and decades to live.",
             steps:["Write: 'At my funeral, I want people to say...'","List the 3 values you want to be known for","Describe the impact you want to have on 3 groups (family, community, field)","Write one sentence that captures all of the above","Test every major decision against this statement"],
             actions:["Generate My Legacy Statement","Build Values Clarity Map","Create Vision Board","Write My Eulogy Exercise"],
+          },
+          {
+            id:"directionclarity", title:"Find Direction When You Feel Lost", badge:"Common Struggle", badgeColor:"#9b72cf",
+            tags:["Direction"],
+            tagline:"You don't need a 10-year plan — you need a next step",
+            whyItWorks:"Research on decision paralysis shows that demanding total clarity before acting actually prevents clarity from ever arriving. Clarity comes from action and feedback, not more thinking — small experiments reveal direction faster than long deliberation.",
+            steps:["List 3 things that gave you energy in the past month, however small","List 3 things that drained you — be specific about why","Identify the overlap: what energizes you that also serves others?","Design one small, low-risk experiment to test that direction","Give yourself 30 days, then reassess based on real data, not guessing"],
+            actions:["Build My Direction-Finding Plan","Generate Experiment Ideas For My Situation","Create 30-Day Clarity Challenge","Find Patterns In What Energizes Me"],
+          },
+        ],
+      },
+      {
+        id:"purposecareer", label:"Purpose-Driven Career", icon:"🎯",
+        desc:"Align your work with what actually matters to you — without sacrificing income.",
+        tags:["All","Meaning","Income","Transition"],
+        cards:[
+          {
+            id:"ikigai", title:"Find Your Ikigai", badge:"Framework", badgeColor:"#f0b429",
+            tags:["Meaning"],
+            tagline:"The Japanese framework for a life with purpose and income",
+            whyItWorks:"Ikigai sits at the intersection of what you love, what you're good at, what the world needs, and what you can be paid for. Most career dissatisfaction comes from optimizing for only 1-2 of these instead of all 4.",
+            steps:["List what you love doing, regardless of pay","List what you're genuinely skilled at, based on real feedback","List problems in the world or your community you care about","List what people are currently willing to pay you for","Find the overlap — this is your starting point, not a final answer"],
+            actions:["Map My Personal Ikigai","Find Career Paths That Match","Build Transition Plan","Generate Income Options For My Ikigai"],
           },
         ],
       },
@@ -1438,10 +1697,27 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"salarynego", title:"Salary Negotiation Guide", badge:"High ROI", badgeColor:"#ffd54f",
+            tags:["Promotion","Job Search"],
             tagline:"One conversation can change your income for the next 5 years",
             whyItWorks:"Studies show 85% of hiring managers expect negotiation. The average person who negotiates gains $5,000–$20,000 more per year. That compounds to $50,000–$200,000 over a decade.",
             steps:["Research market rate: Glassdoor, LinkedIn Salary, Levels.fyi","Set your target (20% above your minimum acceptable)","Send your counteroffer by email — not verbally","Use silence as a tool — don't fill the pause after you state your number","Have a competing offer ready (real or implied)"],
             actions:["Generate My Negotiation Script","Research My Market Rate","Build Promotion Case","Prepare for Salary Conversation"],
+          },
+          {
+            id:"jobsearchstrat", title:"Modern Job Search Strategy", badge:"2026 Updated", badgeColor:"#64b5f6",
+            tags:["Job Search"],
+            tagline:"Why applying online rarely works — and what actually does",
+            whyItWorks:"Studies consistently show 70-80% of jobs are filled through networking and referrals, not cold applications. Applicant Tracking Systems filter out most online applications before a human ever sees them.",
+            steps:["Identify 20 target companies, not just open job listings","Find and message 1-2 employees at each company for informational chats","Optimize LinkedIn for the specific keywords recruiters search for your role","Apply to roles within 48 hours of posting — early applicants get priority","Follow up with a referral request, not just a cold application"],
+            actions:["Build My Target Company List","Generate LinkedIn Outreach Messages","Optimize My LinkedIn Profile","Create 30-Day Job Search Plan"],
+          },
+          {
+            id:"careerswitch", title:"Switching Careers Without Starting Over", badge:"High Stakes", badgeColor:"#e05c6e",
+            tags:["Switch"],
+            tagline:"Use your existing experience as leverage, not baggage",
+            whyItWorks:"Career switchers who frame past experience as 'transferable skills' rather than 'starting fresh' get hired faster and at higher pay than those who downplay their background entirely. Most skills transfer more than people assume.",
+            steps:["List your top 10 skills from your current/past career","For each, identify how it applies in your target field","Take one bridge project or certification to prove capability","Rewrite your resume/CV around transferable skills, not job titles","Target companies known for hiring career switchers in your new field"],
+            actions:["Map My Transferable Skills","Build Career Switch Resume","Find Bridge Certifications I Need","Generate Transition Timeline"],
           },
         ],
       },
@@ -1452,10 +1728,19 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"morningsys", title:"The 5AM Advantage System", badge:"Game Changer", badgeColor:"#ffd54f",
+            tags:["Morning"],
             tagline:"Own the first 2 hours — own the day",
             whyItWorks:"The most productive time in any day is before the world wakes up. Jocko Willink, Robin Sharma, and Tim Cook all protect early mornings. It's not about waking up early — it's about using silence strategically.",
             steps:["Set alarm 1 hour earlier than normal starting this week","First 5 minutes: no phone, hydrate, open windows","20 minutes of movement: walk, stretch, or workout","20 minutes of reading or learning in your growth area","20 minutes of focused work on your most important goal"],
             actions:["Build My Morning Routine","Generate 30-Day Discipline Challenge","Calculate Productivity Impact","Create Evening Wind-Down Protocol"],
+          },
+          {
+            id:"habitstacking", title:"Habit Stacking For Consistency", badge:"Proven Method", badgeColor:"#81c784",
+            tags:["Habits"],
+            tagline:"Attach new habits to ones you already do automatically",
+            whyItWorks:"BJ Fogg's research at Stanford shows new habits stick far better when anchored to existing behavior ('After I [existing habit], I will [new habit]') than when relying on willpower or motivation alone.",
+            steps:["List 5 things you already do every day without thinking — brushing teeth, making coffee, etc.","Pick ONE new habit you want to build","Write the formula: 'After I [existing habit], I will [new habit]'","Make the new habit absurdly small at first — 2 minutes max","Increase difficulty only after 2 weeks of consistency, not before"],
+            actions:["Build My Habit Stack","Generate Habit Ideas For My Goals","Create 30-Day Tracker","Find My Existing Anchor Habits"],
           },
         ],
       },
@@ -1472,10 +1757,42 @@ const TOPIC_CONFIGS = {
         cards:[
           {
             id:"decisframe", title:"The 10/10/10 Decision Framework", badge:"Proven", badgeColor:"#ff8a65",
+            tags:["Career","Life"],
             tagline:"Will this matter in 10 minutes, 10 months, 10 years?",
             whyItWorks:"Suzy Welch's 10/10/10 method removes emotional fog from decisions. It forces long-term perspective while acknowledging short-term feelings. Used by top CEOs and therapists worldwide.",
             steps:["Write the decision clearly: 'Should I...'","Ask: How will I feel about this in 10 minutes?","Ask: How will I feel about this in 10 months?","Ask: How will I feel about this in 10 years?","The answer that dominates in 10 years is usually right"],
             actions:["Apply This Framework to My Decision","Generate Decision Analysis","Compare My Options","Build Decision Log"],
+          },
+          {
+            id:"regretmin", title:"The Regret Minimization Framework", badge:"Jeff Bezos Method", badgeColor:"#64b5f6",
+            tags:["Career","Money","Life"],
+            tagline:"Project yourself to age 80 — what would that version of you choose?",
+            whyItWorks:"Jeff Bezos used this exact framework to decide to leave a stable Wall Street job and start Amazon. It works because short-term fear (embarrassment, financial risk) rarely survives the test of long-term perspective.",
+            steps:["Picture yourself at age 80, looking back on this decision","Ask: will I regret NOT trying this more than failing at it?","Separate fear of failure from fear of judgment — they're different","Identify what you'd actually lose if it doesn't work out","If the downside is recoverable, that's usually a strong signal to act"],
+            actions:["Apply Regret Minimization To My Decision","Generate Worst-Case Scenario Analysis","Build My Decision Case","Compare This To Past Decisions I Regretted Avoiding"],
+          },
+          {
+            id:"oppcost", title:"Calculate Real Opportunity Cost", badge:"Money + Time", badgeColor:"#f0b429",
+            tags:["Money","Career"],
+            tagline:"Every yes is a no to something else — make sure it's worth it",
+            whyItWorks:"Opportunity cost is the single most overlooked factor in major decisions. People compare a choice to doing nothing, when the real comparison should be to the next-best alternative use of that time or money.",
+            steps:["Write down your decision and what it will cost in time and money","List the next-best alternative use of that same time and money","Compare realistic outcomes of both paths, not best-case fantasies","Factor in compounding — what does each path look like in 5 years?","Choose based on the full comparison, not just the option in front of you"],
+            actions:["Calculate My Opportunity Cost","Compare My Two Options Side-By-Side","Project 5-Year Outcomes For Both Paths","Build Decision Matrix"],
+          },
+        ],
+      },
+      {
+        id:"goalsetting", label:"Goal Setting That Works", icon:"🎯",
+        desc:"Set goals you actually achieve, using systems instead of willpower.",
+        tags:["All","Annual","Quarterly","Systems"],
+        cards:[
+          {
+            id:"systemsnotgoals", title:"Systems Beat Goals", badge:"James Clear Method", badgeColor:"#81c784",
+            tags:["Systems"],
+            tagline:"Why the goal isn't the problem — your system is",
+            whyItWorks:"James Clear's research shows that winners and losers in any field often have the same goals. The difference is the system — the process that's run regardless of motivation. Goals set a direction; systems determine whether you actually get there.",
+            steps:["Write your goal clearly, with a number and a date","Now design the smallest repeatable system that moves you toward it","Make the system so easy you can do it even on a bad day","Track the system (did I do it?), not just the outcome","Review and adjust the system monthly, not the goal itself"],
+            actions:["Build My System For This Goal","Generate Daily Minimum Actions","Create Tracking Method","Identify Why Past Goals Failed"],
           },
         ],
       },
@@ -3617,6 +3934,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
 // CHECK-IN
 // ═══════════════════════════════════════════════════════════════════════════════
 function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
+  const G = useThemeColors();
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
   const [loading,setLoading]=useState(false);const [error,setError]=useState("");
@@ -3682,12 +4000,6 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   );
 
 
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.12)",
-  };
   const FEELINGS=[
     {id:"energised",emoji:"⚡",label:"Energised"},
     {id:"focused",  emoji:"🎯",label:"Focused"},
@@ -3882,12 +4194,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
   ];
 
 
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.12)",
-  };
+  const G={...useThemeColors()};
 
   return(
     <div style={{display:"flex",flexDirection:"column",
@@ -4528,11 +4835,11 @@ function ShareCard({report, formData, onClose}){
   const shareWhatsApp = ()=> window.open("https://wa.me/?text="+encodeURIComponent(shareText),"_blank");
   const shareTwitter  = ()=> window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(shareText),"_blank");
 
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)"};
+  const G={...useThemeColors()};
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
-      <div style={{background:"#111008",border:"1px solid rgba(240,180,41,0.2)",borderRadius:20,padding:"28px 24px",maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:G.card,border:"1px solid rgba(240,180,41,0.2)",borderRadius:20,padding:"28px 24px",maxWidth:380,width:"100%"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <div style={{fontSize:16,fontWeight:800,color:G.cream}}>Share your score</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:G.dim,cursor:"pointer",fontSize:20,lineHeight:1}}>×</button>
@@ -4591,6 +4898,7 @@ function FAQItem({q, a, G}){
 }
 
 function Landing({onStart,ipLocation}){
+  const G = useThemeColors();
   const [scrolled,setScrolled]=useState(false);
   const [userCount,setUserCount]=useState(25847);
 
@@ -4604,11 +4912,6 @@ function Landing({onStart,ipLocation}){
     return()=>window.removeEventListener("scroll",onScroll);
   },[]);
 
-  const G={
-    gold:"#f0b429",bg:"#0a0800",surface:"#0e0b02",card:"#131008",
-    border:"rgba(240,180,41,0.12)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.55)",dimmer:"rgba(232,220,200,0.3)",
-  };
 
   const Badge=({icon,text})=>(
     <div style={{display:"inline-flex",alignItems:"center",gap:6,
@@ -5042,6 +5345,7 @@ function Landing({onStart,ipLocation}){
 // 4-step onboarding: Focus → Info → Goal → Blockers
 // ═══════════════════════════════════════════════════════════════════════════════
 function Intake({onSubmit, savedFormData, ipLocation}){
+  const G = useThemeColors();
   // ── 8 steps (0-indexed: 0=name, 1=basics, 2-6=conversational, 7=done) ──
   const TOTAL = 8; // steps 0-6 have questions, step 7 is "Almost there!"
 
@@ -5182,12 +5486,6 @@ function Intake({onSubmit, savedFormData, ipLocation}){
   },[step]);
 
   // ── Design tokens ─────────────────────────────────────────────────────────
-  const G = {
-    gold:"#f0b429", bg:"#0a0800", card:"#131008", cardSel:"#1a1408",
-    border:"rgba(232,220,200,0.08)", cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)", dimmer:"rgba(232,220,200,0.25)",
-    inp:"#0f0c03", inpBorder:"rgba(232,220,200,0.13)",
-  };
   const iStyle={width:"100%",padding:"14px 16px",background:G.inp,
     border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
     fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit"};
@@ -6607,6 +6905,30 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// THEME TOGGLE — Segmented Dark / Light switch
+// ═══════════════════════════════════════════════════════════════════════════════
+function ThemeToggle(){
+  const {theme, setTheme} = useTheme();
+  return(
+    <div style={{display:"flex",background:"var(--cream-05)",border:"1px solid var(--cream-10)",
+      borderRadius:12,padding:4,gap:4}}>
+      {[["dark","🌙","Dark"],["light","☀️","Light"]].map(([id,icon,label])=>(
+        <button key={id} onClick={()=>setTheme(id)}
+          style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,
+            padding:"10px 14px",borderRadius:9,border:"none",cursor:"pointer",
+            fontFamily:"inherit",fontSize:13,fontWeight:600,
+            background:theme===id?"var(--gold)":"transparent",
+            color:theme===id?"#0a0800":"var(--cream-40)",
+            transition:"all .2s"}}>
+          <span style={{fontSize:14}}>{icon}</span>
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -6617,6 +6939,7 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
 // AUTH SCREEN — Premium redesign
 // ═══════════════════════════════════════════════════════════════════════════════
 function AuthScreen({onAuth, onBack}){
+  const G = useThemeColors();
   const [mode,setMode]=useState("login"); // login | signup | forgot | forgot_sent | reset
   const [tab,setTab]=useState("email");   // email | phone
   const [email,setEmail]=useState("");
@@ -6882,13 +7205,6 @@ function AuthScreen({onAuth, onBack}){
   // Aliases — handleEmail already handles both modes
   const handleLogin=handleEmail;
   const handleSignup=handleEmail;
-
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",surface:"#0e0c02",
-    border:"rgba(232,220,200,0.08)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.13)",
-  };
 
   const iStyle={width:"100%",padding:"14px 16px",background:G.inp,
     border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
@@ -10035,10 +10351,7 @@ function PracticesView({userId}){
     byModule[t.module].push(t);
   });
 
-  const G={
-    gold:"#f0b429",card:"#111008",border:"rgba(232,220,200,0.07)",
-    cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-  };
+  const G={...useThemeColors()};
 
   return(
     <div style={{padding:"20px 20px 90px",minHeight:"100vh",color:G.cream,
@@ -11620,7 +11933,7 @@ function BottomNav({nav,setNav}){
 
 // ── MobileTopBar ─────────────────────────────────────────────────────────
 function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName,onHamburger}){
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)"};
+  const G={...useThemeColors()};
   return(
     <div className="mob-top" style={{display:"flex",alignItems:"center",
       justifyContent:"space-between",padding:"max(14px,env(safe-area-inset-top)) 18px 12px",
@@ -11684,11 +11997,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   const name = formData?.name?.split(" ")[0]||"there";
   const today = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",card2:"#0e0c02",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-  };
+  const G={...useThemeColors()};
   const card={background:G.card,border:"1px solid "+G.border,borderRadius:16,padding:"20px",boxSizing:"border-box"};
 
   const txt=(v)=>{if(!v)return "";if(typeof v==="string")return v;if(v?.content)return String(v.content);if(Array.isArray(v))return v.filter(Boolean).map(x=>typeof x==="string"?x:x?.content||"").join(" ");return String(v);};
@@ -11922,9 +12231,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 // SIDE DRAWER — Hamburger menu navigation
 // ═══════════════════════════════════════════════════════════════════════════════
 function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, streak, navPhotoURL, onUnlock, onSignOut}){
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",
-    dimmer:"rgba(232,220,200,0.22)",bg:"#0a0800",card:"rgba(255,255,255,0.04)",
-    border:"rgba(255,255,255,0.08)"};
+  const G={...useThemeColors()};
   const name = formData?.name || "You";
 
   const navItems=[
@@ -12037,12 +12344,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
   const [drawerOpen,setDrawerOpen] = useState(false);
   const [activeChip,setActiveChip] = useState(null);
 
-  const G={
-    gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.55)",
-    dimmer:"rgba(232,220,200,0.25)",bg:"#0a0800",
-    card:"rgba(255,255,255,0.035)",border:"rgba(255,255,255,0.07)",
-    lift:"rgba(255,255,255,0.06)",
-  };
+  const G={...useThemeColors()};
 
   const name = formData?.name?.split(" ")[0] || "You";
 
@@ -12410,12 +12712,10 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
 }
 
 function CategoryPage({catId,setNav,goBack,userId}){
+  const G = useThemeColors();
   const cat=CATEGORIES.find(c=>c.id===catId);
   if(!cat) return null;
   const topicData = TOPIC_CONFIGS[catId];
-  const G={gold:"#f0b429",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)"};
 
   return(
     <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
@@ -12536,25 +12836,17 @@ function CategoryPage({catId,setNav,goBack,userId}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTELLIGENCE CARD — Expandable card with compact/expanded/AI action states
 // ═══════════════════════════════════════════════════════════════════════════════
-function IntelligenceCard({card, catColor, formData, userId, isPaid, isPremium, isProMax, onUnlock}){
-  const [expanded, setExpanded] = useState(false);
-  const [aiResult, setAiResult] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [activeAction, setActiveAction] = useState(null);
+function IntelligenceCard({card, catColor, onSelect, userId}){
   const [saved, setSaved] = useState(()=>{
     try{
       const k=userId?`diq_saved_tools_${userId}`:"diq_saved_tools_guest";
       return JSON.parse(localStorage.getItem(k)||"[]").includes("card:"+card.id);
     }catch{return false;}
   });
+  const _tc=useThemeColors(); const G={..._tc, accent:catColor||_tc.gold};
+  const profitColor=card.profitability==="High"?"#81c784":card.profitability==="Medium"?"#f0b429":"#e05c6e";
 
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",
-    dimmer:"rgba(232,220,200,0.27)",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",accent:catColor||"#f0b429"};
-
-  const profitColor = card.profitability==="High"?"#81c784":card.profitability==="Medium"?"#f0b429":"#e05c6e";
-
-  const toggleSave = (e)=>{
+  const toggleSave=(e)=>{
     e.stopPropagation();
     setSaved(prev=>{
       const next=!prev;
@@ -12573,305 +12865,115 @@ function IntelligenceCard({card, catColor, formData, userId, isPaid, isPremium, 
     });
   };
 
-  const runAction = async(action)=>{
-    if(!isPaid){onUnlock();return;}
-    setActiveAction(action);
-    setAiResult("");
-    setAiLoading(true);
-    const name=formData?.name||"the user";
-    const country=formData?.country||"their country";
-    const occupation=formData?.occupation||"not specified";
-    const goals=formData?.goals||formData?.bigGoal||"build income and grow";
-    const income=formData?.income||"not specified";
-    let prompt="";
-    if(action.includes("Business Plan")||action.includes("business plan")){
-      prompt=`Write a complete, personalized business plan for ${name} from ${country} (current job: ${occupation}, goal: ${goals}) to start a "${card.title}" business. Include: market analysis for ${country}, startup steps with exact costs in local currency, first 30-day action plan, expected monthly income after 3 months, and the 3 biggest risks + how to avoid them. Be specific to their situation. Format with clear sections.`;
-    } else if(action.includes("Suppliers")||action.includes("suppliers")){
-      prompt=`Find the best suppliers for "${card.title}" for someone in ${country}. List 5 specific supplier options with: company name, website URL, minimum order quantity, estimated unit cost in USD, shipping time to ${country}, payment methods accepted, and one advantage + one disadvantage. Include local alternatives if available.`;
-    } else if(action.includes("Profit")||action.includes("profit")||action.includes("Income")||action.includes("Earnings")){
-      prompt=`Calculate the realistic profit potential for "${card.title}" for ${name} in ${country} earning currently ${income}. Show: Month 1 projection (startup + first sales), Month 3 projection (growing), Month 6 projection (established). Include exact startup costs in local currency, break-even point, and best-case vs realistic income scenarios. Use real numbers.`;
-    } else if(action.includes("Market Rate")||action.includes("rate")){
-      prompt=`Research the market salary/rate for someone with skills in "${card.title}" in ${country}. Provide: current market rate range, how to benchmark your own value, the 3 highest-paying companies hiring for this, and exactly what skills command the top 10% of salaries. Include specific numbers.`;
-    } else if(action.includes("Content")||action.includes("Niche")){
-      prompt=`Generate 10 specific content ideas for "${card.title}" for ${name} from ${country}. For each idea: title, hook (first 3 seconds), format (TikTok/YouTube/blog), estimated reach potential, and one unique angle that competitors aren't covering. Tailor to what works in ${country}'s market.`;
-    } else {
-      prompt=`${action} for ${name} from ${country} regarding "${card.title}". Their situation: occupation ${occupation}, goal: ${goals}, income level: ${income}. Be specific, practical, and actionable. Format with clear steps and real numbers. Tailor everything to their country and situation.`;
-    }
-    try{
-      const r=await callAPI({
-        messages:[{role:"user",content:prompt}],
-        system:`You are DestinIQ — a world-class intelligence advisor. You generate hyper-specific, actionable intelligence for real people. Never be vague. Use real numbers, specific company names, real websites, and country-specific data. The person is ${name} from ${country}.`,
-        userId,isPremium,isProMax
-      });
-      const txt=Array.isArray(r?.content)?r.content.filter(x=>x?.type==="text").map(x=>x.text).join(""):
-        (typeof r==="string"?r:r?.text||r?.content?.[0]?.text||"");
-      setAiResult(txt);
-    }catch{setAiResult("Could not generate. Check your connection and try again.");}
-    setAiLoading(false);
-  };
-
   return(
-    <div style={{background:G.card,border:"1px solid "+(expanded?G.accent+"40":G.border),
-      borderRadius:18,overflow:"hidden",transition:"border-color .2s",marginBottom:12}}>
-
-      {/* ── COMPACT VIEW ── */}
-      <div style={{padding:"16px 18px",cursor:"pointer"}} onClick={()=>setExpanded(e=>!e)}>
+    <div onClick={()=>onSelect&&onSelect(card)}
+      style={{background:G.card,border:"1px solid "+G.border,borderRadius:18,
+        overflow:"hidden",marginBottom:12,cursor:"pointer",transition:"all .15s"}}
+      onMouseEnter={e=>{e.currentTarget.style.borderColor=catColor+"45";e.currentTarget.style.background=catColor+"06";}}
+      onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.background=G.card;}}>
+      <div style={{padding:"16px 18px"}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
-
-          {/* Left: image placeholder */}
-          <div style={{width:72,height:72,borderRadius:12,flexShrink:0,overflow:"hidden",
-            background:`linear-gradient(135deg,${G.accent}20,${G.accent}08)`,
-            border:`1px solid ${G.accent}25`,display:"flex",alignItems:"center",
+          {/* Icon */}
+          <div style={{width:68,height:68,borderRadius:14,flexShrink:0,
+            background:`linear-gradient(135deg,${G.accent}22,${G.accent}08)`,
+            border:`1px solid ${G.accent}28`,display:"flex",alignItems:"center",
             justifyContent:"center",fontSize:30}}>
             {card.emoji||"📦"}
           </div>
-
-          {/* Center: title + tagline */}
+          {/* Content */}
           <div style={{flex:1,minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5,flexWrap:"wrap"}}>
               {card.badge&&(
                 <span style={{fontSize:9,fontWeight:700,letterSpacing:".06em",
-                  background:`${card.badgeColor||G.accent}18`,
-                  border:`1px solid ${card.badgeColor||G.accent}40`,
+                  background:`${card.badgeColor||G.accent}18`,border:`1px solid ${card.badgeColor||G.accent}35`,
                   color:card.badgeColor||G.accent,borderRadius:6,padding:"2px 7px"}}>
                   {card.badge}
                 </span>
               )}
               {card.profitability&&(
-                <span style={{fontSize:9,fontWeight:700,letterSpacing:".06em",
-                  background:`${profitColor}15`,border:`1px solid ${profitColor}35`,
+                <span style={{fontSize:9,fontWeight:700,
+                  background:`${profitColor}14`,border:`1px solid ${profitColor}30`,
                   color:profitColor,borderRadius:6,padding:"2px 7px"}}>
                   {card.profitability} Profit
                 </span>
               )}
             </div>
             <div style={{fontSize:15,fontWeight:800,color:G.cream,marginBottom:3,lineHeight:1.3}}>{card.title}</div>
-            <div style={{fontSize:12,color:G.dim,lineHeight:1.5}}>{card.tagline}</div>
+            <div style={{fontSize:12,color:G.dim,lineHeight:1.5,marginBottom:8}}>{card.tagline}</div>
+            {/* Key metric: startup cost only */}
+            {card.startupCost&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:6,
+                background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,
+                borderRadius:8,padding:"4px 10px"}}>
+                <span style={{fontSize:10,color:G.dimmer}}>Startup Cost</span>
+                <span style={{fontSize:12,fontWeight:800,color:G.cream}}>{card.startupCost}</span>
+              </div>
+            )}
+            {card.incomeRange&&!card.startupCost&&(
+              <div style={{display:"inline-flex",alignItems:"center",gap:6,
+                background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,
+                borderRadius:8,padding:"4px 10px"}}>
+                <span style={{fontSize:10,color:G.dimmer}}>Income</span>
+                <span style={{fontSize:12,fontWeight:800,color:"#81c784"}}>{card.incomeRange}</span>
+              </div>
+            )}
           </div>
-
-          {/* Right: save + expand */}
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,flexShrink:0}}>
+          {/* Right */}
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,flexShrink:0}}>
             <button onClick={toggleSave}
-              style={{background:"none",border:"none",cursor:"pointer",fontSize:16,
-                color:saved?"#f0b429":"rgba(232,220,200,0.3)",padding:0,lineHeight:1}}>
+              style={{background:"none",border:"none",cursor:"pointer",
+                fontSize:18,color:saved?"#f0b429":"rgba(232,220,200,0.25)",padding:0,lineHeight:1}}>
               {saved?"★":"☆"}
             </button>
-            <span style={{color:G.dimmer,fontSize:12,transition:"transform .2s",
-              display:"inline-block",transform:expanded?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+            <span style={{color:G.dimmer,fontSize:18}}>›</span>
           </div>
         </div>
-
-        {/* Key metrics row */}
-        {(card.startupCost||card.profitPerSale||card.margin||card.incomeRange||card.setupTime)&&(
-          <div style={{display:"flex",gap:12,marginTop:12,flexWrap:"wrap"}}>
-            {card.startupCost&&(
-              <div style={{fontSize:11,color:G.dim}}>
-                <span style={{color:G.dimmer,fontSize:10}}>Startup </span>
-                <span style={{color:G.cream,fontWeight:700}}>{card.startupCost}</span>
-              </div>
-            )}
-            {card.profitPerSale&&(
-              <div style={{fontSize:11,color:G.dim}}>
-                <span style={{color:G.dimmer,fontSize:10}}>Profit/Sale </span>
-                <span style={{color:"#81c784",fontWeight:700}}>{card.profitPerSale}</span>
-              </div>
-            )}
-            {card.margin&&(
-              <div style={{fontSize:11,color:G.dim}}>
-                <span style={{color:G.dimmer,fontSize:10}}>Margin </span>
-                <span style={{color:G.gold,fontWeight:700}}>{card.margin}</span>
-              </div>
-            )}
-            {card.incomeRange&&(
-              <div style={{fontSize:11,color:G.dim}}>
-                <span style={{color:G.dimmer,fontSize:10}}>Income </span>
-                <span style={{color:"#81c784",fontWeight:700}}>{card.incomeRange}</span>
-              </div>
-            )}
-            {card.setupTime&&(
-              <div style={{fontSize:11,color:G.dim}}>
-                <span style={{color:G.dimmer,fontSize:10}}>Setup </span>
-                <span style={{color:G.cream,fontWeight:700}}>{card.setupTime}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Supplier count */}
-        {card.suppliers?.length>0&&(
-          <div style={{marginTop:8,fontSize:11,color:G.accent,fontWeight:600}}>
-            🔗 {card.suppliers.length} Supplier Links · {Math.ceil((card.steps?.length||5)/2)} min read
-          </div>
-        )}
-      </div>
-
-      {/* ── EXPANDED VIEW ── */}
-      {expanded&&(
-        <div style={{borderTop:"1px solid "+G.border,padding:"18px 18px 20px"}}>
-
-          {/* Why it works */}
-          {card.whyItWorks&&(
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
-                fontFamily:"monospace",marginBottom:8}}>WHY IT WORKS</div>
-              <p style={{fontSize:13,color:G.dim,lineHeight:1.75,margin:0}}>{card.whyItWorks}</p>
-            </div>
-          )}
-
-          {/* Pricing breakdown */}
-          {card.pricing&&(
-            <div style={{marginBottom:18,background:"rgba(255,255,255,0.03)",
-              border:"1px solid "+G.border,borderRadius:12,padding:"14px 16px"}}>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
-                fontFamily:"monospace",marginBottom:12}}>COST & PROFIT</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                {[["Cost",card.pricing.cost,"rgba(232,220,200,0.5)"],
-                  ["Selling",card.pricing.selling,G.gold],
-                  ["Profit",card.pricing.profit,"#81c784"]].map(([label,val,color])=>(
-                  <div key={label} style={{textAlign:"center"}}>
-                    <div style={{fontSize:10,color:G.dimmer,marginBottom:4}}>{label}</div>
-                    <div style={{fontSize:14,fontWeight:800,color}}>{val}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Suppliers */}
+        {/* Footer info */}
+        <div style={{display:"flex",alignItems:"center",gap:16,marginTop:10}}>
           {card.suppliers?.length>0&&(
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
-                fontFamily:"monospace",marginBottom:10}}>SUPPLIER LINKS (Click to visit)</div>
-              <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                {card.suppliers.map(s=>(
-                  <a key={s.name} href={s.url} target="_blank" rel="noreferrer"
-                    style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
-                      background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,
-                      borderRadius:10,textDecoration:"none",transition:"all .15s"}}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor=G.accent+"50"}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
-                    <div style={{width:32,height:32,borderRadius:8,background:G.accent+"18",
-                      border:"1px solid "+G.accent+"28",display:"flex",alignItems:"center",
-                      justifyContent:"center",fontSize:14,flexShrink:0}}>🔗</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:G.cream}}>{s.name}</div>
-                      <div style={{fontSize:11,color:G.dimmer,overflow:"hidden",
-                        textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.note||s.url}</div>
-                    </div>
-                    <span style={{fontSize:11,color:G.accent,fontWeight:700,flexShrink:0}}>Visit →</span>
-                  </a>
-                ))}
-              </div>
-            </div>
+            <span style={{fontSize:11,color:G.accent,fontWeight:600}}>
+              🔗 {card.suppliers.length} Suppliers
+            </span>
           )}
-
-          {/* Platform link (for online income cards) */}
-          {card.platformLink&&(
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
-                fontFamily:"monospace",marginBottom:10}}>PLATFORM</div>
-              <a href={card.platformLink} target="_blank" rel="noreferrer"
-                style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
-                  background:"rgba(255,255,255,0.03)",border:"1px solid "+G.accent+"35",
-                  borderRadius:10,textDecoration:"none"}}>
-                <div style={{width:32,height:32,borderRadius:8,background:G.accent+"18",
-                  border:"1px solid "+G.accent+"28",display:"flex",alignItems:"center",
-                  justifyContent:"center",fontSize:14}}>🌐</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:700,color:G.cream}}>{card.platformLink.replace("https://","")}</div>
-                  <div style={{fontSize:11,color:G.dimmer}}>Click to open platform</div>
-                </div>
-                <span style={{fontSize:11,color:G.accent,fontWeight:700}}>Visit →</span>
-              </a>
-            </div>
-          )}
-
-          {/* Step-by-step */}
           {card.steps?.length>0&&(
-            <div style={{marginBottom:18}}>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
-                fontFamily:"monospace",marginBottom:10}}>STEP-BY-STEP GUIDE</div>
-              <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                {card.steps.map((step,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12}}>
-                    <div style={{width:22,height:22,borderRadius:"50%",
-                      background:`${G.accent}18`,border:`1px solid ${G.accent}30`,
-                      display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:10,fontWeight:800,color:G.accent,flexShrink:0,marginTop:1}}>
-                      {i+1}
-                    </div>
-                    <div style={{fontSize:13,color:G.dim,lineHeight:1.6,paddingTop:1}}>{step}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <span style={{fontSize:11,color:G.dimmer}}>
+              {card.steps.length} steps
+            </span>
           )}
-
-          {/* ── AI ACTION BUTTONS ── */}
-          {card.actions?.length>0&&(
-            <div style={{marginBottom:aiResult?16:0}}>
-              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
-                fontFamily:"monospace",marginBottom:10}}>AI ACTIONS</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {/* Primary action */}
-                <button onClick={()=>runAction(card.actions[0])}
-                  disabled={aiLoading}
-                  style={{width:"100%",padding:"13px 16px",
-                    background:aiLoading&&activeAction===card.actions[0]?"rgba(240,180,41,0.3)":G.accent,
-                    color:aiLoading&&activeAction===card.actions[0]?G.gold:"#000",
-                    border:"none",borderRadius:12,fontSize:13,fontWeight:700,
-                    cursor:aiLoading?"wait":"pointer",fontFamily:"inherit",
-                    display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  <span>✦</span>
-                  <span>{aiLoading&&activeAction===card.actions[0]?"Generating…":card.actions[0]}</span>
-                </button>
-                {/* Secondary actions */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {card.actions.slice(1,3).map(action=>(
-                    <button key={action} onClick={()=>runAction(action)}
-                      disabled={aiLoading}
-                      style={{padding:"11px 10px",
-                        background:aiLoading&&activeAction===action?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.05)",
-                        border:"1px solid "+(aiLoading&&activeAction===action?G.accent+"60":G.border),
-                        borderRadius:10,fontSize:11,fontWeight:600,
-                        color:aiLoading&&activeAction===action?G.gold:G.cream,
-                        cursor:aiLoading?"wait":"pointer",fontFamily:"inherit",
-                        lineHeight:1.4,textAlign:"center"}}>
-                      {aiLoading&&activeAction===action?"…":action}
-                    </button>
-                  ))}
-                </div>
-                {card.actions[3]&&(
-                  <button onClick={()=>runAction(card.actions[3])}
-                    disabled={aiLoading}
-                    style={{padding:"11px 10px",
-                      background:"rgba(255,255,255,0.025)",
-                      border:"1px solid "+G.border,borderRadius:10,
-                      fontSize:11,fontWeight:600,color:G.dim,
-                      cursor:aiLoading?"wait":"pointer",fontFamily:"inherit"}}>
-                    {aiLoading&&activeAction===card.actions[3]?"…":card.actions[3]}
-                  </button>
-                )}
-              </div>
-            </div>
+          {card.setupTime&&(
+            <span style={{fontSize:11,color:G.dimmer}}>Setup: {card.setupTime}</span>
           )}
+          <span style={{fontSize:11,color:G.accent,marginLeft:"auto",fontWeight:600}}>
+            View full intelligence →
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          {/* AI Result */}
-          {aiResult&&(
-            <div style={{marginTop:16,padding:"16px 18px",
-              background:"rgba(240,180,41,0.04)",
-              border:"1px solid rgba(240,180,41,0.2)",borderRadius:14}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                <span style={{fontSize:14}}>✦</span>
-                <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",
-                  color:G.gold,fontFamily:"monospace"}}>{activeAction}</div>
-              </div>
-              <div style={{fontSize:13,color:G.dim,lineHeight:1.85,whiteSpace:"pre-wrap"}}>
-                {aiResult}
-              </div>
-            </div>
-          )}
-
+// ═══════════════════════════════════════════════════════════════════════════════
+// PLAN SECTION — A single collapsible section of the business plan
+// ═══════════════════════════════════════════════════════════════════════════════
+function PlanSection({title, icon, children, accentColor, defaultOpen=false}){
+  const [open, setOpen] = useState(defaultOpen);
+  const G={...useThemeColors()};
+  return(
+    <div style={{border:"1px solid "+(open?accentColor+"35":G.border),borderRadius:14,
+      overflow:"hidden",marginBottom:10,transition:"border-color .2s"}}>
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{padding:"14px 16px",cursor:"pointer",display:"flex",
+          alignItems:"center",gap:12,
+          background:open?`${accentColor}08`:"rgba(255,255,255,0.02)"}}>
+        <span style={{fontSize:18,flexShrink:0}}>{icon}</span>
+        <div style={{flex:1,fontSize:14,fontWeight:700,color:G.cream}}>{title}</div>
+        <span style={{color:open?accentColor:G.dimmer,fontSize:18,
+          transition:"transform .2s",display:"inline-block",
+          transform:open?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+      </div>
+      {open&&(
+        <div style={{padding:"14px 16px 16px",borderTop:"1px solid "+G.border}}>
+          {children}
         </div>
       )}
     </div>
@@ -12879,44 +12981,418 @@ function IntelligenceCard({card, catColor, formData, userId, isPaid, isPremium, 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TOPIC PAGE — Intelligence card feed for a specific topic
+// CARD DETAIL PAGE — Full-page view of a single intelligence card
+// ═══════════════════════════════════════════════════════════════════════════════
+function CardDetailPage({card, catColor, formData, userId, isPaid, isPremium, isProMax, onUnlock, onBack}){
+  const [planSections, setPlanSections] = useState({}); // {sectionKey: {loading, content}}
+  const [activeAction, setActiveAction] = useState(null);
+  const [aiResult, setAiResult] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [saved, setSaved] = useState(()=>{
+    try{
+      const k=userId?`diq_saved_tools_${userId}`:"diq_saved_tools_guest";
+      return JSON.parse(localStorage.getItem(k)||"[]").includes("card:"+card.id);
+    }catch{return false;}
+  });
+
+  const _tc=useThemeColors(); const G={..._tc, accent:catColor||_tc.gold};
+
+  const name=formData?.name||"you";
+  const country=formData?.country||"your country";
+  const occupation=formData?.occupation||"your current job";
+  const goals=formData?.goals||formData?.bigGoal||"build income";
+  const income=formData?.income||"not specified";
+
+  const toggleSave=()=>{
+    setSaved(prev=>{
+      const next=!prev;
+      try{
+        const k=userId?`diq_saved_tools_${userId}`:"diq_saved_tools_guest";
+        const s=new Set(JSON.parse(localStorage.getItem(k)||"[]"));
+        if(next) s.add("card:"+card.id); else s.delete("card:"+card.id);
+        localStorage.setItem(k,JSON.stringify([...s]));
+        const mk=userId?`diq_saved_tools_meta_${userId}`:"diq_saved_tools_meta_guest";
+        const m=JSON.parse(localStorage.getItem(mk)||"{}");
+        if(next) m["card:"+card.id]={label:card.title,icon:"📋",color:catColor,savedAt:Date.now()};
+        else delete m["card:"+card.id];
+        localStorage.setItem(mk,JSON.stringify(m));
+      }catch{}
+      return next;
+    });
+  };
+
+  // Generate a specific plan section
+  const generateSection = async(sectionKey, prompt)=>{
+    if(!isPaid){onUnlock();return;}
+    setPlanSections(prev=>({...prev,[sectionKey]:{loading:true,content:""}}));
+    try{
+      const r=await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:`You are DestinIQ — a hyper-specific business intelligence advisor. Write for ${name} from ${country}. Use real numbers. Be direct, practical, and personalised. Never be generic. Max 300 words per section.`,
+        userId,isPremium,isProMax
+      });
+      const txt=Array.isArray(r?.content)?r.content.filter(x=>x?.type==="text").map(x=>x.text).join(""):
+        (typeof r==="string"?r:r?.text||r?.content?.[0]?.text||"");
+      setPlanSections(prev=>({...prev,[sectionKey]:{loading:false,content:txt}}));
+    }catch{
+      setPlanSections(prev=>({...prev,[sectionKey]:{loading:false,content:"Could not generate. Tap the section again to retry."}}));
+    }
+  };
+
+  // Generate non-plan AI actions
+  const runAction=async(action)=>{
+    if(!isPaid){onUnlock();return;}
+    setActiveAction(action);setAiResult("");setAiLoading(true);
+    let prompt="";
+    if(action.includes("Suppliers")||action.includes("suppliers")){
+      prompt=`Find 5 best suppliers for "${card.title}" for ${name} in ${country}. For each: name, exact URL, minimum order, unit cost in USD + local currency, shipping time to ${country}, payment methods, 1 pro + 1 con. Include local alternatives in ${country} if available.`;
+    } else if(action.includes("Profit")||action.includes("Income")||action.includes("Earnings")){
+      prompt=`Calculate realistic profit for "${card.title}" for ${name} in ${country} (income: ${income}). Show Month 1, Month 3, Month 6 projections. Include startup cost in local currency, break-even date, realistic vs best-case monthly income. Use real numbers.`;
+    } else if(action.includes("Content")||action.includes("Niche")){
+      prompt=`Give ${name} from ${country} 10 specific content ideas for "${card.title}". For each: title, 3-second hook, platform, unique angle competitors miss. Tailor to ${country}'s market.`;
+    } else if(action.includes("Market Rate")){
+      prompt=`What is the market rate for "${card.title}" skills in ${country}? Give: salary range, top 3 employers, skills that get top 10% pay. Real numbers only.`;
+    } else if(action.includes("Launch")||action.includes("Strategy")){
+      prompt=`Create a 30-day launch strategy for ${name} to start "${card.title}" in ${country} with occupation: ${occupation}. Day-by-day for first week, then weekly milestones. Include exact actions, costs, and success metrics.`;
+    } else {
+      prompt=`${action} for ${name} from ${country} regarding "${card.title}". Occupation: ${occupation}, goal: ${goals}, income: ${income}. Be specific, practical, use real numbers and country-specific data.`;
+    }
+    try{
+      const r=await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:`You are DestinIQ — a world-class intelligence advisor for ${name} from ${country}. Use real numbers, real company names, real websites. Never be vague.`,
+        userId,isPremium,isProMax
+      });
+      const txt=Array.isArray(r?.content)?r.content.filter(x=>x?.type==="text").map(x=>x.text).join(""):
+        (typeof r==="string"?r:r?.text||r?.content?.[0]?.text||"");
+      setAiResult(txt);
+    }catch{setAiResult("Could not generate. Check connection and try again.");}
+    setAiLoading(false);
+  };
+
+  // Business plan sections config
+  const PLAN_SECTIONS=[
+    {key:"market",    icon:"📊", title:`The Market Right Now`,
+     prompt:`Analyse the market for "${card.title}" in ${country} right now. Cover: current demand, top competitors, market size, best target customers, and the #1 opportunity nobody is taking. Use specific numbers and local context.`},
+    {key:"startup",   icon:"💰", title:`Startup Cost Breakdown`,
+     prompt:`Give ${name} in ${country} a complete startup cost breakdown for "${card.title}". List every item needed, exact cost in local currency, where to buy it, and which items can be skipped to start lean. Total minimum and recommended startup costs.`},
+    {key:"first30",   icon:"🚀", title:`Your First 30 Days`,
+     prompt:`Write a day-by-day action plan for ${name}'s first 30 days starting "${card.title}" in ${country}. Week 1: setup. Week 2: first sales attempt. Week 3-4: scale. Be specific about what to do each day, what it costs, and what success looks like.`},
+    {key:"income3mo", icon:"📈", title:`Expected Income After 3 Months`,
+     prompt:`Project ${name}'s realistic income from "${card.title}" in ${country} at Month 1, Month 2, and Month 3. Show conservative, realistic, and optimistic scenarios with specific numbers. What needs to be true for each scenario. Include weekly revenue targets.`},
+    {key:"risks",     icon:"⚠️", title:`Biggest Risks & How to Avoid Them`,
+     prompt:`What are the 3 biggest risks for ${name} starting "${card.title}" in ${country}? For each risk: what it is, how likely it is, and the exact steps to prevent or recover from it. Be honest, not discouraging.`},
+  ];
+
+  return(
+    <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",paddingBottom:100}}>
+
+      {/* ── TOP BAR ── */}
+      <div style={{padding:"14px 20px",display:"flex",alignItems:"center",gap:12,
+        borderBottom:"1px solid "+G.border,background:G.bg,
+        position:"sticky",top:0,zIndex:10}}>
+        <button onClick={onBack}
+          style={{background:"none",border:"none",color:G.dim,cursor:"pointer",
+            fontSize:13,display:"flex",alignItems:"center",gap:6,padding:"4px 0",flexShrink:0}}>
+          ← Back
+        </button>
+        <div style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",
+          whiteSpace:"nowrap",fontSize:14,fontWeight:700,color:G.cream}}>{card.title}</div>
+        <button onClick={toggleSave}
+          style={{background:"none",border:"none",cursor:"pointer",
+            fontSize:20,color:saved?"#f0b429":"rgba(232,220,200,0.3)",padding:0,flexShrink:0}}>
+          {saved?"★":"☆"}
+        </button>
+      </div>
+
+      <div style={{maxWidth:860,margin:"0 auto",padding:"20px 20px 0"}}>
+
+        {/* ── HERO ── */}
+        <div style={{background:`linear-gradient(135deg,${G.accent}14,${G.accent}04)`,
+          border:`1px solid ${G.accent}28`,borderRadius:18,padding:"22px",marginBottom:24}}>
+          <div style={{display:"flex",alignItems:"flex-start",gap:16,marginBottom:14}}>
+            <div style={{width:64,height:64,borderRadius:16,flexShrink:0,
+              background:`${G.accent}22`,border:`1px solid ${G.accent}35`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>
+              {card.emoji||"📦"}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",gap:7,marginBottom:6,flexWrap:"wrap"}}>
+                {card.badge&&(
+                  <span style={{fontSize:9,fontWeight:700,
+                    background:`${card.badgeColor||G.accent}18`,border:`1px solid ${card.badgeColor||G.accent}35`,
+                    color:card.badgeColor||G.accent,borderRadius:6,padding:"2px 8px",letterSpacing:".06em"}}>
+                    {card.badge}
+                  </span>
+                )}
+                {card.profitability&&(
+                  <span style={{fontSize:9,fontWeight:700,
+                    background:"rgba(129,199,132,0.14)",border:"1px solid rgba(129,199,132,0.3)",
+                    color:"#81c784",borderRadius:6,padding:"2px 8px"}}>
+                    {card.profitability} Profit
+                  </span>
+                )}
+              </div>
+              <h1 style={{fontSize:20,fontWeight:800,color:G.cream,margin:"0 0 4px",lineHeight:1.3}}>{card.title}</h1>
+              <p style={{fontSize:13,color:G.dim,margin:0,lineHeight:1.6}}>{card.tagline}</p>
+            </div>
+          </div>
+
+          {/* Startup cost — prominent */}
+          {card.startupCost&&(
+            <div style={{display:"inline-flex",alignItems:"center",gap:10,
+              background:"rgba(255,255,255,0.05)",border:"1px solid "+G.border,
+              borderRadius:12,padding:"10px 16px"}}>
+              <span style={{fontSize:13,color:G.dim}}>Startup Cost</span>
+              <span style={{fontSize:18,fontWeight:900,color:G.cream}}>{card.startupCost}</span>
+            </div>
+          )}
+          {card.incomeRange&&(
+            <div style={{display:"inline-flex",alignItems:"center",gap:10,
+              background:"rgba(255,255,255,0.05)",border:"1px solid "+G.border,
+              borderRadius:12,padding:"10px 16px",marginLeft:card.startupCost?10:0}}>
+              <span style={{fontSize:13,color:G.dim}}>Income Range</span>
+              <span style={{fontSize:18,fontWeight:900,color:"#81c784"}}>{card.incomeRange}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── WHY IT WORKS ── */}
+        {card.whyItWorks&&(
+          <div style={{marginBottom:20,padding:"16px 18px",
+            background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,borderRadius:14}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
+              fontFamily:"monospace",marginBottom:8}}>WHY IT WORKS</div>
+            <p style={{fontSize:13,color:G.dim,lineHeight:1.8,margin:0}}>{card.whyItWorks}</p>
+          </div>
+        )}
+
+        {/* ── SUPPLIER LINKS ── */}
+        {card.suppliers?.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
+              fontFamily:"monospace",marginBottom:10}}>🔗 SUPPLIER LINKS</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {card.suppliers.map(s=>(
+                <a key={s.name} href={s.url} target="_blank" rel="noreferrer"
+                  style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",
+                    background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,
+                    borderRadius:12,textDecoration:"none",transition:"border-color .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=G.accent+"55"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                  <div style={{width:36,height:36,borderRadius:10,background:G.accent+"18",
+                    border:"1px solid "+G.accent+"28",display:"flex",alignItems:"center",
+                    justifyContent:"center",fontSize:16,flexShrink:0}}>🔗</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:700,color:G.cream}}>{s.name}</div>
+                    <div style={{fontSize:11,color:G.dimmer}}>{s.note}</div>
+                  </div>
+                  <span style={{fontSize:12,color:G.accent,fontWeight:700,flexShrink:0}}>Visit →</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── PLATFORM LINK ── */}
+        {card.platformLink&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
+              fontFamily:"monospace",marginBottom:10}}>🌐 PLATFORM</div>
+            <a href={card.platformLink} target="_blank" rel="noreferrer"
+              style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",
+                background:`${G.accent}10`,border:`1px solid ${G.accent}35`,
+                borderRadius:12,textDecoration:"none"}}>
+              <div style={{width:40,height:40,borderRadius:11,background:G.accent+"22",
+                border:"1px solid "+G.accent+"35",display:"flex",alignItems:"center",
+                justifyContent:"center",fontSize:18}}>🌐</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:G.cream}}>{card.platformLink.replace("https://","")}</div>
+                <div style={{fontSize:11,color:G.dim}}>Click to open</div>
+              </div>
+              <span style={{fontSize:13,color:G.accent,fontWeight:700}}>Visit →</span>
+            </a>
+          </div>
+        )}
+
+        {/* ── STEP-BY-STEP ── */}
+        {card.steps?.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
+              fontFamily:"monospace",marginBottom:12}}>STEP-BY-STEP GUIDE</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {card.steps.map((step,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,
+                  padding:"12px 14px",background:"rgba(255,255,255,0.025)",
+                  border:"1px solid "+G.border,borderRadius:12}}>
+                  <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,
+                    background:`${G.accent}18`,border:`1px solid ${G.accent}30`,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:11,fontWeight:800,color:G.accent}}>
+                    {i+1}
+                  </div>
+                  <div style={{fontSize:13,color:G.dim,lineHeight:1.65,paddingTop:3}}>{step}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── FULL BUSINESS PLAN — Clickable collapsible sections ── */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.gold,
+            fontFamily:"monospace",marginBottom:4}}>✦ YOUR {card.title.toUpperCase()} PLAN</div>
+          <p style={{fontSize:12,color:G.dimmer,margin:"0 0 14px",lineHeight:1.5}}>
+            Tap any section to generate personalised intelligence for {name} in {country}.
+          </p>
+          {PLAN_SECTIONS.map(sec=>{
+            const s=planSections[sec.key]||{};
+            return(
+              <PlanSection key={sec.key} title={sec.title} icon={sec.icon}
+                accentColor={G.accent}
+                defaultOpen={false}>
+                {!s.content&&!s.loading&&(
+                  <div style={{textAlign:"center",padding:"12px 0"}}>
+                    <p style={{fontSize:12,color:G.dimmer,margin:"0 0 12px",lineHeight:1.6}}>
+                      Tap to generate personalised intelligence for this section.
+                    </p>
+                    <button onClick={()=>generateSection(sec.key,sec.prompt)}
+                      style={{background:G.accent,color:"#000",border:"none",
+                        borderRadius:10,padding:"11px 22px",fontSize:13,fontWeight:700,
+                        cursor:"pointer",fontFamily:"inherit"}}>
+                      ✦ Generate {sec.title}
+                    </button>
+                  </div>
+                )}
+                {s.loading&&(
+                  <div style={{textAlign:"center",padding:"16px 0",display:"flex",
+                    alignItems:"center",justifyContent:"center",gap:8}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:G.accent,
+                      display:"inline-block"}}/>
+                    <div style={{fontSize:12,color:G.dimmer}}>
+                      Generating {sec.title}…
+                    </div>
+                  </div>
+                )}
+                {s.content&&(
+                  <div>
+                    <div style={{fontSize:13,color:G.dim,lineHeight:1.85,whiteSpace:"pre-wrap",
+                      marginBottom:12}}>
+                      {s.content}
+                    </div>
+                    <button onClick={()=>generateSection(sec.key,sec.prompt)}
+                      style={{background:"none",border:"1px solid "+G.border,
+                        borderRadius:8,padding:"7px 14px",fontSize:11,color:G.dimmer,
+                        cursor:"pointer",fontFamily:"inherit"}}>
+                      ↺ Refresh
+                    </button>
+                  </div>
+                )}
+              </PlanSection>
+            );
+          })}
+        </div>
+
+        {/* ── OTHER AI ACTIONS ── */}
+        {card.actions?.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
+              fontFamily:"monospace",marginBottom:10}}>MORE AI ACTIONS</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {card.actions.filter(a=>!a.includes("Business Plan")).map(action=>(
+                <button key={action} onClick={()=>runAction(action)}
+                  disabled={aiLoading}
+                  style={{padding:"12px 10px",
+                    background:aiLoading&&activeAction===action?"rgba(240,180,41,0.12)":"rgba(255,255,255,0.04)",
+                    border:`1px solid ${aiLoading&&activeAction===action?G.accent+"50":G.border}`,
+                    borderRadius:12,fontSize:12,fontWeight:600,
+                    color:aiLoading&&activeAction===action?G.gold:G.cream,
+                    cursor:aiLoading?"wait":"pointer",fontFamily:"inherit",
+                    lineHeight:1.4,textAlign:"center"}}>
+                  {aiLoading&&activeAction===action?"Generating…":action}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Result */}
+        {aiResult&&(
+          <div style={{padding:"16px 18px",background:"rgba(240,180,41,0.04)",
+            border:"1px solid rgba(240,180,41,0.2)",borderRadius:14,marginBottom:20}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+              marginBottom:12}}>
+              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",
+                color:G.gold,fontFamily:"monospace"}}>✦ {activeAction}</div>
+              <button onClick={()=>setAiResult("")}
+                style={{background:"none",border:"none",color:G.dimmer,
+                  cursor:"pointer",fontSize:16,padding:0}}>×</button>
+            </div>
+            <div style={{fontSize:13,color:G.dim,lineHeight:1.85,whiteSpace:"pre-wrap"}}>
+              {aiResult}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOPIC PAGE — Intelligence card feed
 // ═══════════════════════════════════════════════════════════════════════════════
 function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, isPremium, isProMax, onUnlock}){
+  const G = useThemeColors();
   const cat = CATEGORIES.find(c=>c.id===catId);
   const topicData = TOPIC_CONFIGS[catId];
   const topic = topicData?.topics?.find(t=>t.id===topicId);
   const [activeTag, setActiveTag] = useState("All");
+  const [selectedCard, setSelectedCard] = useState(null);
 
   if(!cat||!topic) return(
-    <div style={{padding:40,textAlign:"center",color:"#e8dcc8",fontFamily:"-apple-system,sans-serif"}}>
+    <div style={{padding:40,textAlign:"center",color:G.cream,fontFamily:"-apple-system,sans-serif"}}>
       <div style={{fontSize:32,marginBottom:12}}>🔍</div>
-      <div style={{fontSize:14,color:"rgba(232,220,200,0.5)"}}>Topic not found.</div>
+      <div style={{fontSize:14,color:G.dim}}>Topic not found.</div>
       <button onClick={()=>goBack?goBack():setNav("explore")}
-        style={{marginTop:16,background:"none",border:"none",color:"#f0b429",
+        style={{marginTop:16,background:"none",border:"none",color:G.gold,
           cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>← Go back</button>
     </div>
   );
 
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",
-    dimmer:"rgba(232,220,200,0.27)",bg:"#0a0800",border:"rgba(232,220,200,0.07)"};
-
   const filteredCards = activeTag==="All"
     ? topic.cards
-    : topic.cards.filter(c=>c.badge===activeTag||c.profitability===activeTag||c.difficulty===activeTag||c.risk===activeTag);
+    : topic.cards.filter(c=>
+        (Array.isArray(c.tags)&&c.tags.includes(activeTag)) ||
+        c.badge===activeTag || c.profitability===activeTag ||
+        c.difficulty===activeTag || c.risk===activeTag
+      );
+
+  // Card detail view — full page takeover
+  if(selectedCard){
+    return(
+      <CardDetailPage
+        card={selectedCard} catColor={cat.color}
+        formData={formData} userId={userId}
+        isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
+        onUnlock={onUnlock}
+        onBack={()=>setSelectedCard(null)}
+      />
+    );
+  }
 
   return(
     <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
       <div style={{padding:"16px 20px 0",maxWidth:860,margin:"0 auto"}}>
-        {/* Back */}
         <button onClick={()=>goBack?goBack():setNav("category:"+catId)}
           style={{background:"none",border:"none",color:G.dim,cursor:"pointer",
             fontSize:13,display:"flex",alignItems:"center",gap:6,padding:"4px 0",marginBottom:16}}>
           ← Back
         </button>
 
-        {/* Hero */}
         <div style={{marginBottom:20}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
             <span style={{fontSize:24}}>{topic.icon}</span>
@@ -12924,7 +13400,6 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
           </div>
           <p style={{fontSize:13,color:G.dim,margin:"0 0 16px",lineHeight:1.6}}>{topic.desc}</p>
 
-          {/* Tag filter pills */}
           {topic.tags?.length>0&&(
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {topic.tags.map(tag=>(
@@ -12941,31 +13416,34 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
           )}
         </div>
 
-        {/* Section label */}
         <div style={{fontSize:9,fontWeight:700,letterSpacing:".12em",color:G.dimmer,
           fontFamily:"monospace",marginBottom:16}}>
           {filteredCards.length} INTELLIGENCE CARD{filteredCards.length!==1?"S":""}
+          {activeTag!=="All"&&` · Filtered: ${activeTag}`}
         </div>
       </div>
 
-      {/* Cards feed */}
       <div style={{padding:"0 20px 100px",maxWidth:860,margin:"0 auto"}}>
         {filteredCards.length>0
           ? filteredCards.map(card=>(
               <IntelligenceCard
                 key={card.id} card={card} catColor={cat.color}
-                formData={formData} userId={userId}
-                isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-                onUnlock={onUnlock}
+                userId={userId}
+                onSelect={setSelectedCard}
               />
             ))
           : (
-            <div style={{padding:"40px 20px",textAlign:"center",
+            <div style={{padding:"32px 20px",textAlign:"center",
               background:"rgba(255,255,255,0.02)",border:"1px solid "+G.border,borderRadius:16}}>
-              <div style={{fontSize:13,color:G.dim}}>No cards match this filter.</div>
+              <div style={{fontSize:28,marginBottom:10}}>🔍</div>
+              <div style={{fontSize:14,fontWeight:600,color:G.cream,marginBottom:6}}>No cards for this filter</div>
+              <div style={{fontSize:12,color:G.dim,marginBottom:16}}>Try a different filter or view all cards.</div>
               <button onClick={()=>setActiveTag("All")}
-                style={{marginTop:12,background:"none",border:"none",color:G.gold,
-                  cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>Show all cards</button>
+                style={{background:G.gold,color:"#000",border:"none",borderRadius:10,
+                  padding:"10px 22px",fontSize:13,fontWeight:700,
+                  cursor:"pointer",fontFamily:"inherit"}}>
+                Show All Cards
+              </button>
             </div>
           )
         }
@@ -12976,38 +13454,39 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
 
 // ── ToolPage ──────────────────────────────────────────────────────────────
 function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMax,onUnlock,lang,reportData}){
+  const G = useThemeColors();
   const meta=TOOL_META[toolId];
   const cat=meta?CATEGORIES.find(c=>c.id===meta.cat):null;
   const isToolFree = FREE_TOOLS.includes(toolId)||toolId==="advisor";
   if(!isPaid && !isToolFree){
     return(
       <div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",
-        color:"#e8dcc8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+        color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
         <div style={{fontSize:"clamp(32px,10vw,52px)",marginBottom:16}}>{meta?.icon||"🔒"}</div>
-        <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:"#e8dcc8"}}>{meta?.label||"This Tool"}</h2>
-        <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",lineHeight:1.7,margin:"0 0 24px"}}>
+        <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:G.cream}}>{meta?.label||"This Tool"}</h2>
+        <p style={{fontSize:14,color:G.dim,lineHeight:1.7,margin:"0 0 24px"}}>
           This tool is part of the Pro plan. Upgrade to unlock all 42 intelligence tools.
         </p>
         <button onClick={onUnlock}
-          style={{width:"100%",padding:"15px",background:"#f0b429",color:"#000",border:"none",
+          style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
             borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
             marginBottom:12}}>
           ✦ Unlock All 42 Tools
         </button>
         <button onClick={()=>goBack?goBack():setNav("explore")}
-          style={{background:"none",border:"none",color:"rgba(232,220,200,0.4)",
+          style={{background:"none",border:"none",color:G.dim,
             cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
           ← Go back
         </button>
         <div style={{marginTop:24,padding:"14px 16px",background:"rgba(240,180,41,0.06)",
           border:"1px solid rgba(240,180,41,0.15)",borderRadius:12}}>
-          <div style={{fontSize:11,color:"#f0b429",fontWeight:700,marginBottom:6}}>FREE TOOLS AVAILABLE</div>
+          <div style={{fontSize:11,color:G.gold,fontWeight:700,marginBottom:6}}>FREE TOOLS AVAILABLE</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
             {FREE_TOOLS.map(t=>(
               <span key={t} onClick={()=>setNav("tool:"+t)}
                 style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",
                   border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
-                  fontSize:11,color:"rgba(232,220,200,0.6)",cursor:"pointer"}}>
+                  fontSize:11,color:G.dim,cursor:"pointer"}}>
                 {TOOL_META[t]?.icon} {TOOL_META[t]?.label}
               </span>
             ))}
@@ -13275,11 +13754,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
     e.target.value="";
   };
 
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-  };
+  const G={...useThemeColors()};
 
   const menuItems=[
     {icon:"✏️",label:"Edit Profile",    action:()=>onEditProfile?.()},
@@ -13405,6 +13880,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
 
 
 function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId, streak, setNav, lang="en"}){
+  const G = useThemeColors();
   const [exStr, setExStr]=useState(false);
   const [exBls, setExBls]=useState(false);
   const [exOpp, setExOpp]=useState(false);
@@ -13467,11 +13943,6 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
   const R=62,SW=9,circ=2*Math.PI*R,off=circ-(overall/100)*circ;
 
   // ── Design tokens ────────────────────────────────────────────────────────
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-  };
   const card={background:G.card,border:"1px solid "+G.border,borderRadius:16,padding:"22px",boxSizing:"border-box"};
 
   // ── List item helpers ────────────────────────────────────────────────────
@@ -13750,12 +14221,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
 
 
 function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,onUnlock}){
-  const G={
-    gold:"#f0b429",bg:"#0a0800",card:"#111008",
-    border:"rgba(232,220,200,0.07)",cream:"#e8dcc8",
-    dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)",
-    inp:"rgba(255,255,255,0.04)",inpBorder:"rgba(232,220,200,0.12)",
-  };
+  const G={...useThemeColors()};
   const STORE_KEY=`diq_journal_${userId}`;
   const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY)||"[]");}catch{return [];}});
   const canWriteToday = isPremium || isPaid || entries.length < FREE_JOURNAL_LIMIT;
@@ -14039,11 +14505,10 @@ function getScoreHistory(userId){
 // SCORE COMPARISON CARD — shows in MyReport for Pro Max
 // ═══════════════════════════════════════════════════════════════
 function ScoreComparisonCard({userId, currentScores, currentOverall}){
+  const G = useThemeColors();
   const history = getScoreHistory(userId);
   if(history.length < 2) return null;
   const prev = history[1]; // second entry = previous report
-  const G = {gold:"#f0b429",card:"#111008",border:"rgba(232,220,200,0.07)",
-    cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)"};
 
   const diff = (a,b)=>Math.round((a||0)-(b||0));
   const fmt  = n=>n>0?`+${n}`:String(n);
@@ -14098,8 +14563,7 @@ function ScoreComparisonCard({userId, currentScores, currentOverall}){
 // WEEKLY DIGEST — Pro Max: AI summary every week
 // ═══════════════════════════════════════════════════════════════
 function WeeklyDigestCard({profile,userId,streak,isPremium,isProMax}){
-  const G={gold:"#f0b429",card:"#111008",border:"rgba(232,220,200,0.07)",
-    cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",dimmer:"rgba(232,220,200,0.27)"};
+  const G={...useThemeColors()};
   const DIGEST_KEY=`diq_weekly_digest_${userId}`;
   const [digest,setDigest]=useState(()=>{
     try{ return JSON.parse(localStorage.getItem(DIGEST_KEY)||"null"); }catch{ return null; }
@@ -14186,7 +14650,7 @@ Write it directly to them. Use their name. No bullet points. No generic advice.`
 
 
 function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowCheckin,userId,isPremium,isProMax,ipLocation,showTracker,setShowTracker,lang="en",navPhotoURL,userName}){
-
+  const G = useThemeColors();
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [mod,setMod]=useState(()=>{
     if(typeof window==="undefined") return "today";
@@ -14443,11 +14907,11 @@ Rules:
         {navSection==="practices"&&(
           isPaid
             ?<div style={{padding:"28px 32px"}}><PracticesView userId={userId} formData={formData}/></div>
-            :<div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",color:"#e8dcc8",fontFamily:"-apple-system,sans-serif"}}>
+            :<div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",color:G.cream,fontFamily:"-apple-system,sans-serif"}}>
               <div style={{fontSize:48,marginBottom:14}}>⚡</div>
               <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px"}}>My Practices</h2>
-              <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",lineHeight:1.7,margin:"0 0 24px"}}>Track habits and build the practices that compound over time. Available on Pro.</p>
-              <button onClick={onUnlock} style={{width:"100%",padding:"15px",background:"#f0b429",color:"#000",border:"none",borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>✦ Upgrade to Pro</button>
+              <p style={{fontSize:14,color:G.dim,lineHeight:1.7,margin:"0 0 24px"}}>Track habits and build the practices that compound over time. Available on Pro.</p>
+              <button onClick={onUnlock} style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>✦ Upgrade to Pro</button>
             </div>
         )}
         {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>setNav("home")}/></div>}
@@ -14766,10 +15230,9 @@ function ReferralWidget({userId, isPaid}){
 // ABOUT US
 // ═══════════════════════════════════════════════════════════════════════════════
 function AboutUsPage({onBack}){
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",
-    dimmer:"rgba(232,220,200,0.25)",card:"#111008",border:"rgba(232,220,200,0.07)"};
+  const G={...useThemeColors()};
   return(
-    <div style={{minHeight:"100vh",background:"#0a0800",paddingTop:72,paddingBottom:80,
+    <div style={{minHeight:"100vh",background:G.bg,paddingTop:72,paddingBottom:80,
       color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
       <div style={{maxWidth:680,margin:"0 auto",padding:"0 24px"}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:G.dim,
@@ -14825,11 +15288,10 @@ function AboutUsPage({onBack}){
 function PolicyPage({type,onBack}){
   const isPrivacy = type==="privacy";
   const isContact = type==="contact";
-  const G={gold:"#f0b429",cream:"#e8dcc8",dim:"rgba(232,220,200,0.5)",
-    dimmer:"rgba(232,220,200,0.27)",card:"#111008",border:"rgba(232,220,200,0.07)"};
+  const G={...useThemeColors()};
 
   return(
-    <div style={{minHeight:"100vh",background:"#0a0800",paddingTop:72,paddingBottom:80,
+    <div style={{minHeight:"100vh",background:G.bg,paddingTop:72,paddingBottom:80,
       color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
       <div style={{maxWidth:720,margin:"0 auto",padding:"0 24px"}}>
 
@@ -15262,6 +15724,12 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
             <ReferralWidget userId={user?.id} isPaid={isPaid}/>
           </div>
 
+          {/* Appearance — Light / Dark mode */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",marginBottom:8}}>APPEARANCE</div>
+            <ThemeToggle/>
+          </div>
+
           {/* Language selector */}
           <div style={{marginBottom:16}}>
             <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",marginBottom:8}}>LANGUAGE</div>
@@ -15606,7 +16074,8 @@ function SubscriptionCard({isPaid,isPremium,isProMax,userId,onManageSubscription
   );
 }
 
-export default function DestinIQ(){
+function DestinIQInner(){
+  const G = useThemeColors();
   const [user, setUser]=useState(null);
   const [authLoading, setAuthLoading]=useState(true); // waiting for Supabase session
   const [screen,    setScreen   ]=useState("landing");
@@ -16380,12 +16849,12 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {/* ── LOADING STATE — wait for Supabase session check ─────────────── */}
         {authLoading&&(
           <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",
-            alignItems:"center",justifyContent:"center",background:"#0a0800",
+            alignItems:"center",justifyContent:"center",background:G.bg,
             fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
             {/* Logo */}
-            <div style={{fontSize:"clamp(20px,6vw,32px)",fontWeight:900,color:"#e8dcc8",marginBottom:32,
+            <div style={{fontSize:"clamp(20px,6vw,32px)",fontWeight:900,color:G.cream,marginBottom:32,
               letterSpacing:"-.5px"}}>
-              Destin<span style={{color:"#f0b429"}}>IQ</span>
+              Destin<span style={{color:G.gold}}>IQ</span>
             </div>
             {/* Animated bar */}
             <div style={{width:160,height:3,background:"rgba(255,255,255,0.06)",
@@ -16421,11 +16890,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             {/* Show auth screen only when user explicitly clicked to begin/sign in */}
             {emailConfirmPending
               ? <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
-                  justifyContent:"center",background:"#0a0800",padding:"0 24px",textAlign:"center",
+                  justifyContent:"center",background:G.bg,padding:"0 24px",textAlign:"center",
                   fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
                   <div style={{fontSize:48,marginBottom:20}}>📬</div>
-                  <h2 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:"#e8dcc8",margin:"0 0 12px"}}>Check your inbox</h2>
-                  <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",maxWidth:340,lineHeight:1.7,margin:"0 0 28px"}}>
+                  <h2 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:G.cream,margin:"0 0 12px"}}>Check your inbox</h2>
+                  <p style={{fontSize:14,color:G.dim,maxWidth:340,lineHeight:1.7,margin:"0 0 28px"}}>
                     We sent a confirmation link to your email. Click it to activate your account and start your journey.
                   </p>
                   <button onClick={()=>{setEmailConfirmPending(false);setScreen("auth");}}
@@ -16561,16 +17030,16 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {/* PWA Install Banner */}
         {showInstall&&screen==="results"&&!window?.Capacitor?.isNativePlatform?.()&&(
           <div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",
-            background:"#1a1400",border:"1px solid rgba(240,180,41,0.3)",borderRadius:16,
+            background:G.card,border:"1px solid rgba(240,180,41,0.3)",borderRadius:16,
             padding:"14px 18px",display:"flex",alignItems:"center",gap:12,
             boxShadow:"0 8px 32px rgba(0,0,0,0.5)",zIndex:500,maxWidth:340,width:"calc(100% - 32px)"}}>
             <div style={{fontSize:28}}>📲</div>
             <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#e8dcc8",marginBottom:2}}>Install DestinIQ</div>
-              <div style={{fontSize:11,color:"rgba(232,220,200,0.5)"}}>Add to home screen for quick access</div>
+              <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:2}}>Install DestinIQ</div>
+              <div style={{fontSize:11,color:G.dim}}>Add to home screen for quick access</div>
             </div>
             <button onClick={handleInstallApp}
-              style={{background:"#f0b429",border:"none",borderRadius:8,padding:"7px 14px",
+              style={{background:G.gold,border:"none",borderRadius:8,padding:"7px 14px",
                 fontSize:12,fontWeight:700,cursor:"pointer",color:"#000",fontFamily:"inherit",flexShrink:0}}>
               Install
             </button>
@@ -16657,3 +17126,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
   );
 }
 
+
+export default function DestinIQ(){
+  return(
+    <ThemeProvider>
+      <DestinIQInner/>
+    </ThemeProvider>
+  );
+}
