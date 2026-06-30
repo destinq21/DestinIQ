@@ -173,6 +173,11 @@ function ThemeProvider({children}){
     try{
       document.documentElement.setAttribute("data-theme", theme);
       localStorage.setItem("diq_theme", theme);
+      // Keep native status bar in sync when theme changes mid-session
+      if(typeof window!=="undefined"&&window?.Capacitor?.isNativePlatform?.()&&window?.StatusBar){
+        window.StatusBar.setBackgroundColor({color:theme==="light"?"#f7f4ec":"#0a0800"});
+        window.StatusBar.setStyle({style:theme==="light"?"LIGHT":"DARK"});
+      }
     }catch{}
   },[theme]);
 
@@ -1364,16 +1369,83 @@ const TOPIC_CONFIGS = {
         ],
       },
       {
+        id:"protectwealth", label:"Protect & Grow Wealth", icon:"🛡️",
+        desc:"The defensive side of money — protect what you have while finding new ways to grow it.",
+        tags:["All","Protection","Real Estate","Savings"],
+        cards:[
+          {
+            id:"moneyrule", title:"Your One Money Rule", badge:"Foundation", badgeColor:"#f0b429",
+            tags:["Protection","Savings"],
+            tagline:"The single most important money rule for your income level, in your country",
+            whyItWorks:"Most people manage money reactively — reacting to whatever bill or temptation shows up. A single, clear personal money rule (pay yourself first, never touch savings before bills, 24-hour rule before purchases over a set amount) removes the daily decision fatigue that causes financial leaks. The rule has to be specific enough to actually follow under pressure.",
+            steps:["Identify your biggest recurring money leak — eating out, impulse buys, subscriptions","Write ONE non-negotiable rule that directly blocks that leak","Make the rule specific: an amount, a timing, a condition — not vague willpower","Tell one other person your rule — accountability makes it stick","Review and tighten the rule every 90 days as your income changes"],
+            actions:["Generate My Personal Money Rule","Find My Biggest Money Leak","Calculate My Ideal Savings Target","Build My 90-Day Money Review"],
+          },
+          {
+            id:"avoidwaste", title:"What's Quietly Draining Your Money", badge:"Eye Opener", badgeColor:"#e05c6e",
+            tags:["Protection"],
+            tagline:"The top spending categories that drain people at your income level, named specifically",
+            whyItWorks:"Most financial leaks aren't dramatic — they're small, recurring, and invisible because they feel routine. Subscription creep, convenience fees, social spending to keep up appearances, and 'small' daily purchases compound into the single largest gap between what people earn and what they actually keep. Naming the specific leak makes it fixable; vague budgeting advice doesn't.",
+            steps:["List every subscription and recurring charge you have — check your bank statement, not memory","Cancel anything you haven't actively used in 30 days","Track every 'small' purchase under a set amount for 7 days — the total will surprise you","Identify ONE social spending pattern driven by appearances, not enjoyment","Replace it with a free or low-cost alternative for 30 days and measure the difference"],
+            actions:["Find My Specific Money Drains","Generate My 7-Day Spending Audit","Build My Subscription Cleanup List","Calculate What I'll Save This Year"],
+          },
+          {
+            id:"firstinvest", title:"Your First Real Investment", badge:"Action Step", badgeColor:"#1ab89a",
+            tags:["Savings"],
+            tagline:"The specific first investment product or platform available to you, right now",
+            whyItWorks:"Most people delay investing because 'investing' sounds like it requires large capital or expert knowledge. In reality, every country has accessible entry points — mobile money savings products, treasury bills, index funds, or micro-investment apps — that work with small, regular amounts. The barrier isn't money, it's not knowing the specific first step.",
+            steps:["Identify what's actually accessible in your country — banks, mobile money, apps, treasury bills","Start with the lowest-barrier option first, even if the returns are modest","Commit to a fixed amount monthly rather than waiting for a 'big' amount","Automate the transfer so it doesn't depend on willpower","Revisit and upgrade your investment choice every 6 months as you learn more"],
+            actions:["Find Investment Options In My Country","Build My First Investment Plan","Calculate Returns Over 5 Years","Compare Local Investment Platforms"],
+          },
+          {
+            id:"realestatehack", title:"Earn From Real Estate Without Big Capital", badge:"Low Capital Entry", badgeColor:"#4db6ac",
+            tags:["Real Estate"],
+            tagline:"Property income methods that don't require buying property first",
+            whyItWorks:"Real estate income is usually framed as requiring large capital to buy property — but several real entry points exist without ownership: property finding/agent commissions, short-let management for owners who don't want the hassle, and rental arbitrage (renting long-term then sub-letting short-term legally). These let you build real estate income and market knowledge before you have capital to buy.",
+            steps:["Pick one method: agent commissions, short-let management, or rental arbitrage","Research the specific legal requirements and norms in your city for that method","Find 2-3 property owners or listings to approach as your first test case","Negotiate your first deal with clear terms in writing, even if informal","Reinvest your first commission or profit into learning the next level of the business"],
+            actions:["Generate My Real Estate Income Plan","Find Real Estate Platforms In My Country","Build My First Deal Pitch","Calculate Potential Commission Income"],
+          },
+        ],
+      },
+      {
         id:"jimrohn", label:"Jim Rohn Insights", icon:"📚",
-        desc:"Timeless wisdom on wealth, discipline, and personal development.",
+        desc:"Broke at 25, self-made millionaire at 31 — the 5 money principles he taught for 40 years.",
         tags:["All","Philosophy","Discipline","Wealth"],
         cards:[
           {
-            id:"rohn1", title:"Work Harder on Yourself", badge:"Core Teaching", badgeColor:"#f0b429",
-            tagline:"Success is not to be pursued — it is to be attracted by the person you become.",
-            whyItWorks:"Jim Rohn's core teaching: your income is a direct reflection of your personal development level. The market pays for value — to earn more, you must become more. This is the foundation of everything.",
-            steps:["Read 10 pages of a growth book every day","Spend 30 minutes on your primary skill weekly","Journal about 1 lesson you learned each evening","Track your progress — what gets measured gets improved","Invest 3% of your income in your personal development"],
-            actions:["Build My Personal Development Plan","Find Jim Rohn Books","Generate Daily Discipline Plan","Calculate ROI of Self-Investment"],
+            id:"rohn1", title:"The 70/30 Rule", badge:"Master Formula", badgeColor:"#f0b429",
+            tagline:"Learn to live on 70% of what you make and do something important with the other 30%.",
+            whyItWorks:"This is the foundation of everything Jim Rohn taught about money — deceptively simple and almost universally ignored. Of every dollar that comes in: 70% covers your cost of living. The remaining 30% splits three ways — 10% giving (a discipline that keeps you from hoarding or fearing), 10% active capital (money you put to work through a business or skill investment), and 10% passive savings (a wealth account you never touch). Start at 1% if you have to. The discipline matters more than the percentage.",
+            steps:["70% — cost of living: rent, food, transport, utilities. Track this for 30 days first.","10% — giving: church, family in need, someone who needs a meal. Non-negotiable for Rohn.","10% — active capital: money that WORKS — a skill course, your side hustle, stock in a company you understand.","10% — passive savings: open a separate 'Wealth Account'. Never withdraw from it. Ever.","If you can't start at 30%, start at 5% and grow it every 3 months."],
+            actions:["Build My 70/30 Budget","Calculate My Monthly Split","Find Where I'm Overspending","Create My Wealth Account Plan"],
+          },
+          {
+            id:"rohn2", title:"Profits Are Better Than Wages", badge:"Mindset Shift", badgeColor:"#1ab89a",
+            tagline:"Wages make you a living. Profits make you a fortune.",
+            whyItWorks:"This was the idea that changed Jim Rohn's life at 25, when his mentor Earl Shoaff said it to him. A wage is what someone gives you for your time — it has a ceiling set by someone else. A profit is what you earn because you created value beyond your own labor — its ceiling is set by your creativity and execution. This doesn't mean quit your job tomorrow. It means start building something alongside it that pays you whether you show up or not.",
+            steps:["Keep your job (wages) — it funds your life while you build your profits.","Start a micro-business alongside it — even small profit is the beginning of a different identity.","Reinvest every profit back into the business for the first 12 months. Don't spend what it makes.","When profits equal 50% of your wages, you have options. That is the target.","Rohn's rule: work full-time on your job, part-time on your fortune."],
+            actions:["Generate My Side Income Plan","Calculate My Profit Target","Find Business Ideas That Fit My Schedule","Build My Reinvestment Strategy"],
+          },
+          {
+            id:"rohn3", title:"Your Money Philosophy Decides Your Future", badge:"Identity", badgeColor:"#9b72cf",
+            tagline:"The rich invest their money and spend what's left. The poor spend their money and invest what's left.",
+            whyItWorks:"Jim Rohn believed financial results were a direct consequence of financial philosophy — not income, not luck. Two people earning the same salary can be in completely different positions in 10 years because one paid themselves first and one spent first. This isn't a budgeting tip — it's a statement about identity and belief. The first step isn't opening a savings account, it's changing what you believe money is for.",
+            steps:["Write your current money philosophy in one sentence — what do you actually believe money is for?","Ask honestly: does this philosophy make people rich or keep people poor?","Decide on a new philosophy — Rohn's was: 'I invest first, then live on what remains.'","Build one habit that matches it — automate a transfer of any amount on payday, even 2%."],
+            actions:["Audit My Money Beliefs","Build My New Money Philosophy","Set Up My Automated Transfer Plan","Find Evidence Against My Limiting Belief"],
+          },
+          {
+            id:"rohn4", title:"It's Not the Amount — It's the Habit", badge:"Foundational", badgeColor:"#e05c6e",
+            tagline:"It's not what you save but that you save, consistently, that builds the identity.",
+            whyItWorks:"One of the most damaging financial beliefs is 'I don't earn enough to save.' Rohn destroyed this with one argument: if you can't save out of a small income, you won't save out of a large one. The problem isn't the amount — it's the absence of a saving habit. A person who saves a small amount consistently is building something more important than money: the identity of someone who saves. That identity applies at every income level as it grows.",
+            steps:["Start with any amount, however small — the number doesn't matter yet.","Save it on the day you receive income, not after expenses. Before anything else.","Keep a visible record of what you've saved. Watch the number. Celebrate it.","Increase the amount by 5% every 3 months — small, consistent growth."],
+            actions:["Set Up My Automatic Savings Habit","Calculate My Savings Growth Over Time","Build My Visible Savings Tracker","Generate My 90-Day Savings Challenge"],
+          },
+          {
+            id:"rohn5", title:"The Seasons of Financial Life", badge:"Long-Term", badgeColor:"#4db6ac",
+            tagline:"Winter always follows summer. What did you do in the summer?",
+            whyItWorks:"Jim Rohn applied the four seasons to money. Spring is when opportunity is fresh — the time to plant skills, businesses, savings, and habits. Summer is when you maintain and guard what you built. Fall is when you harvest — compounding from earlier decisions pays off. Then winter comes: a job loss, a recession, an unexpected expense. The person who saved and invested in spring and summer survives financial winter. The person who spent everything does not.",
+            steps:["Identify your current season honestly — which one are you in right now?","If Spring: plant aggressively. Every month without a habit is wasted.","If Summer: guard your progress. Don't increase lifestyle faster than income.","If Fall: harvest AND reinvest. Don't spend the entire harvest.","If Winter: hold steady, cut expenses, survive. Spring comes again."],
+            actions:["Identify My Current Financial Season","Build My Season-Specific Action Plan","Create My Financial Emergency Buffer","Generate My Recovery Strategy"],
           },
         ],
       },
@@ -1533,6 +1605,77 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Cognitive behavioral therapy research shows core beliefs operate below conscious awareness, shaping decisions automatically. Naming a belief immediately reduces its grip — you can't change what you can't see.",
             steps:["Complete this sentence 5 times: 'People like me don't...'","For each answer, ask: where did I learn this?","Ask: is this universally true, or true for my specific past?","Find one counter-example — someone like you who did the thing","Write a new, evidence-based belief to replace the old one"],
             actions:["Run My Full Belief Audit","Find Evidence Against My Limiting Belief","Build New Belief System","Generate Daily Affirmation Based On Real Evidence"],
+          },
+        ],
+      },
+      {
+        id:"resilience", label:"Mental Resilience", icon:"🧱",
+        desc:"8 core principles for building a mind that doesn't break under pressure.",
+        tags:["All","Patience","Thoughts","Hope"],
+        cards:[
+          {
+            id:"bepatient", title:"Be Patient", badge:"Foundation", badgeColor:"#f0b429",
+            tags:["Patience"],
+            tagline:"Aggressive consistency without demanding an immediate reward",
+            whyItWorks:"Most worthwhile things take longer than you expect. Impatience is what causes people to quit at the exact moment they're about to break through. Build a 3-year frame for your goals and a daily frame for your actions — the daily actions are yours to control, the 3-year result is the compound of those actions. Patience is not passive waiting, it's aggressive consistency.",
+            steps:["Write your goal with a realistic 3-year frame, not a 3-month one","Define the single daily action that compounds toward it","Track the action, not the outcome — outcomes lag actions","When frustration hits, zoom out to the 3-year frame, not today","Review progress monthly, not daily — daily is too noisy to judge by"],
+            actions:["Build My 3-Year Goal Frame","Generate My Daily Compounding Action","Find My Impatience Triggers","Create My Monthly Review System"],
+          },
+          {
+            id:"beproactive", title:"Be Proactive", badge:"Thinking Habit", badgeColor:"#1ab89a",
+            tags:["Thoughts"],
+            tagline:"Reactive people manage problems. Proactive people prevent them.",
+            whyItWorks:"Every week, ask: what's the one thing that, if I handle it now, removes 10 problems later? Proactivity is a thinking habit first — you have to train yourself to look ahead before looking around. Most stress comes from problems that were visible weeks before they became urgent.",
+            steps:["Each morning, ask: what do I want to happen today?","Ask: what can I do in the next hour to make it more likely?","Each Sunday, scan the week ahead for problems before they become urgent","Build a 'future problems' list separate from your todo list","Handle one future-problem item weekly, even when nothing's urgent yet"],
+            actions:["Build My Proactive Weekly Scan","Find My Recurring Avoidable Problems","Generate My Morning Planning Routine","Create My Future-Problems List"],
+          },
+          {
+            id:"openchange", title:"Be Open to Change", badge:"Growth", badgeColor:"#9b72cf",
+            tags:["Thoughts"],
+            tagline:"The person who updates their beliefs when they get new evidence moves faster",
+            whyItWorks:"Change is not weakness — refusing to change when evidence demands it is. Every 6 months, audit your top 3 beliefs about yourself, your work, and your goals. Ask honestly: is this still true, or am I holding this belief because I've held it for a long time?",
+            steps:["List your top 3 beliefs about yourself, your work, and your goals","For each, ask: what evidence supports this right now, not historically?","Identify one belief that's outdated based on who you've become","Test a small action that contradicts the outdated belief","Set a 6-month reminder to repeat this audit"],
+            actions:["Run My Belief Audit","Find My Outdated Self-Beliefs","Generate Evidence-Based Replacement Belief","Build My 6-Month Review Reminder"],
+          },
+          {
+            id:"letgo", title:"Learn to Let Go", badge:"Release", badgeColor:"#e05c6e",
+            tags:["Thoughts"],
+            tagline:"Refusing to let the past allocate your present resources",
+            whyItWorks:"Some people carry losses from years ago like they happened this morning. Every unit of energy spent resisting something that already happened is energy that can't go into what's next. Letting go isn't forgetting — it's processing the lesson, then physically moving focus forward.",
+            steps:["Name the specific thing you're still carrying, clearly and honestly","Write the one real lesson it taught you — be specific, not vague","Acknowledge: it happened, it's over, the lesson is extracted","Choose one forward-looking action to redirect that energy into","Notice when you slip back into replaying it — gently redirect each time"],
+            actions:["Process What I'm Still Carrying","Extract The Real Lesson From My Past Setback","Build My Forward-Redirect Plan","Generate My Release Ritual"],
+          },
+          {
+            id:"stayhopeful", title:"Stay Hopeful", badge:"Protect This", badgeColor:"#f0b429",
+            tags:["Hope"],
+            tagline:"Hope is the rational belief that your actions can influence outcomes",
+            whyItWorks:"Hope is not naive optimism — it's the rational belief that your actions matter. People without hope stop trying. People with realistic hope keep adjusting and moving. Protect your hope aggressively: limit time with people who drain it, regularly review evidence of your own progress.",
+            steps:["List 3 pieces of real evidence that your actions have worked before","Identify one relationship or habit that quietly drains your hope","Limit exposure to that drain, even partially, this week","When things feel impossible, zoom out to a longer timeline","Keep a running log of small wins to review when hope dips"],
+            actions:["Build My Evidence-of-Progress Log","Find What's Draining My Hope","Generate My Hope-Protection Plan","Create My Small Wins Tracker"],
+          },
+          {
+            id:"checkthoughts", title:"Check Your Thoughts", badge:"Internal Coach", badgeColor:"#1ab89a",
+            tags:["Thoughts"],
+            tagline:"You don't have to believe every thought you have",
+            whyItWorks:"Your internal monologue is either your best coach or your worst saboteur. Most people never audit it. When you catch a thought like 'I can't do this,' pause and ask: is this actually true, or a habit my brain has? Notice it, question it, replace it with one that's both true and useful.",
+            steps:["For one day, write down every self-critical thought you notice","For each, ask: is this fact or a habitual pattern?","Replace 3 of the most repeated ones with evidence-based alternatives","Practice catching the thought in the moment, not after the fact","Track how often the old thought pattern repeats over 2 weeks"],
+            actions:["Run My Thought Audit","Build My Replacement Thought Bank","Generate My Catch-and-Reframe Script","Create My 2-Week Thought Tracker"],
+          },
+          {
+            id:"notokay", title:"It's Okay Not To Be Okay", badge:"Honesty", badgeColor:"#9b72cf",
+            tags:["Hope"],
+            tagline:"You cannot navigate from a position you're lying about",
+            whyItWorks:"Pretending to be fine when you're not costs enormous energy and cuts you off from help. Acknowledging difficulty isn't weakness — it's the first accurate assessment of your situation. Name what's hard, allow it to be hard, then ask what the smallest next step forward looks like.",
+            steps:["Name specifically what's hard right now, out loud or in writing","Stop performing 'fine' to the people closest to you about this one thing","Identify one person or resource you could actually tell the truth to","Ask: what's the smallest thing I can do from here?","Take that smallest step, even if it's tiny"],
+            actions:["Find Support Resources In My Country","Build My Honest Check-In Script","Generate My Smallest-Next-Step Plan","Create My Support Network Map"],
+          },
+          {
+            id:"dontquit", title:"Don't Give Up Too Early", badge:"Critical", badgeColor:"#e05c6e",
+            tags:["Hope"],
+            tagline:"Most people quit right before the compounding would have kicked in",
+            whyItWorks:"Giving up too early is the single most common reason for failure — not incompetence, not bad luck. Before quitting anything, ask: am I quitting because this genuinely isn't working, or because it's hard right now and harder than expected? Those require very different responses.",
+            steps:["Name exactly what you're considering quitting","Ask: is this not working, or just harder than I expected?","If harder-than-expected: identify what support or skill gap is missing","If genuinely not working: define what evidence would prove that clearly","Set a specific re-evaluation date instead of deciding in the hard moment"],
+            actions:["Diagnose Why I Want To Quit This","Find What Support I'm Actually Missing","Build My Re-Evaluation Checkpoint","Generate My Recommitment Plan"],
           },
         ],
       },
@@ -6744,35 +6887,221 @@ Cover: Their decision-making style and blind spots, a personal decision framewor
 
 // ── GenericAIModule renderer ────────────────────────────────────────────────
 function GenericAIModule({modId, profile, userId, isPaid, isPremium, isProMax, onUnlock, lang="en"}){
+  const G = useThemeColors();
   const cfg   = MODULE_CONFIGS[modId];
   if(!cfg) return null;
 
+  const wellbeingIds = ['innerpeace','angerstress','sleepcoach','anxietytool','griefloss'];
+  const isWellbeing  = wellbeingIds.includes(modId);
+
+  // ── Input-required modules keep the original single-response flow ──────────
+  // (Dream Interpretation, People Decoder, Hard Conversation — these need a
+  // specific user-described situation, not a generic list of points)
+  if(cfg.needsInput){
+    return <GenericAIModuleInputFlow {...{modId,profile,userId,isPaid,isPremium,isProMax,onUnlock,cfg,isWellbeing,G}}/>;
+  }
+
+  // ── All other modules: tappable points instead of one wall of text ─────────
+  return <GenericAIModulePoints {...{modId,profile,userId,isPaid,isPremium,isProMax,onUnlock,cfg,isWellbeing,G}}/>;
+}
+
+// Builds the currency note appended to every prompt sent for this profile
+function buildCurrencyNote(profile){
+  const currencyInfo = getLocalCurrency(profile?.country||"");
+  const currencySymbol = currencyInfo?.symbol || "$";
+  const currencyName   = currencyInfo?.code   || "USD";
+  const note = currencySymbol && currencySymbol!=="$"
+    ? `\n\nCURRENCY RULE: Use ${currencySymbol} (${currencyName}) for ALL local costs, prices, salaries, and expenses. Only use USD for international online income — and always show the ${currencySymbol} equivalent too.`
+    : "";
+  return {currencyInfo, currencySymbol, currencyName, note};
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GenericAIModulePoints — list of tappable principles/points, each expands on tap
+// ═══════════════════════════════════════════════════════════════════════════════
+function GenericAIModulePoints({modId, profile, userId, isPaid, isPremium, isProMax, onUnlock, cfg, isWellbeing, G}){
+  const pointsCacheKey = `diq_mod_points_${modId}_${userId||"guest"}`;
+  const [points, setPoints]   = useState(()=>{
+    try{ const v=JSON.parse(localStorage.getItem(pointsCacheKey)||"null"); return Array.isArray(v)?v:null; }catch{return null;}
+  });
+  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [error2, setError2] = useState("");
+  // expanded[i] = {loading, content} for each point's deep-dive
+  const [expanded, setExpanded] = useState({});
+
+  const generatePoints = async()=>{
+    setLoadingPoints(true); setError2(""); setExpanded({});
+    try{
+      const {currencySymbol, currencyName, note} = buildCurrencyNote(profile);
+      const prompt = `For "${cfg.title}", give ${profile?.name||"this person"} 5 distinct, specific, personalised points/principles — not generic advice. Each point should be a single focused idea they can act on (e.g. for wealth-building content: "Build Multiple Income Streams", "Master Delayed Gratification", "Invest In Your Own Skills First"). Base these on their profile: ${buildProfileContext(profile)||"general best practices for their situation"}.
+
+Return ONLY a JSON array of exactly 5 objects, no markdown, no explanation, no code fences. Each object: {"title":"<3-6 word punchy title>","teaser":"<one sentence, max 18 words, specific to them, not generic>"}`;
+      const result = await callAPI({
+        messages:[{role:"user", content: prompt}],
+        system: `You are DestinIQ writing "${cfg.title}" content. Return ONLY a valid JSON array of 5 objects. Start with [ and end with ]. No markdown, no code fences, no preamble. Make each point genuinely distinct from the others — no overlap.`,
+        userId, isPremium, isProMax,
+      });
+      const txt = Array.isArray(result?.content)
+        ? result.content.filter(x=>x?.type==="text").map(x=>x.text||"").join(" ")
+        : (typeof result==="string" ? result : result?.text || result?.content || "");
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const start = clean.indexOf("["); const end = clean.lastIndexOf("]");
+      if(start===-1||end===-1) throw new Error("No JSON array found");
+      const parsed = JSON.parse(clean.slice(start,end+1));
+      if(!Array.isArray(parsed)||!parsed.length) throw new Error("Empty array");
+      setPoints(parsed);
+      try{ localStorage.setItem(pointsCacheKey, JSON.stringify(parsed)); }catch{}
+    }catch(e){
+      setError2("Could not generate. Check your connection and tap Refresh to try again.");
+    }
+    setLoadingPoints(false);
+  };
+
+  useEffect(()=>{
+    if(!points && (profile?.name||profile?.country||profile)) generatePoints();
+  },[profile?.name,profile?.country]);
+
+  const generateDeepDive = async(idx)=>{
+    if(!isPaid){onUnlock();return;}
+    const point = points[idx];
+    setExpanded(prev=>({...prev,[idx]:{loading:true,content:prev[idx]?.content||""}}));
+    try{
+      const {currencySymbol, currencyName, note} = buildCurrencyNote(profile);
+      const prompt = `Go deep on this specific point for ${profile?.name||"this person"}, in the context of "${cfg.title}": "${point.title}" — ${point.teaser}
+
+Their profile: ${buildProfileContext(profile)||"general best practices for their situation"}.
+
+Write a focused, personalised, practical breakdown of JUST this one point — not the other points, not a general overview. Include specific actions they can take, starting now. Max 250 words.${note}`;
+      const result = await callAPI({
+        messages:[{role:"user", content: prompt}],
+        system: `You are DestinIQ — writing "${cfg.title}" content, specifically the section on "${point.title}". Be specific, practical, and personalised. Never be generic. CURRENCY: ${currencySymbol&&currencySymbol!=="$"?`Use ${currencySymbol} (${currencyName}) for local costs.`:"Use USD."}`,
+        userId, isPremium, isProMax,
+      });
+      const txt = Array.isArray(result?.content)
+        ? result.content.filter(x=>x?.type==="text").map(x=>x.text||"").join(" ")
+        : (typeof result==="string" ? result : result?.text || result?.content || "");
+      setExpanded(prev=>({...prev,[idx]:{loading:false,content:txt}}));
+    }catch{
+      setExpanded(prev=>({...prev,[idx]:{loading:false,content:"Could not generate. Tap again to retry."}}));
+    }
+  };
+
+  return(
+    <div className="cx-md" style={{paddingTop:24,paddingBottom:40}}>
+      {/* Header */}
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:32, marginBottom:8}}>{cfg.icon}</div>
+        <h2 className="d2" style={{marginBottom:6}}>{cfg.title}</h2>
+        <p style={{fontSize:14, color:G.dim, lineHeight:1.6}}>{cfg.subtitle}</p>
+      </div>
+
+      {/* Mental health disclaimer */}
+      {isWellbeing && cfg.disclaimer && (
+        <div style={{padding:"12px 16px",background:"rgba(77,182,172,0.08)",border:"1px solid rgba(77,182,172,0.2)",
+          borderRadius:12,marginBottom:20,fontSize:12,color:"#4db6ac",lineHeight:1.6}}>
+          💙 This module offers practical support tools. If you're in crisis or experiencing severe symptoms, please reach out to a mental health professional or crisis line in {profile?.country||"your country"}.
+        </div>
+      )}
+
+      {/* Points list */}
+      {loadingPoints ? (
+        <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
+          <div style={{fontSize:24,marginBottom:12}}>{cfg.icon}</div>
+          <p style={{color:G.dim,fontSize:14}}>Personalising your {cfg.title}…</p>
+        </div>
+      ) : error2 ? (
+        <div className="card" style={{textAlign:"center",padding:32}}>
+          <p style={{color:"var(--rose)",marginBottom:16,fontSize:14}}>{error2}</p>
+          <button className="btn btn-gold" onClick={generatePoints}>Try Again</button>
+        </div>
+      ) : points?.length ? (
+        <div>
+          <p style={{fontSize:12,color:G.dimmer,margin:"0 0 14px",lineHeight:1.5}}>
+            Tap any point to go deeper, personalised for you.
+          </p>
+          {points.map((point,idx)=>{
+            const ex = expanded[idx]||{};
+            return(
+              <PlanSection key={idx} title={point.title} icon={cfg.icon}
+                accentColor={G.gold} defaultOpen={false}>
+                <p style={{fontSize:12,color:G.dimmer,margin:"0 0 12px",lineHeight:1.6,fontStyle:"italic"}}>
+                  {point.teaser}
+                </p>
+                {!ex.content&&!ex.loading&&(
+                  <div style={{textAlign:"center",padding:"8px 0"}}>
+                    <button onClick={()=>generateDeepDive(idx)}
+                      style={{background:G.gold,color:"#000",border:"none",
+                        borderRadius:10,padding:"11px 22px",fontSize:13,fontWeight:700,
+                        cursor:"pointer",fontFamily:"inherit"}}>
+                      ✦ Go Deeper On This
+                    </button>
+                  </div>
+                )}
+                {ex.loading&&(
+                  <div style={{textAlign:"center",padding:"14px 0",display:"flex",
+                    alignItems:"center",justifyContent:"center",gap:8}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:G.gold,display:"inline-block"}}/>
+                    <div style={{fontSize:12,color:G.dimmer}}>Writing…</div>
+                  </div>
+                )}
+                {ex.content&&!ex.loading&&(
+                  <div>
+                    {isPaid&&(
+                      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+                        <AudioPlayer text={ex.content} label="Listen"/>
+                      </div>
+                    )}
+                    <div style={{fontSize:13,color:G.dim,lineHeight:1.85,whiteSpace:"pre-wrap",marginBottom:10}}>
+                      {ex.content}
+                    </div>
+                    <button onClick={()=>generateDeepDive(idx)}
+                      style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
+                        padding:"7px 14px",fontSize:11,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+                      ↺ Refresh
+                    </button>
+                  </div>
+                )}
+              </PlanSection>
+            );
+          })}
+          <button onClick={generatePoints} style={{background:"none",border:"1px solid var(--line)",borderRadius:10,
+            padding:"10px 20px",color:G.dim,fontSize:12,cursor:"pointer",marginTop:8,display:"flex",
+            alignItems:"center",gap:8}}>
+            ↺ Generate New Points
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
+          <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>{cfg.icon}</div>
+          <p style={{color:G.dim,fontSize:14,marginBottom:20}}>Your personalized {cfg.title} will be written based on your profile.</p>
+          <button className="btn btn-gold" onClick={generatePoints}>Generate My {cfg.title}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GenericAIModuleInputFlow — original single-response flow for needsInput modules
+// (Dream Interpretation, People Decoder, Hard Conversation)
+// ═══════════════════════════════════════════════════════════════════════════════
+function GenericAIModuleInputFlow({modId, profile, userId, isPaid, isPremium, isProMax, onUnlock, cfg, isWellbeing, G}){
   const cacheKey = `diq_mod_${modId}_${userId||"guest"}`;
   const [content2, setContent2] = useState(()=>{ try{return localStorage.getItem(cacheKey)||"";}catch{return "";} });
   const [loading2, setLoading2] = useState(false);
   const [error2,   setError2]   = useState("");
-  // For input-required modules (Dream, People Decoder, Hard Conversation)
   const [userInput, setUserInput] = useState("");
-  const [inputSubmitted, setInputSubmitted] = useState(false);
 
   const generate = async(inputOverride) => {
     const finalInput = inputOverride || userInput;
-    // For input modules, require the user to type something
-    if(cfg.needsInput && !finalInput?.trim()){
+    if(!finalInput?.trim()){
       setError2("Please describe your situation above before generating.");
       return;
     }
-    // Never force profile updates — use whatever data is available from onboarding
     setLoading2(true); setError2("");
     try{
-      const currencyInfo = getLocalCurrency(profile?.country||"");
-      const currencySymbol = currencyInfo?.symbol || getLocalCurrency(profile?.country||"")?.symbol || "$";
-      const currencyName   = currencyInfo?.code   || getLocalCurrency(profile?.country||"")?.code   || "USD";
-      // Build currency instruction to append to every prompt
-      const currencyNote   = currencySymbol && currencySymbol!=="$"
-        ? `\n\nCURRENCY RULE: Use ${currencySymbol} (${currencyName}) for ALL local costs, prices, salaries, and expenses. Only use USD for international online income — and always show the ${currencySymbol} equivalent too.`
-        : "";
-      const prompt = cfg.prompt(profile, currencyInfo, userInput) + currencyNote;
+      const {currencySymbol, currencyName, note} = buildCurrencyNote(profile);
+      const prompt = cfg.prompt(profile, getLocalCurrency(profile?.country||""), userInput) + note;
       const result = await callAPI({
         messages:[{role:"user", content: prompt}],
         system: `You are DestinIQ — a personal intelligence platform writing for a real person.
@@ -6796,68 +7125,51 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
     setLoading2(false);
   };
 
-  // Auto-generate if no content yet
-  useEffect(()=>{
-    // For relocate — clear blank cache so it regenerates cleanly
-    if(modId==="relocate"&&content2===""){
-      try{localStorage.removeItem(cacheKey);}catch{}
-    }
-    if(!content2&&(profile?.name||profile?.country||profile)) generate();
-  },[profile?.name,profile?.country]);
-
-  const wellbeingIds = ['innerpeace','angerstress','sleepcoach','anxietytool','griefloss'];
-  const isWellbeing  = wellbeingIds.includes(modId);
-
   return(
     <div className="cx-md" style={{paddingTop:24,paddingBottom:40}}>
-      {/* Header */}
       <div style={{marginBottom:20}}>
         <div style={{fontSize:32, marginBottom:8}}>{cfg.icon}</div>
         <h2 className="d2" style={{marginBottom:6}}>{cfg.title}</h2>
-        <p style={{fontSize:14, color:"var(--cream-40)", lineHeight:1.6}}>{cfg.subtitle}</p>
+        <p style={{fontSize:14, color:G.dim, lineHeight:1.6}}>{cfg.subtitle}</p>
       </div>
 
-      {/* Input field for modules that need user description */}
-      {cfg.needsInput && (
-        <div style={{marginBottom:20}}>
-          <label style={{display:"block",fontSize:12,color:"var(--cream-40)",fontFamily:"var(--f-mono)",
-            letterSpacing:".08em",marginBottom:10}}>
-            {cfg.inputLabel?.toUpperCase()}
-          </label>
-          <textarea
-            value={userInput}
-            onChange={e=>setUserInput(e.target.value)}
-            placeholder={cfg.inputPlaceholder}
-            rows={5}
-            style={{width:"100%",background:"var(--midnight)",border:`1px solid ${userInput.length>=(cfg.inputMin||20)?"var(--gold)":"var(--line)"}`,
-              borderRadius:14,padding:"14px 16px",color:"var(--cream)",fontSize:14,
-              lineHeight:1.7,resize:"vertical",fontFamily:"inherit",outline:"none",
-              boxSizing:"border-box",transition:"border .2s"}}
-          />
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
-            <span style={{fontSize:11,color:"var(--cream-30)"}}>
-              {userInput.length < (cfg.inputMin||20)
-                ? `${(cfg.inputMin||20)-userInput.length} more characters needed`
-                : "✓ Ready to generate"}
-            </span>
-            <button
-              className="btn btn-gold"
-              disabled={userInput.length < (cfg.inputMin||20) || loading2}
-              onClick={()=>generate(userInput)}
-              style={{fontSize:13,padding:"10px 20px"}}>
-              {loading2 ? "Generating…" : `Get my ${cfg.title}`}
-            </button>
-          </div>
-          {content2 && (
-            <button onClick={()=>{setContent2("");try{localStorage.removeItem(cacheKey);}catch{}setUserInput("");}}
-              style={{background:"none",border:"none",color:"var(--cream-30)",fontSize:12,cursor:"pointer",marginTop:8}}>
-              ✕ Clear and try a different one
-            </button>
-          )}
+      <div style={{marginBottom:20}}>
+        <label style={{display:"block",fontSize:12,color:G.dim,fontFamily:"var(--f-mono)",
+          letterSpacing:".08em",marginBottom:10}}>
+          {cfg.inputLabel?.toUpperCase()}
+        </label>
+        <textarea
+          value={userInput}
+          onChange={e=>setUserInput(e.target.value)}
+          placeholder={cfg.inputPlaceholder}
+          rows={5}
+          style={{width:"100%",background:"var(--midnight)",border:`1px solid ${userInput.length>=(cfg.inputMin||20)?"var(--gold)":"var(--line)"}`,
+            borderRadius:14,padding:"14px 16px",color:"var(--cream)",fontSize:14,
+            lineHeight:1.7,resize:"vertical",fontFamily:"inherit",outline:"none",
+            boxSizing:"border-box",transition:"border .2s"}}
+        />
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+          <span style={{fontSize:11,color:G.dimmer}}>
+            {userInput.length < (cfg.inputMin||20)
+              ? `${(cfg.inputMin||20)-userInput.length} more characters needed`
+              : "✓ Ready to generate"}
+          </span>
+          <button
+            className="btn btn-gold"
+            disabled={userInput.length < (cfg.inputMin||20) || loading2}
+            onClick={()=>generate(userInput)}
+            style={{fontSize:13,padding:"10px 20px"}}>
+            {loading2 ? "Generating…" : `Get my ${cfg.title}`}
+          </button>
         </div>
-      )}
+        {content2 && (
+          <button onClick={()=>{setContent2("");try{localStorage.removeItem(cacheKey);}catch{}setUserInput("");}}
+            style={{background:"none",border:"none",color:G.dimmer,fontSize:12,cursor:"pointer",marginTop:8}}>
+            ✕ Clear and try a different one
+          </button>
+        )}
+      </div>
 
-      {/* Mental health disclaimer */}
       {isWellbeing && cfg.disclaimer && (
         <div style={{padding:"12px 16px",background:"rgba(77,182,172,0.08)",border:"1px solid rgba(77,182,172,0.2)",
           borderRadius:12,marginBottom:20,fontSize:12,color:"#4db6ac",lineHeight:1.6}}>
@@ -6865,11 +7177,10 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
         </div>
       )}
 
-      {/* Content */}
       {loading2 ? (
         <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
           <div style={{fontSize:24,marginBottom:12}}>{cfg.icon}</div>
-          <p style={{color:"var(--cream-40)",fontSize:14}}>Writing your personalized {cfg.title}…</p>
+          <p style={{color:G.dim,fontSize:14}}>Writing your personalized {cfg.title}…</p>
         </div>
       ) : error2 ? (
         <div className="card" style={{textAlign:"center",padding:32}}>
@@ -6878,17 +7189,16 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
         </div>
       ) : content2 ? (
         <div>
-          {/* 🔊 Listen button — Pro+ only */}
           {isPaid&&(
           <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
             <AudioPlayer text={content2} label="Listen to this"/>
           </div>
           )}
-          <div className="card" style={{lineHeight:1.9,fontSize:14,color:"var(--cream-70)",whiteSpace:"pre-wrap"}}>
+          <div className="card" style={{lineHeight:1.9,fontSize:14,color:G.dim,whiteSpace:"pre-wrap"}}>
             {content2}
           </div>
           <button onClick={generate} style={{background:"none",border:"1px solid var(--line)",borderRadius:10,
-            padding:"10px 20px",color:"var(--cream-40)",fontSize:12,cursor:"pointer",marginTop:16,display:"flex",
+            padding:"10px 20px",color:G.dim,fontSize:12,cursor:"pointer",marginTop:16,display:"flex",
             alignItems:"center",gap:8}}>
             ↺ Refresh {cfg.title}
           </button>
@@ -6896,8 +7206,7 @@ ABSOLUTE RULE: Generate the full response NOW using whatever information is avai
       ) : (
         <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
           <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>{cfg.icon}</div>
-          <p style={{color:"var(--cream-50)",fontSize:14,marginBottom:20}}>Your personalized {cfg.title} will be written based on your profile.</p>
-          <button className="btn btn-gold" onClick={generate}>Generate My {cfg.title}</button>
+          <p style={{color:G.dim,fontSize:14,marginBottom:20}}>Describe your situation above to get started.</p>
         </div>
       )}
     </div>
@@ -9692,13 +10001,18 @@ function StreakLeaderboard({userId}){
         if(data){
           const top=data
             .filter(u=>u.streak>0)
-            .map((u,i)=>({
-              rank:i+1,
-              name: u.form_data?.name || u.name || "Anonymous",
-              country: u.form_data?.country || "",
-              streak: u.streak,
-              isMe: u.user_id===userId,
-            }))
+            .map((u,i)=>{
+              const fd = typeof u.form_data==="string"
+                ? (()=>{try{return JSON.parse(u.form_data);}catch{return{};}})()
+                : (u.form_data||{});
+              return{
+                rank:i+1,
+                name: fd?.name || u.name || "Anonymous",
+                country: fd?.country || "",
+                streak: u.streak,
+                isMe: u.user_id===userId,
+              };
+            })
             .slice(0,10);
 
           setLeaders(top);
@@ -9759,8 +10073,8 @@ function StreakLeaderboard({userId}){
 
 // Wins: user-specific localStorage key + Supabase backup
 const WIN_STORE_KEY=(uid)=>`diq_wins_${uid||"guest"}`;
-function loadWins(uid){try{return JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");}catch{return[];}}
-function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(w));}catch{}}
+function loadWins(uid){try{const v=JSON.parse(localStorage.getItem(WIN_STORE_KEY(uid))||"[]");return Array.isArray(v)?v:[];}catch{return[];}}
+function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(Array.isArray(w)?w:[]));}catch{}}
 
 // ─── FREE TIER LIMITS & TOOL LIST (module-level) ─────────────────────────────
 const FREE_JOURNAL_LIMIT = 1;   // Free: 1 journal entry
@@ -9777,14 +10091,15 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
     if(!userId) return;
     supabase.from("user_profiles").select("form_data,wins").eq("user_id",userId).single()
       .then(({data})=>{
-        const rawWins = data?.wins?.length ? data.wins
+        const rawWinsRaw = Array.isArray(data?.wins) && data.wins.length ? data.wins
           : (()=>{
               try{
                 const fd=typeof data?.form_data==="string"?JSON.parse(data.form_data):data?.form_data;
-                return fd?._wins||[];
+                return Array.isArray(fd?._wins)?fd._wins:[];
               }catch{return[];}
             })();
-        if(rawWins?.length){
+        const rawWins = Array.isArray(rawWinsRaw) ? rawWinsRaw : [];
+        if(rawWins.length){
           const serverWins = rawWins;
           const localWins  = loadWins(userId);
           // Merge — take whichever has more wins
@@ -12983,7 +13298,7 @@ function PlanSection({title, icon, children, accentColor, defaultOpen=false}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // CARD DETAIL PAGE — Full-page view of a single intelligence card
 // ═══════════════════════════════════════════════════════════════════════════════
-function CardDetailPage({card, catColor, formData, userId, isPaid, isPremium, isProMax, onUnlock, onBack}){
+function CardDetailPage({card, catColor, catId, formData, userId, isPaid, isPremium, isProMax, onUnlock, onBack}){
   const [planSections, setPlanSections] = useState({}); // {sectionKey: {loading, content}}
   const [activeAction, setActiveAction] = useState(null);
   const [aiResult, setAiResult] = useState("");
@@ -13070,8 +13385,11 @@ function CardDetailPage({card, catColor, formData, userId, isPaid, isPremium, is
     setAiLoading(false);
   };
 
-  // Business plan sections config
-  const PLAN_SECTIONS=[
+  // Business plan sections config — only for Money+ cards.
+  // Other categories (Social, Mindset, Body, Wellness, Purpose, Skills, Plan)
+  // get an action-plan framing with no cost/market/income language.
+  const isMoneyCard = catId==="money";
+  const PLAN_SECTIONS = isMoneyCard ? [
     {key:"market",    icon:"📊", title:`The Market Right Now`,
      prompt:`Analyse the market for "${card.title}" in ${country} right now. Cover: current demand, top competitors, market size, best target customers, and the #1 opportunity nobody is taking. Use specific numbers and local context.`},
     {key:"startup",   icon:"💰", title:`Startup Cost Breakdown`,
@@ -13082,6 +13400,15 @@ function CardDetailPage({card, catColor, formData, userId, isPaid, isPremium, is
      prompt:`Project ${name}'s realistic income from "${card.title}" in ${country} at Month 1, Month 2, and Month 3. Show conservative, realistic, and optimistic scenarios with specific numbers. What needs to be true for each scenario. Include weekly revenue targets.`},
     {key:"risks",     icon:"⚠️", title:`Biggest Risks & How to Avoid Them`,
      prompt:`What are the 3 biggest risks for ${name} starting "${card.title}" in ${country}? For each risk: what it is, how likely it is, and the exact steps to prevent or recover from it. Be honest, not discouraging.`},
+  ] : [
+    {key:"context",   icon:"🧭", title:`Why This Matters For You`,
+     prompt:`Explain why "${card.title}" specifically matters for ${name} from ${country}, given their situation: ${buildProfileContext(formData)||"general circumstances"}. Be specific to them, not generic. 2-3 short paragraphs.`},
+    {key:"first30",   icon:"🚀", title:`Your First 30 Days`,
+     prompt:`Write a day-by-day action plan for ${name}'s first 30 days practicing "${card.title}". Week 1: foundation. Week 2: building consistency. Week 3-4: making it automatic. Be specific about what to do each day and what progress looks like.`},
+    {key:"obstacles", icon:"⚠️", title:`What Will Get In The Way`,
+     prompt:`What are the 3 biggest obstacles ${name} will likely face while working on "${card.title}"? For each: what it is, why it happens, and the exact steps to push through it. Be honest, not discouraging.`},
+    {key:"signs",     icon:"📈", title:`Signs It's Working`,
+     prompt:`What are the realistic signs of progress ${name} should look for after 2 weeks, 1 month, and 3 months of practicing "${card.title}"? Be concrete and specific, not vague feel-good statements.`},
   ];
 
   return(
@@ -13373,7 +13700,7 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
   if(selectedCard){
     return(
       <CardDetailPage
-        card={selectedCard} catColor={cat.color}
+        card={selectedCard} catColor={cat.color} catId={cat.id}
         formData={formData} userId={userId}
         isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
         onUnlock={onUnlock}
@@ -14108,7 +14435,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           {summary&&isPaid&&(
             <div style={{display:"flex",justifyContent:"flex-end",margin:"8px 0"}}>
               <AudioPlayer
-                text={[summary, strengths?.length?`Key strengths: ${strengths.slice(0,3).join(". ")}`:"", opps?.length?`Opportunities: ${opps.slice(0,2).join(". ")}`:""].filter(Boolean).join(" ")}
+                text={[summary, strengths?.length?`Key strengths: ${strengths.slice(0,3).join(". ")}`:"", opportunities?.length?`Opportunities: ${opportunities.slice(0,2).join(". ")}`:""].filter(Boolean).join(" ")}
                 label="Listen to Report"/>
             </div>
           )}
@@ -16314,11 +16641,12 @@ function DestinIQInner(){
     if(typeof window==="undefined") return;
     const isNative = window?.Capacitor?.isNativePlatform?.();
     if(isNative){
-      // Set status bar to dark/gold theme to match app
+      // Set status bar to match current theme
       if(window?.StatusBar){
         try{
-          window.StatusBar.setBackgroundColor({color:"#0a0800"});
-          window.StatusBar.setStyle({style:"DARK"});
+          const isLight = document.documentElement.getAttribute("data-theme")==="light";
+          window.StatusBar.setBackgroundColor({color:isLight?"#f7f4ec":"#0a0800"});
+          window.StatusBar.setStyle({style:isLight?"LIGHT":"DARK"});
         }catch{}
       }
       // Keep screen awake while on dashboard
