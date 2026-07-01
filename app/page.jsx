@@ -162,9 +162,10 @@ function useTheme(){ return useContext(ThemeContext); }
 function ThemeProvider({children}){
   const [theme, setThemeState] = useState(()=>{
     try{
-      const saved = localStorage.getItem("diq_theme");
+      const saved = localStorage.getItem("diq_theme_v2");
       if(saved==="light"||saved==="dark") return saved;
-      if(typeof window!=="undefined"&&window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+      // Default to dark — DestinIQ is a dark-first premium platform.
+      // We do NOT follow OS light mode preference unless the user explicitly set it.
     }catch{}
     return "dark";
   });
@@ -172,7 +173,7 @@ function ThemeProvider({children}){
   useEffect(()=>{
     try{
       document.documentElement.setAttribute("data-theme", theme);
-      localStorage.setItem("diq_theme", theme);
+      localStorage.setItem("diq_theme_v2", theme);
       // Keep native status bar in sync when theme changes mid-session
       if(typeof window!=="undefined"&&window?.Capacitor?.isNativePlatform?.()&&window?.StatusBar){
         window.StatusBar.setBackgroundColor({color:theme==="light"?"#f7f4ec":"#0a0800"});
@@ -697,7 +698,7 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Outfit:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root,[data-theme="dark"]{
-  --void:#05060f;--deep:#08091a;--base:#0d0f1e;--raised:#121526;--lift:#181b2e;--midnight:#0a0c1c;
+  --void:#0a0800;--deep:#0d0b01;--base:#111008;--raised:#111008;--lift:#151209;--midnight:#0a0800;
   --night:#0a0800;--card-bg:#111008;--surface:#0e0c02;
   --cream-80:rgba(237,232,216,0.8);--cream-70:rgba(237,232,216,0.7);--cream-50:rgba(237,232,216,0.5);--cream-40:rgba(237,232,216,0.4);--cream-20:rgba(237,232,216,0.2);--cream-15:rgba(237,232,216,0.12);
   --line:rgba(255,255,255,0.06);--line-gold:rgba(210,175,90,0.18);
@@ -17726,6 +17727,8 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
   return(
     <ErrorBoundary>
     <>
+      {/* Anti-flash: set data-theme on html BEFORE hydration so no white flash */}
+      <script dangerouslySetInnerHTML={{__html:`(function(){try{var t=localStorage.getItem('diq_theme_v2');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}})();`}}/>
       <style>{CSS}</style>
       <OfflineBanner/>
       <div className="bg bg-mesh"/>
