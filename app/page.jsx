@@ -198,16 +198,16 @@ function useThemeColors(){
   const isDark = theme==="dark";
   return {
     isDark,
-    gold:      isDark? "#f0b429" : "#a87f1c",
-    goldBright:isDark? "#ffd166" : "#8a6817",
+    gold:      isDark? "#f0b429" : "#8a6a10",
+    goldBright:isDark? "#ffd166" : "#6e5308",
     cream:     isDark? "#e8dcc8" : "#231c0c",
     dim:       isDark? "rgba(232,220,200,0.5)"  : "rgba(35,28,12,0.55)",
     dimmer:    isDark? "rgba(232,220,200,0.27)" : "rgba(35,28,12,0.32)",
-    bg:        isDark? "#0a0800" : "#f7f4ec",
+    bg:        isDark? "#0a0800" : "#f5f2ea",
     card:      isDark? "#111008" : "#ffffff",
-    surface:   isDark? "#0e0c02" : "#fbf9f2",
-    border:    isDark? "rgba(232,220,200,0.07)" : "rgba(35,28,12,0.1)",
-    inp:       isDark? "rgba(255,255,255,0.04)" : "rgba(35,28,12,0.035)",
+    surface:   isDark? "#0e0c02" : "#fafaf7",
+    border:    isDark? "rgba(232,220,200,0.07)" : "rgba(35,28,12,0.09)",
+    inp:       isDark? "rgba(255,255,255,0.04)" : "rgba(35,28,12,0.04)",
     inpBorder: isDark? "rgba(232,220,200,0.13)" : "rgba(35,28,12,0.15)",
   };
 }
@@ -358,7 +358,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -1091,7 +1091,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .s-streak{padding:14px 20px;border-top:1px solid var(--line-dim);}
 .s-upgrade{padding:0 16px 18px;}
 .main-area{margin-left:0;flex:1;min-width:0;width:100%;max-width:100vw;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
-.bot-nav{display:none!important;position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,16,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
+.bot-nav{display:none!important;position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--void);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 0 max(6px,env(safe-area-inset-bottom));}
 .bot-items{display:flex;justify-content:space-around;}
 .bot-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border:none;background:none;color:var(--cream-30);cursor:pointer;flex:1;transition:color .15s;}
 .bot-item.active{color:var(--gold);}
@@ -4864,7 +4864,7 @@ HOW TO RESPOND:
             ?{top:0,left:0,right:0,bottom:0,width:"100%",height:"100%",borderRadius:0}
             :{bottom:88,right:16,width:"min(380px,calc(100vw - 32px))",height:"min(540px,calc(100vh - 120px))",borderRadius:20}
           ),
-          background:"#0b0c18",
+          background:G.card,
           border:isMobile?"none":"1px solid rgba(210,175,90,0.25)",
           display:"flex",flexDirection:"column",
           zIndex:10000,
@@ -4872,7 +4872,7 @@ HOW TO RESPOND:
           overflow:"hidden",
           isolation:"isolate",
         }}>
-          <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,0.07)",background:"#0b0c18",display:"flex",alignItems:"center",gap:10,flexShrink:0,paddingTop:`max(14px, env(safe-area-inset-top, 14px))`}}>
+          <div style={{padding:"14px 16px",borderBottom:"1px solid "+G.border,background:G.card,display:"flex",alignItems:"center",gap:10,flexShrink:0,paddingTop:`max(14px, env(safe-area-inset-top, 14px))`}}>
             <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>⚡</div>
             <div style={{flex:1}}>
               <div style={{fontSize:13,fontWeight:700,color:"#ede8d8"}}>DestinIQ Support</div>
@@ -4881,7 +4881,7 @@ HOW TO RESPOND:
             {isMobile&&<button onClick={()=>setOpen(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.5)",fontSize:22,cursor:"pointer",padding:"4px 8px",lineHeight:1,WebkitTapHighlightColor:"transparent"}}>✕</button>}
           </div>
 
-          <div style={{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.07)",background:"#0b0c18",flexShrink:0}}>
+          <div style={{display:"flex",borderBottom:"1px solid "+G.border,background:G.card,flexShrink:0}}>
             {[["chat","💬 Chat"],["faq","❓ FAQ"]].map(([t,label])=>(
               <button key={t} onClick={()=>setTab(t)}
                 style={{flex:1,padding:"11px 8px",background:"none",border:"none",
@@ -4895,7 +4895,7 @@ HOW TO RESPOND:
           </div>
 
           {tab==="faq"?(
-            <div style={{flex:1,overflowY:"auto",padding:"12px 14px",background:"#0b0c18",WebkitOverflowScrolling:"touch"}}>
+            <div style={{flex:1,overflowY:"auto",padding:"12px 14px",background:G.card,WebkitOverflowScrolling:"touch"}}>
               {FAQS.map((f,i)=>(
                 <details key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.06)",paddingBottom:10,marginBottom:10}}>
                   <summary style={{fontSize:13,color:"rgba(237,232,216,0.8)",fontWeight:600,cursor:"pointer",lineHeight:1.5,paddingTop:4,WebkitTapHighlightColor:"transparent"}}>
@@ -4907,7 +4907,7 @@ HOW TO RESPOND:
             </div>
           ):(
             <>
-              <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10,background:"#0b0c18",WebkitOverflowScrolling:"touch"}}>
+              <div style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10,background:G.card,WebkitOverflowScrolling:"touch"}}>
                 {msgs.map((m,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
                     <div style={{
@@ -4933,9 +4933,9 @@ HOW TO RESPOND:
               <div style={{
                 padding:"10px 12px",
                 paddingBottom:"max(10px, env(safe-area-inset-bottom, 10px))",
-                borderTop:"1px solid rgba(255,255,255,0.07)",
+                borderTop:"1px solid "+G.border,
                 display:"flex",gap:8,
-                background:"#0b0c18",
+                background:G.card,
                 flexShrink:0,
               }}>
                 <input
@@ -8896,7 +8896,7 @@ function VoiceSelector(){
             top:pos.top,
             left:pos.left,
             zIndex:2147483647,
-            background:"#0f1018",
+            background:G.card,
             border:"1px solid rgba(210,175,90,0.45)",
             borderRadius:14,
             padding:"0 0 8px",
@@ -8913,7 +8913,7 @@ function VoiceSelector(){
           onScroll={e=>e.stopPropagation()}
           onClick={e=>e.stopPropagation()}
         >
-          <div style={{padding:"10px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:4,position:"sticky",top:0,background:"#0f1018",zIndex:1}}>🎙 SELECT VOICE & ACCENT</div>
+          <div style={{padding:"10px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:4,position:"sticky",top:0,background:G.card,zIndex:1}}>🎙 SELECT VOICE & ACCENT</div>
           {grouped.map(g=>(
             <div key={g.key}>
               <div style={{padding:"5px 14px 3px",fontSize:8,color:"rgba(255,255,255,0.22)",fontFamily:"var(--f-mono)",letterSpacing:".1em",textTransform:"uppercase",background:"rgba(255,255,255,0.02)"}}>{g.flag} {g.label}</div>
@@ -12766,7 +12766,7 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
 
       {/* Drawer */}
       <div style={{position:"fixed",top:0,left:0,bottom:0,width:"min(80vw,300px)",
-        background:"#0f0e0a",borderRight:"1px solid "+G.border,zIndex:900,
+        background:G.bg,borderRight:"1px solid "+G.border,zIndex:900,
         display:"flex",flexDirection:"column",overflowY:"auto",
         animation:"drawerSlideIn .22s cubic-bezier(0.32,0.72,0,1)"}}>
 
@@ -12891,7 +12891,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
 
       {/* ── STICKY TOP NAV ── */}
       <div style={{position:"sticky",top:0,zIndex:200,
-        background:"rgba(10,8,0,0.92)",backdropFilter:"blur(14px)",
+        background:G.isDark?"rgba(10,8,0,0.92)":"rgba(245,242,234,0.95)",backdropFilter:"blur(14px)",
         borderBottom:"1px solid "+G.border,padding:"12px 20px",
         display:"flex",alignItems:"center",justifyContent:"space-between"}}>
 
@@ -15752,56 +15752,421 @@ function ReferralWidget({userId, isPaid}){
 // ═══════════════════════════════════════════════════════════════════════════════
 function AboutUsPage({onBack}){
   const G={...useThemeColors()};
+  const gold = G.gold;
+  const goldAlpha = G.isDark ? "rgba(240,180,41," : "rgba(138,106,16,";
+
+  // Reusable section label
+  const SLabel = ({children})=>(
+    <div style={{fontSize:10,fontWeight:700,letterSpacing:".18em",color:gold,
+      fontFamily:"monospace",marginBottom:10,textTransform:"uppercase"}}>
+      {children}
+    </div>
+  );
+
+  // Section divider
+  const Divider = ()=>(
+    <div style={{height:1,background:`linear-gradient(90deg,transparent,${gold}30,transparent)`,
+      margin:"56px 0"}}/>
+  );
+
   return(
-    <div style={{minHeight:"100vh",background:G.bg,paddingTop:72,paddingBottom:80,
-      color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
-      <div style={{maxWidth:680,margin:"0 auto",padding:"0 24px"}}>
-        <button onClick={onBack} style={{background:"none",border:"none",color:G.dim,
-          cursor:"pointer",fontSize:13,marginBottom:32,display:"flex",alignItems:"center",
-          gap:6,padding:0}}>← Back</button>
+    <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      overflowX:"hidden"}}>
 
-        <div style={{fontSize:11,color:G.gold,fontWeight:700,letterSpacing:".15em",
-          fontFamily:"monospace",marginBottom:12}}>OUR STORY</div>
-        <h1 style={{fontSize:"clamp(24px,7vw,36px)",fontWeight:900,color:G.cream,margin:"0 0 32px",lineHeight:1.2}}>
-          Built for people who want more clarity in their lives
-        </h1>
+      {/* ── STICKY TOP BAR ── */}
+      <div style={{position:"sticky",top:0,zIndex:50,
+        background:G.isDark?"rgba(10,8,0,0.9)":"rgba(245,242,234,0.92)",
+        backdropFilter:"blur(16px)",
+        borderBottom:"1px solid "+G.border,
+        padding:"14px 24px",display:"flex",alignItems:"center",gap:14}}>
+        <button onClick={onBack}
+          style={{background:"none",border:"none",color:G.dim,cursor:"pointer",
+            fontSize:13,display:"flex",alignItems:"center",gap:6,padding:0,
+            fontFamily:"inherit"}}>
+          ← Back
+        </button>
+        <div style={{fontSize:13,fontWeight:700,color:G.cream,opacity:.6}}>
+          About DestinIQ
+        </div>
+      </div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:20,fontSize:15,
-          color:G.dim,lineHeight:1.9}}>
-          <p>DestinIQ was born in Ghana, built for the world. We noticed that most personal development tools were built for a Western context — they assumed stable income, strong institutions, and straightforward career paths. For people in Africa, the Caribbean, Southeast Asia, and immigrant communities everywhere, that advice simply didn't land.</p>
+      <div style={{maxWidth:720,margin:"0 auto",padding:"0 24px 100px"}}>
 
-          <p>We built DestinIQ to be different. It asks about your actual life — your income level, your country, your real challenges, your specific goals — and generates intelligence that actually applies to your situation. Not generic motivational content. Real guidance.</p>
+        {/* ══════════════════════════════════════════
+            SECTION 1 — HERO
+        ══════════════════════════════════════════ */}
+        <div style={{textAlign:"center",padding:"72px 0 64px"}}>
+          {/* Glow orb */}
+          <div style={{width:80,height:80,borderRadius:"50%",margin:"0 auto 28px",
+            background:`radial-gradient(circle,${goldAlpha}0.3) 0%,${goldAlpha}0.05) 70%)`,
+            border:`1px solid ${goldAlpha}0.25)`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:32,boxShadow:`0 0 40px ${goldAlpha}0.15)`}}>
+            ✦
+          </div>
 
-          <p>The platform uses advanced AI to analyse your profile across 7 dimensions: career, finances, mindset, relationships, personal growth, lifestyle, and life direction. It then generates a personalised intelligence report and gives you access to 42 specialist AI tools covering every area of your life.</p>
-
-          <p>We're a small team building something we believe should exist. If DestinIQ helps you make one better decision about your career, your finances, or your next move — we've done our job.</p>
+          <SLabel>Personal Intelligence</SLabel>
+          <h1 style={{fontSize:"clamp(28px,7vw,42px)",fontWeight:900,color:G.cream,
+            margin:"0 0 14px",lineHeight:1.15,letterSpacing:"-.5px"}}>
+            About DestinIQ
+          </h1>
+          <div style={{fontSize:"clamp(15px,4vw,19px)",fontWeight:600,
+            color:gold,marginBottom:20}}>
+            Your Personal Intelligence Operating System
+          </div>
+          <p style={{fontSize:15,color:G.dim,lineHeight:1.85,maxWidth:560,
+            margin:"0 auto 28px"}}>
+            DestinIQ is an AI-powered personal intelligence platform designed to help people
+            better understand their lives, make smarter decisions, discover opportunities,
+            and take meaningful action with confidence.
+          </p>
+          <div style={{display:"inline-flex",alignItems:"center",gap:10,
+            padding:"10px 20px",borderRadius:30,
+            background:`${goldAlpha}0.07)`,border:`1px solid ${goldAlpha}0.2)`,
+            fontSize:13,color:gold,fontWeight:700}}>
+            <span>From confusion</span>
+            <span style={{opacity:.5}}>→</span>
+            <span>to structured action</span>
+          </div>
         </div>
 
-        <div style={{margin:"40px 0",height:1,background:G.border}}/>
+        <Divider/>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:16}}>
-          {[
-            ["🌍","Built in Ghana"],
-            ["🤖","Powered by Claude AI"],
-            ["🔒","Privacy first"],
-            ["💳","Payments via Paystack"],
-          ].map(([icon,label])=>(
-            <div key={label} style={{background:G.card,border:"1px solid "+G.border,
-              borderRadius:14,padding:"16px 18px",textAlign:"center"}}>
-              <div style={{fontSize:24,marginBottom:8}}>{icon}</div>
-              <div style={{fontSize:13,fontWeight:600,color:G.cream}}>{label}</div>
+        {/* ══════════════════════════════════════════
+            SECTION 2 — WHAT IS DESTINIQ?
+        ══════════════════════════════════════════ */}
+        <div style={{marginBottom:0}}>
+          <SLabel>What Is DestinIQ?</SLabel>
+          <h2 style={{fontSize:"clamp(20px,5vw,28px)",fontWeight:800,color:G.cream,
+            margin:"0 0 28px",lineHeight:1.3}}>
+            Three pillars of personal intelligence
+          </h2>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",
+            gap:14}}>
+            {[
+              {icon:"🧠",title:"AI Personal Intelligence",
+               desc:"DestinIQ transforms personal information into meaningful insights that help you better understand yourself and your opportunities.",
+               color:"#9b72cf"},
+              {icon:"🧭",title:"Decision Support System",
+               desc:"Instead of overwhelming you with information, DestinIQ organises knowledge into structured guidance for every major area of life.",
+               color:G.isDark?"#f0b429":"#8a6a10"},
+              {icon:"⚡",title:"Action-Oriented Platform",
+               desc:"Every insight leads to practical action — recommendations, tools, learning resources, useful links, and step-by-step guidance.",
+               color:"#4db6ac"},
+            ].map(card=>(
+              <div key={card.title}
+                style={{background:G.card,border:"1px solid "+G.border,
+                  borderRadius:18,padding:"24px 20px",
+                  transition:"border-color .2s,transform .2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=card.color+"60";e.currentTarget.style.transform="translateY(-3px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.transform="translateY(0)";}}>
+                <div style={{width:44,height:44,borderRadius:12,
+                  background:card.color+"18",border:"1px solid "+card.color+"30",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:20,marginBottom:14}}>
+                  {card.icon}
+                </div>
+                <div style={{fontSize:15,fontWeight:800,color:G.cream,marginBottom:8,
+                  lineHeight:1.3}}>
+                  {card.title}
+                </div>
+                <div style={{fontSize:13,color:G.dim,lineHeight:1.75}}>
+                  {card.desc}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Divider/>
+
+        {/* ══════════════════════════════════════════
+            SECTION 3 — HOW IT WORKS
+        ══════════════════════════════════════════ */}
+        <div>
+          <SLabel>How It Works</SLabel>
+          <h2 style={{fontSize:"clamp(20px,5vw,28px)",fontWeight:800,color:G.cream,
+            margin:"0 0 32px",lineHeight:1.3}}>
+            Five steps from profile to action
+          </h2>
+          <div style={{display:"flex",flexDirection:"column",gap:0}}>
+            {[
+              {n:"01",icon:"📋",title:"Complete Onboarding",
+               desc:"You share information — age, country, skills, goals, income, interests, and current challenges.",
+               color:"#9b72cf"},
+              {n:"02",icon:"🤖",title:"AI Analysis",
+               desc:"DestinIQ analyses your situation and identifies strengths, blind spots, opportunities, and priorities.",
+               color:G.isDark?"#f0b429":"#8a6a10"},
+              {n:"03",icon:"📊",title:"My Report",
+               desc:"You receive a personalised intelligence report with actionable insights and recommendations built around your actual life.",
+               color:"#4db6ac"},
+              {n:"04",icon:"🔍",title:"Explore",
+               desc:"Navigate 8 life categories — Money+, Skills, Mindset, Wellness, Body, Purpose, Social & People, Plan & Decide — each packed with intelligence cards.",
+               color:"#e05c6e"},
+              {n:"05",icon:"⚡",title:"Take Action",
+               desc:"Every card comes with practical next steps, supplier links, resources, learning materials, and AI-powered deep dives personalised to you.",
+               color:"#81c784"},
+            ].map((step,i,arr)=>(
+              <div key={step.n}>
+                <div style={{display:"flex",gap:16,alignItems:"flex-start",
+                  padding:"20px 0"}}>
+                  {/* Step number + connector line */}
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",
+                    flexShrink:0}}>
+                    <div style={{width:44,height:44,borderRadius:12,flexShrink:0,
+                      background:step.color+"18",border:"1px solid "+step.color+"35",
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:18}}>
+                      {step.icon}
+                    </div>
+                    {i<arr.length-1&&(
+                      <div style={{width:1,height:32,
+                        background:`linear-gradient(${step.color}40,transparent)`,
+                        marginTop:6}}/>
+                    )}
+                  </div>
+                  {/* Content */}
+                  <div style={{flex:1,paddingTop:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5}}>
+                      <span style={{fontSize:9,fontWeight:700,color:step.color,
+                        fontFamily:"monospace",letterSpacing:".1em"}}>
+                        STEP {step.n}
+                      </span>
+                    </div>
+                    <div style={{fontSize:16,fontWeight:800,color:G.cream,marginBottom:6}}>
+                      {step.title}
+                    </div>
+                    <div style={{fontSize:13,color:G.dim,lineHeight:1.75}}>
+                      {step.desc}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Divider/>
+
+        {/* ══════════════════════════════════════════
+            SECTION 4 — WHY WE BUILT IT
+        ══════════════════════════════════════════ */}
+        <div style={{background:G.card,border:"1px solid "+G.border,
+          borderRadius:20,padding:"32px 28px",position:"relative",overflow:"hidden"}}>
+          {/* Decorative glow */}
+          <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,
+            borderRadius:"50%",
+            background:`radial-gradient(circle,${goldAlpha}0.08) 0%,transparent 70%)`,
+            pointerEvents:"none"}}/>
+          <SLabel>Why We Built DestinIQ</SLabel>
+          <h2 style={{fontSize:"clamp(18px,4.5vw,24px)",fontWeight:800,color:G.cream,
+            margin:"0 0 20px",lineHeight:1.3}}>
+            Most people don't lack potential — they lack clarity.
+          </h2>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {[
+              "Information exists everywhere — scattered across books, videos, websites, courses, and AI chats. Finding the right answer at the right time for your specific situation is overwhelming.",
+              "DestinIQ was created to bring structure to that information and transform it into practical guidance that actually applies to your life — your country, your income level, your real situation.",
+              "Not generic advice. Not Western-centric content. Intelligence built around you, wherever you are in the world.",
+            ].map((p,i)=>(
+              <p key={i} style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0}}>{p}</p>
+            ))}
+          </div>
+        </div>
+
+        <Divider/>
+
+        {/* ══════════════════════════════════════════
+            SECTION 5 — FROM THE FOUNDER
+        ══════════════════════════════════════════ */}
+        <div>
+          <SLabel>From the Founder</SLabel>
+          <div style={{background:`linear-gradient(135deg,${goldAlpha}0.06) 0%,${goldAlpha}0.02) 100%)`,
+            border:`1px solid ${goldAlpha}0.2)`,borderRadius:20,padding:"32px 28px",
+            position:"relative"}}>
+            <div style={{fontSize:48,color:gold,opacity:.25,lineHeight:1,
+              position:"absolute",top:16,right:24,fontFamily:"serif",fontWeight:900}}>
+              "
             </div>
-          ))}
+            <p style={{fontSize:15,color:G.dim,lineHeight:1.9,margin:"0 0 20px",
+              fontStyle:"italic"}}>
+              DestinIQ began with a simple question: what if one intelligent system could help
+              people understand their current situation, identify real opportunities, and make
+              better life decisions — without spending hours searching through different sources?
+            </p>
+            <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:"0 0 20px"}}>
+              That question became DestinIQ. This platform is being built with the vision of
+              becoming a trusted personal intelligence system that empowers people to grow, make
+              informed decisions, and unlock their full potential.
+            </p>
+            <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0}}>
+              Every update is another step toward that vision. Every user helps shape what
+              DestinIQ becomes next.
+            </p>
+            <div style={{marginTop:24,paddingTop:20,borderTop:"1px solid "+G.border,
+              display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:40,height:40,borderRadius:"50%",
+                background:`linear-gradient(135deg,${gold},${G.isDark?"#c89010":"#6e5308"})`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:18,fontWeight:800,color:"#000"}}>
+                A
+              </div>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:G.cream}}>Aban</div>
+                <div style={{fontSize:11,color:G.dimmer}}>Founder, DestinIQ</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div style={{marginTop:40,padding:"20px 24px",background:"rgba(240,180,41,0.05)",
-          border:"1px solid rgba(240,180,41,0.15)",borderRadius:16}}>
-          <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:8}}>Get in touch</div>
-          <a href="mailto:support@destiniq.app" style={{fontSize:14,color:G.gold,textDecoration:"none"}}>
-            support@destiniq.app
-          </a>
-          <div style={{fontSize:12,color:G.dimmer,marginTop:4}}>We reply within 24 hours</div>
+        <Divider/>
+
+        {/* ══════════════════════════════════════════
+            SECTION 6 — OUR VISION
+        ══════════════════════════════════════════ */}
+        <div style={{textAlign:"center",padding:"8px 0 0"}}>
+          <SLabel>Our Vision</SLabel>
+          <div style={{fontSize:"clamp(16px,4.5vw,22px)",fontWeight:800,color:G.cream,
+            lineHeight:1.5,maxWidth:560,margin:"0 auto 0"}}>
+            To build the world's most trusted AI-powered Personal Intelligence Operating System —
+            one that helps people think more clearly, make better decisions, and create meaningful
+            progress in every area of life.
+          </div>
         </div>
+
+        <Divider/>
+
+        {/* ══════════════════════════════════════════
+            SECTION 7 — ROADMAP
+        ══════════════════════════════════════════ */}
+        <div>
+          <SLabel>Roadmap</SLabel>
+          <h2 style={{fontSize:"clamp(20px,5vw,26px)",fontWeight:800,color:G.cream,
+            margin:"0 0 28px",lineHeight:1.3}}>
+            Where DestinIQ is headed
+          </h2>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",
+            gap:14}}>
+            {/* Available Today */}
+            <div style={{background:G.card,border:`1px solid ${"#81c784"}35`,
+              borderRadius:18,padding:"24px 20px",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,
+                background:"linear-gradient(90deg,#4db6ac,#81c784)",borderRadius:"18px 18px 0 0"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:"#81c784"}}/>
+                <div style={{fontSize:11,fontWeight:700,color:"#81c784",
+                  letterSpacing:".1em",fontFamily:"monospace"}}>AVAILABLE TODAY</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {[
+                  "AI Personal Reports",
+                  "Guided Intelligence Categories",
+                  "Personalized Recommendations",
+                  "Daily Check-In System",
+                  "Streak & Win Tracker",
+                  "Referral Program",
+                  "Dark & Light Mode",
+                  "42+ AI-Powered Tools",
+                ].map(item=>(
+                  <div key={item} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{color:"#81c784",fontSize:14,flexShrink:0}}>✓</span>
+                    <span style={{fontSize:13,color:G.cream,fontWeight:500}}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Coming Soon */}
+            <div style={{background:G.card,border:`1px solid ${gold}30`,
+              borderRadius:18,padding:"24px 20px",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,
+                background:`linear-gradient(90deg,${gold},${G.isDark?"#ffd166":"#8a6a10"})`,
+                borderRadius:"18px 18px 0 0"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:gold,
+                  boxShadow:`0 0 8px ${goldAlpha}0.5)`}}/>
+                <div style={{fontSize:11,fontWeight:700,color:gold,
+                  letterSpacing:".1em",fontFamily:"monospace"}}>COMING SOON</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {[
+                  "Native Mobile Apps (iOS & Android)",
+                  "AI Voice Coach",
+                  "Personalized Learning Paths",
+                  "Smarter Opportunity Discovery",
+                  "Advanced Progress Tracking",
+                  "Community Features",
+                  "PDF Report Export",
+                  "Goal Achievement System",
+                ].map(item=>(
+                  <div key={item} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{color:gold,fontSize:13,flexShrink:0}}>•</span>
+                    <span style={{fontSize:13,color:G.dim,fontWeight:500}}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Divider/>
+
+        {/* ══════════════════════════════════════════
+            SECTION 8 — JOIN THE JOURNEY
+        ══════════════════════════════════════════ */}
+        <div style={{textAlign:"center",padding:"8px 0"}}>
+          <SLabel>Join the Journey</SLabel>
+          <h2 style={{fontSize:"clamp(20px,5vw,28px)",fontWeight:800,color:G.cream,
+            margin:"0 0 14px",lineHeight:1.3}}>
+            This is just the beginning
+          </h2>
+          <p style={{fontSize:14,color:G.dim,lineHeight:1.85,maxWidth:500,
+            margin:"0 auto 32px"}}>
+            DestinIQ is continuously evolving. Every new feature is designed to make personal
+            growth, decision-making, and opportunity discovery more intelligent and more accessible.
+            Thank you for being part of the journey.
+          </p>
+
+          {/* Trust badges */}
+          <div style={{display:"grid",
+            gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",
+            gap:10,marginBottom:36}}>
+            {[
+              {icon:"🌍",label:"Built in Ghana",sub:"For the world"},
+              {icon:"🤖",label:"Claude AI",sub:"Powered by Anthropic"},
+              {icon:"🔒",label:"Privacy First",sub:"Your data is yours"},
+              {icon:"💳",label:"Paystack",sub:"Secure payments"},
+            ].map(b=>(
+              <div key={b.label} style={{background:G.card,border:"1px solid "+G.border,
+                borderRadius:14,padding:"16px 12px",textAlign:"center",
+                transition:"border-color .2s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=`${goldAlpha}0.3)`}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
+                <div style={{fontSize:22,marginBottom:6}}>{b.icon}</div>
+                <div style={{fontSize:12,fontWeight:700,color:G.cream,marginBottom:2}}>
+                  {b.label}
+                </div>
+                <div style={{fontSize:10,color:G.dimmer}}>{b.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Contact */}
+          <div style={{display:"inline-block",padding:"20px 28px",
+            background:`${goldAlpha}0.05)`,border:`1px solid ${goldAlpha}0.2)`,
+            borderRadius:16,textAlign:"center"}}>
+            <div style={{fontSize:12,color:G.dimmer,marginBottom:6,
+              fontFamily:"monospace",letterSpacing:".08em"}}>GET IN TOUCH</div>
+            <a href="mailto:support@destiniq.app"
+              style={{fontSize:16,color:gold,fontWeight:700,textDecoration:"none",
+                display:"block",marginBottom:4}}>
+              support@destiniq.app
+            </a>
+            <div style={{fontSize:11,color:G.dimmer}}>We reply within 24 hours</div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
