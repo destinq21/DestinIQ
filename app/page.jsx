@@ -358,7 +358,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -712,19 +712,50 @@ const CSS = `
   color-scheme:dark;
 }
 [data-theme="light"]{
-  --void:#f7f4ec;--deep:#f0ecdf;--base:#ffffff;--raised:#ffffff;--lift:#f5f1e6;--midnight:#ffffff;
-  --night:#f7f4ec;--card-bg:#ffffff;--surface:#fbf9f2;
+  --void:#f5f2ea;--deep:#edeadf;--base:#ffffff;--raised:#fafaf7;--lift:#f2efe6;--midnight:#f7f4ed;
+  --night:#f5f2ea;--card-bg:#ffffff;--surface:#fafaf7;
   --cream-80:rgba(35,28,12,0.82);--cream-70:rgba(35,28,12,0.72);--cream-50:rgba(35,28,12,0.55);--cream-40:rgba(35,28,12,0.45);--cream-20:rgba(35,28,12,0.22);--cream-15:rgba(35,28,12,0.14);
-  --line:rgba(35,28,12,0.1);--line-gold:rgba(168,128,40,0.3);
-  --gold:#a87f1c;--gold-bright:#8a6817;--gold-dim:rgba(168,128,40,0.1);--gold-glow:rgba(168,128,40,0.05);
-  --teal:#11806f;--teal-dim:rgba(17,128,111,0.08);
-  --rose:#a8473d;--rose-dim:rgba(168,71,61,0.08);
-  --violet:#5d3fa0;--violet-dim:rgba(93,63,160,0.08);
-  --emerald:#1b7e54;--emerald-dim:rgba(27,126,84,0.08);
+  --line:rgba(35,28,12,0.1);--line-gold:rgba(140,100,20,0.25);
+  --gold:#8a6a10;--gold-bright:#6e5308;--gold-dim:rgba(138,106,16,0.1);--gold-glow:rgba(138,106,16,0.05);
+  --teal:#0d7060;--teal-dim:rgba(13,112,96,0.08);
+  --rose:#9e3830;--rose-dim:rgba(158,56,48,0.08);
+  --violet:#4e3090;--violet-dim:rgba(78,48,144,0.08);
+  --emerald:#166940;--emerald-dim:rgba(22,105,64,0.08);
   --cream:#231c0c;--cream-60:rgba(35,28,12,0.65);--cream-30:rgba(35,28,12,0.32);
-  --cream-10:rgba(35,28,12,0.09);--cream-05:rgba(35,28,12,0.045);
+  --cream-10:rgba(35,28,12,0.09);--cream-05:rgba(35,28,12,0.04);
   --f-display:'Playfair Display',serif;--f-body:'Outfit',sans-serif;--f-mono:'JetBrains Mono',monospace;
   color-scheme:light;
+}
+/* Light mode overrides for hardcoded dark class styles */
+[data-theme="light"] body{ background:#f5f2ea; color:#231c0c; }
+[data-theme="light"] .bg-mesh{
+  background:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(13,112,96,0.05) 0%,transparent 55%),
+    radial-gradient(ellipse 60% 50% at 80% 100%,rgba(138,106,16,0.06) 0%,transparent 55%),
+    radial-gradient(ellipse 50% 40% at 80% 20%,rgba(78,48,144,0.04) 0%,transparent 50%),
+    var(--void);
+}
+[data-theme="light"] .nav{
+  background:rgba(245,242,234,0.94);
+  border-bottom:1px solid rgba(35,28,12,0.1);
+}
+[data-theme="light"] .card{
+  background:#ffffff;
+  border-color:rgba(35,28,12,0.09);
+}
+[data-theme="light"] .mob-bot{
+  background:rgba(245,242,234,0.95);
+  border-top:1px solid rgba(35,28,12,0.1);
+}
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select{
+  background:#f0ede4;
+  color:#231c0c;
+  border-color:rgba(35,28,12,0.15);
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder{
+  color:rgba(35,28,12,0.35);
 }
 *{transition:background-color .25s ease,border-color .25s ease,color .25s ease;}
 html{scroll-behavior:smooth;}
@@ -1679,6 +1710,53 @@ const TOPIC_CONFIGS = {
           },
         ],
       },
+      {
+        id:"successrules", label:"How To Become Successful", icon:"🏆",
+        desc:"The real playbook — not lucky, not gifted, just following the right rules when nobody's watching.",
+        tags:["All","Routine","Network","Creation","Obsession"],
+        cards:[
+          {
+            id:"studyobsess", title:"Study Obsession", badge:"Rule 01", badgeColor:"#f0b429",
+            tags:["Obsession"],
+            tagline:"Read biographies of the greats — not to worship them, to steal their patterns",
+            whyItWorks:"Steve Jobs, Elon Musk, Rockefeller, Oprah — these people weren't just talented, they were patterned. They made specific choices at specific moments that changed everything. When you read their actual stories (not highlight reels), you see the patterns: they worked when others rested, they obsessed when others stayed balanced, they were willing to look stupid before they looked brilliant. Success leaves clues. You can steal from people who already figured it out.",
+            steps:["Read 1 real biography per month — not summaries, the full book","After each one, write 3 patterns you noticed that most people don't talk about","Pick 1 mistake they made and check honestly if you're currently making the same one","Study failures as hard as successes — what did they do at the moment it nearly fell apart?","Pick one mentor (alive or historical) and study them deeply for 90 days before moving on"],
+            actions:["Generate My Reading List From This","Build My Pattern-Extraction Journal","Find Biographies Relevant To My Goals","Create My 90-Day Study Focus"],
+          },
+          {
+            id:"ruthlessroutine", title:"Ruthless Routine", badge:"Rule 02", badgeColor:"#1ab89a",
+            tags:["Routine"],
+            tagline:"Motivation is a visitor. Discipline is a resident. Build the system that runs when you don't feel like it.",
+            whyItWorks:"Every high performer you study has a morning routine, an output quota, a non-negotiable deep work block. They are not more motivated than you — they designed environments and systems that make their best work the default behavior. Your feelings are unreliable. Your calendar is not. Structure your day so the most important work happens first, before the world gets its hands on your attention.",
+            steps:["Design your ideal morning and run it for 21 days straight — no modification, just execute","Block 2-3 hours of uninterrupted deep work daily — guard it like a meeting with your biggest client","End each day with a 5-minute review: did today move me forward or just keep me busy?","Remove one thing from your environment that competes with your best work","Track your output (what you made or moved), not your hours"],
+            actions:["Design My Daily Routine","Build My Deep Work Block","Generate My 21-Day Routine Challenge","Audit My Current Day Structure"],
+          },
+          {
+            id:"networkmath", title:"Network Mathematics", badge:"Rule 03", badgeColor:"#9b72cf",
+            tags:["Network"],
+            tagline:"One right introduction beats 10 years of solo effort",
+            whyItWorks:"Your network isn't just who you know — it's what you believe is possible. The people around you define your ceiling, whether you notice it or not. The ambitious person who surrounds themselves with builders starts believing bigger without trying. The talented person who stays in a circle of complainers slowly loses the ambition they started with.",
+            steps:["Audit the 5 people you spend most time with — what is their average ambition level?","Reach out to one person you genuinely admire every month, no ask, just connection","Attend one event in your field every quarter — your next breakthrough will come from a room","Give first: show up with value, ideas, referrals — transactions come much later","Follow up within 48 hours of any meaningful conversation, always"],
+            actions:["Audit My Inner Circle","Generate My Outreach Message","Find Events In My Field","Build My Give-First Strategy"],
+          },
+          {
+            id:"createdontconsume2", title:"Create, Don't Consume", badge:"Rule 04", badgeColor:"#e05c6e",
+            tags:["Creation"],
+            tagline:"Consumers pay. Creators get paid. Stop feeding algorithms and start building things.",
+            whyItWorks:"Every hour you spend consuming, someone else is building what you wished you had created. Writing, building, designing, teaching, making — this converts what you know into leverage. Creation is also the fastest path to clarity: you don't know what you think until you write it, you don't know if an idea works until you build it. The creator who ships imperfect work consistently beats the perfectionist who never finishes.",
+            steps:["Create something every day — a post, paragraph, prototype, or line of code. Even if nobody sees it","Ship before you're ready — done is the engine of more, perfect kills real","Pick one medium to master this year: writing, video, audio, or code — one only, go very deep","Set a daily creation time that is protected from consumption (no phone, no feed)","Track your creation streak — visibility makes consistency easier"],
+            actions:["Choose My Creation Medium","Generate My First 30 Content Ideas","Build My Daily Creation Habit","Design My Creation-Only Time Block"],
+          },
+          {
+            id:"obsessenergy", title:"Obsess Over Energy", badge:"Rule 05", badgeColor:"#4db6ac",
+            tags:["Routine","Obsession"],
+            tagline:"You can't build an empire running on empty — your body is your infrastructure",
+            whyItWorks:"Sleep, movement, nutrition, and mental recovery aren't indulgences — they are performance inputs. A well-rested, physically active person with average talent outperforms a brilliant, depleted person almost every time. You cannot think clearly, make good decisions, or sustain long-term effort on bad sleep and zero movement. This is not wellness advice. It is performance strategy.",
+            steps:["Protect 7-8 hours of sleep especially during your highest-stakes work phases","Move for at least 30 minutes daily — the cognitive benefits alone justify it","Audit your energy for 7 days: rate yourself every 3 hours, find the loss patterns","Identify your 2 biggest energy drains and eliminate or reduce one this week","Build a recovery ritual between your workday and your evening — the separation matters"],
+            actions:["Build My Energy Audit","Generate My Recovery Protocol","Find My Energy Drain Patterns","Create My High-Performance Daily Schedule"],
+          },
+        ],
+      },
     ],
   },
 
@@ -1728,6 +1806,53 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Protein is the most important macronutrient for body composition, but it's also the most expensive. Budget-friendly protein sources (eggs, beans, chicken thighs, canned fish) deliver the same results as premium options at a third of the cost.",
             steps:["Target 1.6-2g protein per kg bodyweight daily","Build meals around eggs, chicken thighs, beans, lentils, canned tuna","Buy in bulk and meal prep 2-3 days at a time","Use a kitchen scale for the first 2 weeks to calibrate portion sizes by eye","Plan one cheat meal weekly to stay consistent long-term"],
             actions:["Build My Meal Plan","Calculate My Protein Target","Find Budget Protein Sources In My Country","Generate Weekly Shopping List"],
+          },
+        ],
+      },
+      {
+        id:"lifehacks", label:"Daily Life Hacks", icon:"✨",
+        desc:"The small habits for hair, teeth, skin, and grooming that make a visible difference fast.",
+        tags:["All","Hair","Teeth","Skin","Grooming"],
+        cards:[
+          {
+            id:"teethhacks", title:"Teeth Hacks That Actually Work", badge:"Quick Wins", badgeColor:"#e8dcc8",
+            tags:["Teeth"],
+            tagline:"Small daily habits that visibly change your teeth in under 30 days",
+            whyItWorks:"Most tooth problems (staining, sensitivity, decay) are preventable with the right sequence and tools — yet most people brush incorrectly, at the wrong time, with the wrong technique. These habits require zero extra products and take 2 minutes more per day than what you're currently doing.",
+            steps:["Wait 30 minutes after eating before brushing — brushing immediately after acidic food strips enamel","Brush in small circles, not back-and-forth — back-and-forth damages gum line over time","Brush your tongue every time — 90% of bad breath comes from the tongue, not the teeth","Floss before brushing, not after — this loosens debris so brushing removes it","Oil pulling: 1 teaspoon of coconut oil in the mouth for 5-10 minutes before brushing, 3x per week — reduces bacteria, whitens naturally","Drink water after coffee/tea immediately — reduces staining significantly","Use a straw for coffee, juice, and acidic drinks — bypasses the front teeth"],
+            actions:["Build My Daily Teeth Routine","Generate My 30-Day Whitening Plan","Find Affordable Dental Care In My Country","Calculate My Oral Health Score"],
+          },
+          {
+            id:"hairhacks", title:"Hair Health Hacks", badge:"High Impact", badgeColor:"#f0b429",
+            tags:["Hair"],
+            tagline:"What actually affects hair growth and thickness — not what's marketed to you",
+            whyItWorks:"Hair health is 80% internal (nutrition, stress, sleep) and 20% external (what you put on it). Most people spend money on products while ignoring the inputs that actually drive growth, thickness, and shine. The hacks that work are unsexy and cheap.",
+            steps:["Scalp massage 5 minutes daily — increases blood circulation to follicles, proven to increase thickness in 6 months","Wash 2-3x per week maximum for most hair types — overwashing strips natural oils","Cold water rinse at the end of every wash — seals the cuticle and adds shine","Protein diet: eggs, fish, legumes — hair is made of keratin (protein), deficiency = hair loss","Sleep on a satin or silk pillowcase — reduces friction and breakage by up to 40%","Never brush wet hair — detangle with fingers or a wide-tooth comb from ends to roots","Trim every 8-10 weeks — split ends travel up the shaft and cause more loss if left"],
+            actions:["Build My Hair Care Routine","Find Products Available In My Country","Generate My Hair Growth 90-Day Plan","Calculate What My Hair Needs Based On Type"],
+          },
+          {
+            id:"skinhacks", title:"Skin Care That Works Without Expensive Products", badge:"Practical", badgeColor:"#4db6ac",
+            tags:["Skin"],
+            tagline:"The 5-step daily routine that visibly changes skin in 3 weeks",
+            whyItWorks:"Clear, healthy skin is mostly diet and consistency, not expensive products. The people with consistently good skin are not using 12-step routines — they're following a simple, consistent sequence every morning and evening. The biggest mistake is using too many products that interfere with each other.",
+            steps:["Morning: gentle cleanser → moisturizer with SPF (non-negotiable, even indoors — UV comes through windows) → done","Evening: double cleanse (oil cleanser first to remove sunscreen/makeup, then water-based cleanser) → moisturizer","Drink 2-3 litres of water daily — dehydration shows on the face first","Cut sugar for 2 weeks and note the difference — sugar causes glycation which ages skin visibly","Pillowcase: change every 3-4 days — your face rests there for 8 hours, buildup transfers directly","Never sleep with makeup on — even once breaks down collagen over time","Touch your face less — hands transfer bacteria every single time"],
+            actions:["Build My Morning + Evening Skin Routine","Find Affordable Products Available In My Country","Generate My 30-Day Clear Skin Plan","Identify My Skin Type"],
+          },
+          {
+            id:"eyebrowshacks", title:"Eyebrow Grooming Done Right", badge:"Detail", badgeColor:"#9b72cf",
+            tags:["Grooming"],
+            tagline:"The small details that change how your whole face looks",
+            whyItWorks:"Eyebrows frame your face more than any other feature. Small, specific changes to shape, thickness, and maintenance make a disproportionate impact on overall appearance. The mistakes most people make are over-plucking, ignoring the tail, and not filling in the sparse spots.",
+            steps:["Find your three points: start (above inner corner of eye), arch (above outer edge of iris), end (align with outer corner of eye) — this is your natural shape","Do NOT over-pluck — sparse brows from over-grooming take 6-9 months to recover","Use a spoolie brush to comb hairs upward before trimming — trim only the hairs that extend past the natural upper edge","Fill sparse spots with light, hair-like strokes using a brow pencil one shade lighter than you think you need","Set with a clear brow gel to hold shape all day — costs almost nothing and lasts months","Tweeze individual stragglers between sessions rather than doing full reshape each time"],
+            actions:["Generate My Eyebrow Grooming Guide","Find Products Available In My Country","Build My Weekly Grooming Routine","Get My Shape Recommendation"],
+          },
+          {
+            id:"nailhacks", title:"Nail & Hand Care Hacks", badge:"Underrated", badgeColor:"#81c784",
+            tags:["Grooming"],
+            tagline:"What people notice without knowing they noticed",
+            whyItWorks:"Hand and nail care is one of the highest-ROI grooming areas because hands are visible in every interaction — handshakes, gestures, typing, photos. Clean, well-maintained nails communicate attention to detail even when nothing else about your appearance suggests it.",
+            steps:["File after every shower when nails are soft — filing dry nails causes breakage","Push cuticles back gently with a wooden stick after showering — never cut them (increases infection risk)","Apply cuticle oil or any vegetable oil (coconut, olive) to nails and cuticles 3x per week — grows nails visibly faster","Hand cream every time you wash your hands — hand washing dries skin significantly over time","Avoid using nails as tools — opening cans, peeling stickers — this causes micro-cracks","Keep a nail file in your bag — a small snag left unfiled tears into a break within 24 hours"],
+            actions:["Build My Weekly Nail Care Routine","Find Affordable Products In My Country","Generate My Hand Care Protocol","Create My Grooming Checklist"],
           },
         ],
       },
@@ -1884,6 +2009,61 @@ const TOPIC_CONFIGS = {
             whyItWorks:"BJ Fogg's research at Stanford shows new habits stick far better when anchored to existing behavior ('After I [existing habit], I will [new habit]') than when relying on willpower or motivation alone.",
             steps:["List 5 things you already do every day without thinking — brushing teeth, making coffee, etc.","Pick ONE new habit you want to build","Write the formula: 'After I [existing habit], I will [new habit]'","Make the new habit absurdly small at first — 2 minutes max","Increase difficulty only after 2 weeks of consistency, not before"],
             actions:["Build My Habit Stack","Generate Habit Ideas For My Goals","Create 30-Day Tracker","Find My Existing Anchor Habits"],
+          },
+          {
+            id:"wakeup", title:"When To Wake Up — And Why It Matters", badge:"Game Changer", badgeColor:"#f0b429",
+            tags:["Morning"],
+            tagline:"The first hour of your day is the only hour nobody can take from you",
+            whyItWorks:"The most productive people — builders, athletes, writers, founders — protect their mornings aggressively. Not because waking up early is a personality trait, but because the first 60-90 minutes before the world needs you are the only time your mind is fully yours. No notifications. No one asking things of you. No decisions that belong to other people. That window is where real progress is built.\n\n5:30 AM — Wake up, no snooze. The first decision of the day sets the tone.\n5:30-5:45 AM — Hydrate, no phone. Your brain is dehydrated after sleep — drink water. Looking at notifications first hands control of your morning to everyone else.\n5:45-6:15 AM — Move your body. 30 minutes of movement raises cortisol (focus hormone) to its natural peak. This is not about fitness, it's about cognitive performance.\n6:15-6:30 AM — Review your ONE goal for the day. Not your to-do list. One goal. Write it. Say it.\n6:30-8:00 AM — Deep work, no interruptions. This is your most cognitively powerful window. No calls, no social media. Work on what matters most. This block alone, done consistently, changes your life in 90 days.",
+            steps:["Set your alarm for 5:30-6:00 AM tomorrow — no negotiation","The moment the alarm goes off, sit up and put your feet on the floor. Movement breaks the decision loop","Drink water before picking up your phone — this alone changes the morning's tone","Move for 30 minutes — walk, stretch, bodyweight. Do it before you 'feel like it'","Identify your ONE most important goal for the day before you open any app"],
+            actions:["Build My Morning Routine","Generate My First 30-Day Wake-Up Challenge","Design My Deep Work Block","Calculate The Extra Hours I'd Gain In A Year"],
+          },
+          {
+            id:"routinestick", title:"Build A Routine That Actually Sticks", badge:"System", badgeColor:"#1ab89a",
+            tags:["Habits","Morning","Evening"],
+            tagline:"Your routine is the architecture of your discipline — design it once, execute forever",
+            whyItWorks:"Most people's routines fail because they are aspirational, not structural. They describe what a perfect version of you would do, not what your current self can reliably execute. A routine that sticks is designed around your worst day, not your best. If it only works when you're motivated, it isn't a routine — it's a wish.",
+            steps:["Write your current morning hour by hour — be honest about what actually happens","Identify the one change that would make the biggest difference to your day","Make that change so small you'd be embarrassed to skip it (2 minutes max to start)","Attach it to something you already do — right after waking, right after brushing teeth","Run it for 14 days without modification before adding anything else"],
+            actions:["Audit My Current Daily Routine","Build My Minimum Viable Routine","Generate My 14-Day Consistency Plan","Design My Evening Wind-Down Protocol"],
+          },
+        ],
+      },
+      {
+        id:"investself", label:"Invest In Yourself", icon:"🧠",
+        desc:"The highest-return investments you can make are not in stocks — they're in you.",
+        tags:["All","Skills","Energy","Network","Creation"],
+        cards:[
+          {
+            id:"stackskills", title:"Stack High-Income Skills", badge:"High ROI", badgeColor:"#f0b429",
+            tags:["Skills"],
+            tagline:"One skill makes you employable. A stack of 2-3 rare skills makes you irreplaceable.",
+            whyItWorks:"Pick skills that compound and are hard to outsource: sales, persuasion, writing, coding, design, leadership, public speaking, negotiation. Then layer them. A programmer who can also sell is 10x more valuable than one who only codes. A designer who can write copy commands double the rates. Your current season is the lowest-cost time to acquire these — you have more plasticity than you'll have later.",
+            steps:["List your current primary skill — what's the one thing you do best?","Identify 2 adjacent high-value skills that would multiply your primary skill's value","Spend 1 hour daily learning the first adjacent skill for 90 days","Teach what you learn immediately — tutoring, content, or explaining to a friend","Build a portfolio of evidence, not just claims — real work beats CVs"],
+            actions:["Find My High-Value Skill Stack","Build My 90-Day Skill Plan","Generate Portfolio Project Ideas","Calculate Income Lift From Adding These Skills"],
+          },
+          {
+            id:"energymgmt", title:"Obsess Over Your Energy", badge:"Infrastructure", badgeColor:"#1ab89a",
+            tags:["Energy"],
+            tagline:"You can't build anything running on empty — your body is your infrastructure",
+            whyItWorks:"Sleep, movement, nutrition, and mental recovery are not indulgences — they are performance inputs. A well-rested, physically active person with average talent outperforms a brilliant, depleted person almost every time. This isn't wellness advice. It is performance strategy.",
+            steps:["Protect 7-8 hours of sleep, especially during your most important work phases","Move for at least 30 minutes daily — the cognitive benefits alone are worth it","Audit your energy for 7 days: rate yourself every 3 hours, find the patterns","Identify your 2 biggest energy drains and reduce one of them this week","Build a recovery ritual at the end of your workday — separation between work and rest"],
+            actions:["Build My Energy Audit","Generate My Recovery Protocol","Find My Energy Drain Patterns","Create My Daily Energy Schedule"],
+          },
+          {
+            id:"networkmaths", title:"Network Mathematics", badge:"Leverage", badgeColor:"#9b72cf",
+            tags:["Network"],
+            tagline:"One right introduction beats 10 years of solo effort — the math is real",
+            whyItWorks:"Your network isn't who you know — it's what you believe is possible. The people around you define your ceiling, whether you notice it or not. The ambitious person who surrounds themselves with builders starts to believe bigger without trying. Upgrade your environment, and your results follow automatically — even before you do any more work.",
+            steps:["List the 5 people you spend the most time with — what is their average ambition level?","Reach out to one person you admire every month — no ask, just genuine connection","Attend one event in your field every quarter — your next opportunity will come from a room","Give before you take — show up with value, ideas, connections","Follow up within 48 hours of any meaningful conversation, always"],
+            actions:["Audit My Current Network","Find Events In My Field","Generate My Outreach Message","Build My Network Growth Plan"],
+          },
+          {
+            id:"createnotconsume", title:"Create, Don't Just Consume", badge:"Leverage", badgeColor:"#e05c6e",
+            tags:["Creation"],
+            tagline:"Consumers pay. Creators get paid. Stop feeding algorithms and start building things.",
+            whyItWorks:"Every hour you spend consuming, someone else is building the thing you wish you had created. Writing, building, designing, teaching, making — this is how you convert what you know into leverage. Creation is also the fastest path to clarity. You don't know what you think until you write it. You don't know if an idea works until you build it. The creator who ships imperfect work consistently beats the perfectionist who never finishes.",
+            steps:["Create something every day — a post, a paragraph, a prototype. Even if nobody sees it","Ship before you're ready — done is the engine of more, perfect is the enemy of real","Pick one medium to master this year: writing, video, audio, or code — just one, go deep","Repurpose what you create: one idea → a post, a short video, a voice note","Track your creation streak — visibility makes consistency easier"],
+            actions:["Choose My Creation Medium","Build My Daily Creation Habit","Generate Content Ideas From What I Already Know","Build My Creation-to-Distribution System"],
           },
         ],
       },
@@ -12249,11 +12429,13 @@ function BottomNav({nav,setNav}){
 // ── MobileTopBar ─────────────────────────────────────────────────────────
 function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPhotoURL,userName,onHamburger}){
   const G={...useThemeColors()};
+  const {theme,toggleTheme} = useTheme();
   return(
     <div className="mob-top" style={{display:"flex",alignItems:"center",
       justifyContent:"space-between",padding:"max(14px,env(safe-area-inset-top)) 18px 12px",
-      background:"rgba(10,8,0,0.94)",backdropFilter:"blur(14px)",
-      borderBottom:"1px solid rgba(255,255,255,0.07)",
+      background:G.isDark?"rgba(10,8,0,0.94)":"rgba(247,244,236,0.96)",
+      backdropFilter:"blur(14px)",
+      borderBottom:"1px solid "+(G.isDark?"rgba(255,255,255,0.07)":"rgba(35,28,12,0.08)"),
       position:"sticky",top:0,zIndex:300,gap:12}}>
 
       {/* Left: hamburger OR back button */}
@@ -12283,8 +12465,20 @@ function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPho
         }
       </div>
 
-      {/* Right: bell + avatar */}
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
+      {/* Right: theme toggle + bell + avatar */}
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+
+        {/* 🌙 / ☀️ theme toggle — always visible */}
+        <button onClick={toggleTheme}
+          title={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"}
+          style={{background:"none",border:"1px solid "+(G.isDark?"rgba(255,255,255,0.1)":"rgba(35,28,12,0.12)"),
+            borderRadius:20,cursor:"pointer",fontSize:14,padding:"4px 10px",
+            color:G.cream,display:"flex",alignItems:"center",gap:5,
+            lineHeight:1,transition:"all .2s"}}>
+          <span>{theme==="dark"?"🌙":"☀️"}</span>
+          <span style={{fontSize:10,fontWeight:600,letterSpacing:".04em"}}>{theme==="dark"?"DARK":"LIGHT"}</span>
+        </button>
+
         <button onClick={onNotif} style={{background:"none",border:"none",
           cursor:"pointer",fontSize:18,color:G.dim,padding:4}}>
           🔔
