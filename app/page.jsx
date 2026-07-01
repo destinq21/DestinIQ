@@ -358,7 +358,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
