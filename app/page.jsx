@@ -359,7 +359,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -698,8 +698,8 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Outfit:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root,[data-theme="dark"]{
-  --void:#0a0800;--deep:#0d0b01;--base:#111008;--raised:#111008;--lift:#151209;--midnight:#0a0800;
-  --night:#0a0800;--card-bg:#111008;--surface:#0e0c02;
+  --void:#0a0800;--deep:#0d0b01;--base:#111008;--raised:#131009;--lift:#181409;--midnight:#0f0c02;
+  --night:#0f0c02;--card-bg:#111008;--surface:#0e0c02;
   --cream-80:rgba(237,232,216,0.8);--cream-70:rgba(237,232,216,0.7);--cream-50:rgba(237,232,216,0.5);--cream-40:rgba(237,232,216,0.4);--cream-20:rgba(237,232,216,0.2);--cream-15:rgba(237,232,216,0.12);
   --line:rgba(255,255,255,0.06);--line-gold:rgba(210,175,90,0.18);
   --gold:#d2af5a;--gold-bright:#e8cb7a;--gold-dim:rgba(210,175,90,0.12);--gold-glow:rgba(210,175,90,0.06);
@@ -12934,6 +12934,30 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
         cat.label.toLowerCase().includes(query.toLowerCase()) ||
         cat.desc.toLowerCase().includes(query.toLowerCase()))
     : CATEGORIES;
+
+  // Search individual tools by label — across ALL categories + TOPIC_CONFIGS
+  const filteredTools = query.trim()
+    ? (() => {
+        const q = query.toLowerCase();
+        const results = [];
+        // Search TOOL_META (old tools)
+        Object.entries(TOOL_META).forEach(([id,m])=>{
+          if((m.label||"").toLowerCase().includes(q) || id.toLowerCase().includes(q)){
+            results.push({id, label:m.label||id, icon:m.icon||"✦", color:m.color||"var(--gold)", type:"tool"});
+          }
+        });
+        // Search TOPIC_CONFIGS (new card topics)
+        Object.entries(TOPIC_CONFIGS||{}).forEach(([catId,cat])=>{
+          (cat.topics||[]).forEach(topic=>{
+            if(topic.label.toLowerCase().includes(q)||topic.desc.toLowerCase().includes(q)){
+              results.push({id:"topic:"+catId+"."+topic.id, label:topic.label, icon:topic.icon||"✦",
+                color:CATEGORIES.find(c=>c.id===catId)?.color||"var(--gold)", type:"topic", catId});
+            }
+          });
+        });
+        return results.slice(0,12);
+      })()
+    : [];
 
   const Card = ({children,style={},onClick})=>(
     <div onClick={onClick} style={{background:G.card,border:"1px solid "+G.border,
