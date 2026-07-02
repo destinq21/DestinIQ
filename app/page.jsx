@@ -4455,16 +4455,40 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   );
 }
 function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
+  const chatKey = userId ? `diq_advisor_chat_${userId}` : null;
   const openingMessage = `Hey ${profile?.name?.split(" ")[0]||"there"} 👋 Good to see you.\n\nI'm your AI companion — I've gone through everything you shared and I know your situation well. I'm here whether you want to think something through, talk something out, or just need someone to check in with.\n\nWhat's on your mind?`;
-  const [msgs,setMsgs]=useState([{role:"assistant",content:openingMessage}]);
+
+  // ── PERSISTENT CHAT — load saved history on mount ─────────────────────────
+  const [msgs,setMsgs]=useState(()=>{
+    if(typeof window==="undefined"||!chatKey) return [{role:"assistant",content:openingMessage}];
+    try{
+      const saved=JSON.parse(localStorage.getItem(chatKey)||"null");
+      if(Array.isArray(saved)&&saved.length>0) return saved;
+    }catch{}
+    return [{role:"assistant",content:openingMessage}];
+  });
+  const [showNewChatPrompt,setShowNewChatPrompt]=useState(false);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
+  // Save chat to localStorage whenever msgs changes
+  useEffect(()=>{
+    if(!chatKey||msgs.length<=1) return;
+    try{localStorage.setItem(chatKey,JSON.stringify(msgs.slice(-80)));}catch{} // keep last 80 msgs
+  },[msgs]);
+
+  const startNewChat=()=>{
+    const fresh=[{role:"assistant",content:openingMessage}];
+    setMsgs(fresh);
+    setShowNewChatPrompt(false);
+    if(chatKey) try{localStorage.removeItem(chatKey);}catch{}
+  };
+
   // ── FREE USER DAILY MESSAGE LIMIT ─────────────────────────────────────────
-  // Limit by characters typed per day (not messages — "hello" ≠ a deep question)
-  const FREE_CHAR_LIMIT = 600;   // ~10 short messages or ~5 medium ones
-  const PRO_CHAR_LIMIT  = 6000;  // extended daily conversations
+  // Generous free limit — let users enjoy real conversations before hitting the wall
+  const FREE_CHAR_LIMIT = 3000;  // ~25-30 real messages — enough to feel the value
+  const PRO_CHAR_LIMIT  = 12000; // extended daily conversations
   const limitKey=`diq_advisor_${userId}_${new Date().toDateString()}`;
   const [charsUsed,setCharsUsed]=useState(()=>{
     if(typeof window==="undefined") return 0;
@@ -4473,6 +4497,8 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
   const dailyCharLimit = isPremium ? Infinity : isPaid ? PRO_CHAR_LIMIT : FREE_CHAR_LIMIT;
   const charsRemaining = dailyCharLimit===Infinity ? 999999 : Math.max(0, dailyCharLimit - charsUsed);
   const limitReached   = dailyCharLimit!==Infinity && charsRemaining<=0;
+  // Rough message count estimate (avg ~80 chars per message)
+  const msgsRemaining  = dailyCharLimit===Infinity ? 999 : Math.max(0, Math.floor(charsRemaining/80));
 
   const send=async()=>{
     if(!input.trim()||loading) return;
@@ -4533,11 +4559,43 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
             background:"linear-gradient(135deg,rgba(155,114,207,0.3),rgba(240,180,41,0.1))",
             border:"1px solid rgba(155,114,207,0.3)",display:"flex",alignItems:"center",
             justifyContent:"center",fontSize:18}}>🤖</div>
-          <div>
+          <div style={{flex:1}}>
             <div style={{fontSize:15,fontWeight:700,color:G.cream,lineHeight:1.2}}>AI Coach</div>
             <div style={{fontSize:11,color:"rgba(100,181,246,0.8)"}}>● Online · Powered by DestinIQ</div>
           </div>
+          {/* New Chat button — only show if there's an existing conversation */}
+          {msgs.length>1&&(
+            <button onClick={()=>setShowNewChatPrompt(true)}
+              style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
+                padding:"6px 12px",fontSize:11,color:G.dimmer,cursor:"pointer",
+                fontFamily:"inherit",flexShrink:0,transition:"all .15s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=G.gold;e.currentTarget.style.color=G.gold;}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.color=G.dimmer;}}>
+              + New Chat
+            </button>
+          )}
         </div>
+
+        {/* New chat confirmation */}
+        {showNewChatPrompt&&(
+          <div style={{marginTop:10,padding:"12px 14px",background:"rgba(240,180,41,0.06)",
+            border:"1px solid rgba(240,180,41,0.2)",borderRadius:12,
+            display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+            <div style={{fontSize:12,color:G.dim,flex:1}}>Start a new conversation? Your current chat will be cleared.</div>
+            <div style={{display:"flex",gap:8,flexShrink:0}}>
+              <button onClick={startNewChat}
+                style={{background:G.gold,border:"none",borderRadius:7,padding:"6px 14px",
+                  fontSize:12,fontWeight:700,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+                Start Fresh
+              </button>
+              <button onClick={()=>setShowNewChatPrompt(false)}
+                style={{background:"none",border:"1px solid "+G.border,borderRadius:7,
+                  padding:"6px 12px",fontSize:12,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+                Keep Chat
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Message thread */}
@@ -4629,8 +4687,10 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
           <p style={{fontSize:10,color:G.dimmer,margin:0}}>Enter to send · Shift+Enter for new line</p>
           {dailyCharLimit!==Infinity&&(
             <p style={{fontSize:10,margin:0,
-              color:charsRemaining<100?"#e05252":charsRemaining<300?"#f0b429":"rgba(232,220,200,0.3)"}}>
-              {limitReached?"Limit reached — upgrade for more":`~${Math.ceil(charsRemaining/80)} messages left`}
+              color:limitReached?"#e05252":msgsRemaining<5?"#f0b429":G.dimmer}}>
+              {limitReached
+                ? <span>Daily limit reached · <button onClick={onUnlock} style={{background:"none",border:"none",color:G.gold,cursor:"pointer",fontSize:10,fontFamily:"inherit",padding:0,textDecoration:"underline"}}>Upgrade for unlimited</button></span>
+                : `~${msgsRemaining} messages left today`}
             </p>
           )}
         </div>
@@ -17447,10 +17507,28 @@ function DestinIQInner(){
         const handlePhotoUpdated=(e)=>{ if(e.detail?.url) setNavPhotoURL(e.detail.url); };
         window.addEventListener("photoUpdated",handlePhotoUpdated);
         const handleCI=(e)=>{
-          // Bump the visible streak counter immediately after check-in
+          // Only bump streak if this is the FIRST check-in for today's date
+          const todayKey = new Date().toISOString().slice(0,10);
+          const uid = e.detail?.userId;
+          const lastCountedKey = uid ? `diq_streak_last_counted_${uid}` : null;
+          try{
+            const lastCounted = lastCountedKey ? localStorage.getItem(lastCountedKey) : null;
+            if(lastCounted === todayKey) return; // already counted today — do nothing
+            if(lastCountedKey) localStorage.setItem(lastCountedKey, todayKey);
+          }catch{}
           setStreak(s=>{
             const next=s+1;
-            if(e.detail?.userId) try{localStorage.setItem(`diq_streak_${e.detail.userId}`,String(next));}catch{}
+            if(uid) try{localStorage.setItem(`diq_streak_${uid}`,String(next));}catch{}
+            // Also push the updated streak to Supabase
+            if(uid){
+              try{
+                supabase.from("user_profiles").upsert({
+                  user_id:uid, streak:next,
+                  last_checkin_date:new Date().toISOString().slice(0,10),
+                  updated_at:new Date().toISOString(),
+                },{onConflict:"user_id"}).catch(()=>{});
+              }catch{}
+            }
             return next;
           });
         };
