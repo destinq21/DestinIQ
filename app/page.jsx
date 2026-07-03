@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -359,7 +359,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -515,6 +515,64 @@ const NOTIF_MSGS = {
     (n)=>`${n}, last week is gone. This week starts now. Open your plan and pick one thing.`,
   ],
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROGRESS POINTS ENGINE
+// Tracks real user actions and converts them into a dynamic progress score.
+// Points are stored per-user in localStorage and synced to Supabase.
+// ═══════════════════════════════════════════════════════════════════════════════
+const PROGRESS_POINTS = {
+  checkin:          3,   // completed daily check-in
+  win_logged:       2,   // logged a win
+  step_completed:   1,   // ticked off a card step
+  deepdive_done:    2,   // marked a deep-dive section as done
+  coach_message:    0.5, // sent a message to AI coach
+  streak_7:         5,   // reached 7-day streak
+  streak_14:        5,   // reached 14-day streak
+  streak_30:        10,  // reached 30-day streak
+};
+
+const PROGRESS_PTS_KEY = (uid) => `diq_prog_pts_${uid}`;
+const PROGRESS_ACT_KEY = (uid) => `diq_prog_act_${uid}`;
+
+function getProgressPoints(userId){
+  if(!userId) return 0;
+  try{ return parseFloat(localStorage.getItem(PROGRESS_PTS_KEY(userId))||"0"); }catch{ return 0; }
+}
+
+function addProgressPoints(userId, action, amount){
+  if(!userId) return;
+  // Deduplicate daily actions so they can't be farmed
+  const dedupeKey = PROGRESS_ACT_KEY(userId);
+  const today = new Date().toISOString().slice(0,10);
+  const dailyDeduped = ["checkin","streak_7","streak_14","streak_30"];
+  try{
+    if(dailyDeduped.includes(action)){
+      const done = JSON.parse(localStorage.getItem(dedupeKey)||"{}");
+      const key = action+"_"+today;
+      if(done[key]) return; // already earned today
+      done[key] = true;
+      // Clean up old keys (keep last 30 days worth)
+      const keys = Object.keys(done);
+      if(keys.length > 100) keys.slice(0, keys.length-100).forEach(k=>delete done[k]);
+      localStorage.setItem(dedupeKey, JSON.stringify(done));
+    }
+    const current = getProgressPoints(userId);
+    const next = Math.min(9999, current + amount);
+    localStorage.setItem(PROGRESS_PTS_KEY(userId), String(next));
+    // Dispatch so ProgressScreen can react in real-time
+    window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,points:next,action}}));
+  }catch{}
+}
+
+// Convert raw points into a 0-99 progress score on top of the AI baseline
+function getProgressScore(userId, aiBaseline){
+  const base = Math.max(10, Math.min(85, aiBaseline||60));
+  const pts  = getProgressPoints(userId);
+  // Each point = 0.08% above baseline, capped at 99
+  const earned = Math.min(99 - base, pts * 0.08);
+  return Math.round(base + earned);
+}
 
 const NOTIF_SCHED_KEY="destiniq_notif_v2";
 
@@ -1576,6 +1634,37 @@ const TOPIC_CONFIGS = {
           },
         ],
       },
+      {
+        id:"dating", label:"Dating & Attraction", icon:"💘",
+        desc:"What actually works in dating — attraction, confidence, communication, and connection.",
+        tags:["All","Attraction","First Dates","Online Dating"],
+        cards:[
+          {
+            id:"attractionbasics", title:"What Actually Attracts People", badge:"Evidence-Based", badgeColor:"#e05c6e",
+            tags:["Attraction"],
+            tagline:"Not looks, not money — the specific behaviours that create attraction",
+            whyItWorks:"Research consistently shows that the strongest predictors of attraction are: confidence (not arrogance — the belief that you are enough), directness (saying what you mean without hedging), genuine curiosity about the other person, and emotional stability under pressure. These are behaviours, not traits — they can all be practised.",
+            steps:["Practise directness: state your opinion clearly without seeking approval afterward","Practise presence: in conversations, stop formulating your next line and actually listen","Practise self-disclosure: share something real and specific about yourself early — not surface facts","Let silences exist — comfortable silence signals confidence more than nervous chatter","Be the first to end a good conversation, not the last — leave while the energy is high"],
+            actions:["Build My Attraction Behaviours Plan","Generate My Confidence Practice","Find Patterns In My Past Relationships","Create My 30-Day Social Confidence Challenge"],
+          },
+          {
+            id:"firstdates", title:"How To Have A Great First Date", badge:"Practical", badgeColor:"#f06292",
+            tags:["First Dates"],
+            tagline:"The specific things that make people want a second date",
+            whyItWorks:"First dates fail most often because of the job-interview format — sitting across from each other asking biographical questions. The format creates anxiety not connection. The evidence-backed alternative: a shared low-stakes activity, genuine curiosity over interrogation, vulnerability over performance.",
+            steps:["Choose an activity over a static dinner — walking, mini golf, a market — something that gives you natural things to talk about","Ask about experiences and feelings, not facts: 'what was that like?' not 'where did you go to school?'","Share something real about yourself early — this invites reciprocal vulnerability","Don't go through your mental checklist — be genuinely curious about this specific person","At the end, if you want a second date, say so directly: 'I'd like to do this again' — no ambiguity"],
+            actions:["Plan My Ideal First Date","Generate Questions That Create Real Connection","Build My Pre-Date Confidence Routine","Find Great First Date Ideas In My City"],
+          },
+          {
+            id:"datingapp2", title:"Online Dating That Actually Works", badge:"Data-Backed", badgeColor:"#9b72cf",
+            tags:["Online Dating"],
+            tagline:"The specific profile and message strategies backed by platform data",
+            whyItWorks:"Apps like Tinder, Bumble, and Hinge have published research on what works. The findings are consistent: profiles with a clear primary photo (face visible, genuine smile, good lighting, no group shots) get 40% more matches. Bios that ask a specific question get 2x the first messages. Opening lines that reference something specific from their profile have 3x the response rate of generic openers.",
+            steps:["Primary photo: solo, genuine smile, good lighting, face clearly visible — nothing else","Second photo: doing something you actually enjoy — gives people a conversation starter","Bio: max 150 characters, one specific fact about you, one question for them — no clichés","Opening line: reference one specific thing from their profile — show you looked at it","Don't drag conversations on for days before asking to meet — suggest a date within 5 messages"],
+            actions:["Write My Bio","Generate Opening Lines For My Matches","Critique My Photo Strategy","Build My Matching and Meeting System"],
+          },
+        ],
+      },
     ],
   },
 
@@ -1920,6 +2009,52 @@ const TOPIC_CONFIGS = {
           },
         ],
       },
+      {
+        id:"relationships2", label:"Digital Wellness", icon:"📱",
+        desc:"Reclaim your attention, reduce screen anxiety, and use technology intentionally.",
+        tags:["All","Screen Time","Focus","Social Media"],
+        cards:[
+          {
+            id:"screentime", title:"Take Back Your Attention", badge:"High Impact", badgeColor:"#81c784",
+            tags:["Screen Time","Social Media"],
+            tagline:"The average person checks their phone 96 times a day — here's how to stop",
+            whyItWorks:"Your phone is the most sophisticated attention-capture device ever built. The engineers who made it are paid to keep you on it. You cannot out-willpower a system designed by thousands of engineers to prevent exactly that. The solution isn't discipline — it's architecture.",
+            steps:["Move all social media apps off your home screen into a folder","Set app time limits for the top 3 apps that drain you most","No phone for the first 30 minutes after waking — charge it outside your bedroom","Designate phone-free times: meals, first hour of work, last 30 mins before sleep","Do a 7-day audit: turn on Screen Time (iOS) or Digital Wellbeing (Android) — most people are shocked by the number"],
+            actions:["Build My Digital Detox Plan","Calculate Hours I'd Reclaim Weekly","Generate My Phone-Free Schedule","Find Apps To Help Me Focus"],
+          },
+          {
+            id:"dopaminefast", title:"Dopamine Reset", badge:"Advanced", badgeColor:"#9b72cf",
+            tags:["Focus","Screen Time"],
+            tagline:"Why you feel empty even when nothing is wrong — and how to fix it",
+            whyItWorks:"Constant low-effort stimulation (scrolling, notifications, short videos) raises your dopamine baseline so high that normal life feels boring and unrewarding by comparison. A brief reset restores your ability to feel satisfaction from ordinary things — work, conversation, reading, walking.",
+            steps:["Pick a 24-48 hour window and remove: social media, streaming, gaming, junk food","Replace with: walking, reading physical books, journaling, cooking, conversation","The first 4-6 hours will feel intensely boring — this is the withdrawal phase, not failure","By hour 12, most people notice colours look brighter and conversation feels more interesting","After the reset, reintroduce stimulation intentionally — not reflexively"],
+            actions:["Build My Dopamine Reset Plan","Find What's Draining My Baseline","Generate My Reset Weekend Schedule","Create My Intentional Reintroduction Plan"],
+          },
+        ],
+      },
+      {
+        id:"gratitude", label:"Gratitude & Perspective", icon:"🌅",
+        desc:"The science-backed practice of gratitude and how it physically changes your brain.",
+        tags:["All","Daily Practice","Mindset","Resilience"],
+        cards:[
+          {
+            id:"gratpractice", title:"The Gratitude Practice That Actually Works", badge:"Science-Backed", badgeColor:"#81c784",
+            tags:["Daily Practice"],
+            tagline:"Not 'think positive' — a specific protocol with measurable brain effects",
+            whyItWorks:"Gratitude journaling, done correctly, has been shown in clinical studies to increase sleep quality by 25%, reduce physical symptoms of illness, and measurably lower cortisol. The key is specificity — 'I'm grateful for my family' activates nothing. 'I'm grateful that my sister called me at 11pm when I was struggling' activates the full neurological response.",
+            steps:["Every evening, write exactly 3 things you're grateful for — specific moments, not general categories","For each one, answer: 'why did this happen?' — this links gratitude to agency","Vary the entries each day — repetition reduces the neurological effect significantly","Once per week, write a longer gratitude letter to someone who affected your life positively","Don't share the letter unless you want to — the writing itself is the intervention"],
+            actions:["Start My Gratitude Journal","Generate My First Week of Prompts","Build My Evening Gratitude Routine","Find How Gratitude Affects My Specific Challenges"],
+          },
+          {
+            id:"reframe", title:"The Perspective Shift Method", badge:"Mindset Tool", badgeColor:"#f0b429",
+            tags:["Mindset","Resilience"],
+            tagline:"Change what the situation means without changing what happened",
+            whyItWorks:"Cognitive reframing doesn't deny reality — it changes which aspects of reality you're focusing on. Two people can face the same job loss; one experiences it as catastrophe, one as the forced change they needed. The event is identical. The meaning assigned determines the emotional experience and subsequent behavior.",
+            steps:["Write the situation exactly as it happened — just facts, no interpretation","Write your current interpretation: 'this means...'","Ask: what else could this mean? List 3 alternative interpretations, even ones you don't believe yet","Ask: which interpretation, if true, would make me most capable of responding well?","Choose that interpretation and act from it for 24 hours before revisiting"],
+            actions:["Apply This To My Current Situation","Generate Alternative Interpretations","Build My Reframing Practice","Find Patterns In What I Catastrophise"],
+          },
+        ],
+      },
     ],
   },
 
@@ -1961,6 +2096,44 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Ikigai sits at the intersection of what you love, what you're good at, what the world needs, and what you can be paid for. Most career dissatisfaction comes from optimizing for only 1-2 of these instead of all 4.",
             steps:["List what you love doing, regardless of pay","List what you're genuinely skilled at, based on real feedback","List problems in the world or your community you care about","List what people are currently willing to pay you for","Find the overlap — this is your starting point, not a final answer"],
             actions:["Map My Personal Ikigai","Find Career Paths That Match","Build Transition Plan","Generate Income Options For My Ikigai"],
+          },
+        ],
+      },
+      {
+        id:"financialpurpose", label:"Money With Meaning", icon:"💡",
+        desc:"Align your money and your purpose — build income that actually reflects your values.",
+        tags:["All","Income","Values","Work"],
+        cards:[
+          {
+            id:"meaningful_income", title:"Build Income Around What You Care About", badge:"Purpose + Money", badgeColor:"#64b5f6",
+            tags:["Income","Values"],
+            tagline:"The myth of separating 'passion' from 'money' — and what actually works",
+            whyItWorks:"The 'follow your passion' advice is incomplete. Passion without skills and market demand creates broke idealism. Skills without passion creates burnout. The real target is the intersection: something you're genuinely interested in, that you're building real skills in, that other people will pay for. That intersection expands over time as you invest in it.",
+            steps:["List 5 things you find genuinely interesting — not what you think you should say","For each, identify: what skills would I need to be excellent at this?","Research: are people currently paying for this skill anywhere in the world?","Start building one skill at the intersection of interest and market demand","Don't wait until it replaces your income — start on the side, measure demand first"],
+            actions:["Map My Interest-Skill-Market Intersection","Find Income Models For My Interests","Generate My 12-Month Skill Building Plan","Calculate Income Potential From My Interests"],
+          },
+        ],
+      },
+      {
+        id:"selfknowledge", label:"Know Yourself Deeply", icon:"🔮",
+        desc:"The Socratic foundation: you cannot build the right life if you don't know who you are.",
+        tags:["All","Identity","Values","Strengths"],
+        cards:[
+          {
+            id:"valuesinventory", title:"Your Personal Values Inventory", badge:"Foundational", badgeColor:"#9b72cf",
+            tags:["Identity","Values"],
+            tagline:"Most people live by values they inherited — not values they actually chose",
+            whyItWorks:"Values are the silent criteria by which you make every important decision. When your actions conflict with your stated values, you feel dissonance without understanding why. Mapping your actual values (not your aspirational ones) gives you a framework for every major decision for the rest of your life.",
+            steps:["List 20 values from any list you find (Google 'values list') — don't filter yet","Circle the 10 that resonate most immediately","Now cut to 5 — force-rank by asking 'if I could only keep one of these two, which?'","Write what each of your top 5 values means in specific, behavioral terms — not abstract words","Test every major upcoming decision against this list before committing"],
+            actions:["Generate My Values Inventory","Find Conflicts Between My Current Life and My Values","Build My Values-Based Decision Framework","Create My Personal Mission Statement"],
+          },
+          {
+            id:"strengthsaudit", title:"Find Your Actual Strengths", badge:"Self-Awareness", badgeColor:"#f0b429",
+            tags:["Strengths","Identity"],
+            tagline:"Not what you're good at — what you're energised by while doing it",
+            whyItWorks:"The distinction between skills and strengths is critical. You can be skilled at something that drains you (a learned competency). A true strength is something that energises you even when it's hard. Building a life around your strengths doesn't mean avoiding weakness — it means stopping the attempt to improve weaknesses into strengths and instead making strengths dominant.",
+            steps:["List 10 times in your life when you felt most alive and effective — be specific","Look for patterns: what were you doing? what kind of thinking was involved?","Ask 3 people who know you well: 'when do you think I'm at my best?'","Compare their answers to your own patterns — the overlap is your strength zone","Design your work and goals so that 70%+ of your time is spent in that zone"],
+            actions:["Map My Strength Patterns","Generate My Strengths Profile","Find Career Paths That Match My Strengths","Build My Strengths-First Life Plan"],
           },
         ],
       },
@@ -3282,25 +3455,6 @@ function fallback(f,ipLocation=null){
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHARED UI
 // ═══════════════════════════════════════════════════════════════════════════════
-function Ring({score,color,size=96,label}){
-  const r=(size-12)/2,c=2*Math.PI*r,fill=(score/100)*c;
-  return(
-    <div className="ring-wrap" style={{width:size,height:size}}>
-      <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5"/>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="5"
-          strokeDasharray={`${fill} ${c}`} strokeLinecap="round"
-          style={{transition:"stroke-dasharray 1.6s cubic-bezier(.4,0,.2,1)",filter:`drop-shadow(0 0 5px ${color}50)`}}/>
-      </svg>
-      <div className="ring-inner">
-        <span className="ring-val" style={{color}}>{score}</span>
-        <span className="ring-lbl">{label}</span>
-      </div>
-    </div>
-  );
-}
-
-// ── LockGate: full section gate (paid modules) ───────────────────────────────
 function LockGate({children,isPaid,onUnlock,teaser=""}){
   if(isPaid) return children;
   return(
@@ -3342,24 +3496,6 @@ function FreeGate({total, freeCount, isPaid, onUnlock, label="sections"}){
 
 // ── ContentSlice: shows first N of an array with a blur gate ─────────────────
 // Used for dynamic modules (Life Hacks, Earn Online etc.)
-function ContentSlice({children, totalCount, freeCount=3, isPaid, onUnlock, what="items"}){
-  if(isPaid || totalCount<=freeCount) return children;
-  const locked = totalCount - freeCount;
-  return(
-    <div>
-      {children}
-      <div style={{marginTop:10,padding:"16px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.18)",borderRadius:12,textAlign:"center"}}>
-        <div style={{fontSize:13,color:"var(--cream-50)",marginBottom:12}}>
-          🔒 {locked} more {what} locked — upgrade to see all {totalCount} and refresh anytime
-        </div>
-        <button className="btn btn-gold" style={{fontSize:12,padding:"8px 20px"}} onClick={onUnlock}>
-          Unlock all → from $9/month
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MOMENTUM MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4309,6 +4445,9 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
         }); }catch{}
         // Fire event so DestinIQ can update streak counter in real-time
         window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
+        // Award progress points for completing check-in
+        addProgressPoints(userId, "checkin", PROGRESS_POINTS.checkin);
+        window.dispatchEvent(new CustomEvent("showToast",{detail:"+3 progress points — keep it up!"}));
       }
     }catch(e){
       const fb=`${profile.name}, you showed up today — that matters more than most people realise. Score ${score}/10 is data, not judgment. The next 24 hours are a fresh calculation.`;
@@ -4521,6 +4660,8 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
     }
     const updated=[...msgs,{role:"user",content:msg}];setMsgs(updated);setLoading(true);
+    // Award small points for engaging with coach
+    addProgressPoints(userId, "coach_msg_"+Date.now(), PROGRESS_POINTS.coach_message);
     pushToMemory(userId,"user",msg);
     try{
       // Anthropic API requires first message to be role:"user"
@@ -4712,67 +4853,6 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
     </div>
   );
 }
-function TestimonialForm(){
-  const [open,setOpen]=useState(false);
-  const [name,setName]=useState("");
-  const [location,setLocation]=useState("");
-  const [quote,setQuote]=useState("");
-  const [sent,setSent]=useState(false);
-  const [loading,setLoading]=useState(false);
-
-  const submit=async()=>{
-    if(!name.trim()||!quote.trim()) return;
-    setLoading(true);
-    try{
-      await supabase.from("testimonials").insert({
-        name:`${name.trim()}${location.trim()?` · ${location.trim()}`:""}`,
-        quote:quote.trim(),
-        approved:true, // auto-approved — admin can hide from admin panel if needed
-      });
-      setSent(true);
-    }catch(e){
-      console.warn("testimonial save:",e.message);
-      setSent(true); // still show success even if save fails
-    }
-    setLoading(false);
-  };
-
-  if(sent) return(
-    <div style={{textAlign:"center",padding:"20px 0"}}>
-      <div style={{fontSize:28,marginBottom:8}}>🙏</div>
-      <div style={{fontSize:14,color:"var(--cream-60)",marginBottom:4}}>Thank you! Your story helps others believe it's possible.</div>
-      <div style={{fontSize:12,color:"var(--cream-30)"}}>It will appear here after a quick review.</div>
-    </div>
-  );
-
-  return(
-    <div style={{textAlign:"center",marginTop:16}}>
-      {!open?(
-        <button onClick={()=>setOpen(true)} style={{background:"none",border:"1px solid var(--line-gold)",borderRadius:10,padding:"10px 20px",color:"var(--gold)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}
-          onMouseEnter={e=>e.currentTarget.style.background="var(--gold-dim)"}
-          onMouseLeave={e=>e.currentTarget.style.background="none"}>
-          ✍️ Share your story
-        </button>
-      ):(
-        <div style={{background:"var(--night)",border:"1px solid var(--line-gold)",borderRadius:16,padding:"24px",maxWidth:480,margin:"0 auto",textAlign:"left"}}>
-          <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:4}}>Share your DestinIQ experience</div>
-          <p style={{fontSize:12,color:"var(--cream-40)",marginBottom:16}}>It only takes 30 seconds and it helps someone else take the leap.</p>
-          <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:10}} placeholder="Your name (e.g. Kwame)" value={name} onChange={e=>setName(e.target.value)} maxLength={60}/>
-          <input style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:10}} placeholder="Your country/city (e.g. 28 · Ghana)" value={location} onChange={e=>setLocation(e.target.value)} maxLength={60}/>
-          <textarea style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:10,padding:"11px 14px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6,marginBottom:12}} rows={3} maxLength={300} placeholder="What has DestinIQ done for you? Be specific — the more real, the more it helps others." value={quote} onChange={e=>setQuote(e.target.value)}/>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setOpen(false)} style={{flex:1,background:"none",border:"1px solid var(--cream-15)",borderRadius:10,padding:"10px",color:"var(--cream-40)",fontSize:13,cursor:"pointer"}}>Cancel</button>
-            <button onClick={submit} disabled={loading||!name.trim()||!quote.trim()} style={{flex:2,background:"var(--gold)",border:"none",borderRadius:10,padding:"10px",color:"#000",fontSize:13,fontWeight:700,cursor:loading||!name.trim()||!quote.trim()?"not-allowed":"pointer",opacity:!name.trim()||!quote.trim()?0.5:1}}>{loading?"Sending…":"Submit my story"}</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── MARKDOWN RENDERER ───────────────────────────────────────────────────────
-// Clean plain rendering — no bold decorations, no colored circles.
-// Strips markdown syntax and displays content as readable plain text with spacing.
 function RenderMD({text,style={}}){
   if(!text) return null;
 
@@ -5045,61 +5125,6 @@ HOW TO RESPOND:
 
 // ── Testimonial Marquee — stable component so React never re-mounts it ────────
 // Defined outside Landing so it never resets its CSS animation on re-render.
-function TestimonialMarquee(){
-  return(
-    <div style={{position:"relative",overflow:"hidden",marginBottom:20}}>
-      <style>{`
-        .testim-track{
-          display:flex;
-          gap:14px;
-          width:max-content;
-          animation:slideTestim 40s linear infinite;
-          will-change:transform;
-        }
-        .testim-track:hover{
-          animation-play-state:paused;
-        }
-        @keyframes slideTestim{
-          0%{transform:translateX(0)}
-          100%{transform:translateX(-50%)}
-        }
-      `}</style>
-      <div className="testim-track">
-        {[...ALL_TESTIMONIALS,...ALL_TESTIMONIALS].map((t,i)=>(
-          <div key={i} style={{
-            width:"min(290px,calc(85vw - 16px))",
-            flexShrink:0,
-            background:"var(--night)",
-            border:`1px solid ${i%3===1?"var(--line-gold)":"var(--line)"}`,
-            borderRadius:16,
-            padding:"20px 18px",
-          }}>
-            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
-              <div style={{width:32,height:32,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"var(--gold)",fontFamily:"var(--f-mono)",fontWeight:700,flexShrink:0}}>
-                {(t.name||"?")[0].toUpperCase()}
-              </div>
-              <div>
-                <div className="mono" style={{fontSize:"9px",color:"var(--cream-60)"}}>{t.name}</div>
-                <div style={{display:"flex",gap:1,marginTop:2}}>
-                  {[0,1,2,3,4].map(si=><span key={si} style={{color:"var(--gold)",fontSize:9}}>★</span>)}
-                </div>
-              </div>
-            </div>
-            <p style={{fontSize:12,lineHeight:1.8,color:"var(--cream-60)",fontStyle:"italic",margin:0}}>
-              &ldquo;{t.quote}&rdquo;
-            </p>
-          </div>
-        ))}
-      </div>
-      {/* Fade edges */}
-      <div style={{position:"absolute",top:0,left:0,bottom:0,width:50,background:"linear-gradient(90deg,var(--midnight),transparent)",pointerEvents:"none",zIndex:1}}/>
-      <div style={{position:"absolute",top:0,right:0,bottom:0,width:50,background:"linear-gradient(-90deg,var(--midnight),transparent)",pointerEvents:"none",zIndex:1}}/>
-    </div>
-  );
-}
-
-
-// ─── COUNTRIES LIST ──────────────────────────────────────────────────────────
 const COUNTRIES_LIST = [
   {name:"Afghanistan",currency:"AFN",symbol:"؋"},
   {name:"Albania",currency:"ALL",symbol:"L"},
@@ -5929,7 +5954,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
 
       {/* ── Top bar: back + progress bar ─── */}
       <div style={{padding:"max(16px,env(safe-area-inset-top)) 20px 0"}}>
-        <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",marginBottom:8}}>
           {step>0
             ?<button onClick={back} style={{background:"none",border:"none",color:G.dim,
                 cursor:"pointer",fontSize:22,padding:0,minWidth:32,minHeight:32,lineHeight:1,marginRight:8}}>←</button>
@@ -5938,11 +5963,21 @@ function Intake({onSubmit, savedFormData, ipLocation}){
           {/* Segmented progress */}
           <div style={{flex:1,display:"flex",gap:4}}>
             {[0,1,2,3,4,5,6].map(i=>(
-              <div key={i} style={{flex:1,height:3,borderRadius:2,
-                background:i<=step?"#f0b429":"rgba(232,220,200,0.1)",
+              <div key={i} style={{flex:1,height:4,borderRadius:2,
+                background:i<step?"#f0b429":i===step?"rgba(240,180,41,0.5)":"rgba(232,220,200,0.1)",
                 transition:"background 0.3s"}}/>
             ))}
           </div>
+          {/* Step counter */}
+          <div style={{marginLeft:10,fontSize:11,color:G.dimmer,fontFamily:"monospace",
+            fontWeight:700,whiteSpace:"nowrap"}}>
+            {step+1} / 7
+          </div>
+        </div>
+        {/* Step label */}
+        <div style={{textAlign:"center",fontSize:10,color:G.dimmer,fontFamily:"monospace",
+          letterSpacing:".1em",marginBottom:4,paddingLeft:40}}>
+          {["YOUR NAME","ABOUT YOU","YOUR GOALS","YOUR MINDSET","YOUR BLOCKERS","YOUR MOOD","YOUR VISION"][step]||""}
         </div>
       </div>
 
@@ -6548,87 +6583,6 @@ function getCareerLinks(career, formData){
 // SCORE HISTORY CHART
 // Shows how overall + pillar scores changed over time as user re-assesses
 // ═══════════════════════════════════════════════════════════════════════════════
-function ScoreHistoryChart({history}){
-  if(!history||history.length<2) return null;
-
-  const W=320, H=120, PAD=28;
-  const n=history.length;
-  const plotW=W-PAD*2, plotH=H-PAD*2;
-
-  const lines=[
-    {key:"overall",  color:"var(--gold)",   label:"Overall"},
-    {key:"life",     color:"var(--teal)",   label:"Life"},
-    {key:"wealth",   color:"#4ADE80",       label:"Wealth"},
-    {key:"mindset",  color:"#9b72cf",       label:"Mindset"},
-    {key:"relations",color:"var(--rose)",   label:"Relations"},
-  ];
-
-  const toX=(i)=>PAD + (i/(n-1))*plotW;
-  const toY=(v)=>PAD + plotH - (v/100)*plotH;
-
-  const pts=(key)=>history.map((h,i)=>`${toX(i)},${toY(h[key]||0)}`).join(" ");
-
-  const latest=history[history.length-1];
-  const first=history[0];
-  const overallChange=((latest.overall||0)-(first.overall||0));
-
-  return(
-    <div style={{marginBottom:20,padding:"16px 18px",background:"var(--lift)",borderRadius:16,border:"1px solid rgba(255,255,255,0.07)"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-        <div>
-          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".12em",marginBottom:4}}>YOUR SCORE PROGRESS</div>
-          <div style={{fontSize:13,color:"var(--cream-60)"}}>
-            {n} assessment{n!==1?"s":""} · Started {first.date} · Last updated {latest.date}
-          </div>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 12px",background:overallChange>=0?"rgba(31,168,154,0.1)":"rgba(248,113,113,0.1)",border:`1px solid ${overallChange>=0?"rgba(31,168,154,0.25)":"rgba(248,113,113,0.25)"}`,borderRadius:20}}>
-          <span style={{fontSize:14}}>{overallChange>=0?"📈":"📉"}</span>
-          <span style={{fontSize:13,fontWeight:700,color:overallChange>=0?"var(--teal)":"var(--rose)"}}>
-            {overallChange>=0?"+":""}{overallChange} overall
-          </span>
-        </div>
-      </div>
-
-      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",maxWidth:W,display:"block"}}>
-        {/* Grid lines */}
-        {[0,25,50,75,100].map(v=>(
-          <g key={v}>
-            <line x1={PAD} y1={toY(v)} x2={W-PAD} y2={toY(v)} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
-            <text x={PAD-4} y={toY(v)+4} fontSize="7" fill="rgba(255,255,255,0.2)" textAnchor="end">{v}</text>
-          </g>
-        ))}
-        {/* Date labels */}
-        {history.map((h,i)=>(
-          i===0||i===n-1?(
-            <text key={i} x={toX(i)} y={H-6} fontSize="7" fill="rgba(255,255,255,0.3)" textAnchor={i===0?"start":"end"}>
-              {h.date?.slice(5)}
-            </text>
-          ):null
-        ))}
-        {/* Lines */}
-        {lines.map(l=>(
-          <polyline key={l.key} points={pts(l.key)} fill="none" stroke={l.color} strokeWidth="1.5" strokeLinejoin="round" opacity="0.7"/>
-        ))}
-        {/* Dots on latest */}
-        {lines.map(l=>(
-          <circle key={l.key} cx={toX(n-1)} cy={toY(latest[l.key]||0)} r="3" fill={l.color}/>
-        ))}
-      </svg>
-
-      {/* Legend */}
-      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
-        {lines.map(l=>(
-          <div key={l.key} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"var(--cream-40)"}}>
-            <div style={{width:12,height:2,background:l.color,borderRadius:1}}/>
-            {l.label}: <span style={{color:l.color,fontWeight:600}}>{latest[l.key]||0}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERIC AI MODULE — powers all 28 new modules
 // Each module has its own prompt config but shares this renderer
@@ -7306,11 +7260,22 @@ Write a focused, personalised, practical breakdown of JUST this one point — no
                     <div style={{fontSize:13,color:G.dim,lineHeight:1.85,whiteSpace:"pre-wrap",marginBottom:10}}>
                       {ex.content}
                     </div>
-                    <button onClick={()=>generateDeepDive(idx)}
-                      style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
-                        padding:"7px 14px",fontSize:11,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
-                      ↺ Refresh
-                    </button>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>generateDeepDive(idx)}
+                        style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
+                          padding:"7px 14px",fontSize:11,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+                        ↺ Refresh
+                      </button>
+                      <button onClick={()=>{
+                        addProgressPoints(userId,`generic_${modId}_${idx}_${new Date().toISOString().slice(0,10)}`,PROGRESS_POINTS.deepdive_done);
+                        window.dispatchEvent(new CustomEvent("showToast",{detail:"✓ Marked as done — progress updated!"}));
+                      }}
+                        style={{background:G.gold+"18",border:"1px solid "+G.gold+"40",
+                          borderRadius:8,padding:"7px 14px",fontSize:11,color:G.gold,
+                          fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        ✓ I'm applying this
+                      </button>
+                    </div>
                   </div>
                 )}
               </PlanSection>
@@ -8036,486 +8001,374 @@ Give them a powerful, personalized coaching session. Ask one deep question that 
   );
 }
 
-function buildSingleCountryRelocationPrompt(formData, country, isPremium){
-  const name    = formData?.name    || "the user";
-  const from    = formData?.country || "their current country";
-  const skills  = formData?.skills  || formData?.career || "general skills";
-  const goals   = formData?.goals   || formData?.bigGoal || "improve their life";
-  const income  = formData?.income  || "unknown";
-  const age     = formData?.age     || "unknown";
+// ═══════════════════════════════════════════════════════════════════════════════
+// RELOCATION EXPLORER — Clean rebuild
+// User picks or types a country → AI generates a full personalised report
+// ═══════════════════════════════════════════════════════════════════════════════
+const RELOC_COUNTRIES = [
+  "Canada","United Kingdom","Germany","Australia","Netherlands","Portugal","Spain",
+  "United Arab Emirates","Singapore","New Zealand","Ireland","Sweden","Norway",
+  "Denmark","Switzerland","Austria","Belgium","Finland","Japan","South Korea",
+  "United States","France","Italy","Czech Republic","Poland","Hungary","Romania",
+  "Estonia","Latvia","Lithuania","Malta","Cyprus","Greece","Croatia",
+  "Malaysia","Thailand","Vietnam","Indonesia","Philippines","India","Mexico",
+  "Brazil","Argentina","Colombia","Chile","Costa Rica","Panama","South Africa",
+  "Kenya","Ghana","Rwanda","Mauritius","Tanzania","Ethiopia","Senegal","Morocco",
+  "Egypt","Tunisia","Nigeria","Uganda","Zambia","Zimbabwe","Botswana","Namibia",
+  "Saudi Arabia","Qatar","Bahrain","Kuwait","Oman","Jordan","Lebanon","Turkey",
+  "Georgia","Armenia","Azerbaijan","Kazakhstan","Ukraine","Serbia","Montenegro",
+  "Sri Lanka","Nepal","Bangladesh","China","Taiwan","Hong Kong",
+  "Cambodia","Myanmar","Laos","Papua New Guinea","Fiji",
+  "Cuba","Jamaica","Trinidad and Tobago","Dominican Republic",
+  "Guatemala","Honduras","El Salvador","Peru","Ecuador","Bolivia","Uruguay",
+];
 
-  return `Give ${name} (age ${age}, from ${from}, skills: ${skills}, goal: ${goals}, income: ${income}) a detailed relocation report for ${country}.
+function RelocationExplorer({formData, userId, isPremium, isPaid, onUnlock}){
+  const G = useThemeColors();
+  const [query, setQuery]     = useState("");
+  const [report, setReport]   = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [openSection, setOpenSection]     = useState(null);
+  const [sectionData, setSectionData]     = useState({});
+  const [sectionBusy, setSectionBusy]     = useState({});
 
-CURRENCY RULE FOR THIS REPORT:
-- All amounts the person will SPEND in ${country} = ${country}'s local currency + USD equivalent in brackets.
-- Visa fees, startup costs, rent, food = local currency first.
-- Income potential = USD (since online work pays in USD globally).
+  const name   = formData?.name    || "you";
+  const from   = formData?.country || "your country";
+  const skills = formData?.skills  || formData?.career || "your skills";
+  const goals  = formData?.goals   || formData?.bigGoal || "improve your life";
+  const income = formData?.income  || "not specified";
+  const age    = formData?.age     || "unknown";
 
-Return ONLY a valid JSON object with these exact fields. No markdown. No code fences. Start with { end with }:
+  const suggestions = query.trim().length > 0
+    ? RELOC_COUNTRIES.filter(c =>
+        c.toLowerCase().includes(query.toLowerCase()) &&
+        c.toLowerCase() !== (from || "").toLowerCase()
+      ).slice(0, 7)
+    : [];
 
-{
-  "country": "${country}",
-  "fit": <number 0-100 based on how well this country matches their profile>,
-  "tagline": "<one punchy sentence — why this could work or not for them specifically>",
-  "overview": "<2-3 sentences about living in ${country} from the perspective of someone from ${from}>",
-  "pros": ["<3-4 genuine advantages for someone with their profile>"],
-  "cons": ["<3-4 real challenges they should expect>"],
-  "living": "<specific cost of living in ${country}: monthly rent for decent apartment, food budget, transport. Use ${country}'s LOCAL CURRENCY for all amounts — add USD equivalent in brackets. E.g. 'Rent: KSh 45,000/month ($350). Food: KSh 15,000/month. Total budget: KSh 80,000/month ($620)'>",
-  "visa": "<easy|moderate|hard> — one word only",
-  "visa_detail": "<specific visa pathway for someone from ${from}: which visa, requirements, rough cost, processing time>",
-  "business": "<how to start a business in ${country} as a foreigner — registration, cost, what works for their skills>",
-  "timeline": "<realistic month-by-month plan: Month 1-3, Month 4-6, Month 7-12>",
-  "opportunity": <number 0-100 for income opportunity based on their skills>,
-  "cost": "<low|medium|high> — one word based on cost of living vs their income>",
-  "verdict": "<2-3 honest sentences: should they seriously consider this or not, and why>"
-}
+  const runReport = async (country) => {
+    if (!isPaid) { onUnlock && onUnlock(); return; }
+    setQuery(country);
+    setReport(null);
+    setError("");
+    setSectionData({});
+    setOpenSection(null);
+    setLoading(true);
+    try {
+      const prompt = `Give ${name} (age ${age}, from ${from}, skills: ${skills}, goal: ${goals}, income: ${income}) a relocation intelligence report for ${country}.
+Return ONLY valid JSON, no markdown, no code fences. Start { end }:
+{"country":"${country}","fit":<0-100>,"tagline":"<one punchy sentence for them>","overview":"<2 sentences about ${country} from a ${from} perspective>","pros":["<pro1>","<pro2>","<pro3>"],"cons":["<con1>","<con2>","<con3>"],"living":"<monthly costs in ${country} local currency + USD equivalent>","visa":"<easy|moderate|hard>","visa_detail":"<specific visa pathway for someone from ${from}>","opportunity":<0-100>,"cost":"<low|medium|high>","verdict":"<2 honest sentences: should they go and why>"}`;
+      const raw = await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:"You are a relocation intelligence advisor. Return ONLY valid JSON. No markdown. Be specific with real numbers and real visa names.",
+        userId, isPremium,
+      });
+      const txt = typeof raw==="string" ? raw :
+        (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const s=clean.indexOf("{"), e=clean.lastIndexOf("}");
+      if(s===-1||e===-1) throw new Error("No JSON");
+      const parsed = JSON.parse(clean.slice(s,e+1));
+      setReport(parsed);
+    } catch(err) {
+      setError("Could not generate report. Tap Try Again.");
+    }
+    setLoading(false);
+  };
 
-Be specific. Use real numbers. Reference their actual background. Do not be generic.`;
-}
+  const runSection = async (key, prompt) => {
+    if (!isPaid) { onUnlock && onUnlock(); return; }
+    setSectionBusy(p=>({...p,[key]:true}));
+    try {
+      const raw = await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:`You are a relocation advisor. Write for ${name} from ${from} moving to ${report?.country}. Be specific, practical, real numbers. Max 280 words.`,
+        userId, isPremium,
+      });
+      const txt = typeof raw==="string" ? raw :
+        (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
+      setSectionData(p=>({...p,[key]:txt}));
+    } catch {
+      setSectionData(p=>({...p,[key]:"Could not generate. Tap again to retry."}));
+    }
+    setSectionBusy(p=>({...p,[key]:false}));
+  };
 
-function RelocCard({r, onRetry}){
-  const [open, setOpen] = useState(false);
-  // Safe-guard every field — never trust AI JSON to be complete
-  const country   = r?.country   || "Unknown";
-  const fit       = Number(r?.fit) || 0;
-  const tagline   = r?.tagline   || "";
-  const visa      = r?.visa      || "";
-  const cost      = r?.cost      || "";
-  const overview  = r?.overview  || "";
-  const pros      = Array.isArray(r?.pros)  ? r.pros  : [];
-  const cons      = Array.isArray(r?.cons)  ? r.cons  : [];
-  const living    = r?.living    || "";
-  const visa_detail=r?.visa_detail||"";
-  const business  = r?.business  || "";
-  const timeline  = r?.timeline  || "";
-  const verdict   = r?.verdict   || "";
-  const fitColor  = fit>=75?"#4ADE80":fit>=55?"#FCD34D":"#F87171";
+  const fitColor = !report ? G.gold
+    : report.fit>=70 ? "#81c784"
+    : report.fit>=40 ? "#f0b429" : "#e05c6e";
 
-  if(r?.error) return(
-    <div style={{background:"var(--night)",borderRadius:16,border:"1px solid rgba(248,113,113,0.25)",marginBottom:16,padding:"20px",textAlign:"center"}}>
-      <div style={{fontSize:24,marginBottom:8}}>🌍</div>
-      <div style={{fontSize:14,color:"var(--cream-50)",marginBottom:4}}>Couldn&apos;t load the {country} report</div>
-      <div style={{fontSize:12,color:"var(--cream-30)",marginBottom:16}}>The AI timed out. Try again — it usually works on the second attempt.</div>
-      <button onClick={()=>onRetry&&onRetry(country)}
-        style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"10px 24px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-        Try again →
-      </button>
-    </div>
-  );
+  const SECTIONS = !report ? [] : [
+    {key:"visa_steps",  icon:"🛂", title:"Step-by-Step Visa Guide",
+     prompt:`Write a step-by-step visa guide for ${name} from ${from} to move to ${report.country}. Specific visa name, documents needed, where to apply, fees in local currency + USD, processing time, and what to do if rejected.`},
+    {key:"jobs",        icon:"💼", title:"Jobs & Income Potential",
+     prompt:`Analyse the job market in ${report.country} for ${name} with skills: ${skills} and income: ${income}. In-demand roles for their skills, salary range in local currency + USD, top hiring platforms, remote work viability, and the #1 skill to add to be competitive there.`},
+    {key:"costs",       icon:"💰", title:"Full Cost of Living Breakdown",
+     prompt:`Give ${name} a detailed monthly cost of living in ${report.country}: rent (1-bed and 2-bed in a good neighbourhood), groceries, transport, utilities, phone, healthcare, entertainment. All in local currency + USD. Total it up and compare to their income of ${income}.`},
+    {key:"plan",        icon:"🚀", title:"First 90 Days Action Plan",
+     prompt:`Write a month-by-month plan for ${name}'s first 90 days after arriving in ${report.country}. Month 1: admin and settling in. Month 2: building income/employment. Month 3: establishing life. What to do, where to go, what it costs, what success looks like.`},
+    {key:"culture",     icon:"🌍", title:"Culture & Community",
+     prompt:`Explain living in ${report.country} for someone from ${from}: cultural differences to expect, how locals treat immigrants, communities from ${from} that exist there, language situation, social life, and the honest truth about whether people from ${from} feel welcome and happy there.`},
+  ];
 
-  return(
-    <div style={{background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:16,overflow:"hidden"}}>
-      {/* Header row — always clickable */}
-      <div onClick={()=>setOpen(o=>!o)}
-        style={{padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
-        <div style={{width:52,height:52,borderRadius:12,background:"var(--midnight)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <div style={{fontSize:18,fontWeight:800,color:fitColor,lineHeight:1}}>{fit||"—"}</div>
-          <div style={{fontSize:8,color:"var(--cream-40)",marginTop:1,letterSpacing:"0.05em"}}>FIT</div>
+  return (
+    <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
+      fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",paddingBottom:100}}>
+
+      {/* ── HEADER ── */}
+      <div style={{padding:"20px 20px 0",maxWidth:860,margin:"0 auto"}}>
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:".15em",color:G.gold,
+            fontFamily:"monospace",marginBottom:6}}>RELOCATION INTELLIGENCE</div>
+          <h2 style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:800,color:G.cream,margin:"0 0 6px"}}>
+            Where in the world should you go?
+          </h2>
+          <p style={{fontSize:13,color:G.dim,margin:0,lineHeight:1.6}}>
+            Type any country and get a full AI relocation report — visa, cost of living, jobs, and a 90-day action plan.
+          </p>
         </div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:700,fontSize:15,color:"var(--cream)",marginBottom:3}}>{country}</div>
-          <div style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.4}}>{tagline}</div>
+
+        {/* ── SEARCH ── */}
+        <div style={{position:"relative",marginBottom:16}}>
+          <input value={query} onChange={e=>{setQuery(e.target.value);setReport(null);setError("");}}
+            placeholder="Type a country name…"
+            style={{width:"100%",padding:"14px 48px 14px 18px",
+              background:G.card,border:"1px solid "+(query?G.gold+"60":G.border),
+              borderRadius:14,color:G.cream,fontSize:15,fontFamily:"inherit",
+              outline:"none",boxSizing:"border-box",transition:"border-color .2s"}}
+          />
+          {query&&(
+            <button onClick={()=>{setQuery("");setReport(null);setError("");}}
+              style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                background:"none",border:"none",color:G.dimmer,cursor:"pointer",fontSize:20,padding:0}}>
+              ×
+            </button>
+          )}
+          {/* Dropdown */}
+          {suggestions.length>0&&!report&&!loading&&(
+            <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:200,
+              background:G.card,border:"1px solid "+G.border,borderRadius:14,
+              overflow:"hidden",boxShadow:"0 8px 32px rgba(0,0,0,0.35)"}}>
+              {suggestions.map(c=>(
+                <div key={c} onClick={()=>runReport(c)}
+                  style={{padding:"13px 18px",cursor:"pointer",fontSize:14,color:G.cream,
+                    borderBottom:"1px solid "+G.border,display:"flex",alignItems:"center",gap:10,
+                    transition:"background .12s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=G.gold+"15"}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <span style={{fontSize:16}}>🌍</span>
+                  <span>{c}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-          {visa&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,
-            background:visa==="easy"?"rgba(74,222,128,0.15)":visa==="moderate"?"rgba(252,211,77,0.15)":"rgba(248,113,113,0.15)",
-            color:visa==="easy"?"#4ADE80":visa==="moderate"?"#FCD34D":"#F87171"}}>Visa: {visa}</span>}
-          {cost&&<span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(255,255,255,0.06)",color:"var(--cream-60)"}}>Cost: {cost}</span>}
-          <span style={{color:"var(--cream-30)",fontSize:13}}>{open?"▲":"▼"}</span>
-        </div>
+
+        {/* Quick picks */}
+        {!report&&!loading&&(
+          <div style={{marginBottom:28}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
+              fontFamily:"monospace",marginBottom:10}}>POPULAR DESTINATIONS</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {["Canada","UK","Germany","Australia","UAE","Portugal","Singapore","Ghana"].map(c=>(
+                <button key={c} onClick={()=>runReport(c==="UK"?"United Kingdom":c)}
+                  style={{padding:"7px 14px",borderRadius:20,fontSize:12,fontWeight:600,
+                    border:"1px solid "+G.border,background:"rgba(255,255,255,0.03)",
+                    color:G.dim,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=G.gold+"60";e.currentTarget.style.color=G.cream;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.color=G.dim;}}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Expanded detail */}
-      {open&&(
-        <div style={{padding:"0 20px 20px",borderTop:"1px solid var(--cream-10)"}}>
-          <div style={{paddingTop:16}}>
-            {overview&&<p style={{fontSize:13,color:"var(--cream-80)",lineHeight:1.75,marginBottom:16}}>{overview}</p>}
-            {(pros.length>0||cons.length>0)&&(
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
-                {pros.length>0&&<div style={{background:"rgba(74,222,128,0.07)",borderRadius:12,padding:14}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#4ADE80",marginBottom:8,letterSpacing:"0.08em"}}>WHY IT WORKS</div>
-                  {pros.map((p,i)=><div key={i} style={{fontSize:12,color:"var(--cream-70)",marginBottom:6,lineHeight:1.6,paddingLeft:10,borderLeft:"2px solid rgba(74,222,128,0.3)"}}>✓ {String(p)}</div>)}
-                </div>}
-                {cons.length>0&&<div style={{background:"rgba(248,113,113,0.07)",borderRadius:12,padding:14}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#F87171",marginBottom:8,letterSpacing:"0.08em"}}>BE READY FOR</div>
-                  {cons.map((c,i)=><div key={i} style={{fontSize:12,color:"var(--cream-70)",marginBottom:6,lineHeight:1.6,paddingLeft:10,borderLeft:"2px solid rgba(248,113,113,0.3)"}}>! {String(c)}</div>)}
-                </div>}
+      {/* ── LOADING ── */}
+      {loading&&(
+        <div style={{textAlign:"center",padding:"64px 20px"}}>
+          <div style={{fontSize:44,marginBottom:16}}>🌍</div>
+          <div style={{fontSize:15,color:G.dim,marginBottom:6}}>Analysing {query} for you…</div>
+          <div style={{fontSize:12,color:G.dimmer}}>Checking visas, cost of living, job market and more</div>
+        </div>
+      )}
+
+      {/* ── ERROR ── */}
+      {error&&!loading&&(
+        <div style={{margin:"0 20px 20px",padding:"16px 20px",
+          background:"rgba(224,92,110,0.08)",border:"1px solid rgba(224,92,110,0.25)",
+          borderRadius:14,textAlign:"center"}}>
+          <div style={{fontSize:13,color:"#e05c6e",marginBottom:10}}>{error}</div>
+          <button onClick={()=>query&&runReport(query)}
+            style={{background:G.gold,border:"none",borderRadius:10,padding:"10px 22px",
+              fontSize:13,fontWeight:700,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {/* ── REPORT ── */}
+      {report&&!loading&&(
+        <div style={{padding:"0 20px",maxWidth:860,margin:"0 auto"}}>
+
+          {/* Hero */}
+          <div style={{background:G.card,border:"1px solid "+fitColor+"40",
+            borderRadius:20,padding:"24px",marginBottom:14,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:3,
+              background:`linear-gradient(90deg,${fitColor},${fitColor}60)`,borderRadius:"20px 20px 0 0"}}/>
+            <div style={{display:"flex",alignItems:"flex-start",gap:16,marginBottom:16}}>
+              <div style={{fontSize:40,flexShrink:0}}>🌍</div>
+              <div style={{flex:1}}>
+                <h3 style={{fontSize:"clamp(18px,5vw,24px)",fontWeight:900,color:G.cream,margin:"0 0 4px"}}>
+                  {report.country}
+                </h3>
+                <p style={{fontSize:13,color:G.dim,margin:0,lineHeight:1.6}}>{report.tagline}</p>
               </div>
-            )}
-            {living&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>💰 REAL COST OF LIVING</div>
-              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{living}</p>
-            </div>}
-            {visa_detail&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>🛂 YOUR VISA PATHWAY</div>
-              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{visa_detail}</p>
-            </div>}
-            {business&&<div style={{background:"var(--midnight)",borderRadius:12,padding:14,marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:8,letterSpacing:"0.08em"}}>🏢 STARTING A BUSINESS THERE</div>
-              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{business}</p>
-            </div>}
-            {timeline&&<div style={{background:"rgba(255,255,255,0.04)",borderRadius:12,padding:14,marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:700,color:"var(--cream-40)",marginBottom:6,letterSpacing:"0.08em"}}>⏱ REALISTIC TIMELINE</div>
-              <p style={{fontSize:12,color:"var(--cream-70)",lineHeight:1.6,margin:0}}>{timeline}</p>
-            </div>}
-            {verdict&&<div style={{background:"rgba(156,124,255,0.12)",border:"1px solid rgba(156,124,255,0.25)",borderRadius:12,padding:14}}>
-              <div style={{fontSize:10,fontWeight:700,color:"#A78BFA",marginBottom:6,letterSpacing:"0.08em"}}>OUR HONEST VERDICT</div>
-              <p style={{fontSize:13,color:"var(--cream-80)",lineHeight:1.7,margin:0,fontStyle:"italic"}}>{verdict}</p>
-            </div>}
+              <div style={{textAlign:"center",flexShrink:0}}>
+                <div style={{fontSize:26,fontWeight:900,color:fitColor,lineHeight:1}}>{report.fit}</div>
+                <div style={{fontSize:9,color:G.dimmer,fontFamily:"monospace",letterSpacing:".06em"}}>FIT SCORE</div>
+              </div>
+            </div>
+            {/* Stats row */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+              {[
+                {label:"VISA",        val:report.visa,        col:report.visa==="easy"?"#81c784":report.visa==="moderate"?"#f0b429":"#e05c6e"},
+                {label:"COST",        val:report.cost,        col:report.cost==="low"?"#81c784":report.cost==="medium"?"#f0b429":"#e05c6e"},
+                {label:"OPPORTUNITY", val:report.opportunity+"/100", col:G.gold},
+              ].map(s=>(
+                <div key={s.label} style={{background:"rgba(255,255,255,0.03)",
+                  border:"1px solid "+G.border,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+                  <div style={{fontSize:8,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginBottom:3}}>{s.label}</div>
+                  <div style={{fontSize:13,fontWeight:800,color:s.col,textTransform:"capitalize"}}>{s.val}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{fontSize:13,color:G.dim,lineHeight:1.8,margin:0}}>{report.overview}</p>
           </div>
+
+          {/* Pros & Cons */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            {[
+              {label:"ADVANTAGES",col:"#81c784",items:report.pros||[],tick:"✓"},
+              {label:"CHALLENGES",col:"#e05c6e",items:report.cons||[],tick:"•"},
+            ].map(side=>(
+              <div key={side.label} style={{background:G.card,
+                border:`1px solid ${side.col}25`,borderRadius:14,padding:"14px"}}>
+                <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:side.col,
+                  fontFamily:"monospace",marginBottom:10}}>{side.label}</div>
+                {side.items.map((item,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,marginBottom:7}}>
+                    <span style={{color:side.col,flexShrink:0,fontSize:12}}>{side.tick}</span>
+                    <span style={{fontSize:12,color:G.dim,lineHeight:1.6}}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Cost / Visa / Verdict */}
+          {[
+            {icon:"💰",label:"COST OF LIVING",    val:report.living},
+            {icon:"🛂",label:"VISA OVERVIEW",     val:report.visa_detail},
+            {icon:"✦", label:"VERDICT",           val:report.verdict},
+          ].map(row=>(
+            <div key={row.label} style={{background:G.card,border:"1px solid "+G.border,
+              borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+              <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.gold,
+                fontFamily:"monospace",marginBottom:7}}>{row.icon} {row.label}</div>
+              <div style={{fontSize:13,color:G.dim,lineHeight:1.75}}>{row.val}</div>
+            </div>
+          ))}
+
+          {/* Deep dive collapsible sections */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
+              fontFamily:"monospace",marginBottom:4}}>DEEP INTELLIGENCE</div>
+            <p style={{fontSize:12,color:G.dimmer,margin:"0 0 12px",lineHeight:1.5}}>
+              Tap any section for a full personalised breakdown.
+            </p>
+            {SECTIONS.map(sec=>{
+              const isOpen = openSection===sec.key;
+              const busy   = sectionBusy[sec.key];
+              const data   = sectionData[sec.key];
+              return(
+                <div key={sec.key} style={{background:G.card,
+                  border:"1px solid "+(isOpen?G.gold+"40":G.border),
+                  borderRadius:14,overflow:"hidden",marginBottom:8,transition:"border-color .2s"}}>
+                  <div onClick={()=>{
+                    if(isOpen){setOpenSection(null);return;}
+                    setOpenSection(sec.key);
+                    if(!data&&!busy) runSection(sec.key,sec.prompt);
+                  }}
+                    style={{padding:"13px 16px",cursor:"pointer",display:"flex",
+                      alignItems:"center",gap:12,
+                      background:isOpen?G.gold+"08":"transparent"}}>
+                    <span style={{fontSize:17,flexShrink:0}}>{sec.icon}</span>
+                    <div style={{flex:1,fontSize:14,fontWeight:700,color:G.cream}}>{sec.title}</div>
+                    <span style={{color:isOpen?G.gold:G.dimmer,fontSize:17,
+                      display:"inline-block",transition:"transform .2s",
+                      transform:isOpen?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+                  </div>
+                  {isOpen&&(
+                    <div style={{padding:"12px 16px 14px",borderTop:"1px solid "+G.border}}>
+                      {busy?(
+                        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+                          <span style={{width:6,height:6,borderRadius:"50%",background:G.gold,display:"inline-block"}}/>
+                          <div style={{fontSize:12,color:G.dimmer}}>Generating…</div>
+                        </div>
+                      ):data?(
+                        <div>
+                          <div style={{fontSize:13,color:G.dim,lineHeight:1.85,
+                            whiteSpace:"pre-wrap",marginBottom:10}}>{data}</div>
+                          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                            <button onClick={()=>runSection(sec.key,sec.prompt)}
+                              style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
+                                padding:"6px 14px",fontSize:11,color:G.dimmer,
+                                cursor:"pointer",fontFamily:"inherit"}}>↺ Refresh</button>
+                            <button onClick={()=>{
+                              addProgressPoints(userId,`reloc_${sec.key}_${report?.country}_${new Date().toISOString().slice(0,10)}`,PROGRESS_POINTS.deepdive_done);
+                              window.dispatchEvent(new CustomEvent("showToast",{detail:"✓ Marked as done — progress updated!"}));
+                            }}
+                              style={{background:G.gold+"18",border:"1px solid "+G.gold+"40",
+                                borderRadius:8,padding:"6px 14px",fontSize:11,color:G.gold,
+                                fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                              ✓ I've read this
+                            </button>
+                          </div>
+                        </div>
+                      ):(
+                        <div style={{textAlign:"center",padding:"10px 0"}}>
+                          <button onClick={()=>runSection(sec.key,sec.prompt)}
+                            style={{background:G.gold,color:"#000",border:"none",borderRadius:10,
+                              padding:"11px 22px",fontSize:13,fontWeight:700,
+                              cursor:"pointer",fontFamily:"inherit"}}>
+                            ✦ Generate {sec.title}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Try another */}
+          <button onClick={()=>{setReport(null);setQuery("");setError("");setSectionData({});setOpenSection(null);}}
+            style={{width:"100%",padding:"13px",background:"rgba(255,255,255,0.04)",
+              border:"1px solid "+G.border,borderRadius:14,color:G.dim,
+              fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            🌍 Explore Another Country
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-const WORLD_COUNTRIES = [
-  "Afghanistan","Albania","Algeria","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan",
-  "Bahrain","Bangladesh","Belarus","Belgium","Benin","Bolivia","Bosnia and Herzegovina","Botswana","Brazil",
-  "Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Chile","China","Colombia","Congo",
-  "Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Dominican Republic","DR Congo","Ecuador",
-  "Egypt","El Salvador","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece",
-  "Guatemala","Guinea","Honduras","Hungary","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy",
-  "Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kuwait","Kyrgyzstan","Latvia","Lebanon","Lithuania",
-  "Luxembourg","Madagascar","Malawi","Malaysia","Mali","Malta","Mauritius","Mexico","Moldova","Mongolia",
-  "Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua",
-  "Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Panama","Paraguay","Peru","Philippines",
-  "Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saudi Arabia","Senegal","Serbia","Sierra Leone",
-  "Singapore","Slovakia","Slovenia","Somalia","South Africa","South Korea","Spain","Sri Lanka","Sudan",
-  "Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Tunisia","Turkey","Uganda",
-  "Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela",
-  "Vietnam","Yemen","Zambia","Zimbabwe"
-];
 
-
-function RelocationExplorer({suggestedCountries, formData, userId, isPremium, isPaid, onUnlock}){
-  const G = useThemeColors();
-  const night = G.isDark ? "#0f0c02" : "#f0ede4";
-  const midnight = G.isDark ? "#131009" : "#e8e4d8";
-  const [search,   setSearch]   = useState("");
-  const [selected, setSelected] = useState(null);
-  const [customReport, setCustomReport] = useState(null);
-  const [loading,  setLoading]  = useState(false);
-  const [view,     setView]     = useState("suggested");
-  const [genErr,   setGenErr]   = useState("");
-  const [autoSuggestions, setAutoSuggestions] = useState([]);
-  const [autoLoading, setAutoLoading] = useState(false);
-
-  // Safe: formData may be null/undefined during hydration
-  const userCountry = (formData?.country || "").toLowerCase();
-  const filtered = (WORLD_COUNTRIES||[])
-    .filter(c=>c.toLowerCase().includes(search.toLowerCase()) && c.toLowerCase()!==userCountry)
-    .slice(0,8);
-
-  // Safe list of suggested countries — guard against nulls in each object
-  const safeList = (Array.isArray(suggestedCountries) ? suggestedCountries : [])
-    .filter(r=>r && typeof r==="object");
-
-  // Auto-generate suggestions if none exist from report
-  useEffect(()=>{
-    if(safeList.length>0||autoSuggestions.length>0||autoLoading) return;
-    if(!formData?.country&&!formData?.name) return; // wait for profile
-    const cacheKey=`diq_reloc_auto_${userId||"guest"}`;
-    try{
-      const cached=JSON.parse(localStorage.getItem(cacheKey)||"null");
-      if(cached&&Array.isArray(cached)&&cached.length>0){setAutoSuggestions(cached);return;}
-    }catch{}
-    setAutoLoading(true);
-    const name=formData?.name||"this person";
-    const from=formData?.country||"their country";
-    const job=formData?.occupation||"not specified";
-    const goals=formData?.goals||formData?.bigGoal||"better opportunities";
-    const income=formData?.income||"not specified";
-    const skills=formData?.skills||"not specified";
-    const prompt=`Give ${name} (from ${from}, job: ${job}, skills: ${skills}, income: ${income}, goal: ${goals}) exactly 3 best countries to relocate to. Return ONLY a JSON array of 3 objects. No markdown. No explanation. Each object: {"country":"<name>","fit":<0-100>,"tagline":"<10 words>","overview":"<2 sentences>","pros":["<point>","<point>","<point>"],"cons":["<point>","<point>"],"visa":"<easy|moderate|hard>","visa_detail":"<specific visa name and key requirement>","living":"<realistic monthly cost USD for rent+food+transport in one real city>","opportunity":<0-100>,"cost":"<low|medium|high>","verdict":"<2 sentences honest assessment>"}`;
-    callAPI({messages:[{role:"user",content:prompt}],system:"You are a relocation expert. Return ONLY a valid JSON array of 3 objects. Start with [ and end with ]. No markdown, no code fences, no explanation.",userId,isPremium:true})
-      .then(raw=>{
-        try{
-          const clean=(typeof raw==="string"?raw:(raw?.content?.[0]?.text||raw?.text||"")).replace(/```json|```/g,"").trim();
-          const start=clean.indexOf("["); const end=clean.lastIndexOf("]");
-          if(start===-1||end===-1) return;
-          const parsed=JSON.parse(clean.slice(start,end+1));
-          if(Array.isArray(parsed)&&parsed.length>0){
-            setAutoSuggestions(parsed);
-            try{localStorage.setItem(cacheKey,JSON.stringify(parsed));}catch{}
-          }
-        }catch(e){console.warn("Auto-suggest parse error:",e.message);}
-      })
-      .catch(()=>{})
-      .finally(()=>setAutoLoading(false));
-  },[formData?.name,formData?.country]);
-
-  const allSuggestions = safeList.length>0 ? safeList : autoSuggestions;
-
-  const generateReport = async(country, attempt=1)=>{
-    if(!country) return;
-    setLoading(true); setGenErr(""); setCustomReport(null); setSelected(country); setView("custom");
-    try{
-      const sys="You are a relocation expert. Return ONLY a valid JSON object. No markdown. No code fences. No explanation. Start with { and end with }. Keep each field under 200 characters.";
-      const prompt=buildSingleCountryRelocationPrompt(formData||{}, country, isPremium);
-      const raw=await callAPI({messages:[{role:"user",content:prompt}],system:sys,userId,isPremium:true});
-      const clean=raw.replace(/```json|```/g,"").trim();
-      const start=clean.indexOf("{"); const end=clean.lastIndexOf("}");
-      if(start===-1||end===-1) throw new Error("No JSON in response");
-      const parsed=JSON.parse(clean.slice(start,end+1));
-      if(!parsed.country) parsed.country=country;
-      // Ensure arrays are arrays
-      if(!Array.isArray(parsed.pros))  parsed.pros  = [];
-      if(!Array.isArray(parsed.cons))  parsed.cons  = [];
-      setCustomReport(parsed);
-    }catch(e){
-      console.warn(`Relocation attempt ${attempt}:`, e.message);
-      if(attempt<3){ setTimeout(()=>generateReport(country,attempt+1),1800); return; }
-      setCustomReport({country,fit:0,tagline:"",overview:"",pros:[],cons:[],business:"",living:"",visa_detail:"",opportunity:0,cost:"",visa:"",timeline:"",verdict:"",error:true});
-    }finally{
-      setLoading(false);
-    }
-  };
-
-  return(
-    <LockGate isPaid={isPaid} onUnlock={onUnlock}>
-      <div className="fu">
-        <div className="d3" style={{marginBottom:6}}>Where in the world could you actually thrive?</div>
-        <p className="body" style={{marginBottom:20,color:G.dim}}>
-          We matched your profile against countries where someone with your background, skills, and goals tends to break through.
-          Type any country below for a full custom report.
-        </p>
-
-        {/* Country search */}
-        <div style={{marginBottom:24}}>
-          <div style={{fontSize:11,fontWeight:700,color:G.dimmer,letterSpacing:"0.08em",marginBottom:8}}>HAVE A COUNTRY IN MIND?</div>
-          <div style={{position:"relative"}}>
-            <input value={search} onChange={e=>setSearch(e.target.value)}
-              onBlur={()=>setTimeout(()=>setSearch(""),200)}
-              placeholder="Search any country…"
-              style={{width:"100%",background:midnight,border:"1px solid var(--cream-15)",borderRadius:12,padding:"12px 16px",color:G.cream,fontSize:13,outline:"none",boxSizing:"border-box"}}
-            />
-            {search.length>1&&filtered.length>0&&(
-              <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,background:midnight,border:"2px solid var(--gold)",borderRadius:12,overflow:"hidden auto",maxHeight:260,zIndex:9999,boxShadow:"0 20px 60px rgba(0,0,0,0.95)"}}>
-                {filtered.map(c=>(
-                  <div key={c} onMouseDown={e=>{e.preventDefault();setSearch("");generateReport(c);}}
-                    style={{padding:"13px 18px",cursor:"pointer",fontSize:14,color:G.cream,borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",background:midnight}}
-                    onMouseEnter={e=>e.currentTarget.style.background=night}
-                    onMouseLeave={e=>e.currentTarget.style.background=midnight}>
-                    <span>{c}</span>
-                    <span style={{color:G.gold,fontSize:13,fontWeight:600}}>→</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Loading */}
-        {loading&&(
-          <div style={{textAlign:"center",padding:"40px 20px",background:night,borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:20}}>
-            <div style={{fontSize:28,marginBottom:12}}>🔍</div>
-            <div style={{fontSize:14,color:G.dim,marginBottom:6}}>Building your {selected} report…</div>
-            <div style={{fontSize:12,color:G.dimmer}}>Checking visa rules, costs, opportunities, and what it&apos;s really like to move there{formData?.country?` from ${formData.country}`:""}.</div>
-          </div>
-        )}
-
-        {/* Toggle between custom and suggested */}
-        {!loading&&customReport&&(
-          <div style={{display:"flex",gap:8,marginBottom:20}}>
-            <button onClick={()=>setView("custom")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="custom"?"var(--violet)":midnight,color:view==="custom"?"#fff":G.dim,fontSize:12,cursor:"pointer",fontWeight:600}}>
-              🌍 {selected}
-            </button>
-            <button onClick={()=>setView("suggested")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="suggested"?"var(--violet)":midnight,color:view==="suggested"?"#fff":G.dim,fontSize:12,cursor:"pointer",fontWeight:600}}>
-              ⭐ Our picks for you
-            </button>
-          </div>
-        )}
-
-        {/* Custom report */}
-        {!loading&&customReport&&view==="custom"&&(
-          <RelocCard r={customReport} onRetry={generateReport}/>
-        )}
-
-        {/* Suggested list */}
-        {!loading&&(view==="suggested"||!customReport)&&(
-          <>
-            {!customReport&&<div style={{fontSize:11,fontWeight:700,color:G.dimmer,letterSpacing:"0.08em",marginBottom:12}}>OUR PICKS BASED ON YOUR PROFILE</div>}
-            {autoLoading&&allSuggestions.length===0&&!customReport&&(
-              <div style={{padding:"32px 20px",background:night,borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
-                <div style={{fontSize:28,marginBottom:12}}>🌍</div>
-                <div style={{fontSize:14,color:G.dim,marginBottom:6}}>Finding the best countries for you…</div>
-                <div style={{fontSize:12,color:G.dimmer}}>Matching your profile, skills, and goals against 195 countries.</div>
-              </div>
-            )}
-            {!autoLoading&&allSuggestions.length===0&&!customReport&&(
-              <div style={{padding:"32px 20px",background:night,borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
-                <div style={{fontSize:13,color:G.dimmer,marginBottom:16}}>Search any country above to get your full relocation report.</div>
-              </div>
-            )}
-            {allSuggestions.map((r,i)=>(
-              <RelocCard key={r.country||i} r={r} onRetry={generateReport}/>
-            ))}
-          </>
-        )}
-
-        <div className="insight teal" style={{marginTop:8}}>
-          <p style={{fontSize:13,color:G.dim,lineHeight:1.75}}>
-            Visa rules shift often — always verify on the official embassy or government immigration website before making any decisions.
-          </p>
-        </div>
-      </div>
-    </LockGate>
-  );
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LIFE HACKS MODULE
-// ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
-// AUDIO PLAYER — Text-to-speech using Web Speech API
-// ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
-// VOICE SYSTEM — Global voice state + VoiceSelector + AudioPlayer
-// ═══════════════════════════════════════════════════════════════════════════════
-const _GV={voice:null,subs:[]};
-function useGlobalVoice(){
-  const [v,setV]=useState(_GV.voice);
-  useEffect(()=>{
-    _GV.subs.push(setV);
-    return()=>{_GV.subs=_GV.subs.filter(s=>s!==setV);};
-  },[]);
-  const set=v=>{_GV.voice=v;_GV.subs.forEach(s=>s(v));};
-  return[v,set];
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// HABIT TRACKING SYSTEM
-// Global pub-sub store — same pattern as voice. Persisted to localStorage.
-// Tracks which practice items the user has committed to ("I'm doing this").
-// Each item has:  committed (bool) | status ("active"|"mastered"|"paused")
-//                 startedAt (ISO) | notes (string) | lastUpdated (ISO)
-// Key format: "module:itemId"  e.g. "discipline:wakeup" | "invest:study"
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// All trackable items across every module — single source of truth
-const ALL_TRACKABLE = [
-  // Daily Discipline (7)
-  {key:"discipline:wakeup",    module:"discipline", label:"Wake Up at 5:30–6 AM",           icon:"⏰", color:"var(--gold)"},
-  {key:"discipline:routine",   module:"discipline", label:"Build a Daily Routine",            icon:"🔁", color:"var(--teal)"},
-  {key:"discipline:consistency",module:"discipline",label:"Stay Consistent Daily",            icon:"📅", color:"#9b72cf"},
-  {key:"discipline:focus",     module:"discipline", label:"90-Minute Focus Blocks",           icon:"🎯", color:"var(--rose)"},
-  {key:"discipline:study",     module:"discipline", label:"Study Hard & Retain It",           icon:"📚", color:"var(--gold)"},
-  {key:"discipline:workout",   module:"discipline", label:"Weekly Workout Plan",              icon:"💪", color:"var(--teal)"},
-  {key:"discipline:mindset_d", module:"discipline", label:"Train My Mind Daily",              icon:"🧠", color:"#9b72cf"},
-  // Invest in Yourself (7)
-  {key:"invest:study",         module:"invest",     label:"Study Obsession (1 Bio/Month)",    icon:"📚", color:"var(--gold)"},
-  {key:"invest:body",          module:"invest",     label:"Obsess Over Energy",               icon:"⚡", color:"var(--teal)"},
-  {key:"invest:skills",        module:"invest",     label:"Stack High-Income Skills",         icon:"🛠️", color:"#9b72cf"},
-  {key:"invest:network",       module:"invest",     label:"Network Mathematics",              icon:"🔗", color:"var(--rose)"},
-  {key:"invest:money",         module:"invest",     label:"Make Money Move First",            icon:"💸", color:"var(--gold)"},
-  {key:"invest:create",        module:"invest",     label:"Create, Don't Consume",            icon:"✏️", color:"var(--teal)"},
-  {key:"invest:routine",       module:"invest",     label:"Build a Ruthless Routine",         icon:"⏰", color:"var(--gold)"},
-  // Get Successful (5)
-  {key:"success:01",           module:"success",    label:"Study the Greats' Patterns",       icon:"📖", color:"var(--gold)"},
-  {key:"success:02",           module:"success",    label:"Build a Ruthless Routine",         icon:"🔁", color:"var(--teal)"},
-  {key:"success:03",           module:"success",    label:"Upgrade My Network",               icon:"🔗", color:"#9b72cf"},
-  {key:"success:04",           module:"success",    label:"Create Something Daily",           icon:"✏️", color:"var(--rose)"},
-  {key:"success:05",           module:"success",    label:"Protect My Energy",                icon:"⚡", color:"var(--gold)"},
-  // Strong Mindset (8)
-  {key:"mindset:patient",      module:"mindset",    label:"Practice Patience",                icon:"⏳", color:"var(--gold)"},
-  {key:"mindset:proactive",    module:"mindset",    label:"Be Proactive Every Week",          icon:"⚡", color:"var(--teal)"},
-  {key:"mindset:change",       module:"mindset",    label:"Stay Open to Change",              icon:"🔄", color:"#9b72cf"},
-  {key:"mindset:letgo",        module:"mindset",    label:"Learn to Let Go",                  icon:"🍃", color:"var(--rose)"},
-  {key:"mindset:hope",         module:"mindset",    label:"Protect My Hope",                  icon:"☀️", color:"var(--gold)"},
-  {key:"mindset:thoughts",     module:"mindset",    label:"Audit My Thoughts Daily",          icon:"🧠", color:"var(--teal)"},
-  {key:"mindset:okay",         module:"mindset",    label:"Accept When I'm Not OK",           icon:"💙", color:"#9b72cf"},
-  {key:"mindset:dontquit",     module:"mindset",    label:"Don't Quit When It's Hard",        icon:"🏁", color:"var(--rose)"},
-  // 10x Principles (6)
-  {key:"tenx:consistency",     module:"tenx",       label:"Show Up Consistently",             icon:"📅", color:"var(--gold)"},
-  {key:"tenx:process",         module:"tenx",       label:"Focus on Process Not Outcome",     icon:"🔬", color:"var(--teal)"},
-  {key:"tenx:friction",        module:"tenx",       label:"Remove Friction from Good Habits", icon:"✂️", color:"#9b72cf"},
-  {key:"tenx:feedback",        module:"tenx",       label:"Get Feedback Fast",                icon:"⚡", color:"var(--rose)"},
-  {key:"tenx:mentors",         module:"tenx",       label:"Learn from People Ahead",          icon:"🔭", color:"var(--gold)"},
-  {key:"tenx:focus",           module:"tenx",       label:"Shape My Environment for Focus",   icon:"🎯", color:"var(--teal)"},
-];
-
-const MODULE_LABELS = {
-  discipline:"Daily Discipline",
-  invest:"Invest in Yourself",
-  success:"Get Successful",
-  mindset:"Strong Mindset",
-  tenx:"10x Principles",
-};
-
-// Global store — loaded from localStorage on first use
-const _HT = { data:{}, subs:[], userId:null };
-
-function _htLoad(uid){
-  if(!uid) return;
-  try{
-    const raw = localStorage.getItem(`diq_habits_${uid}`);
-    _HT.data = raw ? JSON.parse(raw) : {};
-  }catch{ _HT.data = {}; }
-}
-function _htSave(uid){
-  if(!uid) return;
-  try{ localStorage.setItem(`diq_habits_${uid}`, JSON.stringify(_HT.data)); }catch{}
-}
-function _htNotify(){ _HT.subs.forEach(s=>s({..._HT.data})); }
-
-function useHabitTracker(userId){
-  const [data, setData] = useState(_HT.data);
-  useEffect(()=>{
-    if(userId && _HT.userId !== userId){
-      _HT.userId = userId;
-      _htLoad(userId);
-      setData({..._HT.data});
-    }
-    _HT.subs.push(setData);
-    return()=>{ _HT.subs = _HT.subs.filter(s=>s!==setData); };
-  },[userId]);
-
-  const commit = (key, notes="")=>{
-    const now = new Date().toISOString();
-    _HT.data[key] = {
-      committed: true,
-      status: "active",
-      startedAt: _HT.data[key]?.startedAt || now,
-      lastUpdated: now,
-      notes,
-    };
-    _htSave(_HT.userId);
-    _htNotify();
-  };
-
-  const updateStatus = (key, status)=>{
-    if(!_HT.data[key]) return;
-    _HT.data[key] = { ..._HT.data[key], status, lastUpdated: new Date().toISOString() };
-    _htSave(_HT.userId);
-    _htNotify();
-  };
-
-  const uncommit = (key)=>{
-    delete _HT.data[key];
-    _htSave(_HT.userId);
-    _htNotify();
-  };
-
-  const addNote = (key, notes)=>{
-    if(!_HT.data[key]) return;
-    _HT.data[key] = { ..._HT.data[key], notes, lastUpdated: new Date().toISOString() };
-    _htSave(_HT.userId);
-    _htNotify();
-  };
-
-  const committed   = ALL_TRACKABLE.filter(t=>data[t.key]?.committed);
-  const mastered    = committed.filter(t=>data[t.key]?.status==="mastered");
-  const active      = committed.filter(t=>data[t.key]?.status==="active");
-  const paused      = committed.filter(t=>data[t.key]?.status==="paused");
-  const total       = ALL_TRACKABLE.length;
-  const pct         = Math.round((committed.length/total)*100);
-
-  return { data, commit, uncommit, updateStatus, addNote, committed, mastered, active, paused, total, pct };
-}
-
-// ── HabitButton: the "I'm doing this" button used inside every module ─────────
 function HabitButton({itemKey, userId, compact=false}){
   const ht = useHabitTracker(userId);
   const item = ALL_TRACKABLE.find(t=>t.key===itemKey);
@@ -8839,30 +8692,6 @@ function NoteEditor({itemKey, ht}){
 }
 
 // ── Mini progress bar widget shown in the Dashboard nav ───────────────────────
-function HabitMiniBar({userId, onClick}){
-  const ht = useHabitTracker(userId);
-  if(ht.committed.length===0) return(
-    <button onClick={onClick} style={{background:"rgba(255,255,255,0.04)",border:"1px dashed rgba(255,255,255,0.12)",borderRadius:10,padding:"5px 12px",color:"var(--cream-30)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",flexShrink:0}}
-      title="Track your practices">
-      Track practices
-    </button>
-  );
-  return(
-    <button onClick={onClick} style={{background:"rgba(31,168,154,0.08)",border:"1px solid rgba(31,168,154,0.2)",borderRadius:10,padding:"5px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,flexShrink:0,transition:"all .2s"}}
-      title="View your practice tracker"
-      onMouseEnter={e=>e.currentTarget.style.background="rgba(31,168,154,0.15)"}
-      onMouseLeave={e=>e.currentTarget.style.background="rgba(31,168,154,0.08)"}>
-      <div style={{width:40,height:4,background:"rgba(255,255,255,0.06)",borderRadius:2,overflow:"hidden"}}>
-        <div style={{height:"100%",width:`${ht.pct}%`,background:"linear-gradient(90deg,var(--teal),var(--gold))",borderRadius:2}}/>
-      </div>
-      <span style={{fontSize:10,fontFamily:"var(--f-mono)",color:"var(--teal)",fontWeight:700}}>{ht.committed.length}/{ht.total}</span>
-    </button>
-  );
-}
-
-// Re-resolve a voice from fresh getVoices() right before speaking.
-// Voice object references go STALE in many browsers (Chrome Android especially).
-// Match by name only — voiceURI is often undefined on mobile browsers.
 function resolveLiveVoice(voiceRef){
   if(typeof window==="undefined"||!window.speechSynthesis||!voiceRef) return null;
   const live=window.speechSynthesis.getVoices();
@@ -8891,158 +8720,6 @@ function loadVoices(){
     attempt();
   }catch(_){}
   });
-}
-
-function VoiceSelector(){
-  const [voices,setVoices]=useState([]);
-  const [sel,setSel]=useGlobalVoice();
-  const [open,setOpen]=useState(false);
-  const btnRef=useRef(null);
-  const dropRef=useRef(null);
-  const [pos,setPos]=useState({top:0,left:0});
-
-  useEffect(()=>{
-    loadVoices().then(vs=>{
-      setVoices(vs);
-      if(!_GV.voice&&vs.length>0){
-        const pick=
-          vs.find(v=>v.name.includes("Natural"))||
-          vs.find(v=>v.name.includes("Neural"))||
-          vs.find(v=>v.name==="Google UK English Female")||
-          vs.find(v=>v.name==="Google US English")||
-          vs.find(v=>v.name.includes("Google")&&v.lang==="en-US")||
-          vs.find(v=>v.name.includes("Samantha"))||
-          vs.find(v=>v.name.includes("Daniel"))||
-          vs.find(v=>v.lang==="en-US")||
-          vs[0];
-        setSel(pick);
-      }
-    });
-  },[]);
-
-  useEffect(()=>{
-    if(!open) return;
-    const updatePos=()=>{
-      if(!btnRef.current) return;
-      const r=btnRef.current.getBoundingClientRect();
-      const dropdownW=270;
-      const dropdownMaxH=380;
-      let top=r.bottom+6;
-      let left=Math.min(r.left,window.innerWidth-dropdownW-8);
-      left=Math.max(8,left);
-      if(top+dropdownMaxH>window.innerHeight&&r.top>dropdownMaxH) top=r.top-dropdownMaxH-6;
-      setPos({top,left});
-    };
-    updatePos();
-    // KEY FIX: check BOTH btnRef AND dropRef — the fixed dropdown is NOT inside btnRef DOM
-    const close=(e)=>{
-      if(!btnRef.current?.contains(e.target)&&!dropRef.current?.contains(e.target)){
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown",close);
-    document.addEventListener("touchstart",close,{passive:true});
-    window.addEventListener("scroll",updatePos,true);
-    window.addEventListener("resize",updatePos);
-    return()=>{
-      document.removeEventListener("mousedown",close);
-      document.removeEventListener("touchstart",close);
-      window.removeEventListener("scroll",updatePos,true);
-      window.removeEventListener("resize",updatePos);
-    };
-  },[open]);
-
-  if(!voices.length) return null;
-
-  const GROUPS=[
-    {flag:"🇺🇸",key:"en-US",label:"American"},
-    {flag:"🇬🇧",key:"en-GB",label:"British"},
-    {flag:"🇦🇺",key:"en-AU",label:"Australian"},
-    {flag:"🇮🇳",key:"en-IN",label:"Indian"},
-    {flag:"🌍",key:"other",label:"Other English"},
-  ];
-  const seen=new Set();
-  const grouped=GROUPS.map(g=>({
-    ...g,
-    voices:voices.filter(v=>{
-      if(seen.has(v.name)) return false;
-      const match=g.key==="other"?!["en-US","en-GB","en-AU","en-IN"].includes(v.lang):v.lang===g.key;
-      if(match){seen.add(v.name);return true;}
-      return false;
-    }).slice(0,6),
-  })).filter(g=>g.voices.length>0);
-
-  const shortName=v=>v.name.replace("Microsoft","").replace("Google","").replace(/\s*\(.*?\)/g,"").trim()||v.name;
-
-  return(
-    <div style={{display:"inline-block"}}>
-      <button ref={btnRef} onClick={(e)=>{e.stopPropagation();setOpen(o=>!o);}}
-        style={{display:"inline-flex",alignItems:"center",gap:5,background:"none",border:"1px solid var(--cream-15)",borderRadius:20,padding:"5px 12px",color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",letterSpacing:".04em",transition:"all .2s",whiteSpace:"nowrap"}}
-        onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--line-gold)";e.currentTarget.style.color="var(--gold)";}}
-        onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--cream-15)";e.currentTarget.style.color="var(--cream-40)";}}>
-        🎙 {sel?shortName(sel).slice(0,16):"Pick voice"} ▾
-      </button>
-      {open&&(
-        <div
-          ref={dropRef}
-          style={{
-            position:"fixed",
-            top:pos.top,
-            left:pos.left,
-            zIndex:2147483647,
-            background:G.card,
-            border:"1px solid rgba(210,175,90,0.45)",
-            borderRadius:14,
-            padding:"0 0 8px",
-            minWidth:240,
-            maxWidth:270,
-            maxHeight:"min(380px,72vh)",
-            overflowY:"auto",
-            WebkitOverflowScrolling:"touch",
-            overscrollBehavior:"contain",
-            boxShadow:"0 24px 80px rgba(0,0,0,0.99)",
-            isolation:"isolate",
-            willChange:"transform",
-          }}
-          onScroll={e=>e.stopPropagation()}
-          onClick={e=>e.stopPropagation()}
-        >
-          <div style={{padding:"10px 14px 8px",fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",letterSpacing:".12em",borderBottom:"1px solid rgba(255,255,255,0.07)",marginBottom:4,position:"sticky",top:0,background:G.card,zIndex:1}}>🎙 SELECT VOICE & ACCENT</div>
-          {grouped.map(g=>(
-            <div key={g.key}>
-              <div style={{padding:"5px 14px 3px",fontSize:8,color:"rgba(255,255,255,0.22)",fontFamily:"var(--f-mono)",letterSpacing:".1em",textTransform:"uppercase",background:"rgba(255,255,255,0.02)"}}>{g.flag} {g.label}</div>
-              {g.voices.map(v=>(
-                <button key={v.name}
-                  onMouseDown={(e)=>{
-                    // Use onMouseDown (fires BEFORE the document mousedown close handler)
-                    // so the selection always registers before the dropdown closes
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSel(v);
-                    setOpen(false);
-                  }}
-                  onTouchEnd={(e)=>{
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSel(v);
-                    setOpen(false);
-                  }}
-                  style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left",background:sel?.name===v.name?"rgba(210,175,90,0.1)":"transparent",border:"none",padding:"10px 16px",color:sel?.name===v.name?"var(--gold)":"rgba(255,255,255,0.65)",fontSize:13,cursor:"pointer",gap:8,fontFamily:"inherit",transition:"background .1s"}}>
-                  <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {sel?.name===v.name&&<span style={{marginRight:5}}>✓</span>}{shortName(v)}
-                  </span>
-                  <span style={{fontSize:9,color:v.localService?"rgba(255,255,255,0.18)":"var(--teal)",flexShrink:0,padding:"1px 6px",borderRadius:4,background:v.localService?"transparent":"rgba(20,184,154,0.07)"}}>{v.localService?"device":"cloud"}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",padding:"8px 14px 0",marginTop:4}}>
-            <button onMouseDown={(e)=>{e.preventDefault();setOpen(false);}} style={{fontSize:10,color:"rgba(255,255,255,0.2)",background:"none",border:"none",cursor:"pointer",fontFamily:"var(--f-mono)"}}>✕ close</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 function AudioPlayer({text,label="Listen",mini=false}){
@@ -9447,62 +9124,6 @@ function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loadi
   );
 }
 
-function LifeHacksModule({data,formData,userId,isPremium,isPaid,onUnlock}){
-  const [hacks,setHacks]=useState(Array.isArray(data?.life_hacks)?data.life_hacks:[]);
-  const [emotional,setEmotional]=useState(Array.isArray(data?.emotional_strength)?data.emotional_strength:[]);
-  const [lLoading,setLLoading]=useState(false);[{},()=>{}];
-  const [eLoading,setELoading]=useState(false);
-  const [lErr,setLErr]=useState("");
-  const [eErr,setEErr]=useState("");
-  useEffect(()=>{
-    const h=Array.isArray(data?.life_hacks)?data.life_hacks:[];
-    const e=Array.isArray(data?.emotional_strength)?data.emotional_strength:[];
-    setHacks(h);
-    setEmotional(e);
-    if(!h.length && formData) setTimeout(()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr),300);
-    if(!e.length && formData) setTimeout(()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr),1800);
-  },[]);
-
-  return(
-    <div className="fu">
-      <ModuleShell title="LIFE HACKS" color="var(--gold)" audioText={hacks.length?hacks.join(". "):""} onRegen={()=>regenerateModule("life_hacks",formData,userId,isPremium,setHacks,setLLoading,setLErr)} loading={lLoading} err={lErr} isPaid={isPaid} onUnlock={onUnlock}>
-        {hacks.length===0&&!lLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your personalised life hacks.</p>}
-        {hacks.map((h,i)=>{
-          const colonIdx=h.indexOf(":");
-          const hasCategory=colonIdx>0&&colonIdx<18;
-          const category=hasCategory?h.slice(0,colonIdx).trim():null;
-          const body=hasCategory?h.slice(colonIdx+1).trim():h;
-          const catColors={"MONEY":"var(--gold)","FOOD":"var(--teal)","FOOD/FUEL":"var(--teal)","TIME":"#9b72cf","PHONE":"var(--rose)","PHONE/DATA":"var(--rose)","HEALTH":"#4ADE80","SKILL":"var(--teal)","NETWORK":"var(--gold)"};
-          const catColor=(category&&catColors[category])||"var(--gold)";
-          return(
-            <div key={i} style={{padding:"13px 16px",marginBottom:10,background:"var(--midnight)",borderRadius:12,border:`1px solid ${catColor}20`}}>
-              {category&&<div style={{fontSize:9,fontFamily:"var(--f-mono)",color:catColor,letterSpacing:".12em",marginBottom:7,display:"flex",alignItems:"center",gap:5}}>
-                <div style={{width:5,height:5,borderRadius:"50%",background:catColor}}/>
-                {category}
-              </div>}
-              <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                <p style={{fontSize:13,color:"rgba(255,255,255,0.72)",lineHeight:1.8,margin:0,flex:1}}>{body}</p>
-                <AudioPlayer text={body} label="" mini={true}/>
-              </div>
-            </div>
-          );
-        })}
-      </ModuleShell>
-      <ModuleShell title="EMOTIONAL STRENGTH" color="var(--teal)" audioText={emotional.length?emotional.join(". "):""} onRegen={()=>regenerateModule("emotional_strength",formData,userId,isPremium,setEmotional,setELoading,setEErr)} loading={eLoading} err={eErr} isPaid={isPaid} onUnlock={onUnlock}>
-        {emotional.length===0&&!eLoading&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate emotional strength practices.</p>}
-        {emotional.map((e,i)=>(
-          <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:i<emotional.length-1?"1px solid rgba(255,255,255,0.05)":"none",alignItems:"flex-start"}}>
-            <span style={{fontSize:18,flexShrink:0}}>🧘</span>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7,margin:0,flex:1}}>{e}</p>
-            <AudioPlayer text={e} label="" mini={true}/>
-          </div>
-        ))}
-      </ModuleShell>
-    </div>
-  );
-}
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // JIM ROHN FINANCIAL WISDOM
 // "Profits are better than wages. Wages make you a living. Profits make you a fortune."
@@ -9597,481 +9218,10 @@ const JIM_ROHN_BOOKS = [
   {label:"The Seasons of Life (PDF summary) — Jim Rohn",url:"https://www.jimrohn.com",emoji:"🌐"},
 ];
 
-function JimRohnMoneySection(){
-  const [expanded, setExpanded] = useState(false);
-  return(
-    <div style={{marginTop:20,marginBottom:8,background:"linear-gradient(135deg,rgba(210,175,90,0.06),rgba(155,114,207,0.03))",border:"1px solid rgba(210,175,90,0.2)",borderRadius:18}}>
-      {/* Header — always visible */}
-      <div style={{padding:"18px 20px 14px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-          <div style={{fontSize:22}}>📜</div>
-          <div>
-            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".14em",marginBottom:3}}>FINANCIAL PHILOSOPHY</div>
-            <div style={{fontSize:16,fontWeight:700,color:"var(--cream)"}}>Jim Rohn on Money</div>
-          </div>
-        </div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,margin:"0 0 14px 0"}}>
-          Broke at 25. Millionaire at 31. He spent 40 years explaining exactly what changed and why.
-          These are the 5 rules that made the difference.
-        </p>
-
-        {/* 5 KEY QUOTES — always visible, no accordion needed */}
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {JIM_ROHN_PRINCIPLES.map((p,i)=>(
-            <div key={p.id} style={{padding:"12px 14px",background:"rgba(0,0,0,0.2)",borderRadius:12,borderLeft:`3px solid ${p.color}`}}>
-              <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".1em",marginBottom:5}}>{p.icon} {p.title.toUpperCase()}</div>
-              <p style={{fontSize:13,color:"var(--cream)",fontStyle:"italic",lineHeight:1.65,margin:"0 0 6px 0"}}>&ldquo;{p.quote}&rdquo;</p>
-              {expanded&&p.steps?.length>0&&<p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:"6px 0 0 0"}}>{p.steps[0]}</p>}
-            </div>
-          ))}
-        </div>
-
-        <button onClick={()=>setExpanded(e=>!e)}
-          style={{width:"100%",marginTop:12,padding:"10px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10,color:"var(--gold)",fontSize:12,fontFamily:"var(--f-mono)",cursor:"pointer",letterSpacing:".05em"}}>
-          {expanded?"▲ Show less":"▼ Show step-by-step application for each"}
-        </button>
-      </div>
-
-      {/* Principles */}
-      <div style={{border:"1px solid rgba(210,175,90,0.15)",borderTop:"none",borderRadius:"0 0 18px 18px",overflow:"hidden"}}>
-        {JIM_ROHN_PRINCIPLES.map((p,i)=>{
-          const isOpen = open===p.id;
-          return(
-            <div key={p.id} style={{borderBottom:i<JIM_ROHN_PRINCIPLES.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
-              {/* Header row */}
-              <button onClick={()=>setOpen(o=>o===p.id?null:p.id)}
-                style={{width:"100%",background:isOpen?`${p.color}06`:"none",border:"none",padding:"16px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left",transition:"background .2s"}}>
-                <div style={{width:38,height:38,borderRadius:10,background:`${p.color}10`,border:`1px solid ${p.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                  {p.icon}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:700,color:isOpen?p.color:"var(--cream)",lineHeight:1.35,marginBottom:3}}>{p.title}</div>
-                  <div style={{fontSize:11,color:"var(--cream-30)",fontStyle:"italic",lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    &ldquo;{p.quote.slice(0,70)}{p.quote.length>70?"…":""}&rdquo;
-                  </div>
-                </div>
-                <div style={{color:p.color,fontSize:16,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
-              </button>
-
-              {/* Expanded */}
-              {isOpen&&(
-                <div style={{padding:"0 20px 20px",background:`${p.color}03`}}>
-                  <div style={{height:1,background:"rgba(255,255,255,0.05)",marginBottom:16}}/>
-
-                  {/* The quote */}
-                  <div style={{padding:"12px 16px",background:`${p.color}08`,borderLeft:`3px solid ${p.color}`,borderRadius:"0 10px 10px 0",marginBottom:16}}>
-                    <p style={{fontSize:14,fontStyle:"italic",color:"var(--cream)",lineHeight:1.75,margin:"0 0 4px 0"}}>
-                      &ldquo;{p.quote}&rdquo;
-                    </p>
-                    <div style={{fontSize:10,color:`${p.color}`,fontFamily:"var(--f-mono)"}}>— Jim Rohn</div>
-                  </div>
-
-                  {/* Explanation */}
-                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.85,marginBottom:16}}>{p.body}</p>
-
-                  {/* Steps */}
-                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:10}}>HOW TO APPLY IT</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
-                    {p.steps.map((step,si)=>(
-                      <div key={si} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.04)"}}>
-                        <div style={{width:24,height:24,borderRadius:"50%",background:`${p.color}10`,border:`1px solid ${p.color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:p.color,fontWeight:700}}>{si+1}</div>
-                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{step}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Real-world application */}
-                  <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12}}>
-                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-40)",letterSpacing:".1em",marginBottom:6}}>IN YOUR CONTEXT</div>
-                    <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7,margin:0}}>{p.application}</p>
-                  </div>
-
-                  <AudioPlayer text={`${p.title}. ${p.quote}. ${p.body}`} label="Listen to Jim Rohn" mini={false}/>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Books and resources */}
-      <div style={{marginTop:12,padding:"14px 16px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:14}}>
-        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".12em",marginBottom:10}}>JIM ROHN — BOOKS & FREE SPEECHES</div>
-        <div style={{display:"flex",flexDirection:"column",gap:7}}>
-          {JIM_ROHN_BOOKS.map((lk,i)=>(
-            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
-              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-              <span style={{fontSize:14,flexShrink:0}}>{lk.emoji}</span>
-              <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
-              <span style={{fontSize:9,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>↗</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // JIM ROHN TAB — Dedicated full-page financial wisdom section
 // Moved to its own tab in "Make Money" so it's easy to find and not buried
 // ═══════════════════════════════════════════════════════════════════════════════
-function JimRohnTab({isPaid, onUnlock}){
-  const [open, setOpen] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-
-  return(
-    <div className="fu">
-      {/* Hero header */}
-      <div style={{marginBottom:28,padding:"24px",background:"linear-gradient(135deg,rgba(210,175,90,0.1),rgba(155,114,207,0.05))",border:"1px solid rgba(210,175,90,0.25)",borderRadius:18}}>
-        <div style={{display:"flex",gap:14,alignItems:"flex-start",marginBottom:14}}>
-          <div style={{fontSize:36,flexShrink:0}}>📜</div>
-          <div>
-            <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".16em",marginBottom:6}}>FINANCIAL PHILOSOPHY</div>
-            <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:"var(--cream)",lineHeight:1.25,marginBottom:8}}>Jim Rohn on Money</div>
-            <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.8,margin:0}}>
-              Broke at 25. Self-made millionaire at 31. He spent the next 40 years explaining exactly what changed.
-              These are the 5 principles he taught over and over — because they are the ones most people never apply.
-            </p>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          <div style={{padding:"5px 12px",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:20,fontSize:11,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>
-            5 principles
-          </div>
-          <div style={{padding:"5px 12px",background:"rgba(31,168,154,0.08)",border:"1px solid rgba(31,168,154,0.15)",borderRadius:20,fontSize:11,color:"var(--teal)",fontFamily:"var(--f-mono)"}}>
-            Step-by-step application
-          </div>
-          <div style={{padding:"5px 12px",background:"rgba(155,114,207,0.08)",border:"1px solid rgba(155,114,207,0.15)",borderRadius:20,fontSize:11,color:"#9b72cf",fontFamily:"var(--f-mono)"}}>
-            Free books & speeches
-          </div>
-        </div>
-      </div>
-
-      {/* 5 Principles — full expanded cards */}
-      <div style={{display:"flex",flexDirection:"column",gap:16,marginBottom:24}}>
-        {JIM_ROHN_PRINCIPLES.map((p,i)=>{
-          const isOpen = open===p.id;
-          return(
-            <div key={p.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?p.color+"50":"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .2s"}}>
-              {/* Principle header — always visible */}
-              <button onClick={()=>setOpen(o=>o===p.id?null:p.id)}
-                style={{width:"100%",background:isOpen?`${p.color}06`:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",gap:14,alignItems:"flex-start",textAlign:"left",transition:"background .2s"}}>
-                <div style={{width:42,height:42,borderRadius:12,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                  {p.icon}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".1em",marginBottom:4}}>
-                    PRINCIPLE {String(i+1).padStart(2,"0")}
-                  </div>
-                  <div style={{fontSize:15,fontWeight:700,color:isOpen?p.color:"var(--cream)",lineHeight:1.35,marginBottom:6}}>
-                    {p.title}
-                  </div>
-                  <p style={{fontSize:12,color:"var(--cream-40)",fontStyle:"italic",margin:0,lineHeight:1.5}}>
-                    &ldquo;{p.quote.length>90?p.quote.slice(0,90)+"…":p.quote}&rdquo;
-                  </p>
-                </div>
-                <span style={{color:p.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s",marginTop:2}}>⌄</span>
-              </button>
-
-              {/* Expanded content */}
-              {isOpen&&(
-                <div style={{padding:"0 20px 24px",borderTop:`1px solid ${p.color}15`}}>
-                  <div style={{height:16}}/>
-
-                  {/* The quote — prominent */}
-                  <div style={{padding:"14px 18px",background:`${p.color}08`,borderLeft:`3px solid ${p.color}`,borderRadius:"0 12px 12px 0",marginBottom:18}}>
-                    <p style={{fontSize:15,fontStyle:"italic",color:"var(--cream)",lineHeight:1.8,margin:"0 0 6px 0"}}>
-                      &ldquo;{p.quote}&rdquo;
-                    </p>
-                    <div style={{fontSize:10,color:p.color,fontFamily:"var(--f-mono)",fontWeight:600}}>— Jim Rohn</div>
-                  </div>
-
-                  {/* Deep explanation */}
-                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.9,marginBottom:18}}>{p.body}</p>
-
-                  {/* Steps */}
-                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:12}}>
-                    HOW TO APPLY IT — RIGHT NOW
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
-                    {p.steps.map((step,si)=>(
-                      <div key={si} style={{display:"flex",gap:10,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.04)"}}>
-                        <div style={{width:26,height:26,borderRadius:"50%",background:`${p.color}10`,border:`1px solid ${p.color}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:10,color:p.color,fontWeight:800}}>
-                          {si+1}
-                        </div>
-                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.7}}>{step}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* In your context */}
-                  <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,marginBottom:14}}>
-                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em",marginBottom:6}}>IN YOUR CONTEXT</div>
-                    <p style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.75,margin:0}}>{p.application}</p>
-                  </div>
-
-                  <AudioPlayer text={`${p.title}. ${p.quote}. ${p.body.slice(0,200)}`} label="Listen" mini={false}/>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Books & free resources */}
-      <div style={{padding:"18px",background:"rgba(155,114,207,0.05)",border:"1px solid rgba(155,114,207,0.18)",borderRadius:16}}>
-        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".14em",marginBottom:14}}>
-          JIM ROHN — BOOKS & FREE SPEECHES
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {JIM_ROHN_BOOKS.map((lk,i)=>(
-            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",background:"var(--midnight)",borderRadius:10,textDecoration:"none",transition:"opacity .15s",border:"1px solid rgba(255,255,255,0.04)"}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
-              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-              <span style={{fontSize:16,flexShrink:0}}>{lk.emoji}</span>
-              <span style={{fontSize:13,color:"var(--cream-70)",flex:1,lineHeight:1.4}}>{lk.label}</span>
-              <span style={{fontSize:10,color:"#9b72cf",fontFamily:"var(--f-mono)",flexShrink:0}}>↗</span>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      {/* Bottom quote */}
-      <div style={{marginTop:20,padding:"20px 24px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:14,textAlign:"center"}}>
-        <p style={{fontFamily:"var(--f-display)",fontSize:17,fontStyle:"italic",color:"var(--gold)",lineHeight:1.7,margin:"0 0 8px 0"}}>
-          &ldquo;Work harder on yourself than you do on your job. If you work hard on your job you can make a living, but if you work hard on yourself you can make a fortune.&rdquo;
-        </p>
-        <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>— Jim Rohn</div>
-      </div>
-    </div>
-  );
-}
-
-function MoneyModule({data,formData,userId,isPremium,isPaid,onUnlock}){
-  const [mp,setMp]=useState(data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{});
-  const [re,setRe]=useState(data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{});
-  const [mpL,setMpL]=useState(false);const [reL,setReL]=useState(false);
-  const [mpE,setMpE]=useState("");const [reE,setReE]=useState("");
-  useEffect(()=>{
-    const mp0=data?.money_protection&&typeof data.money_protection==="object"?data.money_protection:{};
-    const re0=data?.real_estate_hack&&typeof data.real_estate_hack==="object"?data.real_estate_hack:{};
-    setMp(mp0); setRe(re0);
-    if(!mp0.rule&&formData) setTimeout(()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE),300);
-    if(!re0.method&&formData) setTimeout(()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE),2500);
-  },[]);
-  const mpAudio=[mp.rule&&`Golden rule: ${mp.rule}`,mp.savings_target&&`Save: ${mp.savings_target}`,mp.avoid&&`Stop spending on: ${mp.avoid}`,mp.first_investment&&`First investment: ${mp.first_investment}`].filter(Boolean).join(". ");
-  const reAudio=[re.method&&`Method: ${re.method}`,re.how_it_works,re.first_deal&&`First deal: ${re.first_deal}`].filter(Boolean).join(". ");
-  return(
-    <div className="fu">
-      <ModuleShell title="PROTECT YOUR MONEY" color="var(--gold)" audioText={mpAudio} onRegen={()=>regenerateModule("money_protection",formData,userId,isPremium,setMp,setMpL,setMpE)} loading={mpL} err={mpE} isPaid={isPaid} onUnlock={onUnlock}>
-        {!mp.rule&&!mpL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate your money protection plan.</p>}
-        {mp.rule&&(
-          <>
-            <div style={{padding:"13px 16px",background:"rgba(210,175,90,0.05)",borderRadius:12,marginBottom:10,border:"1px solid rgba(210,175,90,0.2)"}}>
-              <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:5}}>GOLDEN RULE</div>
-              <p style={{fontSize:14,fontWeight:600,color:"var(--cream)",margin:0,lineHeight:1.6}}>{mp.rule}</p>
-            </div>
-            {[{l:"SAVINGS TARGET",v:mp.savings_target,c:"var(--teal)"},{l:"STOP WASTING ON",v:mp.avoid,c:"#F87171"},{l:"FIRST INVESTMENT",v:mp.first_investment,c:"var(--gold)"}].map(({l,v,c})=>v&&(
-              <div key={l} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
-                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{l}</div>
-                <p style={{fontSize:13,color:"rgba(255,255,255,0.6)",margin:0,lineHeight:1.6}}>{v}</p>
-              </div>
-            ))}
-          </>
-        )}
-      </ModuleShell>
-      <ModuleShell title="REAL ESTATE HACK" color="var(--teal)" audioText={reAudio} onRegen={()=>regenerateModule("real_estate_hack",formData,userId,isPremium,setRe,setReL,setReE)} loading={reL} err={reE} isPaid={isPaid} onUnlock={onUnlock}>
-        {!re.method&&!reL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to generate real estate income ideas for {formData?.country||"your country"}.</p>}
-        {re.method&&(
-          <>
-            <div style={{padding:"13px 16px",background:"rgba(20,184,154,0.05)",borderRadius:12,marginBottom:10,border:"1px solid rgba(20,184,154,0.2)"}}>
-              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{re.method}</div>
-              <p style={{fontSize:13,color:"rgba(255,255,255,0.6)",margin:0,lineHeight:1.6}}>{re.how_it_works}</p>
-            </div>
-            {re.platform&&<p style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginBottom:8}}>Platform: <span style={{color:"var(--teal)"}}>{re.platform}</span></p>}
-            {re.first_deal&&<div style={{padding:"10px 14px",background:"rgba(210,175,90,0.05)",borderRadius:10,fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.6,borderLeft:"2px solid var(--gold)"}}><b style={{color:"var(--cream)"}}>First deal: </b>{re.first_deal}</div>}
-          </>
-        )}
-      </ModuleShell>
-
-      {/* Money tools - universal links */}
-      <div style={{marginTop:4,padding:"14px 16px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.12)",borderRadius:14}}>
-        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:10}}>MONEY TOOLS — START HERE</div>
-        <div style={{display:"flex",flexDirection:"column",gap:7}}>
-          {[
-            {label:"YNAB — best budgeting app (You Need A Budget)",url:"https://www.youneedabudget.com",emoji:"📊"},
-            {label:"Wise — send & receive money globally at low fees",url:"https://wise.com",emoji:"💸"},
-            {label:"Investopedia — free financial education",url:"https://www.investopedia.com",emoji:"📚"},
-            {label:"Compound interest calculator",url:"https://www.investor.gov/financial-tools-calculators/calculators/compound-interest-calculator",emoji:"🧮"},
-            {label:"The Psychology of Money (book) — Morgan Housel",url:"https://www.amazon.com/Psychology-Money-Timeless-Lessons-Happiness/dp/0857197681",emoji:"📖"},
-          ].map((lk,i)=>(
-            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
-              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-              <span style={{fontSize:14}}>{lk.emoji}</span>
-              <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
-              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function OnlineIncomeModule({data,formData,userId,isPremium,isPaid,onUnlock}){
-  const [online,setOnline]=useState(Array.isArray(data?.online_income)?data.online_income:[]);
-  const [loading,setLoading]=useState(false);
-  const [err,setErr]=useState("");
-  useEffect(()=>{
-    const saved=Array.isArray(data?.online_income)?data.online_income:[];
-    setOnline(saved);
-    if(!saved.length&&formData) setTimeout(()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr),300);
-  },[]);
-  const audioText=online.map(o=>`${o.method}: ${o.why_it_works||""}. Start today: ${o.first_step||""}`).join(". ");
-  const LABELS=["BEST FIT","GOOD FIT","HIGH CEILING"];
-  return(
-    <div className="fu">
-      <ModuleShell title={`MAKE MONEY ONLINE — ${(formData?.country||"YOUR COUNTRY").toUpperCase()}`} color="var(--gold)" audioText={audioText} onRegen={()=>regenerateModule("online_income",formData,userId,isPremium,setOnline,setLoading,setErr)} loading={loading} err={err} isPaid={isPaid} onUnlock={onUnlock}>
-        {online.length===0&&!loading&&(
-          <div style={{textAlign:"center",padding:"20px 0"}}>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:16}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to get online income methods specific to {formData?.country||"your country"} and your skills.</p>
-            <p style={{fontSize:11,color:"rgba(255,255,255,0.2)"}}>Fresh ideas every refresh — we rotate platforms daily so you always get new options.</p>
-          </div>
-        )}
-        {online.map((o,i)=>(
-          <div key={i} style={{padding:"16px",background:"var(--midnight)",borderRadius:14,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
-              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",flex:1}}>{o.method}</div>
-              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.25)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>{LABELS[i]||"OPTION"}</span>
-            </div>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.65,marginBottom:10}}>{o.why_it_works}</p>
-            {/* Earnings */}
-            {(o.earnings||o.local_equivalent)&&(
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-                {o.earnings&&<span style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.08)",border:"1px solid rgba(20,184,154,0.2)",borderRadius:6,padding:"3px 10px",fontFamily:"var(--f-mono)"}}>💵 {o.earnings}</span>}
-                {o.local_equivalent&&<span style={{fontSize:11,color:"rgba(255,255,255,0.35)",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:6,padding:"3px 10px",fontFamily:"var(--f-mono)"}}>≈ {o.local_equivalent}</span>}
-              </div>
-            )}
-            {o.url&&<a href={o.url.startsWith("http")?o.url:`https://${o.url}`} target="_blank" rel="noopener noreferrer" style={{display:"block",fontSize:12,color:"var(--teal)",marginBottom:10,wordBreak:"break-all"}}>🔗 {o.url}</a>}
-            {o.first_step&&(
-              <div style={{padding:"10px 12px",background:"rgba(20,184,154,0.04)",borderRadius:8,fontSize:13,color:"rgba(255,255,255,0.6)",borderLeft:"2px solid var(--teal)",lineHeight:1.6}}>
-                <b style={{color:"var(--teal)"}}>Start in 48 hours: </b>{o.first_step}
-              </div>
-            )}
-            <AudioPlayer text={`${o.method}: ${o.why_it_works||""}. First step: ${o.first_step||""}`} label="" mini={true}/>
-          </div>
-        ))}
-      </ModuleShell>
-    </div>
-  );
-}
-
-
-function BusinessModule({data,formData,userId,isPremium,isPaid,onUnlock}){
-  const [zb,setZb]=useState(data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{});
-  const [pb,setPb]=useState(Array.isArray(data?.product_business)?data.product_business:[]);
-  const [zbL,setZbL]=useState(false);const [pbL,setPbL]=useState(false);
-  const [zbE,setZbE]=useState("");const [pbE,setPbE]=useState("");
-  useEffect(()=>{
-    const zb0=data?.zero_income_business&&typeof data.zero_income_business==="object"?data.zero_income_business:{};
-    const pb0=Array.isArray(data?.product_business)?data.product_business:[];
-    setZb(zb0); setPb(pb0);
-    if(!zb0.idea&&formData) setTimeout(()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE),300);
-    if(!pb0.length&&formData) setTimeout(()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE),2500);
-  },[]);
-  const zbAudio=[zb.idea&&`Business idea: ${zb.idea}`,zb.why_zero,zb.day_one&&`Day one: ${zb.day_one}`,zb.first_revenue&&`First revenue: ${zb.first_revenue}`,zb.scale&&`Scale: ${zb.scale}`].filter(Boolean).join(". ");
-  return(
-    <div className="fu">
-      {/* Business links - shown once above modules */}
-      <div style={{marginBottom:16,padding:"12px 16px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:12}}>
-        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".1em",marginBottom:10}}>SUPPLIER & PLATFORM LINKS</div>
-        <div style={{display:"flex",flexDirection:"column",gap:7}}>
-          {[
-            {label:"Alibaba — buy wholesale products to resell",url:"https://www.alibaba.com",emoji:"🏭"},
-            {label:"DHgate — small-order wholesale supplier",url:"https://www.dhgate.com",emoji:"📦"},
-            {label:"Shopify — start an online store",url:"https://www.shopify.com",emoji:"🛒"},
-            {label:"Jumia — sell on Africa's largest marketplace",url:"https://www.jumia.com",emoji:"🌍"},
-            {label:"Paystack — accept payments in your country",url:"https://paystack.com",emoji:"💳"},
-          ].map((lk,i)=>(
-            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
-              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-              <span style={{fontSize:14}}>{lk.emoji}</span>
-              <span style={{fontSize:13,color:"var(--cream)",flex:1}}>{lk.label}</span>
-              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
-            </a>
-          ))}
-        </div>
-      </div>
-      <ModuleShell title="START WITH ZERO MONEY" color="var(--gold)" audioText={zbAudio} onRegen={()=>regenerateModule("zero_income_business",formData,userId,isPremium,setZb,setZbL,setZbE)} loading={zbL} err={zbE} isPaid={isPaid} onUnlock={onUnlock}>
-        {!zb.idea&&!zbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--gold)"}}>↺ Refresh</b> to generate a zero-capital business plan for {formData?.country||"your country"}.</p>}
-        {zb.idea&&(
-          <>
-            <div style={{padding:"14px",background:"rgba(210,175,90,0.05)",borderRadius:12,marginBottom:12,border:"1px solid rgba(210,175,90,0.2)"}}>
-              <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:5}}>THE MAIN IDEA</div>
-              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:6}}>{zb.idea}</div>
-              <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.6}}>{zb.why_zero}</p>
-            </div>
-            {[{l:"DAY ONE ACTION",v:zb.day_one,c:"var(--teal)"},{l:"FIRST REVENUE",v:zb.first_revenue,c:"var(--gold)"},{l:"HOW TO SCALE & EMPLOY",v:zb.scale,c:"#9b72cf"}].map(({l,v,c})=>v&&(
-              <div key={l} style={{padding:"10px 14px",background:"var(--midnight)",borderRadius:10,marginBottom:8,borderLeft:`2px solid ${c}`}}>
-                <div style={{fontSize:9,color:c,fontFamily:"var(--f-mono)",marginBottom:3}}>{l}</div>
-                <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.6}}>{v}</p>
-              </div>
-            ))}
-            {/* More zero-capital ideas */}
-            {Array.isArray(zb.alternatives)&&zb.alternatives.length>0&&(
-              <div style={{marginTop:16}}>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",marginBottom:10,letterSpacing:".1em"}}>MORE IDEAS FOR {(formData?.country||"YOUR COUNTRY").toUpperCase()}</div>
-                {zb.alternatives.map((alt,i)=>(
-                  <div key={i} style={{display:"flex",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.02)",borderRadius:8,marginBottom:6,border:"1px solid rgba(255,255,255,0.05)"}}>
-                    <div style={{width:20,height:20,borderRadius:"50%",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"var(--gold)",flexShrink:0}}>{i+1}</div>
-                    <p style={{fontSize:12,color:"rgba(255,255,255,0.5)",margin:0,lineHeight:1.6}}>{alt}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </ModuleShell>
-      <ModuleShell title="SELL PHYSICAL PRODUCTS" color="var(--teal)" audioText={pb.length?pb.map(p=>`${p.product}: ${p.why||""}. Margin: ${p.profit_margin||""}`).join(". "):""} onRegen={()=>regenerateModule("product_business",formData,userId,isPremium,setPb,setPbL,setPbE)} loading={pbL} err={pbE} isPaid={isPaid} onUnlock={onUnlock}>
-        {pb.length===0&&!pbL&&<p style={{fontSize:13,color:"rgba(255,255,255,0.3)"}}>Tap <b style={{color:"var(--teal)"}}>↺ Refresh</b> to get product business ideas with supplier links.</p>}
-        {pb.map((p,i)=>(
-          <div key={i} style={{padding:"13px",background:"var(--midnight)",borderRadius:12,marginBottom:12,border:"1px solid rgba(255,255,255,0.07)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8}}>
-              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{p.product}</div>
-              {p.profit_margin&&<span style={{fontSize:9,color:"var(--teal)",fontFamily:"var(--f-mono)",background:"rgba(20,184,154,0.08)",borderRadius:4,padding:"2px 6px",flexShrink:0,border:"1px solid rgba(20,184,154,0.2)"}}>{p.profit_margin} margin</span>}
-            </div>
-            <p style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:8,lineHeight:1.5}}>{p.why}</p>
-            {p.startup_cost&&<div style={{fontSize:12,color:"var(--gold)",marginBottom:10}}>Startup cost: {p.startup_cost}</div>}
-            {Array.isArray(p.supplier_links)&&p.supplier_links.length>0&&(
-              <div>
-                <div style={{fontSize:8,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",marginBottom:6}}>SUPPLIER LINKS</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {p.supplier_links.filter(l=>l).map((link,li)=>(
-                    <a key={li} href={link.startsWith("http")?link:`https://${link}`} target="_blank" rel="noopener noreferrer"
-                      style={{fontSize:11,color:"var(--teal)",background:"rgba(20,184,154,0.06)",borderRadius:6,padding:"3px 9px",textDecoration:"none",border:"1px solid rgba(20,184,154,0.2)"}}>
-                      {link.replace(/https?:\/\//,"").split("/")[0]}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            <AudioPlayer text={`${p.product}: ${p.why||""}. Cost: ${p.startup_cost||""}. Margin: ${p.profit_margin||""}`} label="" mini={true}/>
-          </div>
-        ))}
-      </ModuleShell>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // WIN TRACKER — Daily win logging with streak calendar + AI celebration
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -10419,6 +9569,9 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         }).catch(()=>{});
     }
     setInput("");setMood(null);
+    // Award progress points for logging a win
+    addProgressPoints(userId, "win_logged_"+Date.now(), PROGRESS_POINTS.win_logged);
+    window.dispatchEvent(new CustomEvent("showToast",{detail:"+2 progress points — win logged!"}));
     // Update last_checkin_date if first win today (keeps streak alive)
     const winToday = new Date().toISOString().slice(0,10);
     const winLastKey = `destiniq_win_checkin_${userId}`;
@@ -11279,187 +10432,6 @@ const DISCIPLINE_SECTIONS=[
   },
 ];
 
-function DailyDisciplineModule({formData, userId, isPaid, onUnlock}){
-  const [open,setOpen]=useState(null);
-  const name=formData?.name||"";
-
-  return(
-    <div className="fu">
-      {/* Hero */}
-      <div style={{marginBottom:28,padding:"24px",background:"linear-gradient(135deg,rgba(210,175,90,0.07),rgba(196,100,90,0.04))",border:"1px solid var(--line-gold)",borderRadius:18,textAlign:"center"}}>
-        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:8}}>YOUR DISCIPLINE SYSTEM</div>
-        <div className="d3" style={{marginBottom:10}}>
-          {name?"Done with Distractions, "+name+"?":"Done with Distractions?"}<br/>
-          <span style={{color:"var(--gold)"}}>Here's the system that replaces them.</span>
-        </div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,maxWidth:480,margin:"0 auto"}}>
-          Waking up early. Building routines. Studying hard. Working out. Staying focused when motivation fades.
-          Every one of these is explained below — deeply, specifically, and with the tools to actually do it.
-        </p>
-      </div>
-
-      {/* Sections — first 2 free, rest need paid */}
-      {/* Free: first 2 sections. Paid: all sections */}
-      {(isPaid ? DISCIPLINE_SECTIONS : DISCIPLINE_SECTIONS.slice(0,1)).map(s=>{
-          const isOpen=open===s.id;
-          return(
-            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:10}}>
-              {/* Header */}
-              <button onClick={()=>setOpen(o=>o===s.id?null:s.id)}
-                style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
-                <div style={{width:44,height:44,borderRadius:12,background:`${s.color}14`,border:`1px solid ${s.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                  {s.icon}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:isOpen?s.color:"var(--cream)",marginBottom:3}}>{s.title}</div>
-                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.subtitle}</div>
-                  {s.wakeTime&&!isOpen&&(
-                    <div style={{marginTop:5,display:"inline-flex",alignItems:"center",gap:5,padding:"2px 10px",background:`${s.color}12`,border:`1px solid ${s.color}25`,borderRadius:20}}>
-                      <span style={{fontSize:10,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700}}>{s.wakeTime}</span>
-                    </div>
-                  )}
-                </div>
-                <div style={{color:s.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
-              </button>
-
-              {/* Expanded */}
-              {isOpen&&(
-                <div style={{padding:"0 20px 22px"}}>
-                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
-
-                  {/* Wake time badge */}
-                  {s.wakeTime&&(
-                    <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"6px 14px",background:`${s.color}12`,border:`1px solid ${s.color}28`,borderRadius:24,marginBottom:14}}>
-                      <span style={{fontSize:18}}>⏰</span>
-                      <span style={{fontSize:13,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700}}>{s.wakeTime}</span>
-                    </div>
-                  )}
-
-                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{s.body}</p>
-
-                  {/* Hour-by-hour breakdown */}
-                  {s.breakdown&&(
-                    <div style={{marginBottom:16}}>
-                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>HOUR BY HOUR</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        {s.breakdown.map((b,i)=>(
-                          <div key={i} style={{display:"flex",gap:12,padding:"12px 14px",background:"var(--midnight)",borderRadius:12,border:"1px solid rgba(255,255,255,0.05)"}}>
-                            <div style={{flexShrink:0,minWidth:80}}>
-                              <div style={{fontSize:10,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700,lineHeight:1.4}}>{b.time}</div>
-                            </div>
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:3}}>{b.label}</div>
-                              <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>{b.detail}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Routine blocks */}
-                  {s.blocks&&(
-                    <div style={{marginBottom:16}}>
-                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>YOUR DAILY STRUCTURE</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                        {s.blocks.map((b,i)=>(
-                          <div key={i} style={{background:"var(--midnight)",borderRadius:12,padding:"14px",border:`1px solid ${s.color}18`}}>
-                            <div style={{fontSize:12,fontWeight:700,color:s.color,marginBottom:8,fontFamily:"var(--f-mono)"}}>{b.label}</div>
-                            {b.items.map((item,j)=>(
-                              <div key={j} style={{display:"flex",gap:8,marginBottom:5}}>
-                                <span style={{color:s.color,fontSize:9,marginTop:4,flexShrink:0}}>◎</span>
-                                <span style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.65}}>{item}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Rules / Tactics / Methods / Plan */}
-                  {(s.rules||s.tactics||s.methods||s.mental_tools)&&(
-                    <div style={{marginBottom:16}}>
-                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>
-                        {s.rules?"THE RULES":s.tactics?"THE TACTICS":s.methods?"THE METHODS":"MENTAL TOOLS"}
-                      </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        {(s.rules||s.tactics||s.methods||s.mental_tools).map((item,i)=>{
-                          const label=item.rule||item.tactic||item.method||item.tool;
-                          const detail=item.detail;
-                          return(
-                            <div key={i} style={{background:"var(--midnight)",borderRadius:12,padding:"12px 14px",border:"1px solid rgba(255,255,255,0.05)"}}>
-                              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginBottom:5}}>{i+1}. {label}</div>
-                              <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.7}}>{detail}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Workout plan */}
-                  {s.plan&&(
-                    <div style={{marginBottom:16}}>
-                      <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>WEEKLY WORKOUT PLAN</div>
-                      <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                        {s.plan.map((day,i)=>(
-                          <div key={i} style={{display:"flex",gap:12,padding:"11px 14px",background:"var(--midnight)",borderRadius:11,border:"1px solid rgba(255,255,255,0.05)",alignItems:"flex-start"}}>
-                            <div style={{flexShrink:0,minWidth:88}}>
-                              <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:s.color,fontWeight:700}}>{day.day}</div>
-                            </div>
-                            <div>
-                              <div style={{fontSize:13,fontWeight:600,color:"var(--cream)",marginBottom:2}}>{day.workout}</div>
-                              <div style={{fontSize:11,color:"var(--cream-40)",lineHeight:1.55}}>{day.notes}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* The hard truth */}
-                  <div style={{padding:"14px 16px",background:`${s.color}07`,borderLeft:`3px solid ${s.color}`,borderRadius:"0 12px 12px 0",marginBottom:14}}>
-                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:6}}>THE TRUTH</div>
-                    <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.75,fontStyle:"italic"}}>{s.truth}</p>
-                  </div>
-
-                  {/* Resource links */}
-                  <ResourceLinks links={s.links} accentColor={s.color}/>
-                  <HabitButton itemKey={`discipline:${s.id}`} userId={userId}/>
-                  <AudioPlayer text={`${s.title}. ${s.body}`} label="Listen" mini={false}/>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      <FreeGate total={DISCIPLINE_SECTIONS.length} freeCount={1} isPaid={isPaid} onUnlock={onUnlock} label="discipline sections"/>
-
-      {/* Bottom CTA */}
-      <div style={{marginTop:28,padding:"22px 20px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
-        <div style={{fontSize:22,marginBottom:10}}>🏁</div>
-        <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:8}}>
-          This is the FYP you actually need{name?`, ${name}`:""}
-        </div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,maxWidth:400,margin:"0 auto 16px"}}>
-          Not 60-second clips that feel good for a moment and then disappear. 
-          A complete, deeply explained system you can open any day and execute.
-          Your DestinIQ streak is the proof you're living it.
-        </p>
-        <div style={{marginBottom:14,padding:"12px 16px",background:"rgba(210,175,90,0.06)",borderRadius:10,border:"1px solid rgba(210,175,90,0.15)"}}>
-          <p style={{fontSize:13,color:"var(--gold)",fontStyle:"italic",lineHeight:1.7,margin:"0 0 4px 0"}}>
-            &ldquo;Motivation is what gets you started. Habit is what keeps you going.&rdquo;
-          </p>
-          <p style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)",margin:0}}>— Jim Rohn</p>
-        </div>
-        <div style={{fontFamily:"var(--f-mono)",fontSize:11,color:"var(--gold)",letterSpacing:".1em"}}>
-          ◎ CHECK IN DAILY · TRACK YOUR STREAK · BUILD THE LIFE
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const INVEST_SECTIONS=[
   {
     id:"study",
@@ -11670,88 +10642,6 @@ function ResourceLinks({links, accentColor}){
   );
 }
 
-function InvestInYourselfModule({formData, userId, isPaid, onUnlock}){
-  const [open,setOpen]=useState(null);
-  const toggleAccordion=(id)=>setOpen(o=>o===id?null:id);
-  return(
-    <div className="fu">
-      <div style={{marginBottom:28}}>
-        <div className="d3" style={{marginBottom:8}}>Invest In Yourself{formData?.name?`, ${formData.name}`:""} — Your 20s Decide Your 40s</div>
-        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.75,maxWidth:620}}>
-          The highest-return investments you can make are not in stocks or real estate — they're in yourself.
-          What you build{formData?.age&&parseInt(formData.age)<=35?" in the next few years":" starting now"} is the foundation everything else sits on.
-          {formData?.country?` In ${formData.country}, the people who compound these habits fastest are the ones who start before they feel ready.`:` These are the inputs that compound.`}
-        </p>
-        {formData?.goals&&(
-          <div style={{marginTop:14,padding:"12px 16px",background:"rgba(210,175,90,0.06)",border:"1px solid var(--line-gold)",borderRadius:10,display:"flex",gap:10,alignItems:"flex-start"}}>
-            <span style={{color:"var(--gold)",flexShrink:0,marginTop:2}}>◎</span>
-            <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.65}}>
-              Your goal: <em style={{color:"var(--cream-70)"}}>&ldquo;{formData.goals}&rdquo;</em> — every section below feeds directly into that.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {(isPaid ? INVEST_SECTIONS : INVEST_SECTIONS.slice(0,1)).map(s=>{
-          const isOpen=open===s.id;
-          return(
-            <div key={s.id} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?s.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:12}}>
-              {/* Header */}
-              <button onClick={()=>toggleAccordion(s.id)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
-                <div style={{width:42,height:42,borderRadius:12,background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{s.icon}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{s.title}</div>
-                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.subtitle}</div>
-                </div>
-                <div style={{color:s.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
-              </button>
-
-              {/* Expanded content */}
-              {isOpen&&(
-                <div style={{padding:"0 20px 20px"}}>
-                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
-                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{s.body}</p>
-
-                  {/* Daily habits */}
-                  <div style={{marginBottom:16}}>
-                    <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:s.color,letterSpacing:".12em",marginBottom:10}}>WHAT TO ACTUALLY DO</div>
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                      {s.habits.map((h,i)=>(
-                        <div key={i} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
-                          <div style={{width:22,height:22,borderRadius:"50%",background:`${s.color}15`,border:`1px solid ${s.color}30`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:s.color,fontWeight:700}}>{i+1}</div>
-                          <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{h}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Why it works */}
-                  <div style={{padding:"12px 16px",background:`${s.color}08`,borderLeft:`2px solid ${s.color}`,borderRadius:"0 10px 10px 0"}}>
-                    <p style={{fontSize:13,color:"var(--cream-50)",margin:0,lineHeight:1.7,fontStyle:"italic"}}>{s.why}</p>
-                  </div>
-
-                  <ResourceLinks links={s.links} accentColor={s.color}/>
-                  <HabitButton itemKey={`invest:${s.id}`} userId={userId}/>
-                  <AudioPlayer text={`${s.title}. ${s.body} ${s.habits.join(". ")}`} label="Listen" mini={false}/>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      <FreeGate total={INVEST_SECTIONS.length} freeCount={1} isPaid={isPaid} onUnlock={onUnlock} label="invest sections"/>
-
-      {/* Bottom quote */}
-      <div style={{marginTop:32,padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:16,textAlign:"center"}}>
-        <p style={{fontFamily:"var(--f-display)",fontSize:18,fontStyle:"italic",color:"var(--gold)",lineHeight:1.6,margin:0}}>
-          &ldquo;The best time to plant a tree was 20 years ago. The second best time is today.&rdquo;
-        </p>
-        <p style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginTop:8}}>Your compound interest starts the moment you start.</p>
-      </div>
-    </div>
-  );
-}
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // DISGUSTINGLY SUCCESSFUL MODULE
 // Not lucky. Not gifted. Just following the right rules.
@@ -11862,104 +10752,6 @@ const SUCCESS_TRUTH={
     "The rules are not a secret. Everyone has access to them. The difference is who actually follows them.",
   ],
 };
-
-function DisgustinglySuccessfulModule({formData, userId, isPaid, onUnlock}){
-  const [open,setOpen]=useState(null);
-  return(
-    <div className="fu">
-      {/* Hero */}
-      <div style={{marginBottom:32,padding:"28px 24px",background:"linear-gradient(135deg,rgba(210,175,90,0.08),rgba(20,184,154,0.04))",border:"1px solid var(--line-gold)",borderRadius:18,textAlign:"center"}}>
-        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:10}}>THE REAL PLAYBOOK</div>
-        <div className="d2" style={{marginBottom:12,fontSize:"clamp(22px,4vw,32px)"}}>
-          How to Become Disgustingly Successful{formData?.name?`, ${formData.name}`:""}
-        </div>
-        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.75,maxWidth:520,margin:"0 auto"}}>
-          Not lucky. Not gifted. Just following the right rules — and following them when no one is watching,
-          when it's not working yet, and when it would be much easier to stop.
-          {formData?.challenge?` You said your challenge is "${formData.challenge.slice(0,80)}${formData.challenge.length>80?"…":""}". Every rule below is a direct answer to that.`:""}
-        </p>
-      </div>
-
-      {/* Rules — first 2 free */}
-      <div style={{marginBottom:32}}>
-      {(isPaid ? SUCCESS_RULES : SUCCESS_RULES.slice(0,1)).map(r=>{
-          const isOpen=open===r.number;
-          return(
-            <div key={r.number} style={{background:"var(--lift)",borderRadius:16,border:`1px solid ${isOpen?r.color:"rgba(255,255,255,0.07)"}`,overflow:"hidden",transition:"border-color .25s",marginBottom:12}}>
-              <button onClick={()=>setOpen(o=>o===r.number?null:r.number)} style={{width:"100%",background:"none",border:"none",padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
-                <div style={{width:42,height:42,borderRadius:12,background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--f-mono)",fontSize:13,fontWeight:700,color:r.color,flexShrink:0}}>{r.number}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:"var(--cream)",marginBottom:3}}>{r.title}</div>
-                  <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5,fontStyle:"italic"}}>"{r.hook}"</div>
-                </div>
-                <div style={{color:r.color,fontSize:18,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
-              </button>
-              {isOpen&&(
-                <div style={{padding:"0 20px 20px"}}>
-                  <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:16}}/>
-                  <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:16}}>{r.detail}</p>
-                  <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:r.color,letterSpacing:".12em",marginBottom:10}}>EXECUTE THIS WEEK</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                    {r.actions.map((a,i)=>(
-                      <div key={i} style={{display:"flex",gap:10,padding:"10px 14px",background:"var(--midnight)",borderRadius:10,border:"1px solid rgba(255,255,255,0.05)"}}>
-                        <div style={{width:22,height:22,borderRadius:"50%",background:`${r.color}12`,border:`1px solid ${r.color}25`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"var(--f-mono)",fontSize:9,color:r.color,fontWeight:700}}>{i+1}</div>
-                        <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{a}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <ResourceLinks links={r.links} accentColor={r.color}/>
-                  <HabitButton itemKey={`success:${r.number}`} userId={userId}/>
-                  <AudioPlayer text={`Rule ${r.number}: ${r.title}. ${r.detail}`} label="Listen" mini={false}/>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      <FreeGate total={SUCCESS_RULES.length} freeCount={1} isPaid={isPaid} onUnlock={onUnlock} label="success rules"/>
-      </div>
-
-      {/* Final Truth */}
-      <div style={{padding:"24px",background:"var(--raised)",border:"1px solid var(--line-gold)",borderRadius:18}}>
-        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".15em",marginBottom:14}}>THE FINAL TRUTH</div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {SUCCESS_TRUTH.lines.map((l,i)=>(
-            <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start"}}>
-              <span style={{color:"var(--gold)",fontSize:10,marginTop:4,flexShrink:0}}>◎</span>
-              <p style={{fontSize:14,color:i===0?"var(--cream)":"var(--cream-60)",fontWeight:i===0?600:400,lineHeight:1.75,margin:0}}>{l}</p>
-            </div>
-          ))}
-        </div>
-        <AudioPlayer text={SUCCESS_TRUTH.lines.join(" ")} label="Listen to the full truth" mini={false}/>
-      </div>
-
-      {/* Jim Rohn wisdom */}
-      <div style={{marginTop:16,padding:"16px 18px",background:"rgba(210,175,90,0.05)",border:"1px solid rgba(210,175,90,0.15)",borderRadius:14}}>
-        <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em",marginBottom:10}}>LEARN FROM THE MASTER</div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.75,marginBottom:12,fontStyle:"italic"}}>
-          Jim Rohn spent 40 years teaching exactly this. His work on personal philosophy, seasons of life, and the disciplines of success is still the most practical breakdown of why some people make it and most don&apos;t. Start here:
-        </p>
-        <div style={{display:"flex",flexDirection:"column",gap:7}}>
-          {[
-            {emoji:"📖",label:"The Art of Exceptional Living — Jim Rohn",url:"https://www.amazon.com/Art-Exceptional-Living-Jim-Rohn/dp/B00005A5ZB"},
-            {emoji:"📖",label:"7 Strategies for Wealth & Happiness — Jim Rohn",url:"https://www.amazon.com/Strategies-Wealth-Happiness-Jim-Rohn/dp/0761511148"},
-            {emoji:"🎧",label:"Jim Rohn — The Day That Turns Your Life Around (free, YouTube)",url:"https://www.youtube.com/results?search_query=jim+rohn+the+day+that+turns+your+life+around"},
-            {emoji:"🎧",label:"Jim Rohn — Building Your Network Marketing Business (full speech)",url:"https://www.youtube.com/results?search_query=jim+rohn+building+your+network+marketing+business"},
-          ].map((lk,i)=>(
-            <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"var(--midnight)",borderRadius:8,textDecoration:"none",transition:"opacity .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
-              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-              <span style={{fontSize:14}}>{lk.emoji}</span>
-              <span style={{fontSize:12,color:"var(--cream-60)",flex:1}}>{lk.label}</span>
-              <span style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)"}}>↗</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 10X MINDSET MODULE
@@ -12099,129 +10891,6 @@ const TENX_PRINCIPLES=[
   },
 ];
 
-function MindsetTenXModule({formData, userId, isPaid, onUnlock}){
-  const [openPrinciple,setOpenPrinciple]=useState(null);
-  const [openTenX,setOpenTenX]=useState(null);
-  const [tab,setTab]=useState("mindset"); // "mindset" | "tenx"
-  return(
-    <div className="fu">
-      {/* Hero */}
-      <div style={{marginBottom:24,padding:"22px 24px",background:"linear-gradient(135deg,rgba(155,114,207,0.08),rgba(31,168,154,0.04))",border:"1px solid rgba(155,114,207,0.2)",borderRadius:16,textAlign:"center"}}>
-        <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"#9b72cf",letterSpacing:".15em",marginBottom:8}}>MENTAL OPERATING SYSTEM</div>
-        <div className="d3" style={{marginBottom:8}}>
-          Build a Mind That Doesn&apos;t Break{formData?.name?`, ${formData.name}`:""}
-        </div>
-        <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.7,maxWidth:480,margin:"0 auto"}}>
-          A strong mindset is not a personality trait. It is a set of practiced habits applied consistently —
-          especially when you don&apos;t feel like it.
-          {formData?.challenge?` Specifically built for someone dealing with: "${formData.challenge.slice(0,70)}${formData.challenge.length>70?"…":""}".`:""}
-        </p>
-      </div>
-
-      {/* Sub-tabs */}
-      <div style={{display:"flex",gap:8,marginBottom:24,padding:"4px",background:"var(--midnight)",borderRadius:12,border:"1px solid rgba(255,255,255,0.06)"}}>
-        {[{id:"mindset",label:"Strong Mindset"},{id:"tenx",label:"10x Principles"}].map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)}
-            style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",fontSize:13,fontWeight:600,transition:"all .2s",
-              background:tab===t.id?"var(--lift)":"none",
-              color:tab===t.id?"var(--cream)":"var(--cream-40)"}}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* STRONG MINDSET */}
-      {tab==="mindset"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {MINDSET_PRINCIPLES.map((p,i)=>{
-            const isOpen=openPrinciple===i;
-            return(
-              <div key={i} style={{background:"var(--lift)",borderRadius:14,border:`1px solid ${isOpen?p.color:"rgba(255,255,255,0.06)"}`,overflow:"hidden",transition:"border-color .25s"}}>
-                <button onClick={()=>setOpenPrinciple(o=>o===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left"}}>
-                  <div style={{width:38,height:38,borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.icon}</div>
-                  <div style={{flex:1,fontSize:14,fontWeight:600,color:isOpen?p.color:"var(--cream)"}}>{p.title}</div>
-                  <div style={{color:"var(--cream-30)",fontSize:16,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
-                </button>
-                {isOpen&&(
-                  <div style={{padding:"0 18px 18px"}}>
-                    <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:14}}/>
-                    <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:12}}>{p.body}</p>
-                    <ResourceLinks links={p.links} accentColor={p.color}/>
-                    <HabitButton itemKey={`mindset:${["patient","proactive","change","letgo","hope","thoughts","okay","dontquit"][i]||i}`} userId={userId}/>
-                    <AudioPlayer text={`${p.title}: ${p.body}`} label="Listen" mini={false}/>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 10X PRINCIPLES — paid only */}
-      {tab==="tenx"&&!isPaid&&(
-        <div style={{textAlign:"center",padding:"32px 20px"}}>
-          <div style={{fontSize:28,marginBottom:10}}>🔒</div>
-          <div style={{fontSize:16,fontWeight:700,color:"var(--cream)",marginBottom:8}}>10x Principles — Members Only</div>
-          <p style={{fontSize:13,color:"var(--cream-40)",maxWidth:300,margin:"0 auto 20px",lineHeight:1.65}}>
-            The 6 performance principles are locked for free users. Upgrade to unlock all 14 mindset sections.
-          </p>
-          <button className="btn btn-gold" onClick={onUnlock}>Unlock from $9/month</button>
-        </div>
-      )}
-      {tab==="tenx"&&isPaid&&(
-        <>
-          <div style={{marginBottom:20}}>
-            <div className="d3" style={{marginBottom:8}}>Simple Principles That Make You 10x Better at Anything</div>
-            <p style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.65}}>These are not motivational quotes. They are operating instructions for performance — drawn from the research on how elite performers actually think and work.</p>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {TENX_PRINCIPLES.map((p,i)=>{
-              const isOpen=openTenX===i;
-              return(
-                <div key={i} style={{background:"var(--lift)",borderRadius:14,border:`1px solid ${isOpen?p.color:"rgba(255,255,255,0.06)"}`,overflow:"hidden",transition:"border-color .25s"}}>
-                  <button onClick={()=>setOpenTenX(o=>o===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,textAlign:"left"}}>
-                    <div style={{width:38,height:38,borderRadius:10,background:`${p.color}12`,border:`1px solid ${p.color}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{p.icon}</div>
-                    <div style={{flex:1,fontSize:14,fontWeight:600,color:isOpen?p.color:"var(--cream)"}}>{p.title}</div>
-                    <div style={{color:"var(--cream-30)",fontSize:16,transform:isOpen?"rotate(180deg)":"none",transition:"transform .25s"}}>⌄</div>
-                  </button>
-                  {isOpen&&(
-                    <div style={{padding:"0 18px 18px"}}>
-                      <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:14}}/>
-                      <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.8,marginBottom:12}}>{p.body}</p>
-                      {p.callout&&(
-                        <div style={{padding:"14px 16px",background:`${p.color}08`,border:`1px solid ${p.color}25`,borderRadius:12,marginBottom:12}}>
-                          <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:p.color,letterSpacing:".12em",marginBottom:10}}>{p.callout.label.toUpperCase()}</div>
-                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                            {p.callout.items.map((item,ci)=>(
-                              <div key={ci} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                                <span style={{color:p.color,fontSize:10,marginTop:3,flexShrink:0}}>◎</span>
-                                <p style={{fontSize:13,color:"var(--cream-60)",margin:0,lineHeight:1.65}}>{item}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <ResourceLinks links={p.links} accentColor={p.color}/>
-                      <HabitButton itemKey={`tenx:${["consistency","process","friction","feedback","mentors","focus"][i]||i}`} userId={userId}/>
-                      <AudioPlayer text={`${p.title}. ${p.body}`} label="Listen" mini={false}/>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-
-
-// ── deriveStrengthsRisks ────────────────────────────────────────────────────
-// Safely coerce a report field to plain text, regardless of whether the
-// AI returned it as a string, an array, or an object (e.g. newer reports
-// store `mindset` as {pattern,reframe,emotional,practice} instead of a string).
 function asReportText(val){
   if(val==null) return "";
   if(typeof val==="string") return val;
@@ -13618,6 +12287,95 @@ function CardDetailPage({card, catColor, catId, formData, userId, isPaid, isPrem
   const [activeAction, setActiveAction] = useState(null);
   const [aiResult, setAiResult] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+
+  // ── ACTION LOG — user reports what they did in real life ──────────────────
+  const actionLogKey = userId ? `diq_actionlog_${userId}_${card.id}` : null;
+  const [actionLog, setActionLog] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(actionLogKey)||"[]"); }catch{ return []; }
+  });
+  const [actionInput, setActionInput] = useState("");
+  const [actionFeedback, setActionFeedback] = useState("");
+  const [actionFeedbackLoading, setActionFeedbackLoading] = useState(false);
+  const [showActionLog, setShowActionLog] = useState(false);
+
+  const logAction = async () => {
+    if(!actionInput.trim()) return;
+    const today = new Date().toISOString().slice(0,10);
+    const todayFmt = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    const entry = {
+      id: Date.now(),
+      text: actionInput.trim(),
+      date: today,
+      dateFmt: todayFmt,
+    };
+    const updated = [entry, ...actionLog].slice(0,60); // keep last 60 entries
+    setActionLog(updated);
+    try{ if(actionLogKey) localStorage.setItem(actionLogKey, JSON.stringify(updated)); }catch{}
+    // Award progress points
+    addProgressPoints(userId, `actionlog_${card.id}_${Date.now()}`, 2);
+
+    // Get AI coach feedback on what they reported
+    const userMsg = actionInput.trim();
+    setActionInput("");
+    setActionFeedbackLoading(true);
+    try{
+      const prompt = `${name} just reported this real-life action related to "${card.title}": "${userMsg}"
+
+Their goal: ${goals}. Country: ${from}. Card topic: ${card.tagline}.
+
+Give them 2-3 sentences of genuine, specific feedback:
+- Acknowledge what they did (be specific to what they said, not generic)
+- One concrete next step or observation
+- A brief encouraging close that feels earned, not hollow
+
+Be warm but direct. No emojis. No bullet points. Sound like a real coach who knows them.`;
+
+      const raw = await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:`You are a direct, warm personal coach responding to ${name} from ${from}. Be specific to exactly what they reported. Max 3 sentences. Never be generic.`,
+        userId, isPremium,
+      });
+      const txt = typeof raw==="string" ? raw :
+        (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
+      setActionFeedback(txt);
+    }catch{
+      setActionFeedback("Keep going — every action compounds over time.");
+    }
+    setActionFeedbackLoading(false);
+    // Show the log after first entry
+    setShowActionLog(true);
+  };
+
+  // Step completion tracking
+  const stepsKey = userId ? `diq_steps_${userId}_${card.id}` : null;
+  const [doneSteps, setDoneSteps] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(stepsKey)||"[]"); }catch{ return []; }
+  });
+  // Deep-dive section completion tracking
+  const sectionsKey = userId ? `diq_sections_${userId}_${card.id}` : null;
+  const [doneSections, setDoneSections] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(sectionsKey)||"[]"); }catch{ return []; }
+  });
+
+  const toggleStep = (idx) => {
+    setDoneSteps(prev => {
+      const next = prev.includes(idx) ? prev.filter(i=>i!==idx) : [...prev, idx];
+      try{ if(stepsKey) localStorage.setItem(stepsKey, JSON.stringify(next)); }catch{}
+      // Award point for newly completed step
+      if(!prev.includes(idx)) addProgressPoints(userId, `step_${card.id}_${idx}`, PROGRESS_POINTS.step_completed);
+      return next;
+    });
+  };
+
+  const markSectionDone = (sectionKey) => {
+    setDoneSections(prev => {
+      if(prev.includes(sectionKey)) return prev;
+      const next = [...prev, sectionKey];
+      try{ if(sectionsKey) localStorage.setItem(sectionsKey, JSON.stringify(next)); }catch{}
+      addProgressPoints(userId, `section_${card.id}_${sectionKey}`, PROGRESS_POINTS.deepdive_done);
+      return next;
+    });
+  };
   const [saved, setSaved] = useState(()=>{
     try{
       const k=userId?`diq_saved_tools_${userId}`:"diq_saved_tools_guest";
@@ -13864,20 +12622,36 @@ function CardDetailPage({card, catColor, catId, formData, userId, isPaid, isPrem
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
               fontFamily:"monospace",marginBottom:12}}>STEP-BY-STEP GUIDE</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {card.steps.map((step,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,
-                  padding:"12px 14px",background:"rgba(255,255,255,0.025)",
-                  border:"1px solid "+G.border,borderRadius:12}}>
-                  <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,
-                    background:`${G.accent}18`,border:`1px solid ${G.accent}30`,
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:11,fontWeight:800,color:G.accent}}>
-                    {i+1}
+              {card.steps.map((step,i)=>{
+                const done = doneSteps.includes(i);
+                return(
+                  <div key={i} onClick={()=>toggleStep(i)}
+                    style={{display:"flex",alignItems:"flex-start",gap:12,
+                      padding:"12px 14px",
+                      background:done?`${G.accent}08`:"rgba(255,255,255,0.025)",
+                      border:"1px solid "+(done?G.accent+"40":G.border),
+                      borderRadius:12,cursor:"pointer",transition:"all .2s"}}>
+                    {/* Checkbox */}
+                    <div style={{width:24,height:24,borderRadius:6,flexShrink:0,marginTop:1,
+                      background:done?G.accent:"transparent",
+                      border:"2px solid "+(done?G.accent:G.dimmer),
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      transition:"all .2s"}}>
+                      {done&&<span style={{fontSize:12,color:"#000",fontWeight:800}}>✓</span>}
+                    </div>
+                    <div style={{flex:1,fontSize:13,lineHeight:1.65,paddingTop:2,
+                      color:done?G.dimmer:G.dim,
+                      textDecoration:done?"line-through":"none",
+                      transition:"all .2s"}}>{step}</div>
                   </div>
-                  <div style={{fontSize:13,color:G.dim,lineHeight:1.65,paddingTop:3}}>{step}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+            {doneSteps.length>0&&(
+              <div style={{marginTop:8,fontSize:11,color:G.accent,fontWeight:600}}>
+                ✓ {doneSteps.length}/{card.steps.length} steps completed
+              </div>
+            )}
           </div>
         )}
 
@@ -13923,12 +12697,27 @@ function CardDetailPage({card, catColor, catId, formData, userId, isPaid, isPrem
                       marginBottom:12}}>
                       {s.content}
                     </div>
-                    <button onClick={()=>generateSection(sec.key,sec.prompt)}
-                      style={{background:"none",border:"1px solid "+G.border,
-                        borderRadius:8,padding:"7px 14px",fontSize:11,color:G.dimmer,
-                        cursor:"pointer",fontFamily:"inherit"}}>
-                      ↺ Refresh
-                    </button>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>generateSection(sec.key,sec.prompt)}
+                        style={{background:"none",border:"1px solid "+G.border,
+                          borderRadius:8,padding:"7px 14px",fontSize:11,color:G.dimmer,
+                          cursor:"pointer",fontFamily:"inherit"}}>
+                        ↺ Refresh
+                      </button>
+                      {!doneSections.includes(sec.key)?(
+                        <button onClick={()=>markSectionDone(sec.key)}
+                          style={{background:G.accent+"18",border:"1px solid "+G.accent+"40",
+                            borderRadius:8,padding:"7px 14px",fontSize:11,color:G.accent,
+                            fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                          ✓ I read this & I'm applying it
+                        </button>
+                      ):(
+                        <div style={{display:"flex",alignItems:"center",gap:6,
+                          fontSize:11,color:G.accent,fontWeight:600}}>
+                          <span>✓</span><span>Marked as done</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </PlanSection>
@@ -13958,6 +12747,85 @@ function CardDetailPage({card, catColor, catId, formData, userId, isPaid, isPrem
             </div>
           </div>
         )}
+
+        {/* ── ACTION LOG — user reports real-life actions ── */}
+        <div style={{marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
+              fontFamily:"monospace"}}>📝 LOG YOUR ACTIONS</div>
+            {actionLog.length>0&&(
+              <button onClick={()=>setShowActionLog(s=>!s)}
+                style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",
+                  fontSize:11,fontFamily:"inherit"}}>
+                {showActionLog?"Hide":"Show"} history ({actionLog.length})
+              </button>
+            )}
+          </div>
+
+          {/* Input */}
+          <div style={{display:"flex",gap:8,marginBottom:actionFeedback||actionFeedbackLoading?12:0}}>
+            <input
+              value={actionInput}
+              onChange={e=>setActionInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&!actionFeedbackLoading&&logAction()}
+              placeholder={`e.g. "I saved 50 cedis today" or "Did my workout"`}
+              style={{flex:1,padding:"12px 14px",
+                background:G.card,border:"1px solid "+G.border,
+                borderRadius:12,color:G.cream,fontSize:13,
+                fontFamily:"inherit",outline:"none",
+                transition:"border-color .2s"}}
+              onFocus={e=>e.target.style.borderColor=G.accent+"60"}
+              onBlur={e=>e.target.style.borderColor=G.border}
+            />
+            <button onClick={logAction} disabled={!actionInput.trim()||actionFeedbackLoading}
+              style={{padding:"12px 18px",background:actionInput.trim()?G.accent:"rgba(255,255,255,0.05)",
+                border:"none",borderRadius:12,
+                color:actionInput.trim()?"#000":G.dimmer,
+                fontWeight:700,fontSize:13,cursor:actionInput.trim()?"pointer":"default",
+                fontFamily:"inherit",transition:"all .2s",flexShrink:0}}>
+              {actionFeedbackLoading?"…":"Log it"}
+            </button>
+          </div>
+
+          {/* AI Coach feedback on what they logged */}
+          {actionFeedbackLoading&&(
+            <div style={{padding:"12px 14px",background:"rgba(255,255,255,0.03)",
+              border:"1px solid "+G.border,borderRadius:12,
+              display:"flex",alignItems:"center",gap:8}}>
+              <span style={{width:6,height:6,borderRadius:"50%",background:G.accent,display:"inline-block"}}/>
+              <div style={{fontSize:12,color:G.dimmer}}>Your coach is responding…</div>
+            </div>
+          )}
+          {actionFeedback&&!actionFeedbackLoading&&(
+            <div style={{padding:"14px 16px",background:G.accent+"08",
+              border:"1px solid "+G.accent+"25",borderRadius:12,marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:700,color:G.accent,fontFamily:"monospace",
+                letterSpacing:".08em",marginBottom:7}}>✦ YOUR COACH</div>
+              <div style={{fontSize:13,color:G.dim,lineHeight:1.8}}>{actionFeedback}</div>
+              <div style={{marginTop:8,fontSize:10,color:G.dimmer}}>+2 progress points earned</div>
+            </div>
+          )}
+
+          {/* Action history */}
+          {showActionLog&&actionLog.length>0&&(
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
+                fontFamily:"monospace",marginBottom:8}}>YOUR LOG ({actionLog.length} entries)</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:220,
+                overflowY:"auto"}}>
+                {actionLog.map(entry=>(
+                  <div key={entry.id} style={{display:"flex",gap:12,padding:"10px 12px",
+                    background:"rgba(255,255,255,0.025)",border:"1px solid "+G.border,
+                    borderRadius:10}}>
+                    <div style={{fontSize:10,color:G.dimmer,flexShrink:0,
+                      paddingTop:2,minWidth:36}}>{entry.dateFmt}</div>
+                    <div style={{fontSize:13,color:G.dim,lineHeight:1.5}}>{entry.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* AI Result */}
         {aiResult&&(
@@ -14188,7 +13056,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
         <button className="t-btn">↗ Share</button>
       </div>
       {toolId==="relocate"
-        ? <RelocationExplorer suggestedCountries={reportData?.suggestedCountries||[]} formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
+        ? <RelocationExplorer formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
         : <GenericAIModule modId={toolId} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang||"en"}/>
       }
       <div className="followup">
@@ -14218,7 +13086,14 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
 // ── ProgressScreen ────────────────────────────────────────────────────────
 function ProgressScreen({data,streak,userId,setNav,goBack}){
   const s=data?.scores||{};
-  const overall=Math.min(99,Math.max(1,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
+  const aiBaseline=Math.min(85,Math.max(10,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
+  const [overall, setOverall] = useState(()=>getProgressScore(userId, aiBaseline));
+  // Re-compute when points update
+  useEffect(()=>{
+    const handler=()=>setOverall(getProgressScore(userId,aiBaseline));
+    window.addEventListener("progressUpdated",handler);
+    return()=>window.removeEventListener("progressUpdated",handler);
+  },[userId,aiBaseline]);
   const toolCount=(()=>{try{return JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]").length;}catch{return 0;}})();
   const reportCount=Math.max(1,data?.score_history?.length||1);
 
@@ -14663,15 +13538,17 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           </div>
         </div>
 
-        {/* Export PDF + Comparison (Pro Max) */}
+        {/* Export PDF — available to all paid users */}
         <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8,flexWrap:"wrap"}}>
           {isPaid&&(
             <button onClick={()=>exportReportPDF(formData,data,scores,overall)}
-              style={{padding:"7px 15px",background:isProMax?"rgba(155,114,207,0.12)":"rgba(255,255,255,0.05)",
-                border:`1px solid ${isProMax?"rgba(155,114,207,0.35)":"rgba(255,255,255,0.1)"}`,
-                borderRadius:20,color:isProMax?"#9b72cf":"rgba(232,220,200,0.4)",
-                fontSize:12,cursor:isProMax?"pointer":"default",fontFamily:"inherit"}}>
-              {isProMax?"📄 Export PDF":"🔒 Export PDF (Pro Max)"}
+              style={{padding:"7px 15px",
+                background:isProMax?"rgba(155,114,207,0.12)":"rgba(240,180,41,0.08)",
+                border:`1px solid ${isProMax?"rgba(155,114,207,0.35)":"rgba(240,180,41,0.25)"}`,
+                borderRadius:20,
+                color:isProMax?"#9b72cf":"var(--gold)",
+                fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
+              📄 {isProMax?"Export PDF (Pro Max)":"Export PDF"}
             </button>
           )}
         </div>
@@ -15304,6 +14181,14 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
     try{ localStorage.setItem("diq_active_tab",mod); }catch{}
   },[mod]);
 
+  // ── Toast notifications for progress actions ─────────────────────────────
+  const [toast, setToast] = useState("");
+  useEffect(()=>{
+    const handler=(e)=>{ setToast(e.detail||""); setTimeout(()=>setToast(""),2500); };
+    window.addEventListener("showToast",handler);
+    return()=>window.removeEventListener("showToast",handler);
+  },[]);
+
   // ── Listen for streak updates from check-in and trigger celebration ──────
   useEffect(()=>{
     const handler=(e)=>{
@@ -15482,6 +14367,18 @@ Rules:
     <div style={{paddingTop:8}}>
       {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
       {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+      {/* Progress action toast */}
+      {toast&&(
+        <div style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",
+          background:G.isDark?"#111008":"#fff",border:"1px solid "+G.gold+"40",
+          borderRadius:12,padding:"11px 20px",zIndex:9999,
+          boxShadow:"0 4px 24px rgba(0,0,0,0.3)",
+          fontSize:13,fontWeight:600,color:G.gold,
+          display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap"}}>
+          <span style={{fontSize:16}}>✦</span>
+          {toast}
+        </div>
+      )}
       {showCheckin&&(
         <div className="cx-md" style={{paddingTop:24,paddingBottom:24}}>
           <CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
@@ -16899,37 +15796,6 @@ function AdminDashboard({user,onBack}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // 6. EMPTY STATE (shown when user has no report yet)
 // ═══════════════════════════════════════════════════════════════════════════════
-function EmptyState({onStart,name}){
-  const steps=[
-    {icon:"📋",title:"Complete your profile",desc:"Tell us about yourself — your goals, challenges, where you are in life."},
-    {icon:"🧠",title:"Get your clarity report",desc:"A personalised report built around your specific situation. Not generic advice."},
-    {icon:"📈",title:"Track your momentum",desc:"Check in daily. Watch your score grow as you take real action."},
-  ];
-  return(
-    <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 24px"}}>
-      <div style={{maxWidth:520,textAlign:"center"}}>
-        <div style={{fontSize:48,marginBottom:16}}>👋</div>
-        <div style={{fontFamily:"var(--f-display)",fontSize:28,color:"var(--cream)",marginBottom:8}}>Welcome{name?`, ${name}`:""}</div>
-        <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:36,lineHeight:1.7}}>You're one step away from your personal clarity report. It takes about 3 minutes and will change how you see your next move.</p>
-        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32,textAlign:"left"}}>
-          {steps.map((s,i)=>(
-            <div key={i} style={{display:"flex",gap:14,padding:"14px 16px",background:"var(--night)",border:"1px solid var(--line)",borderRadius:14,alignItems:"flex-start"}}>
-              <div style={{width:36,height:36,borderRadius:"50%",background:"var(--gold-dim)",border:"1px solid var(--line-gold)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{s.icon}</div>
-              <div>
-                <div style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginBottom:3}}>{s.title}</div>
-                <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{s.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button onClick={onStart} style={{background:"var(--gold)",border:"none",borderRadius:12,padding:"14px 36px",color:"#000",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(212,175,55,0.3)"}}>
-          Build my report →
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // 7. WELCOME EMAIL (triggered on signup — sent via Supabase Edge Function)
 // NOTE: Add a Supabase Edge Function called "welcome-email" to send the email.
@@ -17538,9 +16404,11 @@ function DestinIQInner(){
           setStreak(1);
           setScreen("landing");
           // Clear localStorage only on explicit sign-out
-          try{
+try{
+            const preserve = ["diq_saved_tools_","diq_saved_tools_meta_","diq_wins_","diq_streak_","diq_streak_last_","diq_advisor_chat_","diq_reloc_auto_","diq_hab_","destiniq_wins_","diq_prog_pts_","diq_prog_act_","diq_steps_","diq_sections_","diq_actionlog_"];
             Object.keys(localStorage).forEach(k=>{
-              if(k.startsWith("diq_")||k.startsWith("destiniq_")) localStorage.removeItem(k);
+              const keep = preserve.some(p=>k.startsWith(p));
+              if(!keep && (k.startsWith("diq_")||k.startsWith("destiniq_"))) localStorage.removeItem(k);
             });
           }catch(_){}
         }
@@ -17611,7 +16479,13 @@ function DestinIQInner(){
           await supabase.auth.signOut();
           setUser(null);setUserId(null);setScreen("landing");setFormData(null);setReport(null);
           setIsPaid(false);setIsPremium(false);setNavPhotoURL(null);setStreak(1);
-          try{Object.keys(localStorage).forEach(k=>{if(k.startsWith("diq_")||k.startsWith("destiniq_"))localStorage.removeItem(k);});}catch{}
+          try{
+            const preserve = ["diq_saved_tools_","diq_saved_tools_meta_","diq_wins_","diq_streak_","diq_streak_last_","diq_advisor_chat_","diq_reloc_auto_","diq_hab_","destiniq_wins_","diq_prog_pts_","diq_prog_act_","diq_steps_","diq_sections_","diq_actionlog_"];
+            Object.keys(localStorage).forEach(k=>{
+              const keep = preserve.some(p=>k.startsWith(p));
+              if(!keep && (k.startsWith("diq_")||k.startsWith("destiniq_"))) localStorage.removeItem(k);
+            });
+          }catch{}
         };
         window.addEventListener("signOut",handleSignOutEv);
         const handleShowNotif=()=>setShowNotif(true);
@@ -17646,6 +16520,10 @@ function DestinIQInner(){
             window.dispatchEvent(new CustomEvent("streakUpdated",{
               detail:{streak:next, celebrate: isMilestone || next%10===0}
             }));
+            // Award streak milestone points
+            if(next===7)  addProgressPoints(uid,"streak_7",  PROGRESS_POINTS.streak_7);
+            if(next===14) addProgressPoints(uid,"streak_14", PROGRESS_POINTS.streak_14);
+            if(next===30) addProgressPoints(uid,"streak_30", PROGRESS_POINTS.streak_30);
             return next;
           });
         };

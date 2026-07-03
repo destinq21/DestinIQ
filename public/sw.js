@@ -1,54 +1,71 @@
-// DestinIQ Service Worker — handles push notifications and brings user back to app
-const APP_URL = "https://destiniq.vercel.app";
+// DestinIQ Service Worker — Background push notifications
+// Place this file at: public/sw.js
 
-// ── PUSH NOTIFICATION HANDLER ─────────────────────────────────────────────────
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
+const CACHE_NAME = 'destiniq-v1';
 
+// ── Install ──────────────────────────────────────────────────────────────────
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+// ── Activate ─────────────────────────────────────────────────────────────────
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
+// ── Push notification received ───────────────────────────────────────────────
+self.addEventListener('push', (event) => {
   let data = {};
-  try { data = event.data.json(); } catch { data = { title: "DestinIQ", body: event.data.text() }; }
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'DestinIQ', body: event.data ? event.data.text() : 'You have a new message' };
+  }
 
+  const title   = data.title   || 'DestinIQ';
   const options = {
-    body: data.body || "Tap to open DestinIQ",
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
-    tag: data.tag || "destiniq-nudge",
-    renotify: true,
+    body:    data.body    || 'Open the app to continue your journey.',
+    icon:    data.icon    || '/icon-192.png',
+    badge:   data.badge   || '/icon-192.png',
+    tag:     data.tag     || 'destiniq',
+    data:    { url: data.url || '/' },
     requireInteraction: false,
-    data: { url: data.url || APP_URL },
-    actions: [
-      { action: "open", title: "Open app" },
-      { action: "dismiss", title: "Later" },
+    silent: false,
+    vibrate: [200, 100, 200],
+    actions: data.actions || [
+      { action: 'open', title: 'Open App' },
     ],
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title || "DestinIQ", options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// ── NOTIFICATION CLICK — brings user back to app ───────────────────────────────
-self.addEventListener("notificationclick", (event) => {
+// ── Notification click ───────────────────────────────────────────────────────
+self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  if (event.action === "dismiss") return;
-
-  const urlToOpen = event.notification.data?.url || APP_URL;
+  const urlToOpen = event.notification.data?.url || '/';
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      // If app is already open, focus it
-      for (const client of clientList) {
-        if (client.url.includes("destiniq.vercel.app") && "focus" in client) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If app already open, focus it
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
           return client.focus();
         }
       }
       // Otherwise open a new window
-      if (clients.openWindow) return clients.openWindow(urlToOpen);
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
     })
   );
 });
 
-// ── INSTALL & ACTIVATE ────────────────────────────────────────────────────────
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(clients.claim()));
+// ── Background sync (optional — for offline action logging) ──────────────────
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-actions') {
+    // Future: sync offline action logs when connection restores
+    event.waitUntil(Promise.resolve());
+  }
+});
