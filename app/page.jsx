@@ -1187,14 +1187,17 @@ const PILLARS=[
 // but with a thin category label above each group for orientation
 
 const CATEGORIES=[
-  {id:"social",  label:"Social & People", icon:"❤️", color:"#e05c6e",desc:"Relationships & people skills",    tools:["relationshipiq","smalltalk","peopledecoder","hardconvo","parenting","confidencelab"]},
-  {id:"money",   label:"Money+",          icon:"💰", color:"#c8a84b",desc:"Build wealth & financial intelligence", tools:["money","earnonline","business","lifehacks","debtfreedom","sidehustle","investment101","jimrohn"]},
-  {id:"mindset", label:"Mindset",         icon:"🧠", color:"#9b72cf",desc:"Rewire how you think",              tools:["mindsettenx","success","fearaudit","dailywisdom","innerpeace","angerstress"]},
-  {id:"body",    label:"Body",            icon:"💪", color:"#4db6ac",desc:"Fuel and move your body",           tools:["nogym","posture","bodyfuel","glowup"]},
-  {id:"wellness",label:"Wellness",        icon:"🌿", color:"#81c784",desc:"Mental & emotional health",         tools:["innerpeace","sleepcoach","anxietytool","griefloss","angerstress"]},
-  {id:"purpose", label:"Purpose",         icon:"🚀", color:"#64b5f6",desc:"Define your direction & legacy",    tools:["visionboard","legacyletter","morningritual","lettertoself","dreaminterp","weeklychallenge"]},
-  {id:"skills",  label:"Skills & Career", icon:"⚡", color:"#ffd54f",desc:"Level up professionally",           tools:["invest","discipline","career","negotiation","digitallife"]},
-  {id:"plan",    label:"Plan & Decide",   icon:"🗺️", color:"#ff8a65",desc:"Strategic planning & decisions",   tools:["roadmap","decisions","relocate","advisor"]},
+  // Daily-life first — what you need every single day
+  {id:"body",    label:"Body",            icon:"💪", color:"#4db6ac",desc:"Wake up, move, groom — fuel your body daily",      tools:["nogym","posture","bodyfuel","glowup"]},
+  {id:"wellness",label:"Wellness",        icon:"🌿", color:"#81c784",desc:"Mental health, sleep & emotional resilience",       tools:["innerpeace","sleepcoach","anxietytool","griefloss","angerstress"]},
+  {id:"mindset", label:"Mindset",         icon:"🧠", color:"#9b72cf",desc:"Daily discipline, habits & how you think",         tools:["mindsettenx","success","fearaudit","dailywisdom","innerpeace","angerstress"]},
+  {id:"skills",  label:"Skills & Career", icon:"⚡", color:"#ffd54f",desc:"Level up professionally every day",                tools:["invest","discipline","career","negotiation","digitallife"]},
+  // Then wealth and relationships
+  {id:"money",   label:"Money+",          icon:"💰", color:"#c8a84b",desc:"Build wealth & financial intelligence",            tools:["money","earnonline","business","lifehacks","debtfreedom","sidehustle","investment101","jimrohn"]},
+  {id:"social",  label:"Social & People", icon:"❤️", color:"#e05c6e",desc:"Relationships, people skills & communication",    tools:["relationshipiq","smalltalk","peopledecoder","hardconvo","parenting","confidencelab"]},
+  // Then direction and strategy
+  {id:"purpose", label:"Purpose",         icon:"🚀", color:"#64b5f6",desc:"Define your direction, legacy & why",             tools:["visionboard","legacyletter","morningritual","lettertoself","dreaminterp","weeklychallenge"]},
+  {id:"plan",    label:"Plan & Decide",   icon:"🗺️", color:"#ff8a65",desc:"Strategic planning, big decisions & next moves",  tools:["roadmap","decisions","relocate","advisor"]},
 ];
 const TOOL_META={
   relationshipiq:{label:"Relationship IQ", icon:"🤝",cat:"social", color:"#e05c6e"},
@@ -1765,6 +1768,61 @@ const TOPIC_CONFIGS = {
   body: {
     topics: [
       {
+        id:"lifehacks", label:"Daily Life Hacks", icon:"✨",
+        desc:"The small daily habits for hair, teeth, skin, wake-up and grooming that make a visible difference fast.",
+        tags:["All","Morning","Hair","Teeth","Skin","Grooming"],
+        cards:[
+          {
+            id:"wakeupright", title:"How To Wake Up Right", badge:"Do This Daily", badgeColor:"#f0b429",
+            tags:["Morning"],
+            tagline:"The first 10 minutes of your morning determine how the next 14 hours feel",
+            whyItWorks:"Your cortisol naturally peaks 30–45 minutes after waking — this is your body's built-in alertness boost. Most people waste it by lying in bed scrolling. Those who move, hydrate, and get light in the first 10 minutes report significantly higher energy and focus throughout the day.",
+            steps:["Alarm goes off — sit up immediately, feet on floor. Don't negotiate with yourself","Drink 500ml of water before anything else — you've been dehydrated for 7-8 hours","Open a window or step outside for 2-5 minutes of natural light — resets your circadian clock","Splash cold water on your face — activates the diving reflex, instant alertness","No phone for the first 20 minutes — protect your morning before the world takes it"],
+            actions:["Build My Morning Routine","Generate My First 30 Days","Calculate How Much Time I'd Gain","Create My Evening Prep Routine"],
+          },
+          {
+            id:"teethhacks", title:"Teeth Hacks That Actually Work", badge:"Quick Wins", badgeColor:"#e8dcc8",
+            tags:["Teeth"],
+            tagline:"Small daily habits that visibly change your teeth in under 30 days",
+            whyItWorks:"Most tooth problems (staining, sensitivity, decay) are preventable with the right sequence. Most people brush incorrectly, at the wrong time, with the wrong technique. These require zero extra products.",
+            steps:["Wait 30 minutes after eating before brushing — brushing immediately after acidic food strips enamel","Brush in small circles, not back-and-forth — back-and-forth damages gum line over time","Brush your tongue every time — 90% of bad breath comes from the tongue, not the teeth","Floss before brushing — loosens debris so brushing removes it","Oil pulling: 1 tsp coconut oil for 5-10 minutes before brushing 3x/week — whitens naturally","Drink water immediately after coffee/tea — reduces staining significantly","Use a straw for coffee, juice, acidic drinks — bypasses front teeth"],
+            actions:["Build My Daily Teeth Routine","Generate My 30-Day Whitening Plan","Find Affordable Dental Care In My Country","Calculate My Oral Health Score"],
+          },
+          {
+            id:"hairhacks", title:"Hair Health Hacks", badge:"High Impact", badgeColor:"#f0b429",
+            tags:["Hair"],
+            tagline:"What actually affects hair growth and thickness — not what's marketed to you",
+            whyItWorks:"Hair health is 80% internal (nutrition, stress, sleep) and 20% external. Most people spend money on products while ignoring inputs that actually drive growth and thickness.",
+            steps:["Scalp massage 5 minutes daily — increases blood flow to follicles, proven to increase thickness in 6 months","Wash 2-3x per week maximum — overwashing strips natural oils","Cold water rinse at end of every wash — seals the cuticle and adds shine","Protein diet: eggs, fish, legumes — hair is made of keratin, deficiency causes loss","Sleep on satin or silk pillowcase — reduces friction and breakage up to 40%","Never brush wet hair — detangle with fingers or wide-tooth comb from ends to roots","Trim every 8-10 weeks — split ends travel up the shaft if left"],
+            actions:["Build My Hair Care Routine","Find Products Available In My Country","Generate My Hair Growth 90-Day Plan","Calculate What My Hair Needs Based On Type"],
+          },
+          {
+            id:"skinhacks", title:"Skin Care Without Expensive Products", badge:"Practical", badgeColor:"#4db6ac",
+            tags:["Skin"],
+            tagline:"The 5-step daily routine that visibly changes skin in 3 weeks",
+            whyItWorks:"Clear skin is mostly diet and consistency, not expensive products. People with consistently good skin follow a simple, consistent sequence — not 12-step routines.",
+            steps:["Morning: gentle cleanser → moisturizer with SPF (non-negotiable, even indoors) → done","Evening: double cleanse (oil cleanser first, then water-based) → moisturizer","Drink 2-3 litres of water daily — dehydration shows on the face first","Cut sugar for 2 weeks — sugar causes glycation which ages skin visibly","Change pillowcase every 3-4 days — your face rests there 8 hours, buildup transfers directly","Never sleep with makeup on — even once breaks down collagen over time","Touch your face less — hands transfer bacteria every single time"],
+            actions:["Build My Morning + Evening Skin Routine","Find Affordable Products In My Country","Generate My 30-Day Clear Skin Plan","Identify My Skin Type"],
+          },
+          {
+            id:"eyebrowshacks", title:"Eyebrow Grooming Done Right", badge:"Detail", badgeColor:"#9b72cf",
+            tags:["Grooming"],
+            tagline:"The small details that change how your whole face looks",
+            whyItWorks:"Eyebrows frame your face more than any other feature. Small, specific changes to shape and maintenance make a disproportionate impact on overall appearance.",
+            steps:["Find your three points: start (above inner corner), arch (above outer iris edge), end (outer corner)","Do NOT over-pluck — sparse brows from over-grooming take 6-9 months to recover","Comb hairs upward with a spoolie before trimming — trim only hairs past the natural upper edge","Fill sparse spots with light hair-like strokes — one shade lighter than you think you need","Set with clear brow gel — holds all day, costs almost nothing"],
+            actions:["Generate My Eyebrow Grooming Guide","Find Products In My Country","Build My Weekly Grooming Routine","Get My Shape Recommendation"],
+          },
+          {
+            id:"nailhacks", title:"Nail & Hand Care Hacks", badge:"Underrated", badgeColor:"#81c784",
+            tags:["Grooming"],
+            tagline:"What people notice without knowing they noticed",
+            whyItWorks:"Hands are visible in every interaction — handshakes, typing, gestures, photos. Clean, well-maintained nails communicate attention to detail without a word.",
+            steps:["File after every shower when nails are soft — filing dry nails causes breakage","Push cuticles back gently with wooden stick after showering — never cut them (infection risk)","Apply cuticle oil or coconut/olive oil 3x per week — grows nails visibly faster","Hand cream every time you wash your hands — washing dries skin significantly over time","Keep a nail file in your bag — a small snag left unfiled tears into a break within 24 hours"],
+            actions:["Build My Weekly Nail Care Routine","Find Affordable Products In My Country","Generate My Hand Care Protocol","Create My Grooming Checklist"],
+          },
+        ],
+      },
+      {
         id:"nogym", label:"No-Gym Workout", icon:"💪",
         desc:"Get fit without a gym membership — anywhere, anytime, with zero equipment.",
         tags:["All","Beginner","Intermediate","Advanced"],
@@ -1807,53 +1865,6 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Protein is the most important macronutrient for body composition, but it's also the most expensive. Budget-friendly protein sources (eggs, beans, chicken thighs, canned fish) deliver the same results as premium options at a third of the cost.",
             steps:["Target 1.6-2g protein per kg bodyweight daily","Build meals around eggs, chicken thighs, beans, lentils, canned tuna","Buy in bulk and meal prep 2-3 days at a time","Use a kitchen scale for the first 2 weeks to calibrate portion sizes by eye","Plan one cheat meal weekly to stay consistent long-term"],
             actions:["Build My Meal Plan","Calculate My Protein Target","Find Budget Protein Sources In My Country","Generate Weekly Shopping List"],
-          },
-        ],
-      },
-      {
-        id:"lifehacks", label:"Daily Life Hacks", icon:"✨",
-        desc:"The small habits for hair, teeth, skin, and grooming that make a visible difference fast.",
-        tags:["All","Hair","Teeth","Skin","Grooming"],
-        cards:[
-          {
-            id:"teethhacks", title:"Teeth Hacks That Actually Work", badge:"Quick Wins", badgeColor:"#e8dcc8",
-            tags:["Teeth"],
-            tagline:"Small daily habits that visibly change your teeth in under 30 days",
-            whyItWorks:"Most tooth problems (staining, sensitivity, decay) are preventable with the right sequence and tools — yet most people brush incorrectly, at the wrong time, with the wrong technique. These habits require zero extra products and take 2 minutes more per day than what you're currently doing.",
-            steps:["Wait 30 minutes after eating before brushing — brushing immediately after acidic food strips enamel","Brush in small circles, not back-and-forth — back-and-forth damages gum line over time","Brush your tongue every time — 90% of bad breath comes from the tongue, not the teeth","Floss before brushing, not after — this loosens debris so brushing removes it","Oil pulling: 1 teaspoon of coconut oil in the mouth for 5-10 minutes before brushing, 3x per week — reduces bacteria, whitens naturally","Drink water after coffee/tea immediately — reduces staining significantly","Use a straw for coffee, juice, and acidic drinks — bypasses the front teeth"],
-            actions:["Build My Daily Teeth Routine","Generate My 30-Day Whitening Plan","Find Affordable Dental Care In My Country","Calculate My Oral Health Score"],
-          },
-          {
-            id:"hairhacks", title:"Hair Health Hacks", badge:"High Impact", badgeColor:"#f0b429",
-            tags:["Hair"],
-            tagline:"What actually affects hair growth and thickness — not what's marketed to you",
-            whyItWorks:"Hair health is 80% internal (nutrition, stress, sleep) and 20% external (what you put on it). Most people spend money on products while ignoring the inputs that actually drive growth, thickness, and shine. The hacks that work are unsexy and cheap.",
-            steps:["Scalp massage 5 minutes daily — increases blood circulation to follicles, proven to increase thickness in 6 months","Wash 2-3x per week maximum for most hair types — overwashing strips natural oils","Cold water rinse at the end of every wash — seals the cuticle and adds shine","Protein diet: eggs, fish, legumes — hair is made of keratin (protein), deficiency = hair loss","Sleep on a satin or silk pillowcase — reduces friction and breakage by up to 40%","Never brush wet hair — detangle with fingers or a wide-tooth comb from ends to roots","Trim every 8-10 weeks — split ends travel up the shaft and cause more loss if left"],
-            actions:["Build My Hair Care Routine","Find Products Available In My Country","Generate My Hair Growth 90-Day Plan","Calculate What My Hair Needs Based On Type"],
-          },
-          {
-            id:"skinhacks", title:"Skin Care That Works Without Expensive Products", badge:"Practical", badgeColor:"#4db6ac",
-            tags:["Skin"],
-            tagline:"The 5-step daily routine that visibly changes skin in 3 weeks",
-            whyItWorks:"Clear, healthy skin is mostly diet and consistency, not expensive products. The people with consistently good skin are not using 12-step routines — they're following a simple, consistent sequence every morning and evening. The biggest mistake is using too many products that interfere with each other.",
-            steps:["Morning: gentle cleanser → moisturizer with SPF (non-negotiable, even indoors — UV comes through windows) → done","Evening: double cleanse (oil cleanser first to remove sunscreen/makeup, then water-based cleanser) → moisturizer","Drink 2-3 litres of water daily — dehydration shows on the face first","Cut sugar for 2 weeks and note the difference — sugar causes glycation which ages skin visibly","Pillowcase: change every 3-4 days — your face rests there for 8 hours, buildup transfers directly","Never sleep with makeup on — even once breaks down collagen over time","Touch your face less — hands transfer bacteria every single time"],
-            actions:["Build My Morning + Evening Skin Routine","Find Affordable Products Available In My Country","Generate My 30-Day Clear Skin Plan","Identify My Skin Type"],
-          },
-          {
-            id:"eyebrowshacks", title:"Eyebrow Grooming Done Right", badge:"Detail", badgeColor:"#9b72cf",
-            tags:["Grooming"],
-            tagline:"The small details that change how your whole face looks",
-            whyItWorks:"Eyebrows frame your face more than any other feature. Small, specific changes to shape, thickness, and maintenance make a disproportionate impact on overall appearance. The mistakes most people make are over-plucking, ignoring the tail, and not filling in the sparse spots.",
-            steps:["Find your three points: start (above inner corner of eye), arch (above outer edge of iris), end (align with outer corner of eye) — this is your natural shape","Do NOT over-pluck — sparse brows from over-grooming take 6-9 months to recover","Use a spoolie brush to comb hairs upward before trimming — trim only the hairs that extend past the natural upper edge","Fill sparse spots with light, hair-like strokes using a brow pencil one shade lighter than you think you need","Set with a clear brow gel to hold shape all day — costs almost nothing and lasts months","Tweeze individual stragglers between sessions rather than doing full reshape each time"],
-            actions:["Generate My Eyebrow Grooming Guide","Find Products Available In My Country","Build My Weekly Grooming Routine","Get My Shape Recommendation"],
-          },
-          {
-            id:"nailhacks", title:"Nail & Hand Care Hacks", badge:"Underrated", badgeColor:"#81c784",
-            tags:["Grooming"],
-            tagline:"What people notice without knowing they noticed",
-            whyItWorks:"Hand and nail care is one of the highest-ROI grooming areas because hands are visible in every interaction — handshakes, gestures, typing, photos. Clean, well-maintained nails communicate attention to detail even when nothing else about your appearance suggests it.",
-            steps:["File after every shower when nails are soft — filing dry nails causes breakage","Push cuticles back gently with a wooden stick after showering — never cut them (increases infection risk)","Apply cuticle oil or any vegetable oil (coconut, olive) to nails and cuticles 3x per week — grows nails visibly faster","Hand cream every time you wash your hands — hand washing dries skin significantly over time","Avoid using nails as tools — opening cans, peeling stickers — this causes micro-cracks","Keep a nail file in your bag — a small snag left unfiled tears into a break within 24 hours"],
-            actions:["Build My Weekly Nail Care Routine","Find Affordable Products In My Country","Generate My Hand Care Protocol","Create My Grooming Checklist"],
           },
         ],
       },
@@ -8158,7 +8169,29 @@ function RelocCard({r, onRetry}){
   );
 }
 
+const WORLD_COUNTRIES = [
+  "Afghanistan","Albania","Algeria","Angola","Argentina","Armenia","Australia","Austria","Azerbaijan",
+  "Bahrain","Bangladesh","Belarus","Belgium","Benin","Bolivia","Bosnia and Herzegovina","Botswana","Brazil",
+  "Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Chile","China","Colombia","Congo",
+  "Costa Rica","Croatia","Cuba","Cyprus","Czech Republic","Denmark","Dominican Republic","DR Congo","Ecuador",
+  "Egypt","El Salvador","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece",
+  "Guatemala","Guinea","Honduras","Hungary","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy",
+  "Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kuwait","Kyrgyzstan","Latvia","Lebanon","Lithuania",
+  "Luxembourg","Madagascar","Malawi","Malaysia","Mali","Malta","Mauritius","Mexico","Moldova","Mongolia",
+  "Montenegro","Morocco","Mozambique","Myanmar","Namibia","Nepal","Netherlands","New Zealand","Nicaragua",
+  "Niger","Nigeria","North Macedonia","Norway","Oman","Pakistan","Panama","Paraguay","Peru","Philippines",
+  "Poland","Portugal","Qatar","Romania","Russia","Rwanda","Saudi Arabia","Senegal","Serbia","Sierra Leone",
+  "Singapore","Slovakia","Slovenia","Somalia","South Africa","South Korea","Spain","Sri Lanka","Sudan",
+  "Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Tunisia","Turkey","Uganda",
+  "Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Venezuela",
+  "Vietnam","Yemen","Zambia","Zimbabwe"
+];
+
+
 function RelocationExplorer({suggestedCountries, formData, userId, isPremium, isPaid, onUnlock}){
+  const G = useThemeColors();
+  const night = G.isDark ? "#0f0c02" : "#f0ede4";
+  const midnight = G.isDark ? "#131009" : "#e8e4d8";
   const [search,   setSearch]   = useState("");
   const [selected, setSelected] = useState(null);
   const [customReport, setCustomReport] = useState(null);
@@ -8243,29 +8276,29 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
     <LockGate isPaid={isPaid} onUnlock={onUnlock}>
       <div className="fu">
         <div className="d3" style={{marginBottom:6}}>Where in the world could you actually thrive?</div>
-        <p className="body" style={{marginBottom:20,color:"var(--cream-60)"}}>
+        <p className="body" style={{marginBottom:20,color:G.dim}}>
           We matched your profile against countries where someone with your background, skills, and goals tends to break through.
           Type any country below for a full custom report.
         </p>
 
         {/* Country search */}
         <div style={{marginBottom:24}}>
-          <div style={{fontSize:11,fontWeight:700,color:"var(--cream-40)",letterSpacing:"0.08em",marginBottom:8}}>HAVE A COUNTRY IN MIND?</div>
+          <div style={{fontSize:11,fontWeight:700,color:G.dimmer,letterSpacing:"0.08em",marginBottom:8}}>HAVE A COUNTRY IN MIND?</div>
           <div style={{position:"relative"}}>
             <input value={search} onChange={e=>setSearch(e.target.value)}
               onBlur={()=>setTimeout(()=>setSearch(""),200)}
               placeholder="Search any country…"
-              style={{width:"100%",background:"var(--midnight)",border:"1px solid var(--cream-15)",borderRadius:12,padding:"12px 16px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box"}}
+              style={{width:"100%",background:midnight,border:"1px solid var(--cream-15)",borderRadius:12,padding:"12px 16px",color:G.cream,fontSize:13,outline:"none",boxSizing:"border-box"}}
             />
             {search.length>1&&filtered.length>0&&(
-              <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,background:"var(--midnight)",border:"2px solid var(--gold)",borderRadius:12,overflow:"hidden auto",maxHeight:260,zIndex:9999,boxShadow:"0 20px 60px rgba(0,0,0,0.95)"}}>
+              <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,background:midnight,border:"2px solid var(--gold)",borderRadius:12,overflow:"hidden auto",maxHeight:260,zIndex:9999,boxShadow:"0 20px 60px rgba(0,0,0,0.95)"}}>
                 {filtered.map(c=>(
                   <div key={c} onMouseDown={e=>{e.preventDefault();setSearch("");generateReport(c);}}
-                    style={{padding:"13px 18px",cursor:"pointer",fontSize:14,color:"var(--cream)",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--midnight)"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="var(--night)"}
-                    onMouseLeave={e=>e.currentTarget.style.background="var(--midnight)"}>
+                    style={{padding:"13px 18px",cursor:"pointer",fontSize:14,color:G.cream,borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",background:midnight}}
+                    onMouseEnter={e=>e.currentTarget.style.background=night}
+                    onMouseLeave={e=>e.currentTarget.style.background=midnight}>
                     <span>{c}</span>
-                    <span style={{color:"var(--gold)",fontSize:13,fontWeight:600}}>→</span>
+                    <span style={{color:G.gold,fontSize:13,fontWeight:600}}>→</span>
                   </div>
                 ))}
               </div>
@@ -8275,20 +8308,20 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
 
         {/* Loading */}
         {loading&&(
-          <div style={{textAlign:"center",padding:"40px 20px",background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:20}}>
+          <div style={{textAlign:"center",padding:"40px 20px",background:night,borderRadius:16,border:"1px solid var(--cream-10)",marginBottom:20}}>
             <div style={{fontSize:28,marginBottom:12}}>🔍</div>
-            <div style={{fontSize:14,color:"var(--cream-60)",marginBottom:6}}>Building your {selected} report…</div>
-            <div style={{fontSize:12,color:"var(--cream-40)"}}>Checking visa rules, costs, opportunities, and what it&apos;s really like to move there{formData?.country?` from ${formData.country}`:""}.</div>
+            <div style={{fontSize:14,color:G.dim,marginBottom:6}}>Building your {selected} report…</div>
+            <div style={{fontSize:12,color:G.dimmer}}>Checking visa rules, costs, opportunities, and what it&apos;s really like to move there{formData?.country?` from ${formData.country}`:""}.</div>
           </div>
         )}
 
         {/* Toggle between custom and suggested */}
         {!loading&&customReport&&(
           <div style={{display:"flex",gap:8,marginBottom:20}}>
-            <button onClick={()=>setView("custom")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="custom"?"var(--violet)":"var(--midnight)",color:view==="custom"?"#fff":"var(--cream-60)",fontSize:12,cursor:"pointer",fontWeight:600}}>
+            <button onClick={()=>setView("custom")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="custom"?"var(--violet)":midnight,color:view==="custom"?"#fff":G.dim,fontSize:12,cursor:"pointer",fontWeight:600}}>
               🌍 {selected}
             </button>
-            <button onClick={()=>setView("suggested")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="suggested"?"var(--violet)":"var(--midnight)",color:view==="suggested"?"#fff":"var(--cream-60)",fontSize:12,cursor:"pointer",fontWeight:600}}>
+            <button onClick={()=>setView("suggested")} style={{flex:1,padding:"8px 12px",borderRadius:10,border:"none",background:view==="suggested"?"var(--violet)":midnight,color:view==="suggested"?"#fff":G.dim,fontSize:12,cursor:"pointer",fontWeight:600}}>
               ⭐ Our picks for you
             </button>
           </div>
@@ -8302,17 +8335,17 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
         {/* Suggested list */}
         {!loading&&(view==="suggested"||!customReport)&&(
           <>
-            {!customReport&&<div style={{fontSize:11,fontWeight:700,color:"var(--cream-40)",letterSpacing:"0.08em",marginBottom:12}}>OUR PICKS BASED ON YOUR PROFILE</div>}
+            {!customReport&&<div style={{fontSize:11,fontWeight:700,color:G.dimmer,letterSpacing:"0.08em",marginBottom:12}}>OUR PICKS BASED ON YOUR PROFILE</div>}
             {autoLoading&&allSuggestions.length===0&&!customReport&&(
-              <div style={{padding:"32px 20px",background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
+              <div style={{padding:"32px 20px",background:night,borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
                 <div style={{fontSize:28,marginBottom:12}}>🌍</div>
-                <div style={{fontSize:14,color:"var(--cream-60)",marginBottom:6}}>Finding the best countries for you…</div>
-                <div style={{fontSize:12,color:"var(--cream-40)"}}>Matching your profile, skills, and goals against 195 countries.</div>
+                <div style={{fontSize:14,color:G.dim,marginBottom:6}}>Finding the best countries for you…</div>
+                <div style={{fontSize:12,color:G.dimmer}}>Matching your profile, skills, and goals against 195 countries.</div>
               </div>
             )}
             {!autoLoading&&allSuggestions.length===0&&!customReport&&(
-              <div style={{padding:"32px 20px",background:"var(--night)",borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
-                <div style={{fontSize:13,color:"var(--cream-40)",marginBottom:16}}>Search any country above to get your full relocation report.</div>
+              <div style={{padding:"32px 20px",background:night,borderRadius:16,border:"1px solid var(--cream-10)",textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:13,color:G.dimmer,marginBottom:16}}>Search any country above to get your full relocation report.</div>
               </div>
             )}
             {allSuggestions.map((r,i)=>(
@@ -8322,7 +8355,7 @@ function RelocationExplorer({suggestedCountries, formData, userId, isPremium, is
         )}
 
         <div className="insight teal" style={{marginTop:8}}>
-          <p style={{fontSize:13,color:"var(--cream-60)",lineHeight:1.75}}>
+          <p style={{fontSize:13,color:G.dim,lineHeight:1.75}}>
             Visa rules shift often — always verify on the official embassy or government immigration website before making any decisions.
           </p>
         </div>
@@ -13060,21 +13093,24 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                   <>
                     <div style={{fontSize:10,fontWeight:700,letterSpacing:".12em",color:G.dimmer,fontFamily:"monospace",marginBottom:12}}>TOOLS</div>
                     <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:filteredCats.length>0?20:0}}>
-                      {filteredTools.map(([id,m])=>(
-                        <div key={id} onClick={()=>setNav("tool:"+id)}
+                      {filteredTools.map(item=>(
+                        <div key={item.id} onClick={()=>setNav(item.id)}
                           style={{background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,borderRadius:14,
                             padding:"13px 16px",display:"flex",alignItems:"center",gap:14,cursor:"pointer"}}
                           onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                           onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
-                          <div style={{width:40,height:40,borderRadius:11,background:`${m.color||"var(--gold)"}18`,
-                            border:`1px solid ${m.color||"var(--gold)"}33`,
+                          <div style={{width:40,height:40,borderRadius:11,
+                            background:`${item.color||"var(--gold)"}18`,
+                            border:`1px solid ${item.color||"var(--gold)"}33`,
                             display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                            {m.icon||"✦"}
+                            {item.icon||"✦"}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:14,fontWeight:700,color:G.cream}}>{m.label}</div>
-                            <div style={{fontSize:11,color:m.color||G.dimmer,fontWeight:600,marginTop:1}}>
-                              {CATEGORIES.find(c=>c.id===m.cat)?.label||""}
+                            <div style={{fontSize:14,fontWeight:700,color:G.cream}}>{item.label}</div>
+                            <div style={{fontSize:11,color:item.color||G.dimmer,fontWeight:600,marginTop:1}}>
+                              {item.type==="topic"
+                                ? (CATEGORIES.find(c=>c.id===item.catId)?.label||"")+" · Topic"
+                                : CATEGORIES.find(c=>c.tools?.includes(item.id))?.label||"Tool"}
                             </div>
                           </div>
                           <span style={{color:G.dimmer,fontSize:18,flexShrink:0}}>›</span>
@@ -15267,6 +15303,22 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
   useEffect(()=>{
     try{ localStorage.setItem("diq_active_tab",mod); }catch{}
   },[mod]);
+
+  // ── Listen for streak updates from check-in and trigger celebration ──────
+  useEffect(()=>{
+    const handler=(e)=>{
+      const {streak:s, celebrate} = e.detail||{};
+      if(!s) return;
+      if(celebrate){
+        setStreakCelebration(s); // full milestone celebration
+      } else {
+        setMiniStreak(s); // mini non-milestone celebration
+        setTimeout(()=>setMiniStreak(null), 3000);
+      }
+    };
+    window.addEventListener("streakUpdated", handler);
+    return()=>window.removeEventListener("streakUpdated", handler);
+  },[]);
   const [aScores,setAScores]=useState({life:0,wealth:0,mindset:0,relations:0});
   const [dailyInsight,setDailyInsight]=useState(data.daily_insight||"");
   const [refreshingInsight,setRefreshingInsight]=useState(false);
@@ -17208,15 +17260,24 @@ function DestinIQInner(){
             // Already checked in today — show current streak as-is
             setStreak(bestStreak);
           } else if (lastSeen === yesterday) {
-            // Checked in yesterday — streak is still alive, increment it for today
-            const newStreak = bestStreak + 1;
-            setStreak(newStreak);
-            // Persist incremented streak immediately so refresh shows correct value
-            supabase.from("user_profiles").upsert({
-              user_id: u.id, streak: newStreak,
-              updated_at: new Date().toISOString(),
-            },{onConflict:"user_id"}).catch(()=>{});
-            try{ localStorage.setItem(`diq_streak_${u.id}`, String(newStreak)); }catch{}
+            // Checked in yesterday — streak alive. Only increment ONCE per today
+            // (guard against multiple restores on the same day from refreshes)
+            const alreadyCountedToday = (()=>{
+              try{ return localStorage.getItem(`diq_streak_last_counted_${u.id}`) === today; }catch{ return false; }
+            })();
+            if(alreadyCountedToday){
+              setStreak(bestStreak); // already incremented today — just restore
+            } else {
+              const newStreak = bestStreak + 1;
+              setStreak(newStreak);
+              try{ localStorage.setItem(`diq_streak_last_counted_${u.id}`, today); }catch{}
+              try{ localStorage.setItem(`diq_streak_${u.id}`, String(newStreak)); }catch{}
+              supabase.from("user_profiles").upsert({
+                user_id: u.id, streak: newStreak,
+                last_checkin_date: today,
+                updated_at: new Date().toISOString(),
+              },{onConflict:"user_id"}).catch(()=>{});
+            }
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
@@ -17383,15 +17444,42 @@ function DestinIQInner(){
     let listener = null;
     CapApp.addListener("appUrlOpen",async({url})=>{
       if(!url) return;
-      const hash = url.includes("#") ? url.split("#")[1] : url.split("?")[1]||"";
-      const p = new URLSearchParams(hash);
-      const access_token  = p.get("access_token");
-      const refresh_token = p.get("refresh_token");
+      // Parse both hash (#) and query string (?) — Supabase may use either
+      let access_token = null, refresh_token = null, code = null;
+      try{
+        // Try fragment first (most common for Supabase implicit flow)
+        if(url.includes("#")){
+          const hash = url.split("#")[1]||"";
+          const p = new URLSearchParams(hash);
+          access_token  = p.get("access_token");
+          refresh_token = p.get("refresh_token");
+        }
+        // Try query string (PKCE flow)
+        if(!access_token && url.includes("?")){
+          const qs = url.split("?")[1]?.split("#")[0]||"";
+          const p = new URLSearchParams(qs);
+          access_token  = p.get("access_token");
+          refresh_token = p.get("refresh_token");
+          code          = p.get("code"); // PKCE authorization code
+        }
+      }catch{}
+
+      // Close in-app browser first — do this regardless of outcome
+      try{ window?.Capacitor?.Plugins?.Browser?.close?.(); }catch{}
+
       if(access_token && refresh_token){
+        // Implicit flow — set session directly
         const{error}=await supabase.auth.setSession({access_token,refresh_token});
-        if(error) console.warn("Deep link auth:",error.message);
-        // Close in-app browser via global plugin
-        try{ window?.Capacitor?.Plugins?.Browser?.close?.(); }catch{}
+        if(error) console.warn("Deep link auth (implicit):",error.message);
+      } else if(code){
+        // PKCE flow — exchange code for session
+        try{
+          const{error}=await supabase.auth.exchangeCodeForSession(code);
+          if(error) console.warn("Deep link auth (PKCE):",error.message);
+        }catch(e){ console.warn("Code exchange failed:",e); }
+      } else {
+        // Let Supabase try to detect from the URL itself
+        try{ await supabase.auth.getSession(); }catch{}
       }
     }).then(l=>{listener=l;}).catch(()=>{});
     return()=>{ try{listener?.remove?.();}catch{} };
@@ -17543,7 +17631,7 @@ function DestinIQInner(){
           setStreak(s=>{
             const next=s+1;
             if(uid) try{localStorage.setItem(`diq_streak_${uid}`,String(next));}catch{}
-            // Also push the updated streak to Supabase
+            // Push to Supabase
             if(uid){
               try{
                 supabase.from("user_profiles").upsert({
@@ -17553,6 +17641,11 @@ function DestinIQInner(){
                 },{onConflict:"user_id"}).catch(()=>{});
               }catch{}
             }
+            // Fire celebration event for Dashboard to pick up
+            const isMilestone = [3,7,14,21,30,50,75,100].includes(next);
+            window.dispatchEvent(new CustomEvent("streakUpdated",{
+              detail:{streak:next, celebrate: isMilestone || next%10===0}
+            }));
             return next;
           });
         };
