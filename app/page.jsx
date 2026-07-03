@@ -12861,6 +12861,64 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
   const [activeTag, setActiveTag] = useState("All");
   const [selectedCard, setSelectedCard] = useState(null);
 
+  // ── AI-generated dynamic cards ────────────────────────────────────────────
+  const aiCardsKey = userId ? `diq_ai_cards_${userId}_${catId}_${topicId}` : null;
+  const [aiCards, setAiCards]       = useState([]);
+  const [aiLoading, setAiLoading]   = useState(false);
+  const [aiError, setAiError]       = useState("");
+  const [aiGenerated, setAiGenerated] = useState(false); // whether we've generated at least once
+
+  const generateAiCards = async () => {
+    if(!isPaid){ onUnlock&&onUnlock(); return; }
+    setAiLoading(true); setAiError("");
+    const name    = formData?.name    || "this person";
+    const country = formData?.country || "their country";
+    const goals   = formData?.goals   || formData?.bigGoal || "grow and improve";
+    const income  = formData?.income  || "not specified";
+    const skills  = formData?.skills  || "not specified";
+    const existing = topic.cards.map(c=>c.title).join(", ");
+    try{
+      const prompt = `Generate 4 NEW and DIFFERENT "${topic.label}" ideas/opportunities for ${name} from ${country} (skills: ${skills}, income: ${income}, goal: ${goals}).
+
+CRITICAL: Do NOT repeat any of these already-shown ideas: ${existing}
+
+These must be genuinely different options the user hasn't seen yet. Tailor them specifically to someone from ${country} with their background.
+
+Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end ]:
+[{"id":"ai_<unique_id>","title":"<specific idea name>","tagline":"<one line, specific to ${country}>","badge":"<2-3 words>","badgeColor":"#64b5f6","whyItWorks":"<2-3 sentences, specific and practical>","steps":["<step 1>","<step 2>","<step 3>","<step 4>","<step 5>"],"actions":["<action 1>","<action 2>","<action 3>"],"startupCost":"<if relevant, else omit>","incomeRange":"<if relevant, else omit>"}]`;
+
+      const raw = await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:`You are DestinIQ generating personalised "${topic.label}" intelligence cards for ${name} from ${country}. Return ONLY a valid JSON array. Be specific, practical, and tailored to their country and situation. Never be generic.`,
+        userId, isPremium,
+      });
+      const txt = typeof raw==="string" ? raw :
+        (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const s=clean.indexOf("["), e=clean.lastIndexOf("]");
+      if(s===-1||e===-1) throw new Error("No JSON array");
+      const parsed = JSON.parse(clean.slice(s,e+1));
+      if(!Array.isArray(parsed)||parsed.length===0) throw new Error("Empty array");
+      // Ensure unique IDs
+      const withIds = parsed.map((c,i)=>({...c, id:`ai_${catId}_${topicId}_${Date.now()}_${i}`, emoji:"✦"}));
+      setAiCards(withIds);
+      setAiGenerated(true);
+      try{ if(aiCardsKey) localStorage.setItem(aiCardsKey, JSON.stringify(withIds)); }catch{}
+    }catch(e){
+      setAiError("Could not generate new ideas. Check your connection and try again.");
+    }
+    setAiLoading(false);
+  };
+
+  // Load cached AI cards on mount
+  useState(()=>{
+    if(!aiCardsKey) return;
+    try{
+      const cached = JSON.parse(localStorage.getItem(aiCardsKey)||"null");
+      if(Array.isArray(cached)&&cached.length>0){ setAiCards(cached); setAiGenerated(true); }
+    }catch{}
+  });
+
   if(!cat||!topic) return(
     <div style={{padding:40,textAlign:"center",color:G.cream,fontFamily:"-apple-system,sans-serif"}}>
       <div style={{fontSize:32,marginBottom:12}}>🔍</div>
@@ -12934,6 +12992,7 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
       </div>
 
       <div style={{padding:"0 20px 100px",maxWidth:860,margin:"0 auto"}}>
+        {/* Static cards */}
         {filteredCards.length>0
           ? filteredCards.map(card=>(
               <IntelligenceCard
@@ -12957,6 +13016,80 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
             </div>
           )
         }
+
+        {/* ── AI-GENERATED CARDS SECTION ─────────────────────────────────── */}
+        {activeTag==="All"&&(
+          <div style={{marginTop:8}}>
+
+            {/* Divider */}
+            {filteredCards.length>0&&(
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+                <div style={{flex:1,height:1,background:G.border}}/>
+                <div style={{fontSize:9,fontWeight:700,color:G.dimmer,fontFamily:"monospace",
+                  letterSpacing:".12em",whiteSpace:"nowrap"}}>
+                  {aiGenerated?"✦ AI-GENERATED IDEAS":"WANT MORE IDEAS?"}
+                </div>
+                <div style={{flex:1,height:1,background:G.border}}/>
+              </div>
+            )}
+
+            {/* Show AI cards if generated */}
+            {aiCards.map(card=>(
+              <IntelligenceCard
+                key={card.id} card={card} catColor={cat.color}
+                userId={userId}
+                onSelect={setSelectedCard}
+              />
+            ))}
+
+            {/* Error */}
+            {aiError&&(
+              <div style={{padding:"14px 16px",background:"rgba(224,92,110,0.08)",
+                border:"1px solid rgba(224,92,110,0.2)",borderRadius:12,
+                marginBottom:14,fontSize:13,color:"#e05c6e",textAlign:"center"}}>
+                {aiError}
+              </div>
+            )}
+
+            {/* Generate / Refresh button */}
+            {aiLoading ? (
+              <div style={{textAlign:"center",padding:"28px 20px",
+                background:"rgba(255,255,255,0.02)",border:"1px solid "+G.border,
+                borderRadius:16,marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+                  fontSize:13,color:G.dim}}>
+                  <span style={{width:8,height:8,borderRadius:"50%",background:G.gold,
+                    display:"inline-block"}}/>
+                  Generating new {topic.label} ideas personalised for you…
+                </div>
+              </div>
+            ) : (
+              <button onClick={generateAiCards}
+                style={{width:"100%",padding:"16px",
+                  background:aiGenerated?"rgba(255,255,255,0.03)":cat.color+"12",
+                  border:`1px solid ${aiGenerated?G.border:cat.color+"40"}`,
+                  borderRadius:16,cursor:"pointer",fontFamily:"inherit",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+                  transition:"all .2s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=cat.color+"60";e.currentTarget.style.background=cat.color+"18";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=aiGenerated?G.border:cat.color+"40";e.currentTarget.style.background=aiGenerated?"rgba(255,255,255,0.03)":cat.color+"12";}}>
+                <span style={{fontSize:18}}>{aiGenerated?"🔄":"✦"}</span>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,color:G.cream,marginBottom:2}}>
+                    {aiGenerated
+                      ? `Refresh — get 4 different ${topic.label} ideas`
+                      : `Generate more ${topic.label} ideas, just for you`}
+                  </div>
+                  <div style={{fontSize:11,color:G.dimmer}}>
+                    {aiGenerated
+                      ? "AI will generate 4 brand new options based on your profile"
+                      : "AI picks ideas specific to your country, skills, and goals"}
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
