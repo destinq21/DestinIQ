@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -687,6 +687,21 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         id:1004, title:"DestinIQ 🔥", channelId:"destiniq-daily",
         body:pick(NOTIF_MSGS.streak)(name,streak),
         schedule:{at:nextAt(21,0), repeats:true, allowWhileIdle:true},
+        sound:"default",
+      });
+      // ── Smart weekly hooks — the moments people need DestinIQ most ────────
+      // Sunday 4pm: Sunday anxiety (weekday 1 = Sunday in Capacitor's scheduler)
+      notifications.push({
+        id:1005, title:"That Sunday feeling? 😰", channelId:"destiniq-daily",
+        body:`${name}, Sunday dread is real — and fixable. 5 minutes now changes how Monday starts.`,
+        schedule:{on:{weekday:1, hour:16, minute:0}, repeats:true, allowWhileIdle:true},
+        sound:"default",
+      });
+      // Monday 8am: weekly reset
+      notifications.push({
+        id:1006, title:"Monday. Three priorities. 🎯", channelId:"destiniq-daily",
+        body:`Set your week's targets before the week sets them for you, ${name}.`,
+        schedule:{on:{weekday:2, hour:8, minute:0}, repeats:true, allowWhileIdle:true},
         sound:"default",
       });
 
@@ -12054,6 +12069,88 @@ function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPho
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SMART HOOKS — context-aware home nudges. Day + time aware, tap → topic/tool.
+// Priority hooks fire on their moment (Sunday evening, Monday morning, late night);
+// otherwise a general pool rotates daily (seeded by date — stable within a day).
+// ═══════════════════════════════════════════════════════════════════════════════
+const SMART_HOOKS = [
+  // ── Moment-specific (checked first, in order) ──────────────────────────────
+  {id:"sunday_dread", icon:"😰", color:"#64b5f6",
+    when:(d)=>d.getDay()===0&&d.getHours()>=14,
+    title:"That Sunday feeling creeping in?",
+    msg:"You're not alone — 76% of working adults feel it. 5 minutes here changes how Monday starts.",
+    nav:"topic:wellness.sundayanxiety"},
+  {id:"monday_reset", icon:"🎯", color:"#81c784",
+    when:(d)=>d.getDay()===1&&d.getHours()<12,
+    title:"Monday. Three priorities, not thirty.",
+    msg:"Set your week's targets before the week sets them for you.",
+    nav:"topic:plan.goalsetting"},
+  {id:"friday_wins", icon:"🏆", color:"#f0b429",
+    when:(d)=>d.getDay()===5&&d.getHours()>=15,
+    title:"Friday check: what did you win this week?",
+    msg:"Log it before the weekend blurs it. Wins you don't record, you forget.",
+    nav:"wins"},
+  {id:"late_night", icon:"😴", color:"#9b72cf",
+    when:(d)=>d.getHours()>=22||d.getHours()<4,
+    title:"Still up? Tomorrow is built tonight.",
+    msg:"A 10-minute wind-down now beats an hour of grogginess tomorrow.",
+    nav:"tool:sleepcoach"},
+  {id:"month_end_money", icon:"💰", color:"#ffd54f",
+    when:(d)=>d.getDate()>=27,
+    title:"Month closing — where did the money go?",
+    msg:"5-minute review now, smarter month ahead. Most people never look. Be the exception.",
+    nav:"category:money"},
+  // ── Daily rotation pool (one per day, seeded by date) ──────────────────────
+  {id:"pool_peoplepleasing", icon:"🚫", color:"#e05c6e", pool:true,
+    title:"Said yes when you meant no this week?",
+    msg:"The saying-no scripts that don't destroy relationships.",
+    nav:"topic:social.peoplepleasing"},
+  {id:"pool_imposter", icon:"🎭", color:"#9b72cf", pool:true,
+    title:"Feel like they'll 'find you out' at work?",
+    msg:"70% of high performers feel this. Here's the evidence file against it.",
+    nav:"topic:mindset.impostersyndrome"},
+  {id:"pool_meals", icon:"🍳", color:"#81c784", pool:true,
+    title:"Deciding what to eat 21 times a week?",
+    msg:"Decide once. 20 minutes of planning kills a week of bad choices.",
+    nav:"topic:body.mealplanning"},
+  {id:"pool_japa", icon:"✈️", color:"#64b5f6", pool:true,
+    title:"Leave or stay — done the honest math?",
+    msg:"Not Instagram dreams. Real numbers, visa names, and what you'd give up.",
+    nav:"topic:plan.japa"},
+  {id:"pool_firstgen", icon:"🏠", color:"#f0b429", pool:true,
+    title:"Carrying your whole family's expectations?",
+    msg:"The weight of being first — and how to carry it without breaking.",
+    nav:"topic:purpose.firstgen"},
+  {id:"pool_pricing", icon:"💵", color:"#ffd54f", pool:true,
+    title:"Undercharging for your skills?",
+    msg:"The gap between your rate and your worth is bigger than you think.",
+    nav:"topic:skills.freelancepricing"},
+  {id:"pool_remit", icon:"🏦", color:"#4db6ac", pool:true,
+    title:"Sending money home every month?",
+    msg:"Support them without sinking yourself — the sustainable giving system.",
+    nav:"topic:money.remittances"},
+  {id:"pool_discipline", icon:"⚙️", color:"#ff8a65", pool:true,
+    title:"Motivation gone again?",
+    msg:"Good. Systems beat motivation. Build one that survives your worst day.",
+    nav:"tool:discipline"},
+];
+
+function pickSmartHook(userId){
+  try{
+    const now=new Date();
+    const todayKey=now.toISOString().slice(0,10);
+    try{ if(localStorage.getItem(`diq_hook_dismissed_${userId}_${todayKey}`)) return null; }catch{}
+    // Moment-specific hooks win
+    for(const h of SMART_HOOKS){ if(h.when && h.when(now)) return h; }
+    // Otherwise rotate the pool daily (date-seeded, stable within the day)
+    const pool=SMART_HOOKS.filter(h=>h.pool);
+    if(!pool.length) return null;
+    const seed=Number(todayKey.replace(/-/g,""))%pool.length;
+    return pool[seed];
+  }catch{ return null; }
+}
+
 function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight}){
   const hour = new Date().getHours();
   const timeGreet = hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
@@ -12194,6 +12291,26 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
             </button>
           </div>
         </div>
+
+        {/* ══ SMART HOOK — context-aware nudge (day + time aware) ══ */}
+        {(()=>{
+          const hook = pickSmartHook(userId);
+          if(!hook) return null;
+          return(
+            <button onClick={()=>setNav(hook.nav)}
+              style={{...card,marginBottom:14,width:"100%",textAlign:"left",cursor:"pointer",
+                display:"flex",alignItems:"center",gap:14,fontFamily:"inherit",
+                background:`linear-gradient(135deg,${hook.color}14,rgba(0,0,0,0))`,
+                border:`1px solid ${hook.color}30`}}>
+              <span style={{fontSize:26,flexShrink:0}}>{hook.icon}</span>
+              <span style={{flex:1}}>
+                <span style={{display:"block",fontSize:14,fontWeight:700,color:G.cream,marginBottom:3}}>{hook.title}</span>
+                <span style={{display:"block",fontSize:12,color:G.dim,lineHeight:1.5}}>{hook.msg}</span>
+              </span>
+              <span style={{fontSize:18,color:hook.color,flexShrink:0}}>→</span>
+            </button>
+          );
+        })()}
 
         {/* ══ 3. TODAY'S INTELLIGENCE INSIGHT ══ */}
         <div style={{...card,marginBottom:14,
