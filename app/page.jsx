@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -359,7 +359,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_d41e9b02bc9df24ad779359e1e12c01d8b28ba5b"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -1462,6 +1462,55 @@ const TOPIC_CONFIGS = {
         ],
       },
       {
+        id:"remittances", label:"Remittances & Family Money", icon:"🏦",
+        desc:"The money mechanics of supporting family — cheapest transfer routes, sustainable budgets, and building wealth while giving.",
+        tags:["All","Transfers","Budgeting","Investing Home"],
+        cards:[
+          {
+            id:"cheaptransfers", title:"Stop Losing Money On Transfer Fees", badge:"Instant Savings", badgeColor:"#81c784",
+            tags:["Transfers"],
+            tagline:"The difference between the worst and best transfer route is often 8-10% of everything you send",
+            whyItWorks:"Global average remittance cost is around 6% — meaning someone sending $200 monthly loses roughly $144/year to fees and hidden exchange rate markups. The banks and legacy services are consistently the most expensive routes; the markup hides in the exchange rate, not the stated fee. Comparing total received (not fees charged) is the only honest comparison.",
+            steps:[
+              "Compare by amount RECEIVED, not fee charged — a '$0 fee' service with a bad exchange rate costs more than a $4 fee with a fair rate",
+              "Check comparison sites that track live rates across providers for your specific corridor (e.g. UK→Ghana, US→Nigeria)",
+              "Mobile money endpoints (M-Pesa, MoMo) are usually cheaper than cash pickup — and safer for the receiver",
+              "Batch transfers: one monthly transfer costs less than four weekly ones — fixed fees hit small amounts hardest",
+              "Recalculate every 6 months — rates and providers change, and the best route last year may not be the best now"
+            ],
+            actions:["Find The Cheapest Route For My Corridor","Calculate What Fees Cost Me Annually","Build My Monthly Transfer Schedule","Compare Mobile Money vs Bank Options"],
+          },
+          {
+            id:"remitbudget", title:"The Remittance Budget That Doesn't Break You", badge:"Sustainability", badgeColor:"#f0b429",
+            tags:["Budgeting"],
+            tagline:"A fixed percentage system that supports them and protects you",
+            whyItWorks:"The unsustainable pattern: sending whatever is asked, whenever it's asked. This makes your finances a function of other people's emergencies — and family emergencies expand to fill available money. A fixed-percentage system (many advisers suggest capping remittances at 10-15% of net income) converts an open-ended obligation into a plannable expense, which is the only way both you and they get stability.",
+            steps:[
+              "Pick your number: a fixed percentage of net income (10-15% is a common sustainable range) — write it down",
+              "Automate it: send the same amount on the same date monthly — predictability helps the receiver plan too",
+              "Create a separate small 'family emergency fund' (1-2% monthly) — genuine emergencies come from this, not your savings",
+              "Everything above the number is a NO by default — 'my budget for this month is already committed' is a complete answer",
+              "Review annually: as income grows, the percentage stays fixed — your giving grows with you, not ahead of you"
+            ],
+            actions:["Calculate My Sustainable Remittance Number","Build My Family Emergency Fund Plan","Generate My Boundary Script For Extra Requests","Design My Automated Transfer System"],
+          },
+          {
+            id:"investhome", title:"Build Assets Back Home, Not Just Expenses", badge:"Wealth Builder", badgeColor:"#64b5f6",
+            tags:["Investing Home"],
+            tagline:"Shift part of what you send from consumption to assets that pay everyone back",
+            whyItWorks:"Most remittance money funds consumption — rent, food, school fees, medical bills. Necessary, but it evaporates monthly and creates permanent dependence. Redirecting even 20-30% of what you send into income-generating assets (a small shop, farmland, rental space, equipment for a family business) gradually converts your family from a monthly cost into an independent unit — the only real exit from the remittance treadmill.",
+            steps:[
+              "Audit where the money actually goes — ask for a simple breakdown once. Not to control, to understand consumption vs investment",
+              "Pick ONE income-generating project with a family member who has shown reliability — start small enough that failure is survivable",
+              "Structure it clearly: your capital, their labour, agreed profit split — vagueness destroys both money and relationships",
+              "Use trusted verification: a lawyer for land, receipts for equipment — distance fraud on diaspora investments is extremely common",
+              "Reinvest early profits instead of withdrawing — the goal is an asset that eventually replaces part of your monthly sending"
+            ],
+            actions:["Find Investment Options In My Home Country","Build My Family Business Structure","Generate My Land/Asset Verification Checklist","Calculate When Assets Could Replace My Remittances"],
+          },
+        ],
+      },
+      {
         id:"protectwealth", label:"Protect & Grow Wealth", icon:"🛡️",
         desc:"The defensive side of money — protect what you have while finding new ways to grow it.",
         tags:["All","Protection","Real Estate","Savings"],
@@ -1635,6 +1684,55 @@ const TOPIC_CONFIGS = {
         ],
       },
       {
+        id:"peoplepleasing", label:"People-Pleasing & Saying No", icon:"🚫",
+        desc:"Stop living for everyone else's comfort at the cost of your own life.",
+        tags:["All","Boundaries","Family","Work","Self-Worth"],
+        cards:[
+          {
+            id:"sayno", title:"How To Say No Without Guilt", badge:"Life-Changing", badgeColor:"#e05c6e",
+            tags:["Boundaries","Family","Work"],
+            tagline:"No is a complete sentence — but here's how to say it without destroying the relationship",
+            whyItWorks:"People-pleasers don't lack boundaries because they're weak — they lack them because they were taught that their value comes from being helpful, agreeable, and low-maintenance. Saying no feels dangerous because somewhere along the way, disappointing people felt like losing love. It wasn't weakness. It was a strategy that worked until it didn't.",
+            steps:[
+              "Pause before answering any request — 'Let me check and come back to you' buys you time to decide from choice, not reflex",
+              "The phrase: 'I won't be able to do that' — not 'I can't'. Can't implies helplessness. Won't is honest",
+              "You do not need to explain why. One sentence maximum: 'That doesn't work for me right now'",
+              "Expect pushback — the people who are most upset by your no are the ones who most depended on your yes",
+              "Practice with low-stakes situations first: small requests, small nos, build the muscle before the big moments"
+            ],
+            actions:["Generate My Saying-No Script","Find What I'm Afraid Will Happen If I Say No","Build My Boundary Practice Plan","Write A No For My Current Specific Situation"],
+          },
+          {
+            id:"whypeoplepleaser", title:"Why You Became A People-Pleaser", badge:"Root Cause", badgeColor:"#9b72cf",
+            tags:["Self-Worth","Boundaries"],
+            tagline:"You weren't born this way — something taught you that your needs come last",
+            whyItWorks:"People-pleasing is almost always learned in childhood or early relationships. A parent who only showed approval when you were agreeable. A home where conflict was dangerous. A community where putting yourself first was considered selfish. Understanding the origin doesn't excuse it — but it removes the shame from it and makes it much easier to change.",
+            steps:[
+              "Write: 'When I was growing up, I learned that expressing my needs was...' — complete the sentence honestly",
+              "Identify your specific people-pleasing pattern: do you over-explain, over-apologise, over-commit, or avoid conflict?",
+              "Notice the physical feeling — most people-pleasers feel it in the chest or stomach when they're about to say no. That sensation is information, not instruction",
+              "Separate caring about people from needing their approval — you can deeply love someone and still disagree with them",
+              "Write the cost: list what you've given up in the last 6 months by saying yes when you meant no"
+            ],
+            actions:["Trace My People-Pleasing Origin","Identify My Specific Pattern","Calculate What People-Pleasing Has Cost Me","Build My Self-Worth Foundation"],
+          },
+          {
+            id:"familyno", title:"Saying No To Family When You're The 'Responsible One'", badge:"Hard But Necessary", badgeColor:"#f0b429",
+            tags:["Family","Boundaries"],
+            tagline:"You cannot pour from an empty cup — even for the people you love most",
+            whyItWorks:"In many African, Asian, and immigrant families, the responsible child carries everyone. It's love — but it's also a system that only works until you break. The cultural weight makes this feel like betrayal. It isn't. Protecting your capacity to function is what allows you to actually help long-term — not just feel guilty while burning out.",
+            steps:[
+              "Acknowledge the love behind the obligation — this isn't about stopping caring, it's about sustainable caring",
+              "Get clear on what you can genuinely give without resentment — that number is your real limit, not the cultural expectation",
+              "Separate helping from rescuing — helping builds capacity, rescuing creates dependence",
+              "Have the conversation once, clearly, when no crisis is happening — not in the middle of a request",
+              "Build your own financial and emotional buffer first — you can't give what you don't have"
+            ],
+            actions:["Write My Family Boundary Script","Calculate What I Can Sustainably Give","Build My Conversation Plan","Find My Actual Capacity vs My Obligated Capacity"],
+          },
+        ],
+      },
+      {
         id:"dating", label:"Dating & Attraction", icon:"💘",
         desc:"What actually works in dating — attraction, confidence, communication, and connection.",
         tags:["All","Attraction","First Dates","Online Dating"],
@@ -1729,6 +1827,41 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Cognitive behavioral therapy research shows core beliefs operate below conscious awareness, shaping decisions automatically. Naming a belief immediately reduces its grip — you can't change what you can't see.",
             steps:["Complete this sentence 5 times: 'People like me don't...'","For each answer, ask: where did I learn this?","Ask: is this universally true, or true for my specific past?","Find one counter-example — someone like you who did the thing","Write a new, evidence-based belief to replace the old one"],
             actions:["Run My Full Belief Audit","Find Evidence Against My Limiting Belief","Build New Belief System","Generate Daily Affirmation Based On Real Evidence"],
+          },
+        ],
+      },
+      {
+        id:"impostersyndrome", label:"Imposter Syndrome", icon:"🎭",
+        desc:"The high-achiever's hidden enemy — feeling like a fraud even when the evidence says otherwise.",
+        tags:["All","Work","Career","Self-Worth"],
+        cards:[
+          {
+            id:"whatisimposter", title:"You Are Not A Fraud", badge:"Very Common", badgeColor:"#9b72cf",
+            tags:["Work","Self-Worth"],
+            tagline:"70% of people experience imposter syndrome — including the people you think have it all figured out",
+            whyItWorks:"Imposter syndrome is paradoxically most common among high achievers. The more competent you become, the more you're aware of what you don't know. Less competent people don't notice what they're missing — this is called the Dunning-Kruger effect. If you feel like a fraud, it's actually a reliable signal that you're paying close enough attention to know your own limits — which is the beginning of real expertise.",
+            steps:[
+              "Write your evidence: list every qualification, achievement, and piece of feedback that contradicts the fraud feeling",
+              "Separate feelings from facts: 'I feel unqualified' ≠ 'I am unqualified'. Feelings are real but they're not always accurate",
+              "Find the pattern: imposter syndrome tends to spike at transitions — new role, promotion, new environment. This is normal, not a sign you shouldn't be there",
+              "Talk to one trusted peer — you will almost certainly discover they feel the same way",
+              "Reframe: you don't need to feel confident to act confidently. Act first. The feeling follows the evidence, not the other way around"
+            ],
+            actions:["Build My Evidence File Against Imposter Syndrome","Find My Imposter Syndrome Trigger Pattern","Generate My Confidence Building Plan","Write My Accomplishments List"],
+          },
+          {
+            id:"imposterwork", title:"Imposter Syndrome At Work", badge:"Career Critical", badgeColor:"#ffd54f",
+            tags:["Work","Career"],
+            tagline:"When you're waiting to be 'found out' — what to do before the next meeting",
+            whyItWorks:"In work contexts, imposter syndrome leads to over-preparation (spending 3x longer than needed), under-asserting (not speaking in meetings even when you know the answer), and avoiding opportunities (turning down promotions or projects because you 'aren't ready'). Each of these behaviours actually reinforces the syndrome by preventing the evidence that would disprove it.",
+            steps:[
+              "In meetings: set yourself a rule — contribute once in the first 10 minutes, every time, regardless of how you feel",
+              "Stop over-preparing: set a time limit. When you hit it, you're done. Most of the extra preparation is anxiety management, not quality improvement",
+              "When praised, say 'thank you' — not 'it was nothing' or 'the team did it'. Practise receiving acknowledgment",
+              "Keep a 'wins file' — every positive email, feedback, or outcome. Open it before high-stakes situations",
+              "Volunteer for one thing slightly above your comfort level each month — this is the only cure for the feeling of not being ready"
+            ],
+            actions:["Build My Work Confidence Routine","Generate My Wins File","Find What's Stopping Me From Speaking Up","Create My Stretch Challenge Plan"],
           },
         ],
       },
@@ -1943,6 +2076,55 @@ const TOPIC_CONFIGS = {
         ],
       },
       {
+        id:"mealplanning", label:"Meal Planning On A Budget", icon:"🍳",
+        desc:"Eat well, spend less, waste nothing — practical meal planning for real life.",
+        tags:["All","Budget","Weekly Plan","Protein","Quick Meals"],
+        cards:[
+          {
+            id:"weeklymeals", title:"Plan A Full Week Of Meals In 20 Minutes", badge:"Game Changer", badgeColor:"#81c784",
+            tags:["Weekly Plan","Budget"],
+            tagline:"Stop deciding what to eat every day — decide once, execute all week",
+            whyItWorks:"Decision fatigue around food is real. People who plan meals spend 23% less on food, waste significantly less, and eat healthier — not because they have more willpower, but because the decision is already made before hunger (and bad choices) kick in. 20 minutes on Sunday prevents 21 individual 'what should I eat?' decisions across the week.",
+            steps:[
+              "Pick 3 dinner recipes maximum — repeat them. Variety is overrated when you're building a habit",
+              "Build around ONE protein that goes with everything this week: chicken thighs, eggs, or beans (cheapest, most versatile)",
+              "Write your full shopping list from the recipes before going to the market — zero impulse buying",
+              "Batch cook on Sunday: cook all your protein, chop all your vegetables, portion into containers",
+              "Breakfast and lunch = simple and identical all week. Reserve creativity and variety for dinner"
+            ],
+            actions:["Generate My Weekly Meal Plan","Build My Shopping List","Calculate My Weekly Food Budget","Find Budget Protein Sources In My Country"],
+          },
+          {
+            id:"cheapprotein", title:"High Protein Eating For Under $5 A Day", badge:"Budget Essential", badgeColor:"#f0b429",
+            tags:["Budget","Protein"],
+            tagline:"Muscle, energy, and satiety don't require expensive food — just the right choices",
+            whyItWorks:"Protein is the most important macronutrient for energy, muscle, and staying full. It's also the most expensive — unless you know which sources give the best protein per dollar. Eggs, canned fish, dried beans and lentils, chicken thighs, and groundnuts are consistently the highest protein-per-cost foods available in most African and Asian markets.",
+            steps:[
+              "Eggs: the most complete protein per cost in most markets — 6 eggs = ~36g protein for pennies",
+              "Dried beans and lentils: buy dry, soak overnight, cook in bulk — up to 18g protein per cup cooked",
+              "Canned sardines or tuna: ready immediately, no cooking, high protein, shelf-stable",
+              "Chicken thighs not breasts — thighs cost less, have more flavour, and almost the same protein content",
+              "Groundnuts/peanuts: 7g protein per handful, available everywhere, excellent as a snack or sauce base"
+            ],
+            actions:["Build My High-Protein Budget Meal Plan","Find Cheap Protein Sources Near Me","Calculate My Daily Protein Target","Generate My Weekly Shopping List"],
+          },
+          {
+            id:"quickmeals", title:"Meals Under 15 Minutes That Are Actually Good", badge:"Practical", badgeColor:"#4db6ac",
+            tags:["Quick Meals"],
+            tagline:"Real food fast — no recipes required, just a system",
+            whyItWorks:"Most people eat badly not because of lack of knowledge but because good food feels like it takes too long after a long day. The solution isn't willpower — it's a system that produces a decent meal in the same time it takes to order delivery. The key is keeping 5 ingredients always stocked that combine into at least 10 meals.",
+            steps:[
+              "Always have: eggs, onions, tomatoes, rice/yam/plantain, and one protein (canned fish, beans, or frozen chicken)",
+              "The 10-minute egg meal: scrambled eggs with tomatoes and onions over rice — complete nutrition, every time",
+              "The 12-minute bean meal: canned beans heated with onion, pepper, and any spice — serve with bread or rice",
+              "The 15-minute stir fry: any vegetable + any protein + soy sauce over rice — works with literally anything in the fridge",
+              "Batch your rice and starches: cook 3x what you need, refrigerate — reheat takes 2 minutes"
+            ],
+            actions:["Build My 5 Always-Stocked Ingredients List","Generate My 10 Fastest Meals","Plan My Weekly Quick Meal Rotation","Calculate Time I'll Save With This System"],
+          },
+        ],
+      },
+      {
         id:"nutrition", label:"Body Fuel & Nutrition", icon:"🥗",
         desc:"Eat for energy and results without restrictive diets or expensive supplements.",
         tags:["All","Budget","Muscle","Fat Loss"],
@@ -2033,6 +2215,55 @@ const TOPIC_CONFIGS = {
         ],
       },
       {
+        id:"sundayanxiety", label:"Sunday Anxiety & Work Dread", icon:"😰",
+        desc:"That sinking Sunday feeling — what it means and how to stop it running your life.",
+        tags:["All","Anxiety","Work","Weekly Reset"],
+        cards:[
+          {
+            id:"sundaydread", title:"Why Sunday Feels Like Dread", badge:"Very Common", badgeColor:"#64b5f6",
+            tags:["Anxiety","Work"],
+            tagline:"Sunday anxiety is your nervous system telling you something about Monday — listen to it",
+            whyItWorks:"Sunday anxiety (clinically called 'anticipatory anxiety') affects roughly 76% of working adults. It peaks between 4-6pm Sunday. It's not weakness — it's your brain running threat-detection on tomorrow. The problem isn't the feeling, it's what it's pointing at: a job that drains you, a boundary that's been crossed all week, or a to-do list that has no end.",
+            steps:[
+              "Don't fight the feeling — sit with it for 5 minutes and ask: what specifically am I dreading? Name the exact thing",
+              "Separate: is this about tomorrow specifically, or about the whole job/situation?",
+              "Do one small thing Sunday afternoon that closes the week — a 10-minute review of what you accomplished",
+              "Prepare one thing for Monday morning (lay out clothes, prep lunch, write your first task) — reduces uncertainty which drives anxiety",
+              "Create a Sunday evening ritual that belongs to you: a walk, a meal, a show — something that signals rest, not dread"
+            ],
+            actions:["Find What My Sunday Dread Is Actually About","Build My Sunday Evening Reset Ritual","Generate My Monday Morning Plan","Diagnose If This Is Anxiety Or A Job Problem"],
+          },
+          {
+            id:"wrongjob", title:"Is It Anxiety Or The Wrong Job?", badge:"Important Question", badgeColor:"#f0b429",
+            tags:["Work","Anxiety"],
+            tagline:"There's a difference between work being hard and work being wrong for you",
+            whyItWorks:"Normal work stress disappears on holiday and returns when you think about going back. The wrong job feels heavy even when nothing specific is wrong. Many people medicate the symptom (anxiety) without addressing the cause (a job that conflicts with their values, uses none of their strengths, or has an environment that's toxic). The distinction matters because the interventions are completely different.",
+            steps:[
+              "The holiday test: on day 3 of a holiday, when you think about going back — what's the specific feeling?",
+              "Is the dread about the work itself, the environment, or specific people? (each has a different solution)",
+              "Rate: does this job use your strengths more than 50% of the time? If no, that's structural mismatch, not anxiety",
+              "Have you felt this same dread in every job? If yes — it's anxiety. First job you've felt this in? It's the job",
+              "If it's the job: don't quit Monday morning. Build the exit plan first — but start building it now"
+            ],
+            actions:["Diagnose My Sunday Dread Source","Build My Exit Plan If It's The Wrong Job","Find Anxiety Management Tools If It's Anxiety","Generate My 6-Month Career Clarity Plan"],
+          },
+          {
+            id:"weekreset", title:"The Weekly Reset That Changes Everything", badge:"Try This Sunday", badgeColor:"#81c784",
+            tags:["Weekly Reset","Work"],
+            tagline:"30 minutes every Sunday that makes Monday feel like a choice, not a sentence",
+            whyItWorks:"The anxiety of Sunday comes largely from unfinished business and unknown territory. A structured weekly reset closes the prior week and opens the next one with intention — converting the feeling of 'the week is happening to me' into 'I'm happening to the week.' Used by high performers across every field.",
+            steps:[
+              "15 min: Close last week — what did you finish? What's incomplete? Move incomplete items to next week deliberately, not by accident",
+              "5 min: One thing you're proud of from the week — write it. Most people skip this. Don't",
+              "5 min: What drained you most this week? Note it — patterns emerge over 4-6 weeks",
+              "5 min: Three things you're doing Monday morning, in order. Just three. Not a full to-do list — three",
+              "End with something enjoyable — close the laptop and do something you chose"
+            ],
+            actions:["Build My Weekly Reset Template","Generate My Three Monday Priorities","Find My Weekly Energy Drain Patterns","Create My Sunday Evening Ritual"],
+          },
+        ],
+      },
+      {
         id:"gratitude", label:"Gratitude & Perspective", icon:"🌅",
         desc:"The science-backed practice of gratitude and how it physically changes your brain.",
         tags:["All","Daily Practice","Mindset","Resilience"],
@@ -2115,6 +2346,55 @@ const TOPIC_CONFIGS = {
         ],
       },
       {
+        id:"firstgen", label:"First-Generation Pressure", icon:"🏠",
+        desc:"Carrying your family on your back while trying to build your own life — the real weight of being first.",
+        tags:["All","Family","Identity","Money","Purpose"],
+        cards:[
+          {
+            id:"firstgenpressure", title:"The Weight of Being First", badge:"Real Talk", badgeColor:"#9b72cf",
+            tags:["Family","Identity"],
+            tagline:"You are not just building your life — you are building proof that it was worth the sacrifice",
+            whyItWorks:"First-generation professionals carry a unique psychological weight: the feeling that every decision is a referendum on whether the sacrifice was worth it. Failure feels like betrayal. Success creates guilt. Every purchase is scrutinised — by yourself and others. This is one of the most under-discussed sources of anxiety among ambitious people from developing countries and immigrant families.",
+            steps:[
+              "Name what you're carrying: make an actual list of the expectations, real and perceived, you feel responsible for",
+              "Separate what was asked of you from what you assumed — most first-gens are carrying obligations nobody explicitly placed on them",
+              "Understand the difference between honoring your roots and being consumed by them — both are possible; only one is sustainable",
+              "Have one honest conversation with a family member about what you actually need right now — most families don't know they're suffocating you",
+              "Give yourself permission to also be a person, not just a symbol — your wellbeing is part of what you owe them"
+            ],
+            actions:["Map What I'm Actually Carrying","Find Where My Pressure Is Real vs Assumed","Build My Honest Family Conversation","Design My Life That Honours Both Them And Me"],
+          },
+          {
+            id:"remitwealth", title:"Sending Money Home While Building Wealth", badge:"Africa & Diaspora", badgeColor:"#f0b429",
+            tags:["Money","Family"],
+            tagline:"How to support your family without destroying your own financial future",
+            whyItWorks:"Remittances are one of the largest financial flows in the world — and one of the most financially destructive for the senders. Not because giving is wrong, but because most people send without a plan, which means they never build their own buffer, never invest, and end up financially behind the people they're trying to help. The goal isn't to stop giving — it's to give sustainably.",
+            steps:[
+              "Set a fixed remittance amount — not 'whatever is left', not 'whatever they ask for'. A number you decide in advance",
+              "Pay yourself first before sending: your emergency fund and investment come before remittances, not after",
+              "Have the honest conversation: explain your constraints clearly once, not every month — remove the ongoing negotiation",
+              "Invest in income-generating assets back home (land, a small business) rather than only consumption spending",
+              "Track the total: most people who remit have never calculated the annual number. Write it down. It will change how you think about it"
+            ],
+            actions:["Calculate My Annual Remittance Total","Build My Sustainable Giving Plan","Find Investment Options Back Home","Generate My Family Financial Conversation Script"],
+          },
+          {
+            id:"guiltofgrowing", title:"The Guilt of Doing Well", badge:"Rarely Discussed", badgeColor:"#64b5f6",
+            tags:["Identity","Purpose"],
+            tagline:"Why success feels complicated when the people you love are still struggling",
+            whyItWorks:"Survivor's guilt isn't only for trauma — it shows up in first-generation success too. Enjoying your success feels wrong when siblings, cousins, or friends are still grinding. Spending money on yourself feels selfish. Celebrating feels like showing off. This guilt is understandable — but left unaddressed, it quietly sabotages your ability to actually enjoy or maximise the opportunities you worked for.",
+            steps:[
+              "Acknowledge the guilt without letting it make decisions for you — it's data, not instruction",
+              "Reframe: your thriving doesn't take anything away from people who are struggling. It's not a zero-sum game",
+              "Identify specifically what triggers the guilt — a certain purchase? A particular conversation? Knowing the trigger gives you options",
+              "Find one way to channel the guilt productively: mentorship, a specific contribution, an investment that helps someone else build",
+              "Give yourself explicit permission to be well — write it, say it, practise receiving good things without immediately apologising for them"
+            ],
+            actions:["Process My Success Guilt","Find A Productive Channel For My Guilt","Build My Contribution Plan","Design My Permission To Thrive"],
+          },
+        ],
+      },
+      {
         id:"selfknowledge", label:"Know Yourself Deeply", icon:"🔮",
         desc:"The Socratic foundation: you cannot build the right life if you don't know who you are.",
         tags:["All","Identity","Values","Strengths"],
@@ -2143,6 +2423,55 @@ const TOPIC_CONFIGS = {
   // ─── SKILLS & CAREER ──────────────────────────────────────────────────────
   skills: {
     topics: [
+      {
+        id:"freelancepricing", label:"Freelancer Pricing", icon:"💵",
+        desc:"Stop underpricing your skills — how to charge what you're worth and get paid on time.",
+        tags:["All","Pricing","Clients","Negotiation"],
+        cards:[
+          {
+            id:"chargemore", title:"Why You're Undercharging (And How To Stop)", badge:"Money Left On Table", badgeColor:"#ffd54f",
+            tags:["Pricing"],
+            tagline:"The gap between what you charge and what clients would pay is bigger than you think",
+            whyItWorks:"Freelancers systematically underprice for psychological reasons, not market reasons: fear of rejection, comparing to local salaries instead of value delivered, and pricing by time instead of outcome. Studies of freelance platforms show clients frequently associate low prices with low quality — meaning underpricing can actually lose you the exact clients you want.",
+            steps:[
+              "Calculate your real minimum: (monthly costs + savings target + tax) ÷ billable hours. Most freelancers have never done this and are unknowingly working below survival rate",
+              "Price the outcome, not the hours: a logo isn't 5 hours of work — it's the face of a business for the next decade",
+              "Raise prices with every new client until you get pushback on 1 in 3 quotes — that's when you've found market rate",
+              "Never give a price instantly — 'Let me put together a proposal' gives you time to price from strategy, not fear",
+              "Add a premium tier you think nobody will buy — its existence makes your standard tier look reasonable, and some clients WILL buy it"
+            ],
+            actions:["Calculate My Real Minimum Rate","Build My 3-Tier Pricing Structure","Generate My Price Increase Script For Existing Clients","Find Market Rates For My Skill In My Region"],
+          },
+          {
+            id:"getclients", title:"Get Clients Who Actually Pay Well", badge:"Client Quality", badgeColor:"#81c784",
+            tags:["Clients"],
+            tagline:"The problem isn't finding clients — it's finding the right ones",
+            whyItWorks:"Low-paying clients and high-paying clients live in completely different places and respond to completely different signals. Chasing volume on crowded platforms puts you in a race to the bottom against global competition. Positioning yourself where high-value clients already look — and speaking to outcomes they care about — completely changes the economics of freelancing.",
+            steps:[
+              "Niche down: 'graphic designer' competes with millions. 'Brand designer for African fintech startups' competes with dozens",
+              "Go where budgets live: LinkedIn and industry communities have clients with 10x the budget of gig platforms",
+              "Show outcomes, not skills: 'increased signups 40% with a landing page redesign' beats 'proficient in Figma'",
+              "Ask every happy client: 'who else do you know who needs this?' — referred clients negotiate less and pay faster",
+              "Fire your worst client every 6 months — the time freed up always gets filled with better work"
+            ],
+            actions:["Define My Profitable Niche","Rewrite My Positioning Statement","Build My Referral Ask Script","Generate My LinkedIn Outreach Plan"],
+          },
+          {
+            id:"getpaid", title:"Get Paid On Time, Every Time", badge:"Cash Flow", badgeColor:"#4db6ac",
+            tags:["Clients","Negotiation"],
+            tagline:"Late payments aren't a client problem — they're a systems problem",
+            whyItWorks:"Freelancers in Africa and globally lose enormous amounts to late and missing payments. The pattern is predictable: no deposit, no contract, unclear terms, then months of awkward follow-ups. Clients pay late when the cost of paying late is zero. Every element below raises that cost — politely, professionally, and before the work starts.",
+            steps:[
+              "50% deposit before any work starts — no exceptions, including friends and family. Serious clients never object to this",
+              "Written agreement every time — even a simple email: scope, price, timeline, payment terms. 'Per my email' wins disputes",
+              "Invoice immediately on delivery — every day you delay invoicing signals the payment isn't urgent",
+              "Late fee clause: 5% after 14 days, stated upfront in the agreement — you'll rarely need to enforce it because its existence works",
+              "For new clients: final files/access delivered only after final payment clears — watermarked previews until then"
+            ],
+            actions:["Generate My Payment Terms Template","Write My Deposit Request Script","Build My Invoice Follow-Up Sequence","Create My Simple Contract Template"],
+          },
+        ],
+      },
       {
         id:"careerpath", label:"Career Path", icon:"◇",
         desc:"Navigate your career with clarity, strategy, and data-backed decisions.",
@@ -2286,6 +2615,55 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Opportunity cost is the single most overlooked factor in major decisions. People compare a choice to doing nothing, when the real comparison should be to the next-best alternative use of that time or money.",
             steps:["Write down your decision and what it will cost in time and money","List the next-best alternative use of that same time and money","Compare realistic outcomes of both paths, not best-case fantasies","Factor in compounding — what does each path look like in 5 years?","Choose based on the full comparison, not just the option in front of you"],
             actions:["Calculate My Opportunity Cost","Compare My Two Options Side-By-Side","Project 5-Year Outcomes For Both Paths","Build Decision Matrix"],
+          },
+        ],
+      },
+      {
+        id:"japa", label:"Leave or Stay? The JAPA Decision", icon:"✈️",
+        desc:"The real calculation behind relocating — not just dreams, but the honest numbers and trade-offs.",
+        tags:["All","Africa","UK","Canada","Financial","Career"],
+        cards:[
+          {
+            id:"japacalc", title:"The Honest JAPA Calculation", badge:"Africa-Specific", badgeColor:"#64b5f6",
+            tags:["Africa","Financial"],
+            tagline:"Leaving isn't always better. Staying isn't always worse. Here's how to actually decide.",
+            whyItWorks:"JAPA decisions are almost always made on emotion and comparison — someone's Instagram abroad, family pressure, or frustration with local systems. Almost nobody does the actual calculation: true cost of relocation, realistic income abroad vs. purchasing power difference, career ceiling here vs. there, and what you'd be giving up that you can't get back. This card forces the honest math.",
+            steps:[
+              "Calculate your real cost of relocation: visa fees, flights, first 3 months living costs, emergency buffer — what's the actual number?",
+              "Research realistic starting salary in your target country for your exact role — not best case, median case",
+              "Convert to purchasing power: GBP 2,500/month in London after rent is often less comfortable than GHC 8,000/month in Accra",
+              "What is your ceiling here? Map the realistic 5-year trajectory if you stay and execute — don't compare your worst case here to their best case abroad",
+              "What do you lose? Family proximity, cultural comfort, existing network, local business opportunities — these have real value"
+            ],
+            actions:["Build My JAPA Financial Calculator","Map My 5-Year Trajectory If I Stay","Calculate True Cost Of My Target Country","Compare Purchasing Power Honestly"],
+          },
+          {
+            id:"japaready", title:"Are You Actually Ready To Leave?", badge:"Honest Assessment", badgeColor:"#f0b429",
+            tags:["Africa","Career"],
+            tagline:"The skills, savings, and mindset you actually need before you go",
+            whyItWorks:"Many people who struggle abroad weren't under-qualified for the destination — they were under-prepared for the transition. The gap isn't just financial (though that's real). It's psychological: isolation, racism, culture shock, the collapse of the social status they had at home. People who thrive abroad prepared for the full picture, not just the opportunity side.",
+            steps:[
+              "Financial readiness: you need 6 months of living costs in your target city saved before you leave — not 1 month",
+              "Professional readiness: research whether your qualifications are recognised in your target country — some aren't without conversion",
+              "Network readiness: do you know even 3 people in that city you could call at 10pm? If not, build this before you arrive",
+              "Psychological readiness: read honest accounts from people from your country living there — not highlight reels",
+              "Exit plan clarity: what would make you come back? Having a clear answer to this is a sign of clear thinking, not weakness"
+            ],
+            actions:["Build My JAPA Readiness Assessment","Calculate My Required Savings Target","Find Communities From My Country Abroad","Create My 18-Month Relocation Plan"],
+          },
+          {
+            id:"staywin", title:"If You Stay — How To Win Here", badge:"Underrated Path", badgeColor:"#81c784",
+            tags:["Africa","Financial","Career"],
+            tagline:"The people building the most meaningful wealth in Africa are the ones who stayed",
+            whyItWorks:"The most common regret among Africans abroad isn't that they left — it's that they left too early, before building the skills and capital that would have made them significantly more valuable and effective back home. The people building the most generational wealth in Ghana, Nigeria, Kenya, and South Africa right now are those who treated local constraints as puzzles to solve, not reasons to leave.",
+            steps:[
+              "Identify the gap in your local market that your skills could fill — constraints create niches that don't exist abroad",
+              "Build your Africa-relevant skill stack: languages, local networks, understanding of local systems and informal economies",
+              "Start the business or project you'd start abroad — but here, where your network and cultural intelligence are advantages",
+              "Target international clients while living locally — this gives you foreign currency with local cost of living (the best financial position)",
+              "Build the life you'd want to return to — many who leave spend their whole career abroad trying to get back to what they left"
+            ],
+            actions:["Find My Local Market Opportunity","Build My Africa-Specific Advantage Plan","Calculate Remote Income In Foreign Currency","Design My 5-Year Local Wealth Plan"],
           },
         ],
       },
@@ -7089,6 +7467,25 @@ Create a 12-month roadmap with: Quarterly milestones, monthly focus areas, weekl
 Their situation: ${p.goals||p.bigGoal}. Blockers: ${p.challenge||"not specified"}.
 Cover: Their decision-making style and blind spots, a personal decision framework for major life choices, how to overcome analysis paralysis, and a framework for the most important decision they face right now.`,
   },
+
+  relocate: {
+    title:"Relocation Intelligence",icon:"🌍",subtitle:"Find the best country for your next chapter",
+    // Note: routing renders the dedicated RelocationExplorer component for this tool.
+    // This prompt is a fallback for anything that calls MODULE_CONFIGS.relocate.prompt directly.
+    prompt:(p)=>{
+      const name    = p?.name    || "this person";
+      const from    = p?.country || "their current country";
+      const goals   = p?.goals   || p?.bigGoal || "better opportunities";
+      return "Write a personal relocation intelligence overview for " + name + " from " + from + " whose goal is: " + goals + ". Give a direct verdict on relocate vs stay, three matching countries with visa names and realistic monthly costs, and a six month preparation plan. Be specific with real numbers.";
+    }
+  },
+
+  advisor: {
+    title:"AI Coach",icon:"🤖",subtitle:"Your personal AI life coach — ask anything",
+    prompt:(p)=>`You are DestinIQ's personal AI coach having a deep 1-on-1 conversation with ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}).
+Their goals: ${p.goals||p.bigGoal||"personal growth"}. Main challenge: ${p.challenge||"not specified"}. Focus: ${p.focus||"life improvement"}.
+Give them a powerful, personalized coaching session. Ask one deep question that helps them see their situation more clearly. Then provide your honest coach assessment. Be direct, warm, and genuinely helpful.`
+  },
 };
 
 // ── GenericAIModule renderer ────────────────────────────────────────────────
@@ -7736,26 +8133,6 @@ function AuthScreen({onAuth, onBack}){
     border:"1px solid "+G.inpBorder,borderRadius:12,color:G.cream,
     fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit",
     transition:"border-color .2s",
-  relocate: {
-    title:"Relocation Intelligence",icon:"🌍",subtitle:"Find the best country for your next chapter",
-    prompt:(p)=>{
-      const name    = p?.name    || "this person";
-      const age     = p?.age     || "an adult";
-      const from    = p?.country || "their current country";
-      const goals   = p?.goals   || p?.bigGoal || "better opportunities and a better quality of life";
-      const income  = p?.income  || "not specified";
-      const job     = p?.occupation || "not specified";
-      const blocker = p?.challenge  || "not specified";
-      return "Write a detailed personal relocation intelligence report for " + name + ", aged " + age + ", currently living in " + from + ". Their career: " + job + ". Monthly income level: " + income + ". Life goal: " + goals + ". Main challenge: " + blocker + ". Write everything in flowing paragraphs without bullet points or headers. Cover four things: First, give a direct honest verdict on whether they should relocate or stay and exactly why, considering their income, job, age and country. Second, name three specific countries that genuinely match their background, and for each one give the actual visa name and specific requirements, realistic monthly costs in USD for rent plus food plus transport in a real city you name, and the salary range they could realistically earn in their field. Third, give a month by month six month plan starting from today showing exactly what to save, what documents to prepare, which communities to join online, and what skills to build before the move. Fourth, share the single most important thing that people from " + from + " consistently overlook when trying to relocate, and what separates those who succeed from those who fail. Be specific. Use real numbers. Name real cities and real visa programs.";
-    }
-  },
-
-  advisor: {
-    title:"AI Coach",icon:"🤖",subtitle:"Your personal AI life coach — ask anything",
-    prompt:(p)=>`You are DestinIQ's personal AI coach having a deep 1-on-1 conversation with ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}).
-Their goals: ${p.goals||p.bigGoal||"personal growth"}. Main challenge: ${p.challenge||"not specified"}. Focus: ${p.focus||"life improvement"}.
-Give them a powerful, personalized coaching session. Ask one deep question that helps them see their situation more clearly. Then provide your honest coach assessment. Be direct, warm, and genuinely helpful.`
-  }
 };
 
   const showEmailForm = tab==="email" && (mode==="login"||mode==="signup");
