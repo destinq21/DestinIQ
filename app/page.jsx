@@ -5479,6 +5479,7 @@ function RenderMD({text,style={}}){
 
 // ─── SUPPORT WIDGET ───────────────────────────────────────────────────────────
 function SupportWidget(){
+  const G = useThemeColors();
   const [open,setOpen]=useState(false);
   const [tab,setTab]=useState("chat");
   const [msgs,setMsgs]=useState([{role:"assistant",text:"Hi! I'm the DestinIQ support assistant. Ask me anything about the app, your account, payments, or how features work."}]);
