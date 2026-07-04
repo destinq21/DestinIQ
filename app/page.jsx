@@ -247,7 +247,19 @@ class ErrorBoundary extends React.Component {
 
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
+  {
+    auth: {
+      // PKCE: OAuth returns a ?code= (robust through Android deep links,
+      // unlike #fragment tokens which can get stripped). The code_verifier
+      // is stored in this WebView because sign-in starts here — so the
+      // exchange completes inside the app.
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  }
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -17344,19 +17356,24 @@ function DestinIQInner(){
       // Close in-app browser first — do this regardless of outcome
       try{ window?.Capacitor?.Plugins?.Browser?.close?.(); }catch{}
 
+      const finishLogin=()=>{
+        // Session is set — reload so restoreUserSession takes over and
+        // the login screen is replaced by the dashboard.
+        try{ window.location.replace(window.location.origin); }catch{ window.location.reload(); }
+      };
       if(access_token && refresh_token){
-        // Implicit flow — set session directly
         const{error}=await supabase.auth.setSession({access_token,refresh_token});
-        if(error) console.warn("Deep link auth (implicit):",error.message);
+        if(error){ alert("Sign-in failed (session): "+error.message); return; }
+        finishLogin();
       } else if(code){
-        // PKCE flow — exchange code for session
         try{
           const{error}=await supabase.auth.exchangeCodeForSession(code);
-          if(error) console.warn("Deep link auth (PKCE):",error.message);
-        }catch(e){ console.warn("Code exchange failed:",e); }
+          if(error){ alert("Sign-in failed (exchange): "+error.message); return; }
+          finishLogin();
+        }catch(e){ alert("Sign-in failed: "+(e?.message||e)); }
       } else {
-        // Let Supabase try to detect from the URL itself
-        try{ await supabase.auth.getSession(); }catch{}
+        // No tokens in the link — show what arrived so we can diagnose
+        alert("Sign-in link had no tokens. URL: "+String(url).slice(0,120));
       }
     }).then(l=>{listener=l;}).catch(()=>{});
     return()=>{ try{listener?.remove?.();}catch{} };
