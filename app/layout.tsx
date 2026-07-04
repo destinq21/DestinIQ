@@ -5,11 +5,11 @@ export const metadata: Metadata = {
   title: "DestinIQ — Personal Intelligence Platform",
   description: "AI-powered personal intelligence. Know your strengths, blind spots, and next move.",
   icons: {
-    icon: "/favicon-32.png",
-    shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    icon: "/favicon-32.png?v=2",
+    shortcut: "/favicon.ico?v=2",
+    apple: "/apple-touch-icon.png?v=2",
   },
-  manifest: "/manifest.json",
+  manifest: "/manifest.json?v=2",
   openGraph: {
     title: "DestinIQ — Personal Intelligence Platform",
     description: "AI that knows your next move before you do.",
