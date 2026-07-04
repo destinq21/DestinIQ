@@ -8570,6 +8570,10 @@ function AuthScreen({onAuth, onBack}){
             <span style={{color:G.gold,cursor:"pointer"}} onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))}>Privacy Policy</span>
           </p>
         )}
+        {/* Build stamp — verifies which code version the device is running */}
+        <div style={{textAlign:"center",fontSize:9,color:G.dimmer,opacity:0.5,marginTop:10,fontFamily:"monospace"}}>
+          v-oauth-pkce-2
+        </div>
       </div>
     </div>
   );
@@ -17332,6 +17336,7 @@ function DestinIQInner(){
     if(!CapApp) return;
     let listener = null;
     CapApp.addListener("appUrlOpen",async({url})=>{
+      alert("🔗 Link received by app:\n"+String(url||"(empty)").slice(0,140)); // TEMP debug tracer
       if(!url) return;
       // Parse both hash (#) and query string (?) — Supabase may use either
       let access_token = null, refresh_token = null, code = null;
