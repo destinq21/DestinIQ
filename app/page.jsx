@@ -17385,9 +17385,23 @@ function DestinIQInner(){
           const dbLast    = profile.last_checkin_date || fdLast;
           const localLast = (() => { try{ return localStorage.getItem(`destiniq_checkin_${u.id}`)||""; }catch{return "";} })();
           const localStreak = (() => { try{ const s=localStorage.getItem(`diq_streak_${u.id}`); return s?parseInt(s):0; }catch{return 0;} })();
-          const lastSeen  = [dbLast, localLast, fdLast].filter(Boolean).sort().pop() || "";
+          // Wins are presence too — compute the consecutive-day streak from win
+          // history so past win-logging days count retroactively.
+          let winStreak=0, winLast="";
+          try{
+            const wds=[...new Set((loadWins(u.id)||[]).map(w=>w.date).filter(Boolean))].sort().reverse();
+            winLast=wds[0]||"";
+            if(winLast===today||winLast===yesterday){
+              let cursor=new Date(winLast+"T12:00:00");
+              for(const d of wds){
+                if(d===cursor.toISOString().slice(0,10)){ winStreak++; cursor=new Date(cursor.getTime()-86400000); }
+                else break;
+              }
+            }
+          }catch{}
+          const lastSeen  = [dbLast, localLast, fdLast, winLast].filter(Boolean).sort().pop() || "";
           // Take highest streak from all sources (most reliable)
-          const bestStreak = Math.max(savedStreak, localStreak, 1);
+          const bestStreak = Math.max(savedStreak, localStreak, winStreak, 1);
 
           // ── LOCAL-FIRST TRUST ─────────────────────────────────────────────
           // If handleCI already counted today or yesterday on THIS device,
