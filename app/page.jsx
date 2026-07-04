@@ -4911,6 +4911,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   const G = useThemeColors();
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
+  const [commit,setCommit]=useState("");
   const [loading,setLoading]=useState(false);const [error,setError]=useState("");
   const todayStr = new Date().toISOString().slice(0,10);
   const ciResultKey = `diq_ci_result_${userId}_${todayStr}`;
@@ -4923,6 +4924,14 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
     if(!feeling||!did.trim()) return;
     setLoading(true);setError("");
     const entry={feeling,score,did,avoided};
+    // Save tomorrow's commitment for the follow-up loop
+    try{
+      if(commit.trim()&&userId){
+        localStorage.setItem(`diq_commit_${userId}`, JSON.stringify({
+          text:commit.trim().slice(0,140), date:new Date().toISOString().slice(0,10), done:false, asked:""
+        }));
+      }
+    }catch{}
     const memCtx=buildMemoryContext(userId);
     pushToMemory(userId,"user",`Check-in: ${score}/10, ${feeling}, did="${did}"`);
     try{
@@ -5096,6 +5105,18 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
             </div>
             <textarea value={avoided} onChange={e=>setAvoided(e.target.value)} rows={2}
               placeholder="Procrastinating on something? A hard decision? Leave it blank if not."
+              style={iStyle}
+              onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
+              onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
+          </div>
+
+          {/* One thing tomorrow — feeds the accountability follow-up */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:8}}>
+              One thing you'll do tomorrow <span style={{color:G.dimmer,fontWeight:400}}>(optional — I'll check in on it)</span>
+            </div>
+            <textarea value={commit} onChange={e=>setCommit(e.target.value)} rows={2}
+              placeholder="e.g. Message that client about the invoice"
               style={iStyle}
               onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
               onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
@@ -12147,6 +12168,132 @@ function pickSmartHook(userId){
   }catch{ return null; }
 }
 
+// ── ACCOUNTABILITY FOLLOW-UP — "you said you'd do this" card ─────────────────
+function FollowUpCard({userId, G, card}){
+  const [entry,setEntry]=useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(`diq_commit_${userId}`)||"null"); }catch{ return null; }
+  });
+  const todayKey=new Date().toISOString().slice(0,10);
+  if(!entry||!entry.text||entry.done) return null;
+  if(entry.date>=todayKey) return null;          // committed today — ask tomorrow
+  if(entry.asked===todayKey) return null;        // already answered "not yet" today
+  const save=(e2)=>{ setEntry(e2); try{ localStorage.setItem(`diq_commit_${userId}`,JSON.stringify(e2)); }catch{} };
+  const yes=()=>{
+    save({...entry,done:true});
+    try{ addProgressPoints(userId,"followup_done",3); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"🎉 You said it, you did it. +3 points."})); }catch{}
+  };
+  const notYet=()=>{
+    save({...entry,asked:todayKey});
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"No shame — it carries to tomorrow. Small steps count."})); }catch{}
+  };
+  return(
+    <div style={{...card,marginBottom:14,border:"1px solid rgba(240,180,41,0.25)",
+      background:"linear-gradient(135deg,rgba(240,180,41,0.07),rgba(0,0,0,0))"}}>
+      <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>YOUR WORD TO YOURSELF</div>
+      <div style={{fontSize:14,color:G.cream,lineHeight:1.6,marginBottom:14}}>
+        You said you'd: <span style={{fontWeight:700}}>"{entry.text}"</span>
+        <span style={{color:G.dim}}> — did it happen?</span>
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={yes} style={{flex:1,background:G.gold,color:"#000",border:"none",
+          borderRadius:10,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+          ✓ Done it
+        </button>
+        <button onClick={notYet} style={{flex:1,background:"rgba(255,255,255,0.05)",color:G.dim,
+          border:"1px solid "+G.border,borderRadius:10,padding:"11px",fontSize:13,fontWeight:600,
+          cursor:"pointer",fontFamily:"inherit"}}>
+          Not yet
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── WEEKLY REVEAL — Sunday/Monday week-in-review ─────────────────────────────
+function WeeklyRevealCard({userId, G, card, setNav}){
+  const day=new Date().getDay();
+  if(day!==0&&day!==1) return null; // Sunday + Monday only
+  let ci7=0, wins=0;
+  try{
+    const log=getMomentumLog(userId)||[];
+    const weekAgo=Date.now()-7*86400000;
+    ci7=log.filter(e=>{ const t=new Date(e.date||0).getTime(); return t>weekAgo; }).length;
+  }catch{}
+  try{ wins=(loadWins(userId)||[]).length; }catch{}
+  return(
+    <div style={{...card,marginBottom:14,border:"1px solid rgba(155,114,207,0.3)",
+      background:"linear-gradient(135deg,rgba(155,114,207,0.10),rgba(0,0,0,0))"}}>
+      <div style={{fontSize:9,color:"#b794e0",letterSpacing:".12em",fontFamily:"monospace",marginBottom:12}}>✦ YOUR WEEK IN REVIEW</div>
+      <div style={{display:"flex",gap:18,marginBottom:14,flexWrap:"wrap"}}>
+        <div><span style={{fontSize:22,fontWeight:800,color:G.cream}}>{ci7}</span><span style={{fontSize:11,color:G.dim}}> check-ins this week</span></div>
+        <div><span style={{fontSize:22,fontWeight:800,color:G.cream}}>{wins}</span><span style={{fontSize:11,color:G.dim}}> wins logged all-time</span></div>
+      </div>
+      <button onClick={()=>setNav("tool:advisor")}
+        style={{background:"rgba(155,114,207,0.18)",border:"1px solid rgba(155,114,207,0.4)",
+          color:"#c9a6ee",borderRadius:10,padding:"10px 18px",fontSize:12,fontWeight:700,
+          cursor:"pointer",fontFamily:"inherit"}}>
+        Ask your coach about this week →
+      </button>
+    </div>
+  );
+}
+
+// ── TODAY'S CARD — one rotating daily pick from the whole library ────────────
+let _allCardsCache=null;
+function getTodaysCard(){
+  try{
+    if(!_allCardsCache){
+      _allCardsCache=[];
+      Object.entries(TOPIC_CONFIGS).forEach(([catId,cfg])=>{
+        (cfg.topics||[]).forEach(t=>(t.cards||[]).forEach(c=>{
+          _allCardsCache.push({catId, topicId:t.id, topicLabel:t.label, icon:t.icon, title:c.title, tagline:c.tagline||""});
+        }));
+      });
+    }
+    if(!_allCardsCache.length) return null;
+    const seed=Number(new Date().toISOString().slice(0,10).replace(/-/g,""))%_allCardsCache.length;
+    return _allCardsCache[seed];
+  }catch{ return null; }
+}
+function TodaysCardBanner({G, card, setNav}){
+  const tc=getTodaysCard();
+  if(!tc) return null;
+  return(
+    <button onClick={()=>setNav(`topic:${tc.catId}.${tc.topicId}`)}
+      style={{...card,marginBottom:14,width:"100%",textAlign:"left",cursor:"pointer",fontFamily:"inherit",
+        display:"flex",alignItems:"center",gap:14,border:"1px solid "+G.border}}>
+      <span style={{fontSize:24,flexShrink:0}}>🎴</span>
+      <span style={{flex:1}}>
+        <span style={{display:"block",fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:4}}>TODAY'S CARD · {tc.topicLabel.toUpperCase()} · GONE AT MIDNIGHT</span>
+        <span style={{display:"block",fontSize:14,fontWeight:700,color:G.cream}}>{tc.title}</span>
+        {tc.tagline&&<span style={{display:"block",fontSize:11,color:G.dim,marginTop:3,lineHeight:1.5}}>{tc.tagline.slice(0,90)}</span>}
+      </span>
+      <span style={{fontSize:18,color:G.gold,flexShrink:0}}>→</span>
+    </button>
+  );
+}
+
+// ── IDENTITY STRIP — what you've built here ──────────────────────────────────
+function IdentityStrip({userId, streak, G}){
+  let wins=0, habits=0;
+  try{ wins=(loadWins(userId)||[]).length; }catch{}
+  try{
+    const h=JSON.parse(localStorage.getItem(`diq_hab_${userId}`)||"{}");
+    habits=Object.values(h).filter(x=>x?.committed).length;
+  }catch{}
+  if(!wins&&!habits&&!(streak>1)) return null;
+  return(
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+      {[streak>1&&`🔥 Day ${streak}`, wins>0&&`🏆 ${wins} win${wins!==1?"s":""}`, habits>0&&`⚡ ${habits} practice${habits!==1?"s":""} committed`]
+        .filter(Boolean).map(t=>(
+        <span key={t} style={{fontSize:11,fontWeight:600,color:G.dim,padding:"6px 12px",
+          background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,borderRadius:20}}>{t}</span>
+      ))}
+    </div>
+  );
+}
+
 function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight}){
   const hour = new Date().getHours();
   const timeGreet = hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
@@ -12288,6 +12435,12 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
           </div>
         </div>
 
+        {/* ══ IDENTITY STRIP + FOLLOW-UP + WEEKLY REVEAL ══ */}
+        <IdentityStrip userId={userId} streak={streak} G={G}/>
+        <FollowUpCard userId={userId} G={G} card={card}/>
+        <WeeklyRevealCard userId={userId} G={G} card={card} setNav={setNav}/>
+        <TodaysCardBanner G={G} card={card} setNav={setNav}/>
+
         {/* ══ SMART HOOK — context-aware nudge (day + time aware) ══ */}
         {(()=>{
           const hook = pickSmartHook(userId);
@@ -12359,49 +12512,6 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
             </div>
           </div>
         )}
-
-        {/* ══ 6. GROWTH SNAPSHOT ══ */}
-        <div style={{...card,marginBottom:14}}>
-          <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:14,textTransform:"uppercase"}}>Growth Snapshot</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-            {[
-              {icon:"🔥",label:"Day Streak",  val:streak||0,   unit:"days",  color:"#ff8a65"},
-              {icon:"⚡",label:"Check-ins",   val:log.length||0,unit:"total", color:G.gold},
-              {icon:"📊",label:"Life Score",  val:overall,     unit:"/100",  color:"#64b5f6"},
-            ].map(({icon,label,val,unit,color})=>(
-              <div key={label} style={{textAlign:"center",padding:"14px 8px",
-                background:"rgba(255,255,255,0.02)",borderRadius:12,
-                border:"1px solid rgba(255,255,255,0.04)"}}>
-                <div style={{fontSize:20,marginBottom:5}}>{icon}</div>
-                <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color,lineHeight:1,marginBottom:3}}>
-                  {val}<span style={{fontSize:10,color:G.dimmer,fontWeight:400}}>{unit}</span>
-                </div>
-                <div style={{fontSize:10,color:G.dimmer}}>{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ══ 7. AI RECOMMENDED NEXT STEP (one action only) ══ */}
-        <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.06),rgba(240,180,41,0.02))",
-          border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"22px",
-          display:"flex",alignItems:"center",justifyContent:"space-between",
-          gap:16,flexWrap:"wrap"}}>
-          <div style={{flex:1,minWidth:160}}>
-            <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:9}}>AI RECOMMENDS</div>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-              <span style={{fontSize:20}}>{recom.icon}</span>
-              <span style={{fontSize:15,fontWeight:700,color:G.cream}}>{recom.label}</span>
-            </div>
-            <p style={{fontSize:12,color:G.dim,lineHeight:1.6,margin:0}}>{recom.desc}</p>
-          </div>
-          <button onClick={()=>setNav("tool:"+recom.id)}
-            style={{background:G.gold,color:"#000",border:"none",borderRadius:10,
-              padding:"12px 22px",fontSize:13,fontWeight:700,cursor:"pointer",
-              fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>
-            Start Now →
-          </button>
-        </div>
 
         {/* Upgrade nudge (free users only) */}
         {!isPaid&&(
@@ -17281,14 +17391,31 @@ function DestinIQInner(){
             // not on mere visit — one source of truth, no double-increment races.
             setStreak(bestStreak);
           } else {
-            // Missed a day — streak broken, reset to 1
-            setStreak(1);
-            supabase.from("user_profiles").upsert({
-              user_id: u.id, streak: 1,
-              updated_at: new Date().toISOString(),
-            }, {onConflict:"user_id"}).catch(()=>{});
-            // Also update localStorage so next restore agrees
-            try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
+            // Missed day(s). If exactly ONE day was missed and this month's
+            // Streak Shield is unused — auto-protect the streak.
+            const twoDaysAgo = new Date(Date.now()-2*86400000).toISOString().slice(0,10);
+            const monthKey = today.slice(0,7);
+            let shieldUsed = "";
+            try{ shieldUsed = localStorage.getItem(`diq_shield_used_${u.id}`)||""; }catch{}
+            if(lastSeen===twoDaysAgo && shieldUsed!==monthKey && bestStreak>=3){
+              // 🛡️ Shield consumes — streak survives
+              setStreak(bestStreak);
+              try{ localStorage.setItem(`diq_shield_used_${u.id}`, monthKey); }catch{}
+              try{ localStorage.setItem(`diq_streak_${u.id}`, String(bestStreak)); }catch{}
+              setTimeout(()=>{ try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"🛡️ Streak Shield used — your "+bestStreak+"-day streak is safe. (1 per month)"})); }catch{} }, 1200);
+              supabase.from("user_profiles").upsert({
+                user_id: u.id, streak: bestStreak,
+                updated_at: new Date().toISOString(),
+              }, {onConflict:"user_id"}).catch(()=>{});
+            } else {
+              // Streak broken — reset to 1
+              setStreak(1);
+              supabase.from("user_profiles").upsert({
+                user_id: u.id, streak: 1,
+                updated_at: new Date().toISOString(),
+              }, {onConflict:"user_id"}).catch(()=>{});
+              try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
+            }
           }
         }
         if (profile.form_data){
