@@ -8572,7 +8572,7 @@ function AuthScreen({onAuth, onBack}){
         )}
         {/* Build stamp — verifies which code version the device is running */}
         <div style={{textAlign:"center",fontSize:9,color:G.dimmer,opacity:0.5,marginTop:10,fontFamily:"monospace"}}>
-          v-oauth-pkce-2
+          v-oauth-pkce-3
         </div>
       </div>
     </div>
@@ -17333,7 +17333,8 @@ function DestinIQInner(){
     if(!isNative) return;
     // Access Capacitor plugins via global (no import needed — avoids build errors)
     const CapApp = window?.Capacitor?.Plugins?.App;
-    if(!CapApp) return;
+    if(!CapApp){ alert("⚠️ App plugin missing — deep links can't reach the app. Run: npm install @capacitor/app && npx cap sync android, then rebuild APK."); return; }
+    alert("✅ Deep-link listener armed (v2)"); // TEMP — confirms handler is alive
     let listener = null;
     const handleAuthUrl = async(url)=>{
       alert("🔗 Link received by app:\n"+String(url||"(empty)").slice(0,140)); // TEMP debug tracer
