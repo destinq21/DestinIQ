@@ -8602,7 +8602,7 @@ function AuthScreen({onAuth, onBack}){
         )}
         {/* Build stamp — verifies which code version the device is running */}
         <div style={{textAlign:"center",fontSize:9,color:G.dimmer,opacity:0.5,marginTop:10,fontFamily:"monospace"}}>
-          v-err-probe-4
+          v-oauth-final-5
         </div>
       </div>
     </div>
@@ -17514,15 +17514,23 @@ function DestinIQInner(){
         alert("Sign-in link had no tokens. URL: "+String(url).slice(0,120));
       }
     };
-    // Warm path: link arrives while the app is running
-    CapApp.addListener("appUrlOpen",({url})=>{ handleAuthUrl(url); })
-      .then(l=>{listener=l;}).catch(()=>{});
+    // Warm path: link arrives while the app is running.
+    // Compat: newer Capacitor returns a Promise from addListener, older
+    // versions return the handle directly — support both, never call .then blindly.
+    try{
+      const ret = CapApp.addListener("appUrlOpen",({url})=>{ handleAuthUrl(url); });
+      if(ret && typeof ret.then==="function"){ ret.then(l=>{listener=l;}).catch(()=>{}); }
+      else{ listener = ret; }
+    }catch{}
     // Cold path: the link LAUNCHED the app (or the WebView reloaded and the
     // event fired before this listener existed) — fetch the launch URL directly.
     try{
-      CapApp.getLaunchUrl?.().then(r=>{
-        if(r?.url && /code=|access_token=/.test(r.url)) handleAuthUrl(r.url);
-      }).catch(()=>{});
+      const lr = CapApp.getLaunchUrl?.();
+      if(lr && typeof lr.then==="function"){
+        lr.then(r=>{ if(r?.url && /code=|access_token=/.test(r.url)) handleAuthUrl(r.url); }).catch(()=>{});
+      } else if(lr?.url && /code=|access_token=/.test(lr.url)){
+        handleAuthUrl(lr.url);
+      }
     }catch{}
     return()=>{ try{listener?.remove?.();}catch{} };
   },[]);
