@@ -245,21 +245,6 @@ class ErrorBoundary extends React.Component {
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
 // Capacitor plugins accessed via window.Capacitor.Plugins (no imports needed)
 
-// TEMP DEBUG: surface uncaught errors on native (phone console is unreachable)
-if(typeof window!=="undefined"){
-  try{
-    if(window?.Capacitor?.isNativePlatform?.() && !window.__diqErrHook){
-      window.__diqErrHook = true;
-      window.addEventListener("error",(e)=>{
-        try{ alert("💥 App error:\n"+(e?.message||"?")+"\n"+String(e?.error?.stack||"").slice(0,300)); }catch{}
-      });
-      window.addEventListener("unhandledrejection",(e)=>{
-        try{ alert("💥 Promise error:\n"+String(e?.reason?.message||e?.reason||"?").slice(0,300)); }catch{}
-      });
-    }
-  }catch{}
-}
-
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
@@ -8600,10 +8585,6 @@ function AuthScreen({onAuth, onBack}){
             <span style={{color:G.gold,cursor:"pointer"}} onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))}>Privacy Policy</span>
           </p>
         )}
-        {/* Build stamp — verifies which code version the device is running */}
-        <div style={{textAlign:"center",fontSize:9,color:G.dimmer,opacity:0.5,marginTop:10,fontFamily:"monospace"}}>
-          v-oauth-final-5
-        </div>
       </div>
     </div>
   );
@@ -17465,11 +17446,9 @@ function DestinIQInner(){
     if(!isNative) return;
     // Access Capacitor plugins via global (no import needed — avoids build errors)
     const CapApp = window?.Capacitor?.Plugins?.App;
-    if(!CapApp){ alert("⚠️ App plugin missing — deep links can't reach the app. Run: npm install @capacitor/app && npx cap sync android, then rebuild APK."); return; }
-    alert("✅ Deep-link listener armed (v2)"); // TEMP — confirms handler is alive
+    if(!CapApp){ console.warn("@capacitor/app plugin missing — OAuth deep links unavailable"); return; }
     let listener = null;
     const handleAuthUrl = async(url)=>{
-      alert("🔗 Link received by app:\n"+String(url||"(empty)").slice(0,140)); // TEMP debug tracer
       if(!url) return;
       // Parse both hash (#) and query string (?) — Supabase may use either
       let access_token = null, refresh_token = null, code = null;
@@ -17501,17 +17480,17 @@ function DestinIQInner(){
       };
       if(access_token && refresh_token){
         const{error}=await supabase.auth.setSession({access_token,refresh_token});
-        if(error){ alert("Sign-in failed (session): "+error.message); return; }
+        if(error){ alert("Sign-in didn't complete — please try again."); console.warn("setSession:",error.message); return; }
         finishLogin();
       } else if(code){
         try{
           const{error}=await supabase.auth.exchangeCodeForSession(code);
-          if(error){ alert("Sign-in failed (exchange): "+error.message); return; }
+          if(error){ alert("Sign-in didn't complete — please try again."); console.warn("exchange:",error.message); return; }
           finishLogin();
-        }catch(e){ alert("Sign-in failed: "+(e?.message||e)); }
+        }catch(e){ alert("Sign-in didn't complete — please try again."); console.warn("oauth:",e?.message||e); }
       } else {
-        // No tokens in the link — show what arrived so we can diagnose
-        alert("Sign-in link had no tokens. URL: "+String(url).slice(0,120));
+        // No tokens in the link — log for diagnosis, stay quiet for the user
+        console.warn("OAuth link had no tokens:",String(url).slice(0,140));
       }
     };
     // Warm path: link arrives while the app is running.
