@@ -10386,6 +10386,19 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
     const updated=[win,...wins];
     setWins(updated);
     saveWins(updated, userId); // localStorage (instant)
+    // ── Showing up counts: logging a win keeps the daily streak alive too ──
+    // (handleCI has a once-per-day guard, so this can never double-count)
+    if(userId){
+      try{
+        const ciToday=new Date().toISOString().slice(0,10);
+        localStorage.setItem(`destiniq_checkin_${userId}`, ciToday);
+        supabase.from("user_profiles").upsert({
+          user_id:userId, last_checkin_date:ciToday,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"user_id"}).catch(()=>{});
+        window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
+      }catch{}
+    }
     // Supabase backup — save wins inside form_data._wins
     if(userId){
       supabase.from("user_profiles").select("form_data").eq("user_id",userId).single()
@@ -10453,7 +10466,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10}}>
             <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"var(--gold)",lineHeight:1}}>{currentStreak}</div>
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>DAY STREAK 🔥</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>WIN STREAK 🏆</div>
           </div>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(20,184,154,0.06)",border:"1px solid rgba(20,184,154,0.2)",borderRadius:10}}>
             <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"var(--teal)",lineHeight:1}}>{totalWins}</div>
