@@ -757,10 +757,19 @@ async function testNotification(name){
       if(!LN) return false;
       const perm = await LN.requestPermissions();
       if(perm?.display!=="granted"&&perm?.notifications!=="granted") return false;
+      // The channel MUST exist before scheduling on it (Android 8+ silently
+      // drops notifications sent to unknown channels). Safe to call repeatedly.
+      try{
+        await LN.createChannel({
+          id:"destiniq-daily", name:"Daily Reminders",
+          description:"Check-in reminders and streak protection",
+          importance:4, visibility:1, sound:"default", vibration:true,
+        });
+      }catch(e){ /* iOS has no channels */ }
       await LN.schedule({notifications:[{
         id:9999, title:"DestinIQ ✅", channelId:"destiniq-daily",
         body:`${name||"Hey"}, notifications are working! You'll get daily check-ins from now on.`,
-        schedule:{at:new Date(Date.now()+5000)}, // 5 seconds from now
+        schedule:{at:new Date(Date.now()+5000), allowWhileIdle:true}, // 5 seconds from now
         sound:"default",
       }]});
       return true;
