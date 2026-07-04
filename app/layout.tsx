@@ -3,7 +3,13 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "DestinIQ — Personal Intelligence Platform",
-  description: "AI-powered personal intelligence. Know your strengths, blind spots and next move.",
+  description: "AI-powered personal intelligence. Know your strengths, blind spots, and next move.",
+  icons: {
+    icon: "/favicon-32.png",
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
   openGraph: {
     title: "DestinIQ — Personal Intelligence Platform",
     description: "AI that knows your next move before you do.",
@@ -27,16 +33,11 @@ export const viewport = {
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-        <meta name="theme-color" content="#f0b429" />
-        <link rel="manifest" href="/manifest.json" />
-      </head>
       <body>{children}</body>
     </html>
   );

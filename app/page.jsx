@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -150,7 +150,7 @@
  */
 
 
-import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -359,7 +359,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_test_your_key_here"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -1260,6 +1260,8 @@ const CATEGORIES=[
 const TOOL_META={
   relationshipiq:{label:"Relationship IQ", icon:"🤝",cat:"social", color:"#e05c6e"},
   smalltalk:     {label:"Small Talk",       icon:"💬",cat:"social", color:"#e05c6e"},
+  relationshipiq:{label:"Relationship IQ",  icon:"❤️",cat:"social", color:"#e05c6e"},
+  weeklychallenge:{label:"Weekly Challenge",icon:"🏅",cat:"purpose",color:"#64b5f6"},
   peopledecoder: {label:"People Decoder",   icon:"🧩",cat:"social", color:"#e05c6e"},
   hardconvo:     {label:"Hard Conversation",icon:"🗣️",cat:"social", color:"#e05c6e"},
   parenting:     {label:"Parenting",        icon:"👨‍👧",cat:"social", color:"#e05c6e"},
@@ -4832,6 +4834,20 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
       if(e.message==="API_KEY_MISSING"){setError("API key not configured.");return;}
       try{localStorage.setItem(ciResultKey,fb);}catch{}
       setResult(fb);pushToMemory(userId,"assistant",fb);
+      // The check-in still HAPPENED even though the AI reply failed —
+      // record it so streak, momentum count, and points all still move.
+      try{
+        const ciToday = new Date().toISOString().slice(0,10);
+        supabase.from("user_profiles").upsert({
+          user_id:userId, last_checkin_date:ciToday,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"user_id"}).catch(()=>{});
+        localStorage.setItem(`destiniq_checkin_${userId}`, ciToday);
+        addMomentumEntry(userId,{energy:score,focus:score,momentum:score,feeling,note:did,date:new Date().toDateString()});
+        window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
+        addProgressPoints(userId,"checkin",PROGRESS_POINTS.checkin);
+        window.dispatchEvent(new CustomEvent("showToast",{detail:"+3 progress points — keep it up!"}));
+      }catch{}
     }
     setLoading(false);
   };
@@ -7486,6 +7502,72 @@ Cover: Their decision-making style and blind spots, a personal decision framewor
 Their goals: ${p.goals||p.bigGoal||"personal growth"}. Main challenge: ${p.challenge||"not specified"}. Focus: ${p.focus||"life improvement"}.
 Give them a powerful, personalized coaching session. Ask one deep question that helps them see their situation more clearly. Then provide your honest coach assessment. Be direct, warm, and genuinely helpful.`
   },
+
+  money: {
+    title:"Money Intelligence",icon:"💰",subtitle:"Your personal wealth-building blueprint",
+    prompt:(p)=>`You are DestinIQ. Write a personal money intelligence report for ${p.name||"this person"} from ${p.country||"their country"} (income level: ${p.income||"not specified"}, goal: ${p.goals||p.bigGoal||"financial freedom"}).
+Write in flowing paragraphs. Cover: an honest diagnosis of their current money situation and the #1 leak to fix first, a savings and budgeting structure with real numbers appropriate to their income and country, the exact next three money moves in order of priority, and the single money habit that would change their trajectory most if started this week. Use their local currency alongside USD. Be specific, not generic.`
+  },
+
+  earnonline: {
+    title:"Earn Online",icon:"💻",subtitle:"Real online income paths for your skills",
+    prompt:(p)=>`You are DestinIQ. Create a personal earn-online report for ${p.name||"this person"} from ${p.country||"their country"} (skills: ${p.skills||p.occupation||"not specified"}, goal: ${p.goals||p.bigGoal||"extra income"}).
+Write in flowing paragraphs. Cover: the three online income paths that genuinely fit their skills and country (with realistic monthly earnings in USD for beginner, 6-month, and 1-year stages), which platforms actually pay out in their country, the first 14 days step by step to get the first dollar, and the trap most people from ${p.country||"their region"} fall into when starting online. Be brutally realistic about timelines.`
+  },
+
+  business: {
+    title:"Business Builder",icon:"🏗️",subtitle:"Start and grow a real business where you live",
+    prompt:(p)=>`You are DestinIQ. Write a personal business intelligence report for ${p.name||"this person"} in ${p.country||"their country"} (capital level: ${p.income||"limited"}, background: ${p.skills||p.occupation||"not specified"}).
+Write in flowing paragraphs. Cover: two business ideas matched to their capital and local market with startup cost breakdowns in local currency, realistic first-90-days revenue expectations, where their first ten customers actually come from, and the local execution mistake that kills most new businesses in ${p.country||"their market"}. Real numbers, real suppliers or channels where possible.`
+  },
+
+  invest: {
+    title:"Investing Simplified",icon:"📈",subtitle:"Grow what you earn — from your country",
+    prompt:(p)=>`You are DestinIQ. Write a personal investing starter report for ${p.name||"this person"} in ${p.country||"their country"} (income: ${p.income||"not specified"}).
+Write in flowing paragraphs. Cover: the investment options actually accessible from their country (local instruments like treasury bills or unit trusts, plus global access routes), the right order to invest in (emergency fund → low risk → growth), realistic return expectations with real percentages, and the scams and 'opportunities' people in ${p.country||"their region"} most commonly lose money to. Conservative, honest, specific.`
+  },
+
+  roadmap: {
+    title:"Life Roadmap",icon:"🗺️",subtitle:"Your next 12 months, mapped",
+    prompt:(p)=>`You are DestinIQ. Build a personal 12-month roadmap for ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}, goal: ${p.goals||p.bigGoal||"a better life"}, main obstacle: ${p.challenge||"not specified"}).
+Write in flowing paragraphs by quarter. For each quarter: the single focus, the measurable target, the key habit to install, and what to deliberately ignore. End with what their life realistically looks like in 12 months if they execute, and the one thing most likely to derail them based on their stated challenge.`
+  },
+
+  career: {
+    title:"Career Accelerator",icon:"🚀",subtitle:"Get promoted, paid more, or repositioned",
+    prompt:(p)=>`You are DestinIQ. Write a career acceleration report for ${p.name||"this person"} (${p.occupation||"professional"}, ${p.country||"their country"}, goal: ${p.goals||p.bigGoal||"career growth"}).
+Write in flowing paragraphs. Cover: an honest read of their current position and market value, the highest-leverage skill to add in the next 6 months for their field, how to become visible to decision-makers (specific actions, not platitudes), and whether their bigger opportunity is growing where they are, switching companies, or going independent — with reasoning.`
+  },
+
+  discipline: {
+    title:"Discipline Engine",icon:"⚙️",subtitle:"Systems that work when motivation doesn't",
+    prompt:(p)=>`You are DestinIQ. Write a personal discipline report for ${p.name||"this person"} (goal: ${p.goals||p.bigGoal||"consistency"}, struggle: ${p.challenge||"staying consistent"}).
+Write in flowing paragraphs. Cover: why their discipline actually breaks (design, not character), a minimum daily system so small it survives their worst days, environment changes that remove the need for willpower, and the exact recovery protocol for the day after they fall off. Practical, kind, zero hustle-culture clichés.`
+  },
+
+  success: {
+    title:"Success Principles",icon:"🏆",subtitle:"The fundamentals that actually move life forward",
+    prompt:(p)=>`You are DestinIQ. Write a personal success principles report for ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}, goal: ${p.goals||p.bigGoal||"a successful life"}).
+Write in flowing paragraphs. Cover: the three principles most relevant to their specific situation and stage of life, how each one applies concretely to their stated goal, the principle they are most likely violating right now based on their challenge (${p.challenge||"not specified"}), and one practice for this week per principle. Grounded and specific — no vague inspiration.`
+  },
+
+  jimrohn: {
+    title:"Jim Rohn Wisdom",icon:"🌱",subtitle:"Timeless personal development, applied to you",
+    prompt:(p)=>`You are DestinIQ channeling the teaching style of Jim Rohn (plain-spoken, warm, story-driven) for ${p.name||"this person"} (goal: ${p.goals||p.bigGoal||"a better life"}, challenge: ${p.challenge||"not specified"}).
+Write in flowing paragraphs. Apply these Rohn ideas to their exact situation: work harder on yourself than on your job; you're the average of the people around you; profits are better than wages; the seasons of life. For each, one concrete application to their life this month. End with the question Rohn would ask them.`
+  },
+
+  lifehacks: {
+    title:"Daily Life Hacks",icon:"✨",subtitle:"Small daily upgrades that compound",
+    prompt:(p)=>`You are DestinIQ. Write a personal daily-life optimisation report for ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}, focus: ${p.focus||p.goals||"daily improvement"}).
+Write in flowing paragraphs. Cover: their ideal morning first-hour given their goals, three friction-removers for the daily annoyances that drain most people, one grooming or self-presentation upgrade with outsized impact, and an evening shutdown ritual that improves tomorrow. All practical for their country and budget.`
+  },
+
+  mindsettenx: {
+    title:"10X Mindset",icon:"🧠",subtitle:"Think bigger — rewire your defaults",
+    prompt:(p)=>`You are DestinIQ. Write a personal 10X mindset report for ${p.name||"this person"} (goal: ${p.goals||p.bigGoal||"growth"}, main mental obstacle: ${p.challenge||"limiting beliefs"}).
+Write in flowing paragraphs. Cover: the limiting belief most likely running their decisions based on what they've shared, what 10X (not 10%) thinking would change about their current plan, one uncomfortable action this month that their bigger self would take, and how to tell the difference between fear worth listening to and fear worth ignoring.`
+  },
 };
 
 // ── GenericAIModule renderer ────────────────────────────────────────────────
@@ -7563,6 +7645,13 @@ Return ONLY a JSON array of exactly 5 objects, no markdown, no explanation, no c
   useEffect(()=>{
     if(!points && (profile?.name||profile?.country||profile)) generatePoints();
   },[profile?.name,profile?.country]);
+
+  // Listen for the ToolPage action bar's Refresh button
+  useEffect(()=>{
+    const h=(e)=>{ if(e.detail?.modId===modId) generatePoints(); };
+    window.addEventListener("toolRefresh",h);
+    return()=>window.removeEventListener("toolRefresh",h);
+  },[modId,profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const generateDeepDive = async(idx)=>{
     if(!isPaid){onUnlock();return;}
@@ -9079,6 +9168,101 @@ function resolveLiveVoice(voiceRef){
       || null;
 }
 
+// ── VOICE PREFERENCE — saved voice name in localStorage, used by all audio ────
+const VOICE_PREF_KEY = "diq_voice_pref";
+function getSavedVoice(){
+  if(typeof window==="undefined") return null;
+  try{
+    const name = localStorage.getItem(VOICE_PREF_KEY);
+    if(!name) return null;
+    return (window.speechSynthesis?.getVoices()||[]).find(v=>v.name===name)||{name};
+  }catch{ return null; }
+}
+function saveVoicePref(name){
+  try{
+    if(name) localStorage.setItem(VOICE_PREF_KEY, name);
+    else localStorage.removeItem(VOICE_PREF_KEY);
+    window.dispatchEvent(new CustomEvent("voicePrefChanged",{detail:{name}}));
+  }catch{}
+}
+// Friendly accent label from a voice's lang/name
+function voiceAccentLabel(v){
+  const lang=(v.lang||"").toLowerCase(), name=(v.name||"").toLowerCase();
+  if(lang.startsWith("en-gb")||name.includes("british")||name.includes("uk")) return "🇬🇧 British";
+  if(lang.startsWith("en-au")) return "🇦🇺 Australian";
+  if(lang.startsWith("en-in")) return "🇮🇳 Indian";
+  if(lang.startsWith("en-za")) return "🇿🇦 South African";
+  if(lang.startsWith("en-ng")) return "🇳🇬 Nigerian";
+  if(lang.startsWith("en-ie")) return "🇮🇪 Irish";
+  if(lang.startsWith("en-ca")) return "🇨🇦 Canadian";
+  if(lang.startsWith("en-us")) return "🇺🇸 American";
+  return "🌍 English";
+}
+// Hook: live voice preference shared across every AudioPlayer instance
+function useVoicePreference(){
+  const [voice,setVoice]=useState(()=>getSavedVoice());
+  useEffect(()=>{
+    const h=()=>setVoice(getSavedVoice());
+    window.addEventListener("voicePrefChanged",h);
+    // Also refresh when browser voices finish loading
+    try{ window.speechSynthesis.onvoiceschanged=()=>setVoice(getSavedVoice()); }catch{}
+    return()=>window.removeEventListener("voicePrefChanged",h);
+  },[]);
+  return voice;
+}
+
+// ── VoicePicker — dropdown of available voices grouped by accent + preview ────
+function VoicePicker(){
+  const G=useThemeColors();
+  const [voices,setVoices]=useState([]);
+  const [sel,setSel]=useState(()=>{ try{return localStorage.getItem(VOICE_PREF_KEY)||"";}catch{return "";} });
+  const [previewing,setPreviewing]=useState(false);
+  useEffect(()=>{ loadVoices().then(vs=>setVoices(vs||[])); },[]);
+
+  const pick=(name)=>{ setSel(name); saveVoicePref(name); };
+  const preview=()=>{
+    try{
+      window.speechSynthesis.cancel();
+      const v=(window.speechSynthesis.getVoices()||[]).find(x=>x.name===sel);
+      const u=new SpeechSynthesisUtterance(`Hi! This is your DestinIQ voice. Let's build your best life together.`);
+      if(v){u.voice=v;u.lang=v.lang;}
+      u.onend=()=>setPreviewing(false); u.onerror=()=>setPreviewing(false);
+      setPreviewing(true);
+      window.speechSynthesis.speak(u);
+    }catch{ setPreviewing(false); }
+  };
+
+  if(voices.length===0) return(
+    <div style={{fontSize:12,color:G.dimmer}}>No voices available on this device.</div>
+  );
+  return(
+    <div>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <select value={sel} onChange={e=>pick(e.target.value)}
+          style={{flex:1,padding:"11px 12px",background:G.inp,border:"1px solid "+G.inpBorder,
+            borderRadius:10,color:G.cream,fontSize:13,fontFamily:"inherit",outline:"none"}}>
+          <option value="">Auto (best available)</option>
+          {voices.map(v=>(
+            <option key={v.name} value={v.name}>
+              {voiceAccentLabel(v)} — {v.name.replace(/Microsoft |Google |Apple /,"").slice(0,34)}
+            </option>
+          ))}
+        </select>
+        <button onClick={preview} disabled={previewing}
+          style={{padding:"11px 16px",background:G.gold+"18",border:"1px solid "+G.gold+"40",
+            borderRadius:10,color:G.gold,fontSize:12,fontWeight:700,cursor:"pointer",
+            fontFamily:"inherit",whiteSpace:"nowrap"}}>
+          {previewing?"🔊 …":"▶ Preview"}
+        </button>
+      </div>
+      <div style={{fontSize:10,color:G.dimmer,marginTop:6,lineHeight:1.5}}>
+        Voices come from your device — phones and desktops offer different accents. Your choice applies to every Listen button.
+      </div>
+    </div>
+  );
+}
+
+
 // Loads all voices — returns a promise that resolves when voices are ready
 function loadVoices(){
   return new Promise(res=>{
@@ -9102,7 +9286,7 @@ function loadVoices(){
 function AudioPlayer({text,label="Listen",mini=false}){
   const [state,setState]=useState("idle");
   const [supported]=useState(()=>typeof window!=="undefined"&&"speechSynthesis" in window);
-  const [selVoice]=useGlobalVoice();
+  const selVoice=useVoicePreference(); // user's chosen voice — falls back to best English voice
   const uttRef=useRef(null);
 
   const clean=t=>(t||"")
@@ -11652,18 +11836,35 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   const txt=(v)=>{if(!v)return "";if(typeof v==="string")return v;if(v?.content)return String(v.content);if(Array.isArray(v))return v.filter(Boolean).map(x=>typeof x==="string"?x:x?.content||"").join(" ");return String(v);};
 
   const scores = data?.scores||{};
-  const overall = Math.min(99,Math.max(1,Math.round(
+  const aiBaseline = Math.min(85,Math.max(10,Math.round(
     (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
   )));
+  // Dynamic score — baseline + earned progress points, updates live
+  const [overall,setOverall] = useState(()=>{
+    try{ return getProgressScore(userId, aiBaseline); }catch{ return aiBaseline; }
+  });
+  useEffect(()=>{
+    const h=()=>{ try{ setOverall(getProgressScore(userId, aiBaseline)); }catch{} };
+    h(); // recompute on mount (points may have changed elsewhere)
+    window.addEventListener("progressUpdated",h);
+    return()=>window.removeEventListener("progressUpdated",h);
+  },[userId,aiBaseline]);
   // Save snapshot for comparison mode (runs once per report load)
   useEffect(()=>{
     if(userId && scores && Object.keys(scores).length>0) saveScoreSnapshot(userId,scores,overall);
   },[userId]);
 
-  // Today's Insight — from report data or derived from profile
+  // Today's Insight — from report data or derived from profile (short & punchy)
   const getInsight=()=>{
-    const ri=txt(dailyInsight)||txt(data?.daily_insight)||txt(data?.daily_recommendation)||txt(data?.closing);
-    if(ri&&ri.length>20){ const sents=ri.split(/(?<=[\.!?])\s+/); return sents.slice(0,4).join(' ').slice(0,400); }
+    let ri=txt(dailyInsight)||txt(data?.daily_insight)||txt(data?.daily_recommendation)||txt(data?.closing);
+    if(ri&&ri.length>20){
+      // Strip common AI preambles
+      ri=ri.replace(/^(here'?s|here is|sure[,!]?|of course[,!]?|absolutely[,!]?)[^.!?]*[.!?:]\s*/i,"").trim();
+      const sents=ri.split(/(?<=[.!?])\s+/);
+      let out=sents.slice(0,2).join(" ");
+      if(out.length>220) out=out.slice(0,217).replace(/\s+\S*$/,"")+"…";
+      return out;
+    }
     const bl=(Array.isArray(formData?.blockers)?formData.blockers.join(" "):(formData?.challenge||"")).toLowerCase();
     const fo=(formData?.focus||"").toLowerCase();
     if(bl.includes("overthink"))  return "You tend to overthink decisions. Today is about taking one clear action without delay.";
@@ -11688,8 +11889,14 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
     }catch{return [];}
   })();
 
-  // Momentum log for check-in count
-  const log=getMomentumLog(userId);
+  // Momentum log for check-in count — recounts live when a check-in completes
+  const [logTick,setLogTick]=useState(0);
+  useEffect(()=>{
+    const h=()=>setLogTick(t=>t+1);
+    window.addEventListener("checkinComplete",h);
+    return()=>window.removeEventListener("checkinComplete",h);
+  },[]);
+  const log=useMemo(()=>getMomentumLog(userId),[userId,logTick]);
 
   // Recommended next tool based on profile
   const getRecom=()=>{
@@ -11991,14 +12198,21 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
 function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, onUnlock, streak, navPhotoURL}){
   const [query,    setQuery]   = useState("");
   const [drawerOpen,setDrawerOpen] = useState(false);
-  const [activeChip,setActiveChip] = useState(null);
 
   const G={...useThemeColors()};
 
   const name = formData?.name?.split(" ")[0] || "You";
 
-  const struggles = ["Overthinking","Lack of Discipline","Money Problems",
-    "Confidence","Career Direction","Relationships","Anxiety","Purpose"];
+  const struggles = [
+    {label:"Overthinking",       nav:"topic:mindset.impostersyndrome"},
+    {label:"Lack of Discipline", nav:"tool:discipline"},
+    {label:"Money Problems",     nav:"category:money"},
+    {label:"Confidence",         nav:"tool:confidencelab"},
+    {label:"Career Direction",   nav:"tool:career"},
+    {label:"Relationships",      nav:"category:social"},
+    {label:"Anxiety",            nav:"topic:wellness.sundayanxiety"},
+    {label:"Purpose",            nav:"category:purpose"},
+  ];
 
   const recommended = CATEGORIES.slice(0,4).map(cat=>({
     icon:cat.icon, name:cat.label,
@@ -12247,13 +12461,15 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
           </div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             {struggles.map(s=>(
-              <button key={s} onClick={()=>setActiveChip(activeChip===s?null:s)}
+              <button key={s.label} onClick={()=>setNav(s.nav)}
                 style={{padding:"8px 14px",borderRadius:20,fontSize:12,fontWeight:600,
-                  border:"1px solid "+(activeChip===s?G.gold:G.border),
-                  background:activeChip===s?"rgba(240,180,41,0.12)":"rgba(255,255,255,0.04)",
-                  color:activeChip===s?G.gold:G.cream,cursor:"pointer",
-                  fontFamily:"inherit",transition:"all .15s"}}>
-                {s}
+                  border:"1px solid "+G.border,
+                  background:"rgba(255,255,255,0.04)",
+                  color:G.cream,cursor:"pointer",
+                  fontFamily:"inherit",transition:"all .15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=G.gold;e.currentTarget.style.color=G.gold;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.color=G.cream;}}>
+                {s.label}
               </button>
             ))}
           </div>
@@ -13240,10 +13456,17 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
 
   // ── AI-generated dynamic cards ────────────────────────────────────────────
   const aiCardsKey = userId ? `diq_ai_cards_${userId}_${catId}_${topicId}` : null;
-  const [aiCards, setAiCards]       = useState([]);
+  const [aiCards, setAiCards] = useState(()=>{
+    if(typeof window==="undefined"||!aiCardsKey) return [];
+    try{
+      const cached = JSON.parse(localStorage.getItem(aiCardsKey)||"null");
+      if(Array.isArray(cached)&&cached.length>0) return cached;
+    }catch{}
+    return [];
+  });
   const [aiLoading, setAiLoading]   = useState(false);
   const [aiError, setAiError]       = useState("");
-  const [aiGenerated, setAiGenerated] = useState(false); // whether we've generated at least once
+  const [aiGenerated, setAiGenerated] = useState(()=>aiCards.length>0); // whether we've generated at least once
 
   const generateAiCards = async () => {
     if(!isPaid){ onUnlock&&onUnlock(); return; }
@@ -13287,14 +13510,7 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
     setAiLoading(false);
   };
 
-  // Load cached AI cards on mount
-  useState(()=>{
-    if(!aiCardsKey) return;
-    try{
-      const cached = JSON.parse(localStorage.getItem(aiCardsKey)||"null");
-      if(Array.isArray(cached)&&cached.length>0){ setAiCards(cached); setAiGenerated(true); }
-    }catch{}
-  });
+  // (AI cards cache is loaded in the useState initializers above)
 
   if(!cat||!topic) return(
     <div style={{padding:40,textAlign:"center",color:G.cream,fontFamily:"-apple-system,sans-serif"}}>
@@ -13549,6 +13765,41 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
     setFuL(false);setFu("");
   };
   const related=(cat?.tools||[]).filter(t=>t!==toolId).slice(0,3);
+
+  // ── Action bar handlers ─────────────────────────────────────────────────────
+  const contentRef = useRef(null);
+  const [listening,setListening] = useState(false);
+  const handleListen=()=>{
+    try{
+      if(listening){ window.speechSynthesis.cancel(); setListening(false); return; }
+      const text=(contentRef.current?.innerText||"").replace(/\s+/g," ").trim().slice(0,3000);
+      if(!text){ window.dispatchEvent(new CustomEvent("showToast",{detail:"Nothing to read yet — generate content first"})); return; }
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      // Respect the user's chosen voice (Profile → Voice & Audio)
+      try{
+        const pref=getSavedVoice();
+        const live=window.speechSynthesis.getVoices();
+        const v=pref?live.find(x=>x.name===pref.name):null;
+        if(v){u.voice=v;u.lang=v.lang;}
+      }catch{}
+      u.rate=1; u.onend=()=>setListening(false); u.onerror=()=>setListening(false);
+      window.speechSynthesis.speak(u); setListening(true);
+    }catch{ setListening(false); }
+  };
+  useEffect(()=>()=>{ try{window.speechSynthesis.cancel();}catch{} },[]); // stop on unmount
+  const handleRefresh=()=>{
+    // Child modules (GenericAIModulePoints etc.) listen for this and regenerate
+    window.dispatchEvent(new CustomEvent("toolRefresh",{detail:{modId:toolId}}));
+  };
+  const handleShare=async()=>{
+    const url=typeof window!=="undefined"?window.location.origin:"https://destiniq.vercel.app";
+    const title=`${meta?.label||toolId} — DestinIQ`;
+    try{
+      if(navigator.share){ await navigator.share({title, text:`Check out ${meta?.label||toolId} on DestinIQ`, url}); }
+      else{ await navigator.clipboard.writeText(url); window.dispatchEvent(new CustomEvent("showToast",{detail:"Link copied to clipboard!"})); }
+    }catch{}
+  };
   return(
     <div className="pg">
       <button className="pg-back" onClick={()=>goBack?goBack():setNav(cat?"category:"+cat.id:"explore")} style={{cursor:"pointer"}}>← {cat?.label||"Back"}</button>
@@ -13559,16 +13810,23 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
           {cat&&<p style={{fontSize:11,color:meta?.color||"var(--gold)",margin:0}}>{cat.label}</p>}
         </div>
       </div>
+      {toolId!=="advisor"&&(
       <div className="tool-act-bar">
-        <button className="t-btn pri">🔊 Listen</button>
-        <button className="t-btn">↺ Refresh</button>
+        <button className="t-btn pri" onClick={handleListen}>{listening?"⏹ Stop":"🔊 Listen"}</button>
+        <button className="t-btn" onClick={handleRefresh}>↺ Refresh</button>
         <button className="t-btn" style={{color:bm?"var(--gold)":""}} onClick={toggleSave}>{bm?"★ Saved":"☆ Save"}</button>
-        <button className="t-btn">↗ Share</button>
+        <button className="t-btn" onClick={handleShare}>↗ Share</button>
       </div>
+      )}
+      <div ref={contentRef}>
       {toolId==="relocate"
         ? <RelocationExplorer formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
+        : toolId==="advisor"
+        ? <AdvisorChat profile={formData} reportData={reportData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
         : <GenericAIModule modId={toolId} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang||"en"}/>
       }
+      </div>
+      {toolId!=="advisor"&&(<>
       <div className="followup">
         <label>Ask DestinIQ a follow-up</label>
         <div className="fu-row">
@@ -13589,6 +13847,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
           );})}
         </div>
       )}
+      </>)}
     </div>
   );
 }
@@ -13882,6 +14141,14 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
               <span style={{color:G.dimmer,fontSize:18}}>›</span>
             </div>
           ))}
+        </div>
+
+        {/* Voice & Audio — pick the voice for all Listen buttons */}
+        <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:14,
+          padding:"16px 18px",marginBottom:14}}>
+          <div style={{fontSize:11,color:G.dimmer,fontFamily:"monospace",
+            letterSpacing:".08em",marginBottom:10}}>🔊 VOICE &amp; AUDIO</div>
+          <VoicePicker/>
         </div>
 
         {!isPaid&&(
@@ -14961,7 +15228,7 @@ Rules:
         )}
         {/* ExploreScreen handled by early return above */}
         {isCat&&<CategoryPage catId={catId} setNav={setNav} goBack={goBack} userId={userId}/>}
-        {isTopic&&<TopicPage catId={topicCatId} topicId={topicId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock}/>}
+        {isTopic&&<TopicPage key={topicCatId+"."+topicId} catId={topicCatId} topicId={topicId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock}/>}
         {isTool&&MODULE_CONFIGS?.[toolId]&&(
           <ToolPage key={toolId} toolId={toolId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang} reportData={data}/>
         )}
@@ -16160,6 +16427,12 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
             <ThemeToggle/>
           </div>
 
+          {/* Voice & Audio — accent selection for all Listen buttons */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",marginBottom:8}}>VOICE &amp; AUDIO</div>
+            <VoicePicker/>
+          </div>
+
           {/* Language selector */}
           <div style={{marginBottom:16}}>
             <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em",marginBottom:8}}>LANGUAGE</div>
@@ -16629,31 +16902,30 @@ function DestinIQInner(){
           // Take highest streak from all sources (most reliable)
           const bestStreak = Math.max(savedStreak, localStreak, 1);
 
-          if (!lastSeen) {
+          // ── LOCAL-FIRST TRUST ─────────────────────────────────────────────
+          // If handleCI already counted today or yesterday on THIS device,
+          // localStorage is the most recent truth — Supabase writes can fail
+          // or lag. Never let a stale DB row downgrade a locally-earned streak.
+          const localCounted = (()=>{ try{ return localStorage.getItem(`diq_streak_last_counted_${u.id}`)||""; }catch{ return ""; } })();
+          if((localCounted===today || localCounted===yesterday) && localStreak>0){
+            setStreak(localStreak);
+            // Re-sync Supabase in the background in case the earlier write failed
+            supabase.from("user_profiles").upsert({
+              user_id:u.id, streak:localStreak,
+              last_checkin_date: localLast||localCounted,
+              updated_at:new Date().toISOString(),
+            },{onConflict:"user_id"}).catch(()=>{});
+          } else if (!lastSeen) {
             // Never checked in before — keep whatever streak DB has (could be 1 from signup)
             setStreak(bestStreak);
           } else if (lastSeen === today) {
             // Already checked in today — show current streak as-is
             setStreak(bestStreak);
           } else if (lastSeen === yesterday) {
-            // Checked in yesterday — streak alive. Only increment ONCE per today
-            // (guard against multiple restores on the same day from refreshes)
-            const alreadyCountedToday = (()=>{
-              try{ return localStorage.getItem(`diq_streak_last_counted_${u.id}`) === today; }catch{ return false; }
-            })();
-            if(alreadyCountedToday){
-              setStreak(bestStreak); // already incremented today — just restore
-            } else {
-              const newStreak = bestStreak + 1;
-              setStreak(newStreak);
-              try{ localStorage.setItem(`diq_streak_last_counted_${u.id}`, today); }catch{}
-              try{ localStorage.setItem(`diq_streak_${u.id}`, String(newStreak)); }catch{}
-              supabase.from("user_profiles").upsert({
-                user_id: u.id, streak: newStreak,
-                last_checkin_date: today,
-                updated_at: new Date().toISOString(),
-              },{onConflict:"user_id"}).catch(()=>{});
-            }
+            // Checked in yesterday — streak is still alive. Display it as-is.
+            // The +1 happens when they actually CHECK IN today (handleCI),
+            // not on mere visit — one source of truth, no double-increment races.
+            setStreak(bestStreak);
           } else {
             // Missed a day — streak broken, reset to 1
             setStreak(1);
