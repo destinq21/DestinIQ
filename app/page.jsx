@@ -359,7 +359,7 @@ async function saveWeeklyReport(userId, report) {
 // ── PAYSTACK ────────────────────────────────────────────────────────────────
 // Get your key: dashboard.paystack.com → Settings → API Keys & Webhooks
 // Use TEST key (pk_test_...) while testing, LIVE key (pk_live_...) when going live
-const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // ← PASTE YOUR KEY HERE
+const PAYSTACK_PUBLIC_KEY = "pk_live_bb8939dd293ded6e56e617dc7075ff4d8d810d16"; // LIVE key — real payments enabled
 
 // All charges handled by Paystack — they manage tax + billing worldwide
 // in the world are accepted and settle automatically. We just SHOW the price
@@ -616,6 +616,15 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         return;
       }
 
+      // Create the channel (required on Android 8+ — no channel, no notifications)
+      try{
+        await LN.createChannel({
+          id:"destiniq-daily", name:"Daily Reminders",
+          description:"Check-in reminders and streak protection",
+          importance:4, visibility:1, sound:"default", vibration:true,
+        });
+      }catch(e){ /* iOS has no channels — safe to ignore */ }
+
       // Cancel existing DestinIQ notifications before rescheduling
       try{
         const pending = await LN.getPending();
@@ -640,7 +649,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
           id:1001, title:"DestinIQ", channelId:"destiniq-daily",
           body:pick(NOTIF_MSGS.morning)(name,goal),
           schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
-          smallIcon:"ic_stat_notify", sound:"default",
+          sound:"default",
         });
       }
       if(times.afternoon){
@@ -649,7 +658,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
           id:1002, title:"DestinIQ", channelId:"destiniq-daily",
           body:pick(NOTIF_MSGS.afternoon)(name),
           schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
-          smallIcon:"ic_stat_notify", sound:"default",
+          sound:"default",
         });
       }
       if(times.evening){
@@ -658,7 +667,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
           id:1003, title:"DestinIQ", channelId:"destiniq-daily",
           body:pick(NOTIF_MSGS.evening)(name,streak),
           schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
-          smallIcon:"ic_stat_notify", sound:"default",
+          sound:"default",
         });
       }
       // 9pm streak protection
@@ -666,7 +675,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         id:1004, title:"DestinIQ 🔥", channelId:"destiniq-daily",
         body:pick(NOTIF_MSGS.streak)(name,streak),
         schedule:{at:nextAt(21,0), repeats:true, allowWhileIdle:true},
-        smallIcon:"ic_stat_notify", sound:"default",
+        sound:"default",
       });
 
       await LN.schedule({notifications});
@@ -725,7 +734,7 @@ async function testNotification(name){
         id:9999, title:"DestinIQ ✅", channelId:"destiniq-daily",
         body:`${name||"Hey"}, notifications are working! You'll get daily check-ins from now on.`,
         schedule:{at:new Date(Date.now()+5000)}, // 5 seconds from now
-        smallIcon:"ic_stat_notify", sound:"default",
+        sound:"default",
       }]});
       return true;
     }catch(e){ return false; }
