@@ -44,8 +44,7 @@ const config: CapacitorConfig = {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
     LocalNotifications: {
-      smallIcon: 'ic_stat_icon',
-      iconColor: '#f0b429',    // DestinIQ gold
+      // Uses the app icon (DQ logo) by default — no custom smallIcon needed
     },
     Camera: {
       // No special config needed

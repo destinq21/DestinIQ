@@ -17015,10 +17015,14 @@ function DestinIQInner(){
       if(window?.KeepAwake){
         try{ window.KeepAwake.keepAwake(); }catch{}
       }
-      // Hide splash screen after app loads
-      if(window?.SplashScreen){
-        try{ window.SplashScreen.hide(); }catch{}
-      }
+      // Hide splash screen after app loads (Capacitor plugin path + failsafe)
+      const hideSplash=()=>{
+        try{ window?.Capacitor?.Plugins?.SplashScreen?.hide?.(); }catch{}
+        try{ window?.SplashScreen?.hide?.(); }catch{} // legacy fallback
+      };
+      hideSplash();
+      setTimeout(hideSplash, 1500);  // retry in case plugins bridge was still initialising
+      setTimeout(hideSplash, 4000);  // last-resort retry
     }
   },[]);
 
