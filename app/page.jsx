@@ -245,6 +245,81 @@ class ErrorBoundary extends React.Component {
 // Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local
 // Capacitor plugins accessed via window.Capacitor.Plugins (no imports needed)
 
+// ── SMART QUIET-MODE ─────────────────────────────────────────────────────────
+// Once the user checks in (or logs a win), today's remaining reminder
+// notifications are pointless noise — cancel them and re-arm from tomorrow.
+if(typeof window!=="undefined" && !window.__diqQuietHook){
+  window.__diqQuietHook = true;
+  window.addEventListener("checkinComplete", async(e)=>{
+    try{
+      const uid = e?.detail?.userId;
+      if(!uid || !window?.Capacitor?.isNativePlatform?.()) return;
+      const LN = window?.Capacitor?.Plugins?.LocalNotifications;
+      if(!LN) return;
+      // Cancel today's daily nudges + streak alert (weekly hooks 1005/1006 stay)
+      await LN.cancel({notifications:[{id:1001},{id:1002},{id:1003},{id:1004}]});
+      // Re-arm for TOMORROW at the user's saved times
+      let t={morning:"07:00",afternoon:"13:00",evening:"20:00"};
+      try{ t={...t, ...(JSON.parse(localStorage.getItem(`diq_notif_times_${uid}`)||"{}"))}; }catch{}
+      const tomorrowAt=(hm)=>{
+        const [h,m]=hm.split(":").map(Number);
+        const d=new Date(); d.setDate(d.getDate()+1); d.setHours(h,m,0,0);
+        return d;
+      };
+      const name=(()=>{try{return JSON.parse(localStorage.getItem("destiniq_form_data")||"{}")?.name||"";}catch{return "";}})();
+      // Commitment injection: if they promised something for tomorrow,
+      // the morning notification carries their own words back to them.
+      // ── GENTLE MODE: if today's check-in scored low, tomorrow holds them ──
+      let lowDay=false;
+      try{
+        const log=getMomentumLog(uid)||[];
+        const last=log[log.length-1]||log[0];
+        const sc=Number(last?.energy??last?.momentum??10);
+        lowDay = sc>0 && sc<=4;
+      }catch{}
+      const GENTLE={
+        morning:[
+          "Good morning. Yesterday was heavy — today only asks for one small step. That's enough.",
+          "No pressure today. Showing up gently still counts. We're here when you're ready.",
+          "Morning. Be as kind to yourself today as you'd be to a friend having your week.",
+        ],
+        afternoon:[
+          "Checking in softly — have you eaten? Had water? Small care counts double on hard days.",
+          "However today is going, you're doing better than it feels. One breath, one step.",
+        ],
+        evening:[
+          "However today went — you got through it. That's worth logging. Rest well.",
+          "No judgment tonight. Just note one true thing about today, then let it go.",
+        ],
+      };
+      const gpick=(a)=>a[Math.floor(Date.now()/86400000)%a.length];
+      let morningBody = lowDay ? gpick(GENTLE.morning)
+        : "A new day, a fresh check-in. 2 minutes to set your direction.";
+      try{
+        if(!lowDay){
+          const c=JSON.parse(localStorage.getItem(`diq_commit_${uid}`)||"null");
+          if(c?.text&&!c.done) morningBody=`You said you'd: "${c.text}". Today's the day.`;
+        }
+      }catch{}
+      await LN.schedule({notifications:[
+        {id:1001,title:"Good morning"+(name?", "+name:"")+" ☀️",channelId:"destiniq-daily",
+          body:morningBody,
+          schedule:{at:tomorrowAt(t.morning),allowWhileIdle:true},sound:"default"},
+        {id:1002,title:"Midday momentum ⚡",channelId:"destiniq-daily",
+          body:lowDay?gpick(GENTLE.afternoon):"Quick pulse: how's the day actually going? Your check-in is waiting.",
+          schedule:{at:tomorrowAt(t.afternoon),allowWhileIdle:true},sound:"default"},
+        {id:1003,title:"Evening reflection 🌙",channelId:"destiniq-daily",
+          body:lowDay?gpick(GENTLE.evening):"Before the day closes — what happened today that mattered?",
+          schedule:{at:tomorrowAt(t.evening),allowWhileIdle:true},sound:"default"},
+        // On low days the 9pm PRESSURE alert stays silent — care over urgency.
+        ...(lowDay?[]:[{id:1004,title:"DestinIQ 🔥",channelId:"destiniq-daily",
+          body:"Your streak ends at midnight — one quick check-in keeps the flame alive.",
+          schedule:{at:tomorrowAt("21:00"),allowWhileIdle:true},sound:"default"}]),
+      ]});
+    }catch(err){ console.warn("quiet-mode reschedule:",err?.message||err); }
+  });
+}
+
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
@@ -494,37 +569,45 @@ function addDecision(uid,decision) {
 // ═══════════════════════════════════════════════════════════════════════════════
 const NOTIF_MSGS = {
   morning:[
-    (n,g)=>`${n}, it's morning. Your goal is "${g||"a better life"}". The people winning started their day already. Open DestinIQ.`,
+    // Warm + purposeful (the majority)
+    (n,g)=>`${n}, it's morning. Your goal is "${g||"a better life"}". One small move today gets you closer. Open DestinIQ.`,
     (n)=>`Good morning ${n}. 5 minutes of planning now saves 3 hours of confusion later. Let's go.`,
-    (n)=>`${n} — while others are still in bed, you could already be moving. Get up. Start.`,
-    (n)=>`DestinIQ morning call for ${n}: Your roadmap has a next step waiting. Today is the day.`,
-    (n)=>`${n}, sleeping longer won't change anything. Moving will. Your daily check-in is ready.`,
-    (n)=>`Rise up ${n}. Every day you delay is a day someone else gets ahead. Your plan is ready.`,
+    (n)=>`Morning, ${n}. You don't need a perfect day — just a started one. Your check-in is ready.`,
+    (n)=>`${n}, today doesn't need you to be amazing. It needs you to show up. That's it.`,
+    (n,g)=>`New day, ${n}. "${g||"Your goal"}" doesn't build itself — but it builds fast when you do a little daily.`,
+    (n)=>`DestinIQ morning call for ${n}: your roadmap has a next step waiting. Today is the day.`,
+    (n)=>`${n} — future you is watching this morning. Give them something to thank you for.`,
+    // The edge (sparingly)
     (n)=>`${n}, the best time to start was yesterday. The second best time is right now. Open your plan.`,
+    (n)=>`Rise up ${n}. Every day you delay is a day someone else gets ahead. Your plan is ready.`,
   ],
   afternoon:[
-    (n)=>`${n}, half the day is gone. What actually happened? Log your check-in before tonight.`,
     (n)=>`Afternoon check-in, ${n}. Did you do the thing you planned this morning?`,
     (n)=>`${n} — afternoon is when most people lose focus. This is your reminder not to.`,
-    (n)=>`Your advisor is ready to help you think through whatever you're stuck on right now, ${n}.`,
     ()=>`DestinIQ: Quick question — what's the one thing you'll finish before the day ends?`,
+    (n)=>`${n}, the day is half-written. The second half is still yours to author.`,
+    (n)=>`Stuck on something, ${n}? Your advisor is ready to think it through with you.`,
+    (n)=>`Small nudge, ${n}: one focused hour this afternoon beats a scattered evening.`,
   ],
   evening:[
-    (n,s)=>`${n}, your ${s}-day streak ends at midnight if you don't check in. 2 minutes is all it takes.`,
+    // Reflection + wins ONLY — the 9pm alert owns streak urgency
     (n)=>`Evening check-in time, ${n}. Not to judge the day — just to learn from it.`,
-    (n)=>`${n} — log one win from today. Even a small one. Streaks are built one honest answer at a time.`,
-    (n)=>`Before the day ends, ${n}: what did you actually move forward today? Log it now.`,
+    (n)=>`${n} — log one win from today. Even a small one. Wins you don't record, you forget.`,
+    (n)=>`Before the day ends, ${n}: what did you actually move forward today? Log it.`,
     ()=>`DestinIQ: Your daily reflection is waiting. Takes 60 seconds. Worth every one.`,
+    (n)=>`${n}, rough day or great day — both deserve 2 minutes of honesty. Check in.`,
+    (n)=>`How was the day really, ${n}? Your future self learns from tonight's answer.`,
   ],
   streak:[
     (n,s)=>`⚠️ ${n}, your ${s}-day streak expires in 3 hours. Don't lose it tonight.`,
-    (n,s)=>`${s} days in a row, ${n}. Don't let tonight be the one you regret. Log your check-in.`,
-    (n,s)=>`Streak alert: You've shown up ${s} days straight, ${n}. Midnight will reset it. 90 seconds to keep it alive.`,
+    (n,s)=>`${s} days in a row, ${n}. Don't let tonight be the one you regret. 90 seconds.`,
+    (n,s)=>`Streak alert: ${s} straight days of showing up, ${n}. Midnight resets it. Keep the flame.`,
+    (n,s)=>`${n} — day ${s} isn't finished until you check in. Quick, before midnight.`,
   ],
   weekly:[
     (n)=>`New week, ${n}. Your roadmap has steps waiting. Which one are you committing to this week?`,
-    (n)=>`Monday, ${n}. This is when the gap between people who make it and people who don't gets decided.`,
-    (n)=>`${n}, last week is gone. This week starts now. Open your plan and pick one thing.`,
+    (n)=>`Monday, ${n}. Three priorities, not thirty. Pick them before the week picks for you.`,
+    (n)=>`${n}, last week is gone — kept or wasted, it's done. This one starts clean. Open your plan.`,
   ],
 };
 
@@ -607,6 +690,8 @@ function fireNotification(title, body, tag="destiniq"){
 }
 
 async function scheduleNotification(uid, name, goal, streak, times, onFire){
+  // Persist times so smart quiet-mode can re-arm after a check-in
+  try{ if(uid&&times) localStorage.setItem(`diq_notif_times_${uid}`, JSON.stringify(times)); }catch{}
   if(!uid||!times) return;
   const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
 
@@ -653,6 +738,10 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         return d;
       };
 
+      // Flush all previously scheduled ids first — clears any spam-looping
+      // notifications queued by the old at+repeats bug.
+      try{ await LN.cancel({notifications:[1001,1002,1003,1004,1005,1006,9999].map(id=>({id}))}); }catch{}
+
       const notifications = [];
 
       if(times.morning){
@@ -660,7 +749,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         notifications.push({
           id:1001, title:"DestinIQ", channelId:"destiniq-daily",
           body:pick(NOTIF_MSGS.morning)(name,goal),
-          schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
+          schedule:{on:{hour:h, minute:m}, allowWhileIdle:true},
           sound:"default",
         });
       }
@@ -669,7 +758,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         notifications.push({
           id:1002, title:"DestinIQ", channelId:"destiniq-daily",
           body:pick(NOTIF_MSGS.afternoon)(name),
-          schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
+          schedule:{on:{hour:h, minute:m}, allowWhileIdle:true},
           sound:"default",
         });
       }
@@ -678,7 +767,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         notifications.push({
           id:1003, title:"DestinIQ", channelId:"destiniq-daily",
           body:pick(NOTIF_MSGS.evening)(name,streak),
-          schedule:{at:nextAt(h,m), repeats:true, allowWhileIdle:true},
+          schedule:{on:{hour:h, minute:m}, allowWhileIdle:true},
           sound:"default",
         });
       }
@@ -686,7 +775,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
       notifications.push({
         id:1004, title:"DestinIQ 🔥", channelId:"destiniq-daily",
         body:pick(NOTIF_MSGS.streak)(name,streak),
-        schedule:{at:nextAt(21,0), repeats:true, allowWhileIdle:true},
+        schedule:{on:{hour:21, minute:0}, allowWhileIdle:true},
         sound:"default",
       });
       // ── Smart weekly hooks — the moments people need DestinIQ most ────────
@@ -787,8 +876,12 @@ async function testNotification(name){
 if(typeof window!=="undefined"){
   try{
     const saved=JSON.parse(localStorage.getItem(NOTIF_SCHED_KEY)||"null");
-    if(saved&&Notification.permission==="granted"&&saved.uid){
-      scheduleNotification(saved.uid,saved.name,saved.goal,saved.streak,saved.times,null);
+    const isNativeLoad = window?.Capacitor?.isNativePlatform?.();
+    const ciTodayKey = saved?.uid ? (localStorage.getItem(`destiniq_checkin_${saved.uid}`)||"") : "";
+    const alreadyToday = ciTodayKey === new Date().toISOString().slice(0,10);
+    if(saved&&saved.uid&&(isNativeLoad || (typeof Notification!=="undefined"&&Notification.permission==="granted"))){
+      // If they already checked in today, stay quiet — quiet-mode owns tomorrow.
+      if(!alreadyToday) scheduleNotification(saved.uid,saved.name,saved.goal,saved.streak,saved.times,null);
     }
   }catch(_){}
 }
@@ -6147,10 +6240,14 @@ function Landing({onStart,ipLocation}){
             Real results from<br/><span style={{color:G.gold}}>real people.</span>
           </h2>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
-          {testimonials.map((t,i)=>(
-            <div key={t.name} style={{background:G.card,border:"1px solid rgba(232,220,200,0.06)",
-              borderRadius:16,padding:"22px"}}>
+        <div style={{overflow:"hidden",position:"relative"}}>
+        <div style={{display:"flex",gap:14,width:"max-content",
+          animation:"diqTestiScroll 28s linear infinite"}}
+          onMouseEnter={e=>e.currentTarget.style.animationPlayState="paused"}
+          onMouseLeave={e=>e.currentTarget.style.animationPlayState="running"}>
+          {[...testimonials,...testimonials].map((t,i)=>(
+            <div key={t.name+"_"+i} style={{background:G.card,border:"1px solid rgba(232,220,200,0.06)",
+              borderRadius:16,padding:"22px",width:300,flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
                 <div style={{width:40,height:40,borderRadius:"50%",
                   background:`hsl(${i*80+30},50%,42%)`,display:"flex",alignItems:"center",
@@ -6169,6 +6266,8 @@ function Landing({onStart,ipLocation}){
             </div>
           ))}
         </div>
+        </div>
+        <style>{`@keyframes diqTestiScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}`}</style>
       </section>
 
 
@@ -11832,81 +11931,104 @@ const STREAK_MILESTONES = {
 
 function StreakCelebration({streak, onClose}){
   const [animIn, setAnimIn] = useState(false);
-  const milestone = STREAK_MILESTONES[streak];
-  if(!milestone) return null;
-
+  // Hooks FIRST — early returns before hooks break React
   useEffect(()=>{
-    // Animate in
-    setTimeout(()=>setAnimIn(true), 50);
-    // Auto-close after 5 seconds
-    const t = setTimeout(onClose, 5000);
-    return ()=>clearTimeout(t);
+    const t1=setTimeout(()=>setAnimIn(true), 50);
+    const t2=setTimeout(onClose, 6000);
+    return ()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
+  const milestone = STREAK_MILESTONES[streak] || {
+    emoji:"🔥", color:"var(--gold)",
+    title:`${streak} days strong!`,
+    msg:"Every day you show up, you become someone slightly harder to stop.",
+  };
+  // Confetti particles — deterministic randoms so render is stable
+  const CONFETTI=["🎉","✨","🔥","⭐","💛","🏆"];
+  const parts = Array.from({length:26},(_,i)=>({
+    e:CONFETTI[i%CONFETTI.length],
+    left:(i*37)%100,
+    delay:(i*137)%1400,
+    dur:2600+((i*263)%1800),
+    size:16+((i*97)%22),
+  }));
 
   return(
     <div onClick={onClose} style={{
       position:"fixed", inset:0, zIndex:3000,
-      background:"rgba(0,0,0,0.85)",
+      background:"rgba(0,0,0,0.92)",
       display:"flex", alignItems:"center", justifyContent:"center",
-      cursor:"pointer",
+      cursor:"pointer", overflow:"hidden",
       transition:"opacity .3s",
       opacity: animIn ? 1 : 0,
     }}>
+      {/* Confetti rain */}
+      {animIn&&parts.map((p,i)=>(
+        <span key={i} style={{
+          position:"absolute", top:-40, left:p.left+"%",
+          fontSize:p.size, lineHeight:1, pointerEvents:"none",
+          animation:`diqConfetti ${p.dur}ms linear ${p.delay}ms infinite`,
+        }}>{p.e}</span>
+      ))}
+
+      {/* Glow burst behind the number */}
+      <div style={{position:"absolute", width:420, height:420, borderRadius:"50%",
+        background:`radial-gradient(circle, ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}33 0%, transparent 65%)`,
+        animation: animIn?"diqGlowPulse 1.6s ease-in-out infinite alternate":"none",
+        pointerEvents:"none"}}/>
+
       <div onClick={e=>e.stopPropagation()} style={{
         textAlign:"center", padding:"40px 32px",
-        maxWidth:380, width:"100%",
-        transform: animIn ? "scale(1) translateY(0)" : "scale(0.8) translateY(40px)",
-        transition:"transform .4s cubic-bezier(0.175,0.885,0.32,1.275)",
+        maxWidth:420, width:"100%", position:"relative",
+        transform: animIn ? "scale(1) translateY(0)" : "scale(0.5) translateY(80px)",
+        transition:"transform .55s cubic-bezier(0.175,0.885,0.32,1.4)",
       }}>
         {/* Emoji */}
         <div style={{
-          fontSize:80, lineHeight:1,
-          marginBottom:20,
-          filter:"drop-shadow(0 0 30px "+milestone.color+")",
+          fontSize:96, lineHeight:1, marginBottom:8,
+          filter:"drop-shadow(0 0 40px "+milestone.color+")",
           animation:"streakBounce 0.6s ease infinite alternate",
         }}>
           {milestone.emoji}
         </div>
 
-        {/* Streak number */}
+        {/* GIANT streak number — the TikTok moment */}
         <div style={{
-          fontSize:96, fontWeight:900, lineHeight:1,
+          fontSize:"clamp(120px, 38vw, 190px)", fontWeight:900, lineHeight:0.95,
           color: milestone.color,
           fontFamily:"var(--f-display)",
-          marginBottom:4,
-          textShadow:`0 0 40px ${milestone.color}60`,
+          textShadow:`0 0 80px ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}90, 0 0 20px ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}60`,
+          animation: animIn?"diqNumberPop .7s cubic-bezier(0.175,0.885,0.32,1.5)":"none",
         }}>
           {streak}
         </div>
         <div style={{
-          fontSize:14, fontFamily:"var(--f-mono)", letterSpacing:".2em",
-          color:"var(--cream-40)", marginBottom:24, textTransform:"uppercase",
+          fontSize:16, fontFamily:"var(--f-mono)", letterSpacing:".3em",
+          color:"var(--cream-60)", margin:"6px 0 22px", textTransform:"uppercase",
+          fontWeight:700,
         }}>
-          day streak 🔥
+          DAY STREAK 🔥
         </div>
 
-        {/* Title */}
         <div style={{
-          fontSize:28, fontWeight:800, color:"var(--cream)",
+          fontSize:30, fontWeight:800, color:"var(--cream)",
           marginBottom:12, lineHeight:1.25,
         }}>
           {milestone.title}
         </div>
 
-        {/* Message */}
         <p style={{
           fontSize:16, color:"var(--cream-60)", lineHeight:1.75,
-          marginBottom:32,
+          marginBottom:30,
         }}>
           {milestone.msg}
         </p>
 
-        {/* CTA */}
         <button onClick={onClose} style={{
-          background: milestone.color, border:"none", borderRadius:14,
-          padding:"14px 40px", fontSize:15, fontWeight:700,
+          background: milestone.color, border:"none", borderRadius:16,
+          padding:"16px 48px", fontSize:16, fontWeight:800,
           color: milestone.color === "var(--gold)" ? "#000" : "#fff",
           cursor:"pointer", letterSpacing:".03em",
+          boxShadow:`0 0 40px ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}50`,
         }}>
           Keep going 🔥
         </button>
@@ -11918,7 +12040,21 @@ function StreakCelebration({streak, onClose}){
       <style>{`
         @keyframes streakBounce {
           from { transform: scale(1) rotate(-5deg); }
-          to   { transform: scale(1.15) rotate(5deg); }
+          to   { transform: scale(1.18) rotate(5deg); }
+        }
+        @keyframes diqConfetti {
+          0%   { transform: translateY(-40px) rotate(0deg); opacity: 1; }
+          85%  { opacity: 1; }
+          100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
+        }
+        @keyframes diqNumberPop {
+          0%   { transform: scale(0.2); }
+          60%  { transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        @keyframes diqGlowPulse {
+          from { transform: scale(0.85); opacity: .7; }
+          to   { transform: scale(1.15); opacity: 1; }
         }
       `}</style>
     </div>
