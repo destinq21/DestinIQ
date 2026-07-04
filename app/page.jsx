@@ -2841,7 +2841,14 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
       ...(session?.access_token?{"Authorization":`Bearer ${session.access_token}`}:{}),
     },
     body:JSON.stringify({
-      system: (system||"") + `
+      system: (()=>{
+        const s = system||"";
+        // JSON-mode requests must NOT receive the prose writing rules —
+        // "write flowing paragraphs" sabotages "return only a JSON array".
+        if(/json/i.test(s)){
+          return s + `\n\nCRITICAL: Output ONLY the raw JSON. No preamble, no explanation, no markdown fences, no trailing text. Ensure the JSON is COMPLETE and valid — never truncate.` + langPrompt();
+        }
+        return s + `
 
 CRITICAL WRITING RULES — FOLLOW EXACTLY:
 1. Write like a brilliant, warm friend who has studied this person deeply — not a consultant, coach or therapist
@@ -2853,7 +2860,8 @@ CRITICAL WRITING RULES — FOLLOW EXACTLY:
 7. Never end with "I hope this helps" or "feel free to reach out" or any generic closer
 8. End with ONE clear specific action — not a list, just one thing
 9. Speak to them like they are intelligent — no over-explaining
-10. If you don't have a detail, work with what you have — NEVER ask them to update their profile` + langPrompt(),
+10. If you don't have a detail, work with what you have — NEVER ask them to update their profile` + langPrompt();
+      })(),
       messages,
       max_tokens: maxTokens||(isProMax?6000:isPremium?4000:1800)
     }),
@@ -4450,6 +4458,45 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
   const [error,setError]=useState("");
   const [scriptReady,setScriptReady]=useState(false);
 
+  // ── TESTER CODE REDEMPTION ─────────────────────────────────────────────────
+  const [showCode,setShowCode]=useState(false);
+  const [codeInput,setCodeInput]=useState("");
+  const [codeStatus,setCodeStatus]=useState(""); // "", "checking", "success", "invalid"
+  const TESTER_DAYS = 30; // free access duration
+  const grantTesterAccess = async(code)=>{
+    const expires=new Date(Date.now()+TESTER_DAYS*86400000).toISOString();
+    await supabase.from("user_profiles").upsert({
+      user_id:userId, is_paid:true,
+      plan:"tester", tester_code:code, tester_expires:expires,
+      updated_at:new Date().toISOString(),
+    },{onConflict:"user_id"});
+    try{ localStorage.setItem(`diq_paid_${userId}`,"1"); }catch{}
+    setCodeStatus("success");
+    setTimeout(()=>{ window.location.reload(); }, 1600);
+  };
+  const redeemCode=async()=>{
+    const code=codeInput.trim().toUpperCase();
+    if(!code||!userId) return;
+    setCodeStatus("checking");
+    try{
+      // Atomic claim: only succeeds if the code exists AND is unredeemed.
+      // The database enforces single-use — two accounts can never share a code.
+      const {data:claim}=await supabase.from("tester_codes")
+        .update({redeemed_by:userId, redeemed_at:new Date().toISOString()})
+        .eq("code",code).is("redeemed_by",null)
+        .select();
+      if(Array.isArray(claim)&&claim.length>0){
+        await grantTesterAccess(code);
+        return;
+      }
+      // Claim failed — was it already redeemed by THIS user? (re-activation is fine)
+      const {data:row}=await supabase.from("tester_codes")
+        .select("redeemed_by").eq("code",code).maybeSingle();
+      if(row?.redeemed_by===userId){ await grantTesterAccess(code); return; }
+      setCodeStatus(row ? "used" : "invalid");
+    }catch(e){ setCodeStatus("invalid"); }
+  };
+
   // Load Paystack script once
   useEffect(()=>{
     if(window.PaystackPop){setScriptReady(true);return;}
@@ -4733,6 +4780,46 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
               Visa · Mastercard · all major cards · Ghana MoMo · worldwide
             </span>
           </button>
+
+          {/* Tester code redemption */}
+          <div style={{textAlign:"center",marginBottom:18}}>
+            {!showCode?(
+              <button onClick={()=>setShowCode(true)}
+                style={{background:"none",border:"none",color:"var(--cream-30)",fontSize:12,
+                  cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}}>
+                Have a tester code?
+              </button>
+            ):(
+              <div style={{maxWidth:340,margin:"0 auto"}}>
+                <div style={{display:"flex",gap:8}}>
+                  <input value={codeInput} onChange={e=>{setCodeInput(e.target.value);setCodeStatus("");}}
+                    onKeyDown={e=>e.key==="Enter"&&redeemCode()}
+                    placeholder="Enter tester code"
+                    style={{flex:1,padding:"11px 14px",background:"var(--raised)",
+                      border:"1px solid "+(codeStatus==="invalid"?"rgba(224,92,110,0.5)":"var(--line)"),
+                      borderRadius:10,color:"var(--cream)",fontSize:13,fontFamily:"inherit",
+                      outline:"none",textTransform:"uppercase",letterSpacing:".05em"}}/>
+                  <button onClick={redeemCode} disabled={codeStatus==="checking"||!codeInput.trim()}
+                    style={{padding:"11px 18px",background:"var(--gold)",border:"none",borderRadius:10,
+                      color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+                      opacity:codeStatus==="checking"||!codeInput.trim()?0.5:1}}>
+                    {codeStatus==="checking"?"…":"Redeem"}
+                  </button>
+                </div>
+                {codeStatus==="invalid"&&(
+                  <div style={{fontSize:11,color:"#e05c6e",marginTop:8}}>Invalid code — check the spelling and try again.</div>
+                )}
+                {codeStatus==="used"&&(
+                  <div style={{fontSize:11,color:"#e05c6e",marginTop:8}}>This code has already been used by another account.</div>
+                )}
+                {codeStatus==="success"&&(
+                  <div style={{fontSize:12,color:"#81c784",marginTop:8,fontWeight:600}}>
+                    ✓ Welcome, tester! Pro unlocked for 30 days — loading your access…
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Security note */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:24,flexWrap:"wrap"}}>
@@ -8060,7 +8147,7 @@ function AuthScreen({onAuth, onBack}){
       if(data?.url){
         // Check if running in Capacitor native app
         const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
-        if(isNative && window?.CapacitorBrowser){
+        if(isNative && window?.Capacitor?.Plugins?.Browser){
           // Use in-app browser — stays inside the app, no Chrome
           // Use Capacitor Browser via global plugin — no import needed
           const CapBrowser = window?.Capacitor?.Plugins?.Browser;
@@ -8844,6 +8931,92 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// HABIT TRACKER — practice registry + hook (rebuilt)
+// Storage: diq_hab_{userId} → { [key]: {committed,status,notes,startedAt} }
+// ═══════════════════════════════════════════════════════════════════════════════
+const ALL_TRACKABLE = [
+  // Morning & Daily
+  {key:"wake_early",     icon:"🌅", label:"Wake up before 6am",                module:"Morning & Daily"},
+  {key:"no_phone_30",    icon:"📵", label:"No phone first 30 minutes",         module:"Morning & Daily"},
+  {key:"hydrate_first",  icon:"💧", label:"Drink water before anything else",  module:"Morning & Daily"},
+  {key:"morning_light",  icon:"☀️", label:"Get sunlight within 30 min of waking", module:"Morning & Daily"},
+  {key:"evening_shutdown",icon:"🌙",label:"Evening shutdown ritual",           module:"Morning & Daily"},
+  // Money & Wealth
+  {key:"track_spending", icon:"🧾", label:"Track every expense",               module:"Money & Wealth"},
+  {key:"save_first",     icon:"🏦", label:"Pay yourself first (save before spending)", module:"Money & Wealth"},
+  {key:"no_impulse",     icon:"🛑", label:"24-hour rule before non-essential buys", module:"Money & Wealth"},
+  {key:"weekly_money_review", icon:"📊", label:"Weekly money review",          module:"Money & Wealth"},
+  {key:"invest_monthly", icon:"📈", label:"Invest something every month",      module:"Money & Wealth"},
+  // Body & Health
+  {key:"daily_movement", icon:"🏃", label:"Move 20+ minutes daily",            module:"Body & Health"},
+  {key:"sleep_7h",       icon:"😴", label:"Sleep 7+ hours",                    module:"Body & Health"},
+  {key:"protein_meals",  icon:"🥚", label:"Protein with every meal",           module:"Body & Health"},
+  {key:"posture_check",  icon:"🪑", label:"Posture checks through the day",    module:"Body & Health"},
+  {key:"no_late_eating", icon:"🍽️", label:"No eating 2h before bed",          module:"Body & Health"},
+  // Mind & Focus
+  {key:"deep_work",      icon:"🎯", label:"One deep work block daily",         module:"Mind & Focus"},
+  {key:"daily_reading",  icon:"📖", label:"Read 10+ pages daily",              module:"Mind & Focus"},
+  {key:"journaling",     icon:"✍️", label:"Journal or reflect daily",          module:"Mind & Focus"},
+  {key:"gratitude_3",    icon:"🙏", label:"3 specific gratitudes each evening", module:"Mind & Focus"},
+  {key:"screen_limits",  icon:"⏳", label:"Respect social media time limits",  module:"Mind & Focus"},
+  // People & Growth
+  {key:"reach_out",      icon:"💬", label:"Reach out to one person daily",     module:"People & Growth"},
+  {key:"say_no",         icon:"🚫", label:"Say no to one thing that drains you", module:"People & Growth"},
+  {key:"skill_practice", icon:"⚡", label:"Practice your key skill daily",     module:"People & Growth"},
+  {key:"weekly_review",  icon:"🗓️", label:"Sunday weekly reset",              module:"People & Growth"},
+  {key:"log_wins",       icon:"🏆", label:"Log wins as they happen",           module:"People & Growth"},
+];
+
+const HAB_KEY = (uid)=>`diq_hab_${uid||"anon"}`;
+
+function useHabitTracker(userId){
+  const [data,setData]=useState(()=>{
+    if(typeof window==="undefined") return {};
+    try{ return JSON.parse(localStorage.getItem(HAB_KEY(userId))||"{}")||{}; }catch{ return {}; }
+  });
+  // Reload when user changes
+  useEffect(()=>{
+    try{ setData(JSON.parse(localStorage.getItem(HAB_KEY(userId))||"{}")||{}); }catch{ setData({}); }
+  },[userId]);
+
+  const persist=(next)=>{
+    setData(next);
+    try{ localStorage.setItem(HAB_KEY(userId), JSON.stringify(next)); }catch{}
+  };
+  const commit=(key)=>{
+    const next={...data,[key]:{...(data[key]||{}),committed:true,status:data[key]?.status||"active",startedAt:data[key]?.startedAt||new Date().toISOString()}};
+    persist(next);
+    try{ addProgressPoints(userId, `habit_commit_${key}`, 1); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"✓ Practice committed — +1 point"})); }catch{}
+  };
+  const uncommit=(key)=>{
+    const next={...data,[key]:{...(data[key]||{}),committed:false}};
+    persist(next);
+  };
+  const updateStatus=(key,status)=>{
+    const next={...data,[key]:{...(data[key]||{}),status}};
+    persist(next);
+    if(status==="mastered"){
+      try{ addProgressPoints(userId, `habit_master_${key}`, 3); }catch{}
+      try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"✦ Practice mastered — +3 points!"})); }catch{}
+    }
+  };
+  const addNote=(key,notes)=>{
+    const next={...data,[key]:{...(data[key]||{}),notes}};
+    persist(next);
+  };
+
+  const committed = ALL_TRACKABLE.filter(t=>data[t.key]?.committed);
+  const mastered  = committed.filter(t=>data[t.key]?.status==="mastered");
+  const active    = committed.filter(t=>(data[t.key]?.status||"active")==="active");
+  const paused    = committed.filter(t=>data[t.key]?.status==="paused");
+  const total     = ALL_TRACKABLE.length;
+  const pct       = total?Math.round((committed.length/total)*100):0;
+
+  return { data, commit, uncommit, updateStatus, addNote, committed, mastered, active, paused, total, pct };
+}
+
 function HabitButton({itemKey, userId, compact=false}){
   const ht = useHabitTracker(userId);
   const item = ALL_TRACKABLE.find(t=>t.key===itemKey);
@@ -9194,6 +9367,29 @@ function saveVoicePref(name){
     window.dispatchEvent(new CustomEvent("voicePrefChanged",{detail:{name}}));
   }catch{}
 }
+// Quality score — network/neural voices sound far better than local defaults
+function voiceQualityScore(v){
+  const n=(v.name||"").toLowerCase();
+  let s=0;
+  if(n.includes("natural"))  s+=50;   // Microsoft Natural (Edge) — best free voices
+  if(n.includes("neural"))   s+=45;
+  if(n.includes("online"))   s+=25;
+  if(n.includes("premium")||n.includes("enhanced")) s+=25;
+  if(n.includes("google"))   s+=20;   // Google network voices — solid
+  if(v.localService===false) s+=15;   // network voices generally beat local
+  if(n.includes("espeak"))   s-=40;   // notoriously robotic
+  if(n.includes("compact"))  s-=20;
+  return s;
+}
+// Best available voice when the user hasn't picked one
+function bestAutoVoice(){
+  try{
+    const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>(v.lang||"").toLowerCase().startsWith("en"));
+    if(!vs.length) return null;
+    return [...vs].sort((a,b)=>voiceQualityScore(b)-voiceQualityScore(a))[0];
+  }catch{ return null; }
+}
+
 // Friendly accent label from a voice's lang/name
 function voiceAccentLabel(v){
   const lang=(v.lang||"").toLowerCase(), name=(v.name||"").toLowerCase();
@@ -9226,7 +9422,19 @@ function VoicePicker(){
   const [voices,setVoices]=useState([]);
   const [sel,setSel]=useState(()=>{ try{return localStorage.getItem(VOICE_PREF_KEY)||"";}catch{return "";} });
   const [previewing,setPreviewing]=useState(false);
-  useEffect(()=>{ loadVoices().then(vs=>setVoices(vs||[])); },[]);
+  useEffect(()=>{
+    let alive=true;
+    loadVoices().then(vs=>{ if(alive) setVoices(vs||[]); });
+    // Live update if the browser delivers more voices later
+    const onChanged=()=>{
+      try{
+        const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>(v.lang||"").toLowerCase().startsWith("en"));
+        if(alive&&vs.length>0) setVoices(prev=>vs.length>prev.length?vs:prev);
+      }catch{}
+    };
+    try{ window.speechSynthesis.addEventListener?.("voiceschanged", onChanged); }catch{}
+    return()=>{ alive=false; try{ window.speechSynthesis.removeEventListener?.("voiceschanged", onChanged); }catch{} };
+  },[]);
 
   const pick=(name)=>{ setSel(name); saveVoicePref(name); };
   const preview=()=>{
@@ -9251,7 +9459,7 @@ function VoicePicker(){
           style={{flex:1,padding:"11px 12px",background:G.inp,border:"1px solid "+G.inpBorder,
             borderRadius:10,color:G.cream,fontSize:13,fontFamily:"inherit",outline:"none"}}>
           <option value="">Auto (best available)</option>
-          {voices.map(v=>(
+          {[...voices].sort((a,b)=>voiceQualityScore(b)-voiceQualityScore(a)).map(v=>(
             <option key={v.name} value={v.name}>
               {voiceAccentLabel(v)} — {v.name.replace(/Microsoft |Google |Apple /,"").slice(0,34)}
             </option>
@@ -9265,7 +9473,7 @@ function VoicePicker(){
         </button>
       </div>
       <div style={{fontSize:10,color:G.dimmer,marginTop:6,lineHeight:1.5}}>
-        Voices come from your device — phones and desktops offer different accents. Your choice applies to every Listen button.
+        Voices come from your device — phones and desktops offer different accents. Your choice applies to every Listen button. Tip: on Windows, Microsoft Edge unlocks the most human-sounding "Natural" voices.
       </div>
     </div>
   );
@@ -9277,18 +9485,20 @@ function loadVoices(){
   return new Promise(res=>{
     try{
     if(typeof window==="undefined"||!("speechSynthesis" in window)){res([]);return;}
-    const attempt=()=>{
-      const vs=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
-      if(vs.length>0){res(vs);return;}
-      window.speechSynthesis.onvoiceschanged=()=>{
-        const vs2=(window.speechSynthesis.getVoices()||[]).filter(v=>v.lang.startsWith("en"));
-        res(vs2);
-      };
-      // Fallback timeout
-      setTimeout(()=>res(window.speechSynthesis.getVoices().filter(v=>v.lang.startsWith("en"))),2000);
-    };
-    attempt();
-  }catch(_){}
+    const get=()=>(window.speechSynthesis.getVoices()||[]).filter(v=>(v.lang||"").toLowerCase().startsWith("en"));
+    let best=get();
+    // Browsers often expose ONE default voice instantly and the full list moments
+    // later — so poll until the list stops growing rather than trusting the first hit.
+    let ticks=0;
+    const timer=setInterval(()=>{
+      ticks++;
+      const now=get();
+      if(now.length>best.length) best=now;
+      // Stable non-empty list for a bit, or time's up → resolve with the best we saw
+      if((best.length>1&&ticks>=3)||ticks>=12){ clearInterval(timer); res(best); }
+    },250);
+    try{ window.speechSynthesis.onvoiceschanged=()=>{ const now=get(); if(now.length>best.length) best=now; }; }catch{}
+  }catch(_){ res([]); }
   });
 }
 
@@ -9337,13 +9547,8 @@ function AudioPlayer({text,label="Listen",mini=false}){
         voiceToUse=liveVoices.find(v=>v.name===selVoice.name)||null;
       }
       if(!voiceToUse){
-        // Fallback: best available English voice
-        voiceToUse=
-          liveVoices.find(v=>v.name.includes("Natural"))||
-          liveVoices.find(v=>v.name.includes("Google")&&v.lang==="en-US")||
-          liveVoices.find(v=>v.lang==="en-US")||
-          liveVoices.find(v=>v.lang.startsWith("en"))||
-          liveVoices[0]||null;
+        // Fallback: highest-quality English voice by ranking (network/neural first)
+        voiceToUse = bestAutoVoice() || liveVoices.find(v=>v.lang?.startsWith("en")) || liveVoices[0] || null;
       }
       const u=new SpeechSynthesisUtterance(t);
       const {rate,pitch}=getVoiceParams(voiceToUse);
@@ -13499,7 +13704,7 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
       const raw = await callAPI({
         messages:[{role:"user",content:prompt}],
         system:`You are DestinIQ generating personalised "${topic.label}" intelligence cards for ${name} from ${country}. Return ONLY a valid JSON array. Be specific, practical, and tailored to their country and situation. Never be generic.`,
-        userId, isPremium,
+        userId, isPremium, maxTokens:3000,
       });
       const txt = typeof raw==="string" ? raw :
         (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
@@ -13789,10 +13994,10 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
       try{
         const pref=getSavedVoice();
         const live=window.speechSynthesis.getVoices();
-        const v=pref?live.find(x=>x.name===pref.name):null;
+        const v=(pref?live.find(x=>x.name===pref.name):null) || bestAutoVoice();
         if(v){u.voice=v;u.lang=v.lang;}
       }catch{}
-      u.rate=1; u.onend=()=>setListening(false); u.onerror=()=>setListening(false);
+      u.rate=0.95; u.pitch=1; u.onend=()=>setListening(false); u.onerror=()=>setListening(false);
       window.speechSynthesis.speak(u); setListening(true);
     }catch{ setListening(false); }
   };
@@ -16866,7 +17071,18 @@ function DestinIQInner(){
       if (profile) {
         // ── SUBSCRIPTION STATUS ─────────────────────────────────────────
         // Source 1: Supabase (authoritative)
-        if (profile.is_paid) {
+        // Tester accounts expire — check before honouring is_paid
+        const testerExpired = profile.plan==="tester" && profile.tester_expires &&
+          new Date(profile.tester_expires).getTime() < Date.now();
+        if (testerExpired) {
+          // Trial over — revert to free (they can subscribe or ask for a new code)
+          setIsPaid(false);
+          try { localStorage.removeItem(`diq_paid_${u.id}`); } catch(_){}
+          supabase.from("user_profiles").upsert({
+            user_id:u.id, is_paid:false, plan:"free",
+            updated_at:new Date().toISOString(),
+          },{onConflict:"user_id"}).catch(()=>{});
+        } else if (profile.is_paid) {
           setIsPaid(true);
           // Keep localStorage in sync with DB
           try { localStorage.setItem(`diq_paid_${u.id}`, "1"); } catch(_){}
