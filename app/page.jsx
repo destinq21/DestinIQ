@@ -17335,7 +17335,7 @@ function DestinIQInner(){
     const CapApp = window?.Capacitor?.Plugins?.App;
     if(!CapApp) return;
     let listener = null;
-    CapApp.addListener("appUrlOpen",async({url})=>{
+    const handleAuthUrl = async(url)=>{
       alert("🔗 Link received by app:\n"+String(url||"(empty)").slice(0,140)); // TEMP debug tracer
       if(!url) return;
       // Parse both hash (#) and query string (?) — Supabase may use either
@@ -17380,7 +17380,17 @@ function DestinIQInner(){
         // No tokens in the link — show what arrived so we can diagnose
         alert("Sign-in link had no tokens. URL: "+String(url).slice(0,120));
       }
-    }).then(l=>{listener=l;}).catch(()=>{});
+    };
+    // Warm path: link arrives while the app is running
+    CapApp.addListener("appUrlOpen",({url})=>{ handleAuthUrl(url); })
+      .then(l=>{listener=l;}).catch(()=>{});
+    // Cold path: the link LAUNCHED the app (or the WebView reloaded and the
+    // event fired before this listener existed) — fetch the launch URL directly.
+    try{
+      CapApp.getLaunchUrl?.().then(r=>{
+        if(r?.url && /code=|access_token=/.test(r.url)) handleAuthUrl(r.url);
+      }).catch(()=>{});
+    }catch{}
     return()=>{ try{listener?.remove?.();}catch{} };
   },[]);
 
