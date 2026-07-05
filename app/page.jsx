@@ -8753,6 +8753,488 @@ const RELOC_COUNTRIES = [
   "Guatemala","Honduras","El Salvador","Peru","Ecuador","Bolivia","Uruguay",
 ];
 
+// ── Verified government job portals (official sources only) ──────────────────
+// Surfaced inside a country deep-dive with a "Government source ✓" badge.
+// Verified against the official sources on 5 Jul 2026 — re-check before relying;
+// registers move. Only ever add a portal you've confirmed is government-run.
+const RELOC_JOB_PORTALS = {
+  "Canada":[
+    {name:"Job Bank", url:"https://www.jobbank.gc.ca", operator:"Government of Canada",
+     note:"Canada's national employment service. Free, no hidden fees, no registration needed to search."},
+  ],
+  "United Kingdom":[
+    {name:"Register of Licensed Sponsors (Workers)", url:"https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers", operator:"UK Home Office",
+     note:"The official list of employers allowed to sponsor a UK work visa. Check a company here before you pay anyone or sign anything."},
+  ],
+  "Germany":[
+    {name:"Make it in Germany", url:"https://www.make-it-in-germany.com", operator:"German Federal Government",
+     note:"The federal portal for skilled workers — job listings plus visa and qualification-recognition guidance."},
+    {name:"Federal Employment Agency (BA Jobsuche)", url:"https://www.arbeitsagentur.de", operator:"Bundesagentur für Arbeit",
+     note:"Germany's largest official job board, run by the Federal Employment Agency. Mostly German-language listings."},
+  ],
+  "Australia":[
+    {name:"Workforce Australia", url:"https://www.workforceaustralia.gov.au", operator:"Australian Government — Dept. of Employment & Workplace Relations",
+     note:"The government's national jobs board. Any Australian can search and apply."},
+  ],
+  "New Zealand":[
+    {name:"Immigration NZ — Work & the Green List", url:"https://www.immigration.govt.nz/work", operator:"Immigration New Zealand",
+     note:"Official work-visa guidance plus the Green List of in-demand roles that can fast-track residence. NZ runs no general government job board — start here to see if your role opens a door."},
+    {name:"NZ Government Jobs", url:"https://jobs.govt.nz", operator:"New Zealand Public Service",
+     note:"Public-sector vacancies across government agencies."},
+  ],
+  "Ireland":[
+    {name:"JobsIreland", url:"https://www.jobsireland.ie", operator:"Dept. of Social Protection (Intreo)",
+     note:"Ireland's public employment service — free job search and profile matching."},
+  ],
+};
+
+// EU/EEA + Switzerland → the official EU-wide portal (EURES) also applies.
+const EURES_ENTRY = {
+  name:"EURES — European Job Mobility Portal", url:"https://eures.europa.eu", operator:"European Commission",
+  note:"The EU's own job portal, spanning 30+ countries. Free for jobseekers, and widely regarded as one of the safest places to look.",
+};
+const EURES_COUNTRIES = new Set([
+  "Germany","Netherlands","Portugal","Spain","Ireland","Sweden","Norway","Denmark",
+  "Switzerland","Austria","Belgium","Finland","France","Italy","Czech Republic","Poland",
+  "Hungary","Romania","Estonia","Latvia","Lithuania","Malta","Cyprus","Greece","Croatia",
+]);
+
+function resolveRelocPortals(country){
+  if(!country) return [];
+  const list = [...(RELOC_JOB_PORTALS[country] || [])];
+  if(EURES_COUNTRIES.has(country)) list.push(EURES_ENTRY);
+  return list;
+}
+
+// Open an external URL safely. On native (Android/iOS APK) a plain
+// <a target="_blank"> or window.open can navigate the app's WebView away with
+// no back button — which reads as the app "breaking". This uses the in-app
+// Capacitor Browser on native (same pattern as the OAuth/Paystack flows) and
+// falls back to a new tab on web.
+async function openExternal(url){
+  try{
+    const isNative = typeof window!=="undefined" && window?.Capacitor?.isNativePlatform?.();
+    const CapBrowser = window?.Capacitor?.Plugins?.Browser;
+    if(isNative && CapBrowser){
+      await CapBrowser.open({ url, presentationStyle:"popover", toolbarColor:"#0a0a0f" });
+      return;
+    }
+  }catch(e){ /* fall through to web open */ }
+  if(typeof window!=="undefined") window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// Renders automatically inside the report once a country with verified sources
+// is selected. Returns null (renders nothing) for countries we haven't verified.
+function RelocGovPortals({country}){
+  const G = useThemeColors();
+  const portals = resolveRelocPortals(country);
+  if(portals.length===0) return null;
+  return (
+    <div style={{background:G.card,border:"1px solid "+G.gold+"33",borderRadius:14,
+      padding:"14px 16px",marginBottom:10}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+        gap:10,marginBottom:8,flexWrap:"wrap"}}>
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.gold,
+          fontFamily:"monospace"}}>🛡 WHERE TO ACTUALLY LOOK</div>
+        <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 9px",
+          borderRadius:999,fontSize:10,fontWeight:700,letterSpacing:".03em",
+          color:"#000",background:G.gold,whiteSpace:"nowrap"}}>
+          GOVERNMENT SOURCE ✓
+        </span>
+      </div>
+      <p style={{fontSize:12,color:G.dimmer,margin:"0 0 12px",lineHeight:1.6}}>
+        Official government services only. If a job ever asks you to pay a fee just to apply, treat it as a red flag and come back here.
+      </p>
+      <div style={{display:"grid",gap:8}}>
+        {portals.map(p=>(
+          <div key={p.url} style={{background:"rgba(255,255,255,0.03)",
+            border:"1px solid "+G.border,borderRadius:11,padding:"12px 13px"}}>
+            <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",
+              gap:10,flexWrap:"wrap",marginBottom:4}}>
+              <a href={p.url}
+                onClick={(e)=>{e.preventDefault(); openExternal(p.url);}}
+                target="_blank" rel="noopener noreferrer"
+                style={{color:G.gold,fontSize:14,fontWeight:700,textDecoration:"none"}}>
+                {p.name} ↗
+              </a>
+              <span style={{fontSize:10,color:G.dimmer}}>{p.operator}</span>
+            </div>
+            <div style={{fontSize:12,color:G.dim,lineHeight:1.6}}>{p.note}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── The honest call: does this person actually need to move? ─────────────────
+// Reads the intake the user already gave and returns a verdict on three axes:
+// relocate abroad, change town at home, and time away from family/friends.
+// AI-driven — same callAPI + JSON pattern as runReport, gated behind isPaid.
+function RelocationVerdict({formData, userId, isPremium, isPaid, onUnlock}){
+  const G = useThemeColors();
+  const [verdict, setVerdict] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+
+  const name    = formData?.name    || "you";
+  const from    = formData?.country || "your country";
+  const skills  = formData?.skills  || formData?.career || formData?.occupation || "their skills";
+  const goals   = formData?.goals   || formData?.bigGoal || "improve their life";
+  const income  = formData?.income  || "not specified";
+  const age     = formData?.age     || "unknown";
+  const block   = formData?.challenge || (Array.isArray(formData?.blockers)?formData.blockers.join(", "):formData?.blockers) || "not specified";
+  const support = formData?.support || "not specified";
+
+  const run = async () => {
+    if(!isPaid){ onUnlock && onUnlock(); return; }
+    setLoading(true); setError(""); setVerdict(null);
+    try{
+      const prompt = `Based on this person's situation, give an HONEST verdict on whether they actually need to move to reach their goal — or whether they can succeed right where they are. Do NOT push relocation; many people are better off staying. Be specific to THEIR facts.
+
+Person: ${name}, age ${age}, lives in ${from}.
+Skills/work: ${skills}
+Main goal: ${goals}
+Income: ${income}
+Biggest challenge: ${block}
+Support system: ${support}
+
+Judge three separate questions:
+1. relocate — do they need to move to ANOTHER COUNTRY to reach this goal?
+2. changeTown — do they need to move to a different city/town WITHIN ${from}?
+3. timeAway — will pursuing this realistically mean time apart from family and friends?
+
+Return ONLY valid JSON, no markdown, no code fences. Start { end }:
+{"stance":"<one honest headline sentence — the overall call>","relocate":{"answer":"<yes|no|maybe>","reason":"<2 sentences, specific to them>"},"changeTown":{"answer":"<yes|no|maybe>","reason":"<2 sentences>"},"timeAway":{"answer":"<yes|no|maybe>","reason":"<2 sentences about family and friends>"},"summary":"<2-3 sentence honest bottom line>","nextStep":"<one concrete next action they can take this week>"}`;
+      const raw = await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:"You are an honest relocation and life-direction advisor. You do not romanticise moving abroad; staying is often the right answer. Return ONLY valid JSON. No markdown.",
+        userId, isPremium,
+      });
+      const txt = typeof raw==="string" ? raw :
+        (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const s=clean.indexOf("{"), e=clean.lastIndexOf("}");
+      if(s===-1||e===-1) throw new Error("No JSON");
+      setVerdict(JSON.parse(clean.slice(s,e+1)));
+    }catch(err){
+      setError("Could not read your situation. Tap Try Again.");
+    }
+    setLoading(false);
+  };
+
+  const AX = {
+    relocate:  {icon:"✈️",  label:"Relocate abroad"},
+    changeTown:{icon:"🏙️", label:"Change town at home"},
+    timeAway:  {icon:"👋",  label:"Time away from loved ones"},
+  };
+  const ansColor = (a)=> a==="yes" ? G.gold : a==="no" ? "#81c784" : "#f0b429";
+  const ansText  = (a)=> a==="yes" ? "YES" : a==="no" ? "NO" : "MAYBE";
+
+  return (
+    <div style={{background:G.card,border:"1px solid "+G.gold+"33",borderRadius:18,
+      padding:"18px 18px 16px",marginBottom:20,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:0,left:0,right:0,height:3,
+        background:`linear-gradient(90deg,${G.gold},${G.gold}60)`}}/>
+      <div style={{fontSize:10,fontWeight:700,letterSpacing:".15em",color:G.gold,
+        fontFamily:"monospace",marginBottom:6}}>THE HONEST CALL</div>
+
+      {!verdict && !loading && (
+        <>
+          <div style={{fontSize:16,fontWeight:800,color:G.cream,marginBottom:6}}>
+            Before you look anywhere — do you even need to move?
+          </div>
+          <p style={{fontSize:13,color:G.dim,lineHeight:1.6,margin:"0 0 14px"}}>
+            You've already told us enough. Get a straight read on whether reaching your goal actually means relocating, changing cities, or spending time away from the people you love — no romanticising, no pressure to pack.
+          </p>
+          <button onClick={run}
+            style={{background:G.gold,color:"#000",border:"none",borderRadius:12,
+              padding:"12px 22px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+            ✦ Give me the honest call
+          </button>
+        </>
+      )}
+
+      {loading && (
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0"}}>
+          <span style={{width:8,height:8,borderRadius:"50%",background:G.gold,display:"inline-block"}}/>
+          <div style={{fontSize:13,color:G.dim}}>Weighing your situation honestly…</div>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div style={{marginTop:8}}>
+          <div style={{fontSize:13,color:"#e05c6e",marginBottom:10}}>{error}</div>
+          <button onClick={run} style={{background:G.gold,border:"none",borderRadius:10,
+            padding:"9px 20px",fontSize:13,fontWeight:700,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {verdict && !loading && (
+        <>
+          <div style={{fontSize:16,fontWeight:800,color:G.cream,lineHeight:1.5,margin:"2px 0 14px"}}>
+            {verdict.stance}
+          </div>
+          <div style={{display:"grid",gap:8,marginBottom:14}}>
+            {["relocate","changeTown","timeAway"].map(k=>{
+              const a = verdict[k]||{};
+              return (
+                <div key={k} style={{background:"rgba(255,255,255,0.03)",
+                  border:"1px solid "+G.border,borderRadius:12,padding:"12px 13px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5}}>
+                    <span style={{fontSize:16}}>{AX[k].icon}</span>
+                    <div style={{flex:1,fontSize:13,fontWeight:700,color:G.cream}}>{AX[k].label}</div>
+                    <span style={{padding:"3px 10px",borderRadius:999,fontSize:10,fontWeight:800,
+                      letterSpacing:".05em",color:"#000",background:ansColor(a.answer)}}>
+                      {ansText(a.answer)}
+                    </span>
+                  </div>
+                  <div style={{fontSize:12,color:G.dim,lineHeight:1.65}}>{a.reason}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{background:G.gold+"0e",border:"1px solid "+G.gold+"30",
+            borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.gold,
+              fontFamily:"monospace",marginBottom:6}}>BOTTOM LINE</div>
+            <div style={{fontSize:13,color:G.cream,opacity:.9,lineHeight:1.7,marginBottom:10}}>{verdict.summary}</div>
+            <div style={{fontSize:12,color:G.dim,lineHeight:1.6}}>
+              <span style={{color:G.gold,fontWeight:700}}>Next step: </span>{verdict.nextStep}
+            </div>
+          </div>
+          <button onClick={run}
+            style={{background:"none",border:"1px solid "+G.border,borderRadius:10,
+              padding:"8px 16px",fontSize:12,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+            ↺ Re-run the call
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Which door is yours ──────────────────────────────────────────────────────
+// Inside a chosen country, reads the person's financial level + profile and
+// works out the realistic entry route into THAT country — skilled worker,
+// study, founder/business, or investor — with real program names and an honest
+// note about which doors aren't realistic yet. AI-driven, mirrors runReport.
+function CountryRouteFinder({formData, country, userId, isPremium, isPaid, onUnlock}){
+  const G = useThemeColors();
+  const [loading,setLoading] = useState(false);
+  const [data,setData]       = useState(null);
+  const [error,setError]     = useState("");
+  const [capital,setCapital] = useState("");   // movable savings/capital band
+  const [reason,setReason]   = useState("");   // why THIS country
+
+  // Why they want this country reshapes the door as much as the money does.
+  const REASONS = ["Work / a job","Build a business","Study","Join family",
+    "A safer, stable life","Better future for my kids","Retire"];
+  // Capital you could actually move is what decides the investor/business doors —
+  // monthly income alone doesn't. Bands are in USD as a common denominator.
+  const CAPITAL_BANDS = ["Under $5k","$5k–25k","$25k–100k","$100k–500k","$500k+"];
+
+  const name   = formData?.name    || "you";
+  const from   = formData?.country || "your country";
+  const skills = formData?.skills  || formData?.career || "your skills";
+  const goals  = formData?.goals   || formData?.bigGoal || "improve your life";
+  const income = formData?.income  || "not specified";
+  const age    = formData?.age     || "unknown";
+
+  const ROUTE_META = {
+    job:     {icon:"💼", tag:"EMPLOYMENT"},
+    study:   {icon:"🎓", tag:"STUDY ROUTE"},
+    business:{icon:"🏢", tag:"BUSINESS"},
+    investor:{icon:"💰", tag:"INVESTOR"},
+    family:  {icon:"👪", tag:"FAMILY"},
+  };
+
+  const run = async () => {
+    if(!isPaid){ onUnlock && onUnlock(); return; }
+    setLoading(true); setError("");
+    try{
+      const prompt = `Work out the realistic immigration/entry route into ${country} for ${name}: age ${age}, from ${from}, skills/work: ${skills}, monthly income: ${income}, capital/savings they could move: ${capital||"not specified"}, reason for choosing ${country}: ${reason||"not specified"}, main goal: ${goals}.
+Weigh two things together: WHY they want ${country} (their reason) and the capital they can actually move (not monthly income). The reason shapes which door fits — someone moving to study, join family, build a business or retire needs a different route than someone moving for a job. Do NOT suggest an investor or high-capital business route unless their movable capital clearly supports it — be honest instead of giving false hope. If their reason and their money pull in different directions (e.g. they want to build a business but have little capital), say so plainly and give the realistic first step. If capital or reason is "not specified", infer cautiously and say what you assumed.
+Return ONLY valid JSON, no markdown, no code fences. Start { end }:
+{"primary_route":"<job|study|business|investor|family>","primary_label":"<the real, current named program or visa for ${country} — e.g. Express Entry, Skilled Worker visa, Start-up Visa>","capital_needed":"<rough funds/capital this specific route requires, in ${country} local currency + USD>","primary_reason":"<2 sentences: why this is the door that actually fits them given their finances and skills>","alternatives":[{"label":"<another real route name>","when":"<the condition under which this would become their route>"}],"honest_note":"<1-2 honest sentences: which doors are NOT realistic for them yet, and what specifically would have to change to open them>"}`;
+      const raw = await callAPI({
+        messages:[{role:"user",content:prompt}],
+        system:"You are a relocation pathway advisor. Return ONLY valid JSON. Name real, current immigration programs for the specific country. Be financially honest — never push an investor or high-capital route on someone whose income clearly cannot support it.",
+        userId, isPremium,
+      });
+      const txt = typeof raw==="string" ? raw :
+        (raw?.content?.filter(x=>x?.type==="text").map(x=>x.text).join("")||raw?.text||"");
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const s=clean.indexOf("{"), e=clean.lastIndexOf("}");
+      if(s===-1||e===-1) throw new Error("No JSON");
+      setData(JSON.parse(clean.slice(s,e+1)));
+    }catch{
+      setError("Could not work out your route. Tap to try again.");
+    }
+    setLoading(false);
+  };
+
+  const meta = data ? (ROUTE_META[data.primary_route] || ROUTE_META.job) : null;
+
+  return (
+    <div style={{background:G.card,border:"1px solid "+G.gold+"33",borderRadius:16,
+      padding:"16px",marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+        gap:10,marginBottom:data?14:8,flexWrap:"wrap"}}>
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.gold,
+          fontFamily:"monospace"}}>✦ WHICH DOOR IS YOURS</div>
+        {data&&(
+          <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 9px",
+            borderRadius:999,fontSize:10,fontWeight:700,letterSpacing:".03em",
+            color:"#000",background:G.gold,whiteSpace:"nowrap"}}>
+            {meta.icon} {meta.tag}
+          </span>
+        )}
+      </div>
+
+      {!data&&!loading&&!error&&(
+        <>
+          <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:"0 0 14px"}}>
+            Based on your profile, here's the realistic way {name} would actually get into {country} — as a worker, a student, a founder, or an investor. No false hope, no gatekeeping.
+          </p>
+
+          {/* Why this country — reshapes the door as much as the money */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:600,color:G.cream,marginBottom:2}}>
+              What's pulling you to {country}?
+            </div>
+            <div style={{fontSize:11,color:G.dimmer,marginBottom:9,lineHeight:1.5}}>
+              Your reason changes which door fits — pick the closest.
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+              {REASONS.map(r=>{
+                const on = reason===r;
+                return (
+                  <button key={r} onClick={()=>setReason(on?"":r)}
+                    style={{padding:"7px 13px",borderRadius:20,fontSize:12,fontWeight:600,
+                      cursor:"pointer",fontFamily:"inherit",
+                      border:"1px solid "+(on?G.gold:G.border),
+                      background:on?G.gold+"18":"rgba(255,255,255,0.03)",
+                      color:on?G.gold:G.dim,transition:"all .15s"}}>
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Movable capital — the input that actually decides investor/business */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:600,color:G.cream,marginBottom:2}}>
+              How much could you move if you had to?
+            </div>
+            <div style={{fontSize:11,color:G.dimmer,marginBottom:9,lineHeight:1.5}}>
+              Savings you could actually relocate — not your monthly income. Rough is fine; skip it if you'd rather not say.
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+              {CAPITAL_BANDS.map(b=>{
+                const on = capital===b;
+                return (
+                  <button key={b} onClick={()=>setCapital(on?"":b)}
+                    style={{padding:"7px 13px",borderRadius:20,fontSize:12,fontWeight:600,
+                      cursor:"pointer",fontFamily:"inherit",
+                      border:"1px solid "+(on?G.gold:G.border),
+                      background:on?G.gold+"18":"rgba(255,255,255,0.03)",
+                      color:on?G.gold:G.dim,transition:"all .15s"}}>
+                    {b}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{textAlign:"center"}}>
+            <button onClick={run}
+              style={{background:G.gold,color:"#000",border:"none",borderRadius:12,
+                padding:"12px 24px",fontSize:14,fontWeight:700,cursor:"pointer",
+                fontFamily:"inherit"}}>
+              ✦ Find my way into {country}
+            </button>
+          </div>
+        </>
+      )}
+
+      {loading&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0"}}>
+          <span style={{width:6,height:6,borderRadius:"50%",background:G.gold,display:"inline-block"}}/>
+          <div style={{fontSize:13,color:G.dim}}>Working out your way into {country}…</div>
+        </div>
+      )}
+
+      {error&&!loading&&(
+        <div style={{textAlign:"center",padding:"6px 0"}}>
+          <div style={{fontSize:13,color:"#e05c6e",marginBottom:10}}>{error}</div>
+          <button onClick={run}
+            style={{background:G.gold,color:"#000",border:"none",borderRadius:10,
+              padding:"9px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {data&&!loading&&(
+        <div>
+          <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:12}}>
+            <div style={{fontSize:30,flexShrink:0}}>{meta.icon}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:800,color:G.cream,marginBottom:4,lineHeight:1.3}}>
+                {data.primary_label}
+              </div>
+              <div style={{fontSize:13,color:G.dim,lineHeight:1.7}}>{data.primary_reason}</div>
+            </div>
+          </div>
+
+          {data.capital_needed&&(
+            <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,
+              borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+              <div style={{fontSize:8,fontWeight:700,letterSpacing:".08em",color:G.dimmer,
+                fontFamily:"monospace",marginBottom:3}}>FUNDS THIS ROUTE NEEDS</div>
+              <div style={{fontSize:13,color:G.cream,fontWeight:600,lineHeight:1.5}}>{data.capital_needed}</div>
+            </div>
+          )}
+
+          {Array.isArray(data.alternatives)&&data.alternatives.length>0&&(
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:8,fontWeight:700,letterSpacing:".08em",color:G.dimmer,
+                fontFamily:"monospace",marginBottom:6}}>OTHER DOORS</div>
+              {data.alternatives.map((a,i)=>(
+                <div key={i} style={{display:"flex",gap:8,marginBottom:6}}>
+                  <span style={{color:G.gold,fontSize:12,flexShrink:0}}>→</span>
+                  <div style={{fontSize:12,color:G.dim,lineHeight:1.6}}>
+                    <strong style={{color:G.cream}}>{a.label}:</strong> {a.when}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {data.honest_note&&(
+            <div style={{background:G.gold+"0e",border:"1px solid "+G.gold+"30",
+              borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+              <div style={{fontSize:12,color:G.cream,lineHeight:1.7}}>
+                <strong style={{color:G.gold}}>The honest truth: </strong>{data.honest_note}
+              </div>
+            </div>
+          )}
+
+          <button onClick={run}
+            style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
+              padding:"6px 14px",fontSize:11,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+            ↺ Re-check
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RelocationExplorer({formData, userId, isPremium, isPaid, onUnlock}){
   const G = useThemeColors();
   const [query, setQuery]     = useState("");
@@ -8858,6 +9340,9 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
             Type any country and get a full AI relocation report — visa, cost of living, jobs, and a 90-day action plan.
           </p>
         </div>
+
+        {/* ── THE HONEST CALL (do you even need to move?) ── */}
+        <RelocationVerdict formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
 
         {/* ── SEARCH ── */}
         <div style={{position:"relative",marginBottom:16}}>
@@ -9012,6 +9497,10 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
             </div>
           ))}
 
+          {/* Which door is yours — entry route by financial level */}
+          <CountryRouteFinder formData={formData} country={report.country}
+            userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
+
           {/* Deep dive collapsible sections */}
           <div style={{marginBottom:20}}>
             <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",color:G.dimmer,
@@ -9084,6 +9573,9 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
               );
             })}
           </div>
+
+          {/* Verified government job portals — official sources only */}
+          <RelocGovPortals country={report.country}/>
 
           {/* Try another */}
           <button onClick={()=>{setReport(null);setQuery("");setError("");setSectionData({});setOpenSection(null);}}
@@ -9508,6 +10000,17 @@ function NoteEditor({itemKey, ht}){
 }
 
 // ── Mini progress bar widget shown in the Dashboard nav ───────────────────────
+// Android WebViews don't always implement the Web Speech API, so
+// window.speechSynthesis can be undefined. Calling .cancel() on it (e.g. from an
+// unmount cleanup when leaving a screen via the back button) throws and trips the
+// app's error boundary. This guard makes cancelling speech always safe.
+function cancelSpeech(){
+  try{
+    const ss = (typeof window!=="undefined") ? window.speechSynthesis : null;
+    if(ss && typeof ss.cancel==="function") ss.cancel();
+  }catch(e){ /* no-op: Speech API missing or unavailable */ }
+}
+
 function resolveLiveVoice(voiceRef){
   if(typeof window==="undefined"||!window.speechSynthesis||!voiceRef) return null;
   const live=window.speechSynthesis.getVoices();
@@ -9698,12 +10201,12 @@ function AudioPlayer({text,label="Listen",mini=false}){
     return {rate:0.93, pitch:1.0}; // Default American
   };
 
-  const stop=()=>{window.speechSynthesis.cancel();setState("idle");uttRef.current=null;};
-  const pause=()=>{if(window.speechSynthesis.speaking){window.speechSynthesis.pause();setState("paused");}};
+  const stop=()=>{cancelSpeech();setState("idle");uttRef.current=null;};
+  const pause=()=>{const ss=(typeof window!=="undefined")?window.speechSynthesis:null; if(ss&&ss.speaking){ss.pause();setState("paused");}};
   const play=()=>{
     if(!supported) return;
     if(state==="paused"&&uttRef.current){window.speechSynthesis.resume();setState("playing");return;}
-    window.speechSynthesis.cancel();
+    cancelSpeech();
     const t=clean(text);if(!t) return;
 
     const speakNow=()=>{
@@ -9747,7 +10250,7 @@ function AudioPlayer({text,label="Listen",mini=false}){
     const isMobile=/Android|iPhone|iPad/i.test(typeof navigator!=="undefined"?navigator.userAgent:"");
     setTimeout(speakNow, isMobile?150:60);
   };
-  useEffect(()=>()=>{if(typeof window!=="undefined")window.speechSynthesis.cancel();},[]);
+  useEffect(()=>()=>{cancelSpeech();},[]);
   if(!supported) return(
     <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",
       border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,fontSize:12,
