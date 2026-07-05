@@ -4728,8 +4728,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
 
   const FREE_FEATURES=[
   {text:"1 intelligence report (your profile)",        inc:true},
-  {text:"5 starter tools (Career, Decisions, Confidence, Inner Peace, Side Hustle)", inc:true},
-  {text:"AI Advisor — 3 short messages/day",           inc:true},
+  {text:"Decisions tool free — plus a preview of all 42 tools", inc:true},
+  {text:"AI Advisor — short daily chats",           inc:true},
   {text:"Daily check-in — basic reflection",           inc:true},
   {text:"Win tracker — up to 5 wins",                  inc:true},
   {text:"Journal — 1 entry",                           inc:true},
@@ -6302,11 +6302,11 @@ function Landing({onStart,ipLocation}){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,maxWidth:900,margin:"0 auto"}}>
           {[
             {name:"Free",price:"$0",period:"forever",color:"rgba(255,255,255,0.06)",border:"rgba(255,255,255,0.1)",badge:null,
-             features:["1 Intelligence Report","5 starter AI tools","Daily Check-in","Win Tracker (5/day)","AI Advisor (limited)"],
+             features:["1 Intelligence Report","Decisions tool free + preview all 42","Daily Check-in","Win Tracker (up to 5)","AI Advisor (short daily chats)"],
              cta:"Get Started Free",ctaStyle:{background:"rgba(255,255,255,0.08)",color:G.cream},
              action:()=>onStart()},
             {name:"Pro",price:"$9.99",period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
-             features:["3 Intelligence Reports/month","All 42 AI tools","Unlimited Check-ins","Unlimited Win Tracker","AI Advisor (6,000 chars/day)","Practices & habits","Progress tracking","Audio report read-aloud"],
+             features:["3 Intelligence Reports/month","All 42 AI tools","Unlimited Check-ins","Unlimited Win Tracker","AI Advisor — full daily conversations","Practices & habits","Progress tracking","Audio report read-aloud"],
              cta:"Start Pro →",ctaStyle:{background:G.gold,color:"#000"},
              action:()=>onStart()},
             {name:"Pro Max",price:"$24.99",period:"per month",color:"rgba(155,114,207,0.06)",border:"rgba(155,114,207,0.3)",badge:"Everything",
@@ -16044,9 +16044,14 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
               {/* RESULT VIEW */}
               {result.scores&&(
                 <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-                  <ScorePill label="CONFIDENCE" value={(result.scores.confidence??"—")+"%"} color="#4caf7d"/>
-                  <ScorePill label="STRESS" value={result.scores.stress||"—"} color="#e0b64f"/>
-                  <ScorePill label="OPTIMISM" value={result.scores.optimism||"—"} color="#5b9fd6"/>
+                  <div style={{display:"inline-flex",alignItems:"center",gap:9,padding:"9px 15px",
+                    background:"rgba(76,175,125,0.1)",border:"1px solid rgba(76,175,125,0.3)",borderRadius:22}}>
+                    <span style={{fontSize:15}}>🌱</span>
+                    <span style={{fontSize:9,color:"#4caf7d",letterSpacing:".12em",fontFamily:"monospace"}}>SHOWING UP</span>
+                    <span style={{fontSize:13,color:G.cream,fontWeight:600}}>
+                      {result.achievements?.[0] || "You put words to your day — that's the work"}
+                    </span>
+                  </div>
                 </div>
               )}
               {result.theme&&(
@@ -16114,7 +16119,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
             </div>
             <div style={{fontSize:12,color:G.dimmer,lineHeight:1.6}}>
               This is you, 3 years from now — the version that made it through. They remember every journal entry you've written.
-              {!isPaid&&!isPremium&&<span> Free: 3 messages/day.</span>}
+              {!isPaid&&!isPremium&&<span> Free: short daily chats.</span>}
             </div>
           </div>
 
