@@ -10121,7 +10121,9 @@ function VoicePicker(){
   };
 
   if(voices.length===0) return(
-    <div style={{fontSize:12,color:G.dimmer}}>No voices available on this device.</div>
+    <div style={{fontSize:12,color:G.dimmer,lineHeight:1.6}}>
+      Read-aloud uses a natural voice that sounds the same on every device — there's nothing to set up here. Just tap <strong style={{color:G.cream}}>Listen</strong> anywhere you see it.
+    </div>
   );
   return(
     <div>
