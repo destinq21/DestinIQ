@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DestinIQ — Personal Intelligence Platform",
     description: "AI that knows your next move before you do.",
-    url: "https://destiniq.vercel.app",
+    url: "https://www.destiniq.app",
     siteName: "DestinIQ",
     type: "website",
   },

@@ -14405,7 +14405,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
     window.dispatchEvent(new CustomEvent("toolRefresh",{detail:{modId:toolId}}));
   };
   const handleShare=async()=>{
-    const url=typeof window!=="undefined"?window.location.origin:"https://destiniq.vercel.app";
+    const url=typeof window!=="undefined"?window.location.origin:"https://www.destiniq.app";
     const title=`${meta?.label||toolId} — DestinIQ`;
     try{
       if(navigator.share){ await navigator.share({title, text:`Check out ${meta?.label||toolId} on DestinIQ`, url}); }
@@ -16101,7 +16101,7 @@ function EditProfileModal({formData, userId, onSave, onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 function ReferralWidget({userId, isPaid}){
   const code = userId ? userId.replace(/-/g,"").slice(0,8).toUpperCase() : "";
-  const link = `https://destiniq.vercel.app?ref=${code}`;
+  const link = `https://www.destiniq.app?ref=${code}`;
   const [copied, setCopied] = useState(false);
   const [referrals, setReferrals] = useState(0);
 
@@ -16647,7 +16647,7 @@ function PolicyPage({type,onBack}){
                 </div>
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:4}}>🌍 Website</div>
-                  <a href="https://destiniq.vercel.app" target="_blank" rel="noreferrer"
+                  <a href="https://www.destiniq.app" target="_blank" rel="noreferrer"
                     style={{fontSize:14,color:G.gold,textDecoration:"none"}}>
                     destiniq.vercel.app
                   </a>
@@ -18251,13 +18251,13 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
     setMeta("description","DestinIQ gives you a personalised life intelligence report — built around your goals, your country, and your real situation. Not generic advice.");
     setMeta("og:title","DestinIQ — Your Personal Clarity Report",true);
     setMeta("og:description","Find out exactly where you are, what's holding you back, and what to do next. Built for you, not for everyone.",true);
-    setMeta("og:image","https://destiniq.vercel.app/og-image.png",true);
-    setMeta("og:url","https://destiniq.vercel.app",true);
+    setMeta("og:image","https://www.destiniq.app/og-image.png",true);
+    setMeta("og:url","https://www.destiniq.app",true);
     setMeta("og:type","website",true);
     setMeta("twitter:card","summary_large_image");
     setMeta("twitter:title","DestinIQ — Your Personal Clarity Report");
     setMeta("twitter:description","A personalised life intelligence report built around your goals and situation.");
-    setMeta("twitter:image","https://destiniq.vercel.app/og-image.png");
+    setMeta("twitter:image","https://www.destiniq.app/og-image.png");
   },[]);
 
   return(
