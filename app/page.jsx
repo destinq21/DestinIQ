@@ -10173,11 +10173,18 @@ function loadVoices(){
   });
 }
 
+// Natural, human-sounding cloud voice used for read-aloud (OpenAI tts-1 voices:
+// alloy, ash, coral, echo, fable, nova, onyx, sage, shimmer). "sage" is warm and
+// calm — a good coach voice. Change here to restyle every read-aloud at once.
+const DQ_CLOUD_VOICE = "sage";
+
 function AudioPlayer({text,label="Listen",mini=false}){
   const [state,setState]=useState("idle");
   const [supported]=useState(()=>typeof window!=="undefined"&&"speechSynthesis" in window);
   const selVoice=useVoicePreference(); // user's chosen voice — falls back to best English voice
   const uttRef=useRef(null);
+  const audioRef=useRef(null);        // <audio> for the natural cloud voice
+  const cloudFailRef=useRef(false);   // if cloud is unavailable, stop retrying it this session
 
   const clean=t=>(t||"")
     .replace(/https?:\/\/\S+/g,"")
@@ -10201,14 +10208,40 @@ function AudioPlayer({text,label="Listen",mini=false}){
     return {rate:0.93, pitch:1.0}; // Default American
   };
 
-  const stop=()=>{cancelSpeech();setState("idle");uttRef.current=null;};
-  const pause=()=>{const ss=(typeof window!=="undefined")?window.speechSynthesis:null; if(ss&&ss.speaking){ss.pause();setState("paused");}};
-  const play=()=>{
-    if(!supported) return;
-    if(state==="paused"&&uttRef.current){window.speechSynthesis.resume();setState("playing");return;}
-    cancelSpeech();
-    const t=clean(text);if(!t) return;
+  // Natural cloud voice — generates an MP3 server-side and plays it. Same voice on
+  // every device including the Android APK (it's just audio, not the WebView's TTS).
+  const playCloud=async(t)=>{
+    if(cloudFailRef.current) return false;   // endpoint not available — don't keep trying
+    try{
+      setState("loading");
+      let token=null;
+      try{ const{data}=await supabase.auth.getSession(); token=data?.session?.access_token||null; }catch{}
+      const res=await fetch("/api/tts",{
+        method:"POST",
+        headers:{"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})},
+        body:JSON.stringify({text:t,voice:DQ_CLOUD_VOICE}),
+      });
+      if(!res.ok) throw new Error("tts "+res.status);
+      const blob=await res.blob();
+      if(!blob||blob.size<200) throw new Error("empty audio");
+      const url=URL.createObjectURL(blob);
+      if(!audioRef.current) audioRef.current=new Audio();
+      const a=audioRef.current;
+      a.src=url;
+      a.onplay=()=>setState("playing");
+      a.onended=()=>{ setState("idle"); try{URL.revokeObjectURL(url);}catch{} };
+      a.onerror=()=>{ setState("idle"); };
+      await a.play();
+      return true;
+    }catch(e){
+      cloudFailRef.current=true;   // fall back to the browser voice from here on
+      return false;
+    }
+  };
 
+  const speakBrowser=(t)=>{
+    if(!supported){ setState("unsupported"); return; }
+    cancelSpeech();
     const speakNow=()=>{
       // Always fetch voice fresh right before speaking — never use a stored reference
       const liveVoices=window.speechSynthesis.getVoices();
@@ -10250,21 +10283,39 @@ function AudioPlayer({text,label="Listen",mini=false}){
     const isMobile=/Android|iPhone|iPad/i.test(typeof navigator!=="undefined"?navigator.userAgent:"");
     setTimeout(speakNow, isMobile?150:60);
   };
-  useEffect(()=>()=>{cancelSpeech();},[]);
-  if(!supported) return(
-    <div style={{padding:"10px 14px",background:"rgba(255,255,255,0.03)",
-      border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,fontSize:12,
-      color:"rgba(232,220,200,0.4)",textAlign:"center"}}>
-      🔊 Audio read-aloud not supported in this browser — try Chrome for this feature
-    </div>
-  );
+
+  const stop=()=>{
+    cancelSpeech();
+    if(audioRef.current){ try{audioRef.current.pause();audioRef.current.currentTime=0;}catch{} }
+    setState("idle"); uttRef.current=null;
+  };
+  const pause=()=>{
+    if(audioRef.current&&!audioRef.current.paused&&!audioRef.current.ended){ try{audioRef.current.pause();setState("paused");return;}catch{} }
+    const ss=(typeof window!=="undefined")?window.speechSynthesis:null;
+    if(ss&&ss.speaking){ ss.pause(); setState("paused"); }
+  };
+  const play=async()=>{
+    // Resume from paused
+    if(state==="paused"){
+      if(audioRef.current&&audioRef.current.src&&!audioRef.current.ended){ try{ await audioRef.current.play(); setState("playing"); return; }catch{} }
+      if(supported&&uttRef.current){ window.speechSynthesis.resume(); setState("playing"); return; }
+    }
+    const t=clean(text); if(!t) return;
+    cancelSpeech();
+    if(audioRef.current){ try{audioRef.current.pause();}catch{} }
+    // Natural cloud voice first; the browser voice takes over if it isn't available.
+    const ok=await playCloud(t);
+    if(ok) return;
+    speakBrowser(t);
+  };
+  useEffect(()=>()=>{ cancelSpeech(); if(audioRef.current){ try{audioRef.current.pause();}catch{} } },[]);
 
   if(mini){
     return(
-      <button onClick={state==="playing"?stop:play}
-        title={state==="playing"?"Stop":"Listen"}
+      <button onClick={()=>{ if(state==="idle"||state==="unsupported") play(); else stop(); }}
+        title={state==="playing"?"Stop":state==="loading"?"Preparing…":"Listen"}
         style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:"50%",background:state!=="idle"?"rgba(210,175,90,0.12)":"none",border:`1.5px solid ${state!=="idle"?"rgba(210,175,90,0.5)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:11,marginTop:6,color:state!=="idle"?"var(--gold)":"rgba(255,255,255,0.25)",transition:"all .2s",flexShrink:0}}>
-        {state==="playing"?"⏹":"🔊"}
+        {state==="loading"?"…":state==="playing"?"⏹":"🔊"}
       </button>
     );
   }
@@ -10277,11 +10328,23 @@ function AudioPlayer({text,label="Listen",mini=false}){
           🔊 {label}
         </button>
       )}
+      {state==="loading"&&(
+        <span style={{display:"inline-flex",alignItems:"center",gap:8,padding:"6px 6px",fontSize:12,color:"var(--gold)"}}>
+          Preparing audio
+          <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>{[0,1,2].map(i=><span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?13:8,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>)}</span>
+        </span>
+      )}
+      {state==="unsupported"&&(
+        <span style={{padding:"6px 14px",fontSize:12,color:"rgba(232,220,200,0.4)"}}>
+          🔊 Audio isn't available here right now — try again, or open in Chrome.
+        </span>
+      )}
       {state==="playing"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
           <button onClick={pause} style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>⏸ Pause</button>
           <button onClick={stop} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 12px",color:"rgba(255,255,255,0.3)",fontSize:12,cursor:"pointer"}}>⏹</button>
           <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>{[0,1,2].map(i=><span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?13:8,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>)}</span>
+          <span style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"var(--f-mono)",letterSpacing:".05em"}}>AI voice</span>
         </div>
       )}
       {state==="paused"&&(
