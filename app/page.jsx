@@ -5278,6 +5278,15 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
     try{localStorage.setItem(chatKey,JSON.stringify(msgs.slice(-80)));}catch{} // keep last 80 msgs
   },[msgs]);
 
+  // Reload saved history once chatKey becomes available (userId can arrive async)
+  useEffect(()=>{
+    if(!chatKey||msgs.length>1) return;
+    try{
+      const saved=JSON.parse(localStorage.getItem(chatKey)||"null");
+      if(Array.isArray(saved)&&saved.length>1) setMsgs(saved);
+    }catch{}
+  },[chatKey]);
+
   const startNewChat=()=>{
     const fresh=[{role:"assistant",content:openingMessage}];
     setMsgs(fresh);
@@ -15744,8 +15753,21 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
   const [view,setView]=useState("write"); // write | history | reading | future
   const [reading,setReading]=useState(null);
 
-  // ── Future Me chat state ──
-  const [fmMsgs,setFmMsgs]=useState([]);
+  // ── Future Me chat state (persisted) ──
+  const FM_CHAT_KEY=`diq_fm_chat_${userId}`;
+  const [fmMsgs,setFmMsgs]=useState(()=>{
+    if(typeof window==="undefined") return [];
+    try{
+      const saved=JSON.parse(localStorage.getItem(FM_CHAT_KEY)||"null");
+      if(Array.isArray(saved)) return saved;
+    }catch{}
+    return [];
+  });
+  // Save Future Me chat whenever it changes
+  useEffect(()=>{
+    if(fmMsgs.length===0) return;
+    try{localStorage.setItem(FM_CHAT_KEY,JSON.stringify(fmMsgs.slice(-60)));}catch{}
+  },[fmMsgs]);
   const [fmInput,setFmInput]=useState("");
   const [fmLoading,setFmLoading]=useState(false);
   const fmScrollRef=useRef(null);
@@ -15976,10 +15998,19 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
                 ))}
               </div>
 
-              {/* Today's rotating prompt */}
-              <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",
-                borderRadius:12,padding:"12px 16px",marginBottom:14}}>
-                <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:4}}>TODAY'S REFLECTION</div>
+              {/* Today's rotating prompt — tap to use it */}
+              <div onClick={()=>{
+                  setLetter(l=>l.includes(todaysPrompt)?l:(todaysPrompt+"\n\n"+l).trim()+(l?"":"\n"));
+                }}
+                style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",
+                borderRadius:12,padding:"12px 16px",marginBottom:14,cursor:"pointer",
+                transition:"border-color .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.4)"}
+                onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.15)"}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace"}}>TODAY'S REFLECTION</div>
+                  <div style={{fontSize:10,color:G.dimmer}}>tap to use ↓</div>
+                </div>
                 <div style={{fontSize:13,color:G.cream,lineHeight:1.6}}>{todaysPrompt}</div>
               </div>
 
@@ -16071,7 +16102,16 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
         <>
           <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.08),rgba(155,114,207,0.06))",
             border:"1px solid rgba(240,180,41,0.15)",borderRadius:14,padding:"14px 18px",marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:4}}>🔮 Conversation with Future You</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontSize:13,fontWeight:700,color:G.cream}}>🔮 Conversation with Future You</div>
+              {fmMsgs.length>0&&(
+                <button onClick={()=>{setFmMsgs([]);try{localStorage.removeItem(FM_CHAT_KEY);}catch{}}}
+                  style={{background:"none",border:"1px solid "+G.border,borderRadius:8,
+                    padding:"4px 10px",fontSize:10,color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+                  ↺ New chat
+                </button>
+              )}
+            </div>
             <div style={{fontSize:12,color:G.dimmer,lineHeight:1.6}}>
               This is you, 3 years from now — the version that made it through. They remember every journal entry you've written.
               {!isPaid&&!isPremium&&<span> Free: 3 messages/day.</span>}
