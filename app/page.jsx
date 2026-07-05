@@ -10617,10 +10617,10 @@ function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loadi
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div className="mono" style={{fontSize:"9px",color}}>{title}</div>
-          {audioText&&<AudioPlayer text={audioText} label="" mini={true}/>}
+          {audioText&&isPaid&&<AudioPlayer text={audioText} label="" mini={true}/>}
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          {audioText&&<AudioPlayer text={audioText} label="Listen"/>}
+          {audioText&&isPaid&&<AudioPlayer text={audioText} label="Listen"/>}
           <button onClick={handleRegen} disabled={loading}
             title={isPaid?"Get a new set":"Upgrade to refresh with new ideas"}
             style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.12)",background:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4}}>
@@ -11016,7 +11016,10 @@ const FREE_JOURNAL_LIMIT = 1;   // Free: 1 journal entry
 const FREE_REPORT_LIMIT  = 1;   // Free: 1 intelligence report
 const PRO_REPORT_LIMIT   = 3;   // Pro: 3 reports/month
 // 5 free tools — one from each major area to hook users, Pro unlocks all 42
-const FREE_TOOLS = ["career","decisions","confidencelab","innerpeace","sidehustle"];
+// Only Decisions generates for free (alongside the intelligence report) — it's
+// the flagship free taste. Every other tool is browsable but generates on Pro,
+// so free users never trigger AI cost on them.
+const FREE_TOOLS = ["decisions"];
 // ─────────────────────────────────────────────────────────────────────────────
 
 function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
@@ -11543,7 +11546,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
                 <div style={{padding:"14px 16px",borderTop:"1px solid rgba(255,255,255,0.06)",background:"rgba(210,175,90,0.04)"}}>
                   <div style={{fontSize:9,color:"var(--gold)",fontFamily:"var(--f-mono)",marginBottom:8,letterSpacing:".08em"}}>⬡ YOUR COACH</div>
                   <p style={{fontSize:13,color:"rgba(237,232,216,0.7)",lineHeight:1.75,margin:0}}>{entry.reply}</p>
-                  <AudioPlayer text={entry.reply} label="Listen" mini={false}/>
+                  {isPaid&&<AudioPlayer text={entry.reply} label="Listen" mini={false}/>}
                 </div>
               ):null}
             </div>
@@ -14899,33 +14902,35 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
       <div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",
         color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
         <div style={{fontSize:"clamp(32px,10vw,52px)",marginBottom:16}}>{meta?.icon||"🔒"}</div>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:".12em",color:G.gold,fontFamily:"monospace",marginBottom:8}}>PRO TOOL · PREVIEW</div>
         <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:G.cream}}>{meta?.label||"This Tool"}</h2>
         <p style={{fontSize:14,color:G.dim,lineHeight:1.7,margin:"0 0 24px"}}>
-          This tool is part of the Pro plan. Upgrade to unlock all 42 intelligence tools.
+          Unlock {meta?.label||"this tool"} to get 5 strategies written for your exact situation — then tap any one to go deeper. One of all 42 tools included in Pro.
         </p>
         <button onClick={onUnlock}
           style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
             borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
             marginBottom:12}}>
-          ✦ Unlock All 42 Tools
+          ✦ Unlock {meta?.label||"this tool"} — from $9/mo
         </button>
         <button onClick={()=>goBack?goBack():setNav("explore")}
           style={{background:"none",border:"none",color:G.dim,
             cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
-          ← Go back
+          ← Browse other tools
         </button>
         <div style={{marginTop:24,padding:"14px 16px",background:"rgba(240,180,41,0.06)",
           border:"1px solid rgba(240,180,41,0.15)",borderRadius:12}}>
-          <div style={{fontSize:11,color:G.gold,fontWeight:700,marginBottom:6}}>FREE TOOLS AVAILABLE</div>
+          <div style={{fontSize:11,color:G.gold,fontWeight:700,marginBottom:6}}>FREE RIGHT NOW</div>
+          <p style={{fontSize:12,color:G.dim,lineHeight:1.6,margin:"0 0 10px"}}>
+            Your full intelligence report and the Decisions tool are free — no upgrade needed.
+          </p>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
-            {FREE_TOOLS.map(t=>(
-              <span key={t} onClick={()=>setNav("tool:"+t)}
-                style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",
-                  border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
-                  fontSize:11,color:G.dim,cursor:"pointer"}}>
-                {TOOL_META[t]?.icon} {TOOL_META[t]?.label}
-              </span>
-            ))}
+            <span onClick={()=>setNav("tool:decisions")}
+              style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",
+                border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
+                fontSize:11,color:G.dim,cursor:"pointer"}}>
+              {TOOL_META["decisions"]?.icon} Try Decisions free →
+            </span>
           </div>
         </div>
       </div>
@@ -15515,19 +15520,30 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           </div>
         </div>
 
-        {/* Export PDF — available to all paid users */}
+        {/* Export PDF — Pro Max only; Pro sees an upgrade nudge at peak intent */}
         <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-          {isPaid&&(
+          {isProMax ? (
             <button onClick={()=>exportReportPDF(formData,data,scores,overall)}
               style={{padding:"7px 15px",
-                background:isProMax?"rgba(155,114,207,0.12)":"rgba(240,180,41,0.08)",
-                border:`1px solid ${isProMax?"rgba(155,114,207,0.35)":"rgba(240,180,41,0.25)"}`,
+                background:"rgba(155,114,207,0.12)",
+                border:"1px solid rgba(155,114,207,0.35)",
                 borderRadius:20,
-                color:isProMax?"#9b72cf":"var(--gold)",
+                color:"#9b72cf",
                 fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
-              📄 {isProMax?"Export PDF (Pro Max)":"Export PDF"}
+              📄 Export PDF
             </button>
-          )}
+          ) : isPaid ? (
+            <button onClick={()=>onUnlock&&onUnlock()}
+              title="PDF export is a Pro Max feature"
+              style={{padding:"7px 15px",
+                background:"rgba(155,114,207,0.06)",
+                border:"1px solid rgba(155,114,207,0.25)",
+                borderRadius:20,
+                color:"#9b72cf",
+                fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
+              🔒 Export PDF — Pro Max
+            </button>
+          ) : null}
         </div>
         {isProMax&&<ScoreComparisonCard userId={userId} currentScores={scores} currentOverall={overall}/>}
         {/* Right: Overall Intelligence Score ring */}
@@ -15722,42 +15738,130 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
   const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY)||"[]");}catch{return [];}});
   const canWriteToday = isPremium || isPaid || entries.length < FREE_JOURNAL_LIMIT;
   const [letter,setLetter]=useState("");
-  const [aiReply,setAiReply]=useState("");
+  const [mood,setMood]=useState(null);
+  const [result,setResult]=useState(null); // {reflection,scores,theme,achievements,ending,memory}
   const [loading,setLoading]=useState(false);
-  const [view,setView]=useState("write"); // write | history | reading
+  const [view,setView]=useState("write"); // write | history | reading | future
   const [reading,setReading]=useState(null);
+
+  // ── Future Me chat state ──
+  const [fmMsgs,setFmMsgs]=useState([]);
+  const [fmInput,setFmInput]=useState("");
+  const [fmLoading,setFmLoading]=useState(false);
+  const fmScrollRef=useRef(null);
 
   const todayStr=new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
   const todayKey=new Date().toISOString().slice(0,10);
+  const firstName=profile?.name?.split(" ")[0]||"me";
+
+  // ── MOODS ──
+  const MOODS=[
+    {id:"happy",    emoji:"🙂", label:"Happy"},
+    {id:"calm",     emoji:"😌", label:"Calm"},
+    {id:"sad",      emoji:"😔", label:"Sad"},
+    {id:"angry",    emoji:"😤", label:"Angry"},
+    {id:"anxious",  emoji:"😰", label:"Anxious"},
+    {id:"motivated",emoji:"🔥", label:"Motivated"},
+  ];
+
+  // ── ROTATING DAILY PROMPTS ──
+  const PROMPTS=[
+    "What challenged you today — and how did you respond?",
+    "What made you smile today, even for a second?",
+    "What's one lesson from today you don't want to forget?",
+    "If tomorrow goes perfectly, what happens?",
+    "What are you avoiding right now — and why?",
+    "What would you do today if you weren't afraid?",
+    "Who helped you recently? Have you told them?",
+    "What's draining your energy that you could let go of?",
+    "What small win from this week deserves more credit?",
+    "What does 'progress' look like for you this month?",
+    "What conversation do you need to have but keep postponing?",
+    "What are you grateful for that you usually overlook?",
+    "What would future you thank present you for starting today?",
+    "What's the honest reason behind how you feel right now?",
+  ];
+  const dayOfYear=Math.floor((Date.now()-new Date(new Date().getFullYear(),0,0))/86400000);
+  const todaysPrompt=PROMPTS[dayOfYear%PROMPTS.length];
+
+  // ── GROWTH STATS ──
+  const stats={
+    memories: entries.length,
+    insights: entries.filter(e=>e.reply||e.reflection).length,
+    breakthroughs: entries.reduce((n,e)=>n+((e.achievements||[]).length),0),
+  };
 
   const save=(entry)=>{
-    const updated=[entry,...entries].slice(0,50);
+    const updated=[entry,...entries].slice(0,100);
     setEntries(updated);
     try{localStorage.setItem(STORE_KEY,JSON.stringify(updated));}catch{}
   };
 
+  // ── MEMORY CONTEXT: recent past entries for AI ──
+  const memoryContext=()=>{
+    const past=entries.slice(0,8).map(e=>
+      `[${e.date}${e.mood?" · feeling "+e.mood:""}] ${(e.letter||"").slice(0,250)}`
+    ).join("\n");
+    return past?`\n\nTHEIR PAST JOURNAL ENTRIES (newest first):\n${past}`:"";
+  };
+
+  // ── SUBMIT: get structured reflection ──
   const submit=async()=>{
     if(!letter.trim()||loading) return;
     setLoading(true);
     try{
-      const reply=await callAPI({
-        messages:[{role:"user",content:`Here is a personal letter I'm writing to my future self:\n\n"${letter.trim()}"\n\nI'm ${profile?.name||"someone"}, ${profile?.age||""} from ${profile?.country||""}. My goals: ${profile?.goals||profile?.bigGoal||""}. My main challenge: ${profile?.challenge||""}.\n\nRespond as a deeply wise, warm life coach who has read this letter. First, reflect back what you hear — what this person really wants, fears, and hopes for. Then write a brief response letter to them from their future self, 1 year from now, who made it through.`}],
-        system:"You write emotionally intelligent, deeply personal reflections. Warm, honest, not generic. No therapy-speak. No bullet points. Just real human writing.",
+      const raw=await callAPI({
+        messages:[{role:"user",content:`Today's journal entry from ${profile?.name||"someone"}, ${profile?.age||""} from ${profile?.country||""}. Their goal: ${profile?.goals||profile?.bigGoal||""}. Main challenge: ${profile?.challenge||""}. Mood they selected: ${mood||"not specified"}.\n\nTODAY'S ENTRY:\n"${letter.trim()}"${memoryContext()}\n\nRespond ONLY with valid JSON, no markdown fences, in exactly this shape:\n{"reflection":"(3-5 warm sentences reflecting what you hear — what they really want, fear, hope for. Speak directly to them.)","scores":{"confidence":0-100,"stress":"Low|Medium|High","optimism":"Low|Medium|High"},"theme":"(3-6 word main theme of this entry)","achievements":["(0-3 short achievement strings you genuinely detect, e.g. 'Showed resilience under pressure' — empty array if none)"],"memory":"(If a past entry connects meaningfully to today's — quote a short phrase from it, name roughly when it was, and show their growth in 1-2 sentences. Empty string if no real connection.)","ending":"(2-3 sentence closing that makes today feel like part of their story. Warm, specific to what they wrote, no clichés.)"}`}],
+        system:"You write emotionally intelligent, deeply personal journal reflections. Warm, honest, specific — never generic, never therapy-speak. You output ONLY valid JSON matching the requested shape. No markdown, no backticks, no text outside the JSON.",
         userId,isPremium,
       });
+      let parsed=null;
+      try{ parsed=JSON.parse(raw.trim().replace(/^```json?/,"").replace(/```$/,"").trim()); }catch{}
       const entry={
-        id:Date.now(),
-        date:todayKey,
-        dateLabel:todayStr,
-        letter:letter.trim(),
-        reply:reply.trim(),
+        id:Date.now(), date:todayKey, dateLabel:todayStr,
+        mood, letter:letter.trim(),
+        reflection: parsed?.reflection || raw.trim(),
+        scores:     parsed?.scores || null,
+        theme:      parsed?.theme || "",
+        achievements: parsed?.achievements || [],
+        memory:     parsed?.memory || "",
+        ending:     parsed?.ending || "",
+        reply:      parsed?.reflection || raw.trim(), // backwards compat
       };
       save(entry);
-      setAiReply(reply.trim());
+      setResult(entry);
     }catch{
-      setAiReply("Something went wrong. Your letter is saved — try getting a reflection again.");
+      setResult({reflection:"Something went wrong generating your reflection. Your entry is saved — tap Get Reflection to try again.",scores:null,achievements:[],memory:"",ending:""});
     }
     setLoading(false);
+  };
+
+  // ── FUTURE ME CHAT ──
+  const FM_LIMIT_KEY=`diq_fm_${userId}_${todayKey}`;
+  const fmUsed=()=>{try{return parseInt(localStorage.getItem(FM_LIMIT_KEY)||"0");}catch{return 0;}};
+  const fmCanSend = isPaid||isPremium ? true : fmUsed()<3;
+
+  const sendFm=async()=>{
+    const text=fmInput.trim();
+    if(!text||fmLoading) return;
+    if(!fmCanSend){ onUnlock&&onUnlock(); return; }
+    setFmInput("");
+    const newMsgs=[...fmMsgs,{role:"user",content:text}];
+    setFmMsgs(newMsgs);
+    setFmLoading(true);
+    try{
+      const reply=await callAPI({
+        messages:newMsgs,
+        system:`You are the FUTURE SELF of ${profile?.name||"this person"} — 3 years from now. They made it through what they're facing today. You remember writing these journal entries because you wrote them. Speak in first person as them, older and wiser. Reference their actual past entries when relevant ("I remember when we wrote…"). Be warm, real, specific — never generic motivation. Keep replies under 120 words.\n\nWHO THEY ARE: ${profile?.name||""}, ${profile?.age||""}, from ${profile?.country||""}. Goal: ${profile?.goals||profile?.bigGoal||""}. Challenge: ${profile?.challenge||""}.${memoryContext()}`,
+        userId,isPremium,
+      });
+      setFmMsgs(m=>[...m,{role:"assistant",content:reply.trim()}]);
+      try{localStorage.setItem(FM_LIMIT_KEY,String(fmUsed()+1));}catch{}
+    }catch{
+      setFmMsgs(m=>[...m,{role:"assistant",content:"I couldn't reach you just now — try again in a moment."}]);
+    }
+    setFmLoading(false);
+    setTimeout(()=>{fmScrollRef.current&&(fmScrollRef.current.scrollTop=fmScrollRef.current.scrollHeight);},100);
   };
 
   const iStyle={width:"100%",background:G.inp,border:"1px solid "+G.inpBorder,
@@ -15765,6 +15869,15 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
     outline:"none",fontFamily:"inherit",lineHeight:1.8,resize:"none",
     transition:"border-color .2s",boxSizing:"border-box"};
 
+  const ScorePill=({label,value,color})=>(
+    <div style={{flex:1,minWidth:90,background:G.card,border:"1px solid "+G.border,
+      borderRadius:12,padding:"10px 12px",textAlign:"center"}}>
+      <div style={{fontSize:9,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:4}}>{label}</div>
+      <div style={{fontSize:15,fontWeight:800,color}}>{value}</div>
+    </div>
+  );
+
+  // ── READING VIEW ──
   if(reading){return(
     <div style={{padding:"20px 20px 90px",maxWidth:620,margin:"0 auto",color:G.cream,
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
@@ -15773,16 +15886,31 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
           padding:"0 0 18px",display:"flex",alignItems:"center",gap:6}}>
         ← Back to History
       </button>
-      <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:6}}>{reading.dateLabel}</div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        {reading.mood&&<span style={{fontSize:18}}>{(MOODS.find(m=>m.id===reading.mood)||{}).emoji}</span>}
+        <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace"}}>{reading.dateLabel}</div>
+      </div>
+      {reading.theme&&<div style={{fontSize:13,color:G.gold,fontWeight:700,marginBottom:12}}>{reading.theme}</div>}
       <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:14,padding:"20px",marginBottom:16}}>
-        <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>YOUR LETTER</div>
+        <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>YOUR ENTRY</div>
         <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{reading.letter}</p>
       </div>
-      {reading.reply&&(
-        <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",borderRadius:14,padding:"20px"}}>
-          <div style={{fontSize:10,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>FROM YOUR FUTURE SELF</div>
-          <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{reading.reply}</p>
+      {(reading.reflection||reading.reply)&&(
+        <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",borderRadius:14,padding:"20px",marginBottom:12}}>
+          <div style={{fontSize:10,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>REFLECTION</div>
+          <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{reading.reflection||reading.reply}</p>
         </div>
+      )}
+      {(reading.achievements||[]).length>0&&(
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {reading.achievements.map((a,i)=>(
+            <div key={i} style={{fontSize:13,color:G.cream,background:G.card,
+              border:"1px solid "+G.border,borderRadius:10,padding:"10px 14px"}}>🏆 {a}</div>
+          ))}
+        </div>
+      )}
+      {reading.ending&&(
+        <p style={{fontSize:13,color:G.dimmer,lineHeight:1.8,fontStyle:"italic",margin:"8px 4px"}}>{reading.ending}</p>
       )}
     </div>
   );}
@@ -15792,7 +15920,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
 
       {/* Header */}
-      <div style={{marginBottom:24}}>
+      <div style={{marginBottom:18}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
           <span style={{fontSize:22}}>✉️</span>
           <h2 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:0}}>Journal</h2>
@@ -15800,10 +15928,22 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
         <p style={{fontSize:13,color:G.dimmer,margin:0}}>Write honestly. Your future self will thank you.</p>
       </div>
 
+      {/* Growth stats */}
+      <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
+        {[["📖",stats.memories,"memories saved"],["🧠",stats.insights,"insights discovered"],["✨",stats.breakthroughs,"breakthroughs"]].map(([ic,n,l])=>(
+          <div key={l} style={{flex:1,minWidth:100,background:G.card,border:"1px solid "+G.border,
+            borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+            <div style={{fontSize:16}}>{ic}</div>
+            <div style={{fontSize:18,fontWeight:900,color:G.cream,lineHeight:1.2}}>{n}</div>
+            <div style={{fontSize:9,color:G.dimmer}}>{l}</div>
+          </div>
+        ))}
+      </div>
+
       {/* Tabs */}
-      <div style={{display:"flex",gap:6,marginBottom:20}}>
-        {[["write","Write"],["history","History ("+entries.length+")"]].map(([id,label])=>(
-          <button key={id} onClick={()=>{setView(id);setAiReply("");}}
+      <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
+        {[["write","Write"],["future","🔮 Future Me"],["history","History ("+entries.length+")"]].map(([id,label])=>(
+          <button key={id} onClick={()=>{setView(id);setResult(null);}}
             style={{padding:"7px 16px",borderRadius:20,fontFamily:"inherit",fontSize:12,
               cursor:"pointer",transition:"all .15s",
               background:view===id?"rgba(240,180,41,0.1)":"none",
@@ -15814,102 +15954,203 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
         ))}
       </div>
 
-      {/* Write tab */}
+      {/* ── WRITE TAB ── */}
       {view==="write"&&(
         <>
-          {!aiReply?(
+          {!result?(
             <>
-              <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:6}}>
-                {todayStr}
+              <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:10}}>{todayStr}</div>
+
+              {/* Mood selector */}
+              <div style={{fontSize:10,color:G.dimmer,letterSpacing:".1em",fontFamily:"monospace",marginBottom:8}}>HOW DO YOU FEEL RIGHT NOW?</div>
+              <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+                {MOODS.map(m=>(
+                  <button key={m.id} onClick={()=>setMood(mood===m.id?null:m.id)}
+                    style={{padding:"8px 12px",borderRadius:12,fontFamily:"inherit",fontSize:12,
+                      cursor:"pointer",display:"flex",alignItems:"center",gap:6,transition:"all .15s",
+                      background:mood===m.id?"rgba(240,180,41,0.12)":G.card,
+                      border:`1px solid ${mood===m.id?"rgba(240,180,41,0.45)":G.border}`,
+                      color:mood===m.id?G.gold:G.dim}}>
+                    <span style={{fontSize:15}}>{m.emoji}</span>{m.label}
+                  </button>
+                ))}
               </div>
+
+              {/* Today's rotating prompt */}
+              <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",
+                borderRadius:12,padding:"12px 16px",marginBottom:14}}>
+                <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:4}}>TODAY'S REFLECTION</div>
+                <div style={{fontSize:13,color:G.cream,lineHeight:1.6}}>{todaysPrompt}</div>
+              </div>
+
               <div style={{fontSize:12,color:G.dimmer,marginBottom:12,fontStyle:"italic"}}>
-                Dear future {profile?.name?.split(" ")[0]||"me"},
+                Dear future {firstName},
               </div>
-              <textarea value={letter} onChange={e=>setLetter(e.target.value)} rows={10}
-                placeholder={"Right now I feel…\n\nThe thing I'm most afraid of is…\n\nWhat I really want is…\n\nOne year from now I hope to look back and…"}
+              <textarea value={letter} onChange={e=>setLetter(e.target.value)} rows={9}
+                placeholder={"Right now I feel…\n\nThe thing I'm most afraid of is…\n\nWhat I really want is…"}
                 style={iStyle}
                 onFocus={e=>e.target.style.borderColor="rgba(240,180,41,0.4)"}
                 onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
-                <span style={{fontSize:11,color:G.dimmer}}>{letter.length}/2000 chars</span>
-                {!canWriteToday&&(
-                <div style={{padding:"14px 16px",background:"rgba(240,180,41,0.07)",
-                  border:"1px solid rgba(240,180,41,0.2)",borderRadius:12,marginBottom:12,
-                  textAlign:"center"}}>
-                  <p style={{fontSize:13,color:"#f0b429",margin:"0 0 8px",fontWeight:600}}>Free limit reached</p>
-                  <p style={{fontSize:12,color:"rgba(232,220,200,0.5)",margin:"0 0 10px"}}>Upgrade to Pro for unlimited journal entries and full history.</p>
-                  <button onClick={onUnlock} style={{padding:"9px 20px",background:"#f0b429",color:"#000",
-                    border:"none",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                    ✦ Upgrade to Pro
-                  </button>
-                </div>
-              )}
-              <button onClick={submit} disabled={!letter.trim()||loading||letter.length<20||!canWriteToday}
-                  style={{padding:"12px 24px",background:G.gold,color:"#000",border:"none",
-                    borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
-                    opacity:!letter.trim()||loading||letter.length<20?0.5:1}}>
-                  {loading?"Reflecting…":"Get Reflection →"}
+
+              {canWriteToday?(
+                <button onClick={submit} disabled={loading||!letter.trim()}
+                  style={{width:"100%",marginTop:14,padding:"14px",background:letter.trim()?G.gold:"rgba(240,180,41,0.25)",
+                    border:"none",borderRadius:12,fontSize:14,fontWeight:700,color:"#000",
+                    cursor:letter.trim()?"pointer":"default",fontFamily:"inherit"}}>
+                  {loading?"Reading your words…":"Get Reflection ✨"}
                 </button>
-              </div>
+              ):(
+                <button onClick={()=>onUnlock&&onUnlock()}
+                  style={{width:"100%",marginTop:14,padding:"14px",background:"rgba(240,180,41,0.1)",
+                    border:"1px solid rgba(240,180,41,0.3)",borderRadius:12,fontSize:13,fontWeight:700,
+                    color:G.gold,cursor:"pointer",fontFamily:"inherit"}}>
+                  🔒 Free limit reached — Upgrade for unlimited journaling
+                </button>
+              )}
             </>
           ):(
             <>
+              {/* RESULT VIEW */}
+              {result.scores&&(
+                <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+                  <ScorePill label="CONFIDENCE" value={(result.scores.confidence??"—")+"%"} color="#4caf7d"/>
+                  <ScorePill label="STRESS" value={result.scores.stress||"—"} color="#e0b64f"/>
+                  <ScorePill label="OPTIMISM" value={result.scores.optimism||"—"} color="#5b9fd6"/>
+                </div>
+              )}
+              {result.theme&&(
+                <div style={{fontSize:12,color:G.dimmer,marginBottom:14}}>
+                  🟣 Main theme: <span style={{color:G.cream,fontWeight:700}}>{result.theme}</span>
+                </div>
+              )}
+              {result.memory&&(
+                <div style={{background:"rgba(91,159,214,0.06)",border:"1px solid rgba(91,159,214,0.2)",
+                  borderRadius:14,padding:"16px 18px",marginBottom:14}}>
+                  <div style={{fontSize:9,color:"#5b9fd6",letterSpacing:".12em",fontFamily:"monospace",marginBottom:6}}>🧠 MEMORY CONNECTION</div>
+                  <p style={{fontSize:13,color:G.dim,lineHeight:1.8,margin:0}}>{result.memory}</p>
+                </div>
+              )}
               <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.15)",
                 borderRadius:14,padding:"20px",marginBottom:14}}>
-                <div style={{fontSize:10,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:12}}>FROM YOUR FUTURE SELF</div>
-                <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{aiReply}</p>
+                <div style={{fontSize:10,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:10}}>REFLECTION</div>
+                <p style={{fontSize:14,color:G.dim,lineHeight:1.85,margin:0,whiteSpace:"pre-wrap"}}>{result.reflection}</p>
               </div>
-              <button onClick={()=>{setLetter("");setAiReply("");}}
-                style={{width:"100%",padding:"13px",background:"none",
-                  border:"1px solid "+G.border,borderRadius:12,color:G.dim,
-                  fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
-                ✏️ Write Another Entry
-              </button>
+              {(result.achievements||[]).length>0&&(
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                  {result.achievements.map((a,i)=>(
+                    <div key={i} style={{fontSize:13,color:G.cream,background:G.card,
+                      border:"1px solid "+G.border,borderRadius:10,padding:"10px 14px"}}>🏆 {a}</div>
+                  ))}
+                </div>
+              )}
+              {result.ending&&(
+                <p style={{fontSize:13,color:G.dimmer,lineHeight:1.85,fontStyle:"italic",margin:"0 4px 18px"}}>
+                  {result.ending}
+                </p>
+              )}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{setResult(null);setLetter("");setMood(null);}}
+                  style={{flex:1,padding:"12px",background:G.card,border:"1px solid "+G.border,
+                    borderRadius:12,fontSize:13,fontWeight:600,color:G.cream,cursor:"pointer",fontFamily:"inherit"}}>
+                  ✍️ Write another
+                </button>
+                <button onClick={()=>setView("future")}
+                  style={{flex:1,padding:"12px",background:"rgba(240,180,41,0.1)",
+                    border:"1px solid rgba(240,180,41,0.3)",borderRadius:12,fontSize:13,fontWeight:700,
+                    color:G.gold,cursor:"pointer",fontFamily:"inherit"}}>
+                  🔮 Talk to Future Me
+                </button>
+              </div>
             </>
           )}
         </>
       )}
 
-      {/* History tab */}
-      {view==="history"&&(
+      {/* ── FUTURE ME TAB ── */}
+      {view==="future"&&(
         <>
-          {entries.length===0?(
-            <div style={{textAlign:"center",padding:"40px 20px",color:G.dimmer}}>
-              <div style={{fontSize:36,marginBottom:12}}>✉️</div>
-              <p style={{fontSize:14,margin:0,lineHeight:1.7}}>No entries yet. Write your first letter.</p>
+          <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.08),rgba(155,114,207,0.06))",
+            border:"1px solid rgba(240,180,41,0.15)",borderRadius:14,padding:"14px 18px",marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:4}}>🔮 Conversation with Future You</div>
+            <div style={{fontSize:12,color:G.dimmer,lineHeight:1.6}}>
+              This is you, 3 years from now — the version that made it through. They remember every journal entry you've written.
+              {!isPaid&&!isPremium&&<span> Free: 3 messages/day.</span>}
             </div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {entries.map(e=>(
-                <div key={e.id} onClick={()=>setReading(e)}
-                  style={{padding:"16px 18px",background:G.card,border:"1px solid "+G.border,
-                    borderRadius:13,cursor:"pointer",transition:"border-color .15s"}}
-                  onMouseEnter={ev=>ev.currentTarget.style.borderColor="rgba(240,180,41,0.25)"}
-                  onMouseLeave={ev=>ev.currentTarget.style.borderColor=G.border}>
-                  <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",marginBottom:6}}>{e.dateLabel}</div>
-                  <p style={{fontSize:13,color:G.dim,margin:"0 0 6px",lineHeight:1.5,
-                    overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
-                    {e.letter}
-                  </p>
-                  <div style={{fontSize:11,color:"rgba(240,180,41,0.6)"}}>
-                    {e.reply?"Reply received →":"No reflection yet"}
-                  </div>
-                </div>
-              ))}
-            </div>
+          </div>
+
+          <div ref={fmScrollRef} style={{minHeight:200,maxHeight:380,overflowY:"auto",
+            display:"flex",flexDirection:"column",gap:10,marginBottom:14,padding:"4px 2px"}}>
+            {fmMsgs.length===0&&(
+              <div style={{fontSize:13,color:G.dimmer,textAlign:"center",padding:"40px 20px",lineHeight:1.7}}>
+                Ask anything. "Was it worth it?" "How did we get past this fear?"<br/>"What do you wish I knew right now?"
+              </div>
+            )}
+            {fmMsgs.map((m,i)=>(
+              <div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",
+                background:m.role==="user"?"rgba(240,180,41,0.12)":G.card,
+                border:"1px solid "+(m.role==="user"?"rgba(240,180,41,0.25)":G.border),
+                borderRadius:14,padding:"11px 15px"}}>
+                {m.role==="assistant"&&<div style={{fontSize:9,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:4}}>FUTURE {firstName.toUpperCase()}</div>}
+                <div style={{fontSize:13,color:G.cream,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{m.content}</div>
+              </div>
+            ))}
+            {fmLoading&&(
+              <div style={{alignSelf:"flex-start",fontSize:12,color:G.dimmer,padding:"8px 14px"}}>
+                Future {firstName} is thinking…
+              </div>
+            )}
+          </div>
+
+          <div style={{display:"flex",gap:8}}>
+            <input value={fmInput} onChange={e=>setFmInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")sendFm();}}
+              placeholder={fmCanSend?"Ask your future self anything…":"Daily limit reached — upgrade for unlimited"}
+              style={{...iStyle,flex:1,padding:"12px 16px"}}/>
+            <button onClick={sendFm} disabled={fmLoading||!fmInput.trim()}
+              style={{padding:"12px 20px",background:fmInput.trim()?G.gold:"rgba(240,180,41,0.25)",
+                border:"none",borderRadius:12,fontSize:14,fontWeight:700,color:"#000",
+                cursor:fmInput.trim()?"pointer":"default",fontFamily:"inherit"}}>
+              →
+            </button>
+          </div>
+          {entries.length===0&&(
+            <p style={{fontSize:11,color:G.dimmer,marginTop:10,textAlign:"center"}}>
+              Tip: Future You gets wiser with every journal entry you write.
+            </p>
           )}
         </>
+      )}
+
+      {/* ── HISTORY TAB ── */}
+      {view==="history"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {entries.length===0&&(
+            <div style={{textAlign:"center",padding:"50px 20px",color:G.dimmer,fontSize:13}}>
+              No entries yet. Your story starts with the first one.
+            </div>
+          )}
+          {entries.map(e=>(
+            <div key={e.id} onClick={()=>setReading(e)}
+              style={{background:G.card,border:"1px solid "+G.border,borderRadius:14,
+                padding:"16px 18px",cursor:"pointer",transition:"border-color .15s"}}
+              onMouseEnter={ev=>ev.currentTarget.style.borderColor="rgba(240,180,41,0.3)"}
+              onMouseLeave={ev=>ev.currentTarget.style.borderColor=G.border}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                {e.mood&&<span style={{fontSize:15}}>{(MOODS.find(m=>m.id===e.mood)||{}).emoji}</span>}
+                <div style={{fontSize:10,color:G.dimmer,letterSpacing:".08em",fontFamily:"monospace"}}>{e.dateLabel}</div>
+                {(e.achievements||[]).length>0&&<span style={{fontSize:11}}>🏆</span>}
+              </div>
+              {e.theme&&<div style={{fontSize:12,color:G.gold,fontWeight:700,marginBottom:4}}>{e.theme}</div>}
+              <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,overflow:"hidden",
+                display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{e.letter}</p>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-
-
-
-// ═══════════════════════════════════════════════════════════════
-// PDF EXPORT — Pro Max feature
-// ═══════════════════════════════════════════════════════════════
 function exportReportPDF(formData, data, scores, overall){
   const name     = formData?.name||"User";
   const date     = new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
@@ -17836,28 +18077,39 @@ const RATE_LIMIT_DATE_KEY="destiniq_report_date";
 // FREE_REPORT_LIMIT and PRO_REPORT_LIMIT defined at module level above
 // Pro Max: unlimited // free users get 3 reports total
 
+function currentMonthKey(){ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1); }
+
 function getRateLimit(){
-  if(typeof window==="undefined") return{count:0,date:null};
+  if(typeof window==="undefined") return{count:0,month:null};
   try{
-    const date=localStorage.getItem(RATE_LIMIT_DATE_KEY);
-    const count=parseInt(localStorage.getItem(RATE_LIMIT_KEY)||"0",10);
-    return{count,date};
-  }catch{return{count:0,date:null};}
+    const month=localStorage.getItem(RATE_LIMIT_DATE_KEY);
+    let count=parseInt(localStorage.getItem(RATE_LIMIT_KEY)||"0",10);
+    if(month!==currentMonthKey()) count=0;   // new month → counter resets
+    return{count,month};
+  }catch{return{count:0,month:null};}
 }
 
 function incrementRateLimit(){
   if(typeof window==="undefined") return;
   try{
-    const{count}=getRateLimit();
+    const{count}=getRateLimit();   // already month-aware (resets on a new month)
     localStorage.setItem(RATE_LIMIT_KEY,String(count+1));
-    localStorage.setItem(RATE_LIMIT_DATE_KEY,new Date().toDateString());
+    localStorage.setItem(RATE_LIMIT_DATE_KEY,currentMonthKey());
   }catch{}
 }
 
-function isRateLimited(isPaid){
-  if(isPaid) return false; // paid users have no limit
+// Reports per calendar month by tier: Free 1, Pro 3, Pro Max unlimited.
+function reportLimitFor(isPaid,isProMax){
+  if(isProMax) return Infinity;
+  if(isPaid)   return PRO_REPORT_LIMIT;
+  return FREE_REPORT_LIMIT;
+}
+
+function isRateLimited(isPaid,isProMax){
+  const lim=reportLimitFor(isPaid,isProMax);
+  if(lim===Infinity) return false;
   const{count}=getRateLimit();
-  return count>=FREE_REPORT_LIMIT;
+  return count>=lim;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -18152,18 +18404,25 @@ function DestinIQInner(){
             // not on mere visit — one source of truth, no double-increment races.
             setStreak(bestStreak);
           } else {
-            // Missed day(s). If exactly ONE day was missed and this month's
-            // Streak Shield is unused — auto-protect the streak.
+            // Missed day(s). If exactly ONE day was missed and their Streak
+            // Shield is available — auto-protect the streak. Free refills the
+            // shield monthly; Pro/Pro Max refills it weekly (so paying users
+            // basically never lose a streak).
             const twoDaysAgo = new Date(Date.now()-2*86400000).toISOString().slice(0,10);
-            const monthKey = today.slice(0,7);
+            const isPaidUser = !!profile.is_paid;
+            const weekKey = (()=>{ const dt=new Date(today+"T12:00:00"); const oj=new Date(dt.getFullYear(),0,1); const wk=Math.ceil((((dt-oj)/86400000)+oj.getDay()+1)/7); return dt.getFullYear()+"-W"+wk; })();
+            const shieldPeriod = isPaidUser ? weekKey : today.slice(0,7);
             let shieldUsed = "";
             try{ shieldUsed = localStorage.getItem(`diq_shield_used_${u.id}`)||""; }catch{}
-            if(lastSeen===twoDaysAgo && shieldUsed!==monthKey && bestStreak>=3){
+            if(lastSeen===twoDaysAgo && shieldUsed!==shieldPeriod && bestStreak>=3){
               // 🛡️ Shield consumes — streak survives
               setStreak(bestStreak);
-              try{ localStorage.setItem(`diq_shield_used_${u.id}`, monthKey); }catch{}
+              try{ localStorage.setItem(`diq_shield_used_${u.id}`, shieldPeriod); }catch{}
               try{ localStorage.setItem(`diq_streak_${u.id}`, String(bestStreak)); }catch{}
-              setTimeout(()=>{ try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"🛡️ Streak Shield used — your "+bestStreak+"-day streak is safe. (1 per month)"})); }catch{} }, 1200);
+              const shieldMsg = isPaidUser
+                ? "🛡️ Streak Shield saved your "+bestStreak+"-day streak! A fresh shield arrives next week."
+                : "🛡️ Streak Shield saved your "+bestStreak+"-day streak! Free gives 1 a month — Pro refills it every week so you never lose a streak.";
+              setTimeout(()=>{ try{ window.dispatchEvent(new CustomEvent("showToast",{detail:shieldMsg})); }catch{} }, 1200);
               supabase.from("user_profiles").upsert({
                 user_id: u.id, streak: bestStreak,
                 updated_at: new Date().toISOString(),
@@ -18621,8 +18880,10 @@ try{
   const handleSubmit=useCallback(async(f)=>{
     try{
     if(!userId) return;
-    if(isRateLimited(isPaid)){
-      setApiError("You've used your free reports. Upgrade to generate more.");
+    if(isRateLimited(isPaid,isProMax)){
+      setApiError(isPaid
+        ? "You've used your 3 reports for this month. Upgrade to Pro Max for unlimited reports."
+        : "You've used your free report for this month. Upgrade to Pro for more reports and all 42 tools.");
       setScreen("paywall");
       return;
     }
