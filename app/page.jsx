@@ -320,6 +320,16 @@ if(typeof window!=="undefined" && !window.__diqQuietHook){
   });
 }
 
+// ── HUMAN TOASTS — warmth & wit, rotating ─────────────────────────────────────
+const HUMAN_TOASTS={
+  checkin:["+3 points. Look at you, actually doing the thing 👏","Checked in. Your future self just fist-pumped. +3","+3 points — consistency looks good on you 😌","Another day showed up to. Legend behavior. +3"],
+  win:["Logged. This wall of wins is getting impressive 🏆","Win saved. Someone's on a roll 👀","Noted for the history books 📖","That counts. Small wins stack into big lives."],
+  followup:["🎉 You said it, you did it. That's rare air. +3","Promise kept. Do you know how rare that is? +3 🎉","Word = bond. +3 points, champion."],
+  notyet:["No shame — even Beyoncé has unfinished lists. Tomorrow.","It carries over. Rome, one day, etc. 🏛️","Tomorrow's a fresh page. We'll be here."],
+  habit:["✓ Committed. Your habits called — they're proud. +1","✓ Practice locked in. +1 point 🌱"],
+};
+const humanToast=(k)=>{const p=HUMAN_TOASTS[k]||[];return p[Math.floor(Math.random()*p.length)]||"Nice.";};
+
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
@@ -5061,7 +5071,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
         window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
         // Award progress points for completing check-in
         addProgressPoints(userId, "checkin", PROGRESS_POINTS.checkin);
-        window.dispatchEvent(new CustomEvent("showToast",{detail:"+3 progress points — keep it up!"}));
+        window.dispatchEvent(new CustomEvent("showToast",{detail:humanToast("checkin")}));
       }
     }catch(e){
       const fb=`${profile.name}, you showed up today — that matters more than most people realise. Score ${score}/10 is data, not judgment. The next 24 hours are a fresh calculation.`;
@@ -5080,7 +5090,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
         addMomentumEntry(userId,{energy:score,focus:score,momentum:score,feeling,note:did,date:new Date().toDateString()});
         window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
         addProgressPoints(userId,"checkin",PROGRESS_POINTS.checkin);
-        window.dispatchEvent(new CustomEvent("showToast",{detail:"+3 progress points — keep it up!"}));
+        window.dispatchEvent(new CustomEvent("showToast",{detail:humanToast("checkin")}));
       }catch{}
     }
     setLoading(false);
@@ -7745,7 +7755,8 @@ Cover: Their decision-making style and blind spots, a personal decision framewor
       const name    = p?.name    || "this person";
       const from    = p?.country || "their current country";
       const goals   = p?.goals   || p?.bigGoal || "better opportunities";
-      return "Write a personal relocation intelligence overview for " + name + " from " + from + " whose goal is: " + goals + ". Give a direct verdict on relocate vs stay, three matching countries with visa names and realistic monthly costs, and a six month preparation plan. Be specific with real numbers.";
+      const income = p?.income || "not specified";
+      return "Write a personal relocation intelligence overview for " + name + " from " + from + " (capital/income level: " + income + ") whose goal is: " + goals + ". FIRST determine their situation type: (a) limited capital seeking opportunity abroad, (b) significant capital who could move ANY direction including developed-to-developing (e.g. US to Ghana) where their money multiplies, or (c) someone who may be better STAYING and building where they are. Tailor everything to that type: for capital-rich movers give BUSINESS and investment opportunities in the destination (what to start, startup costs, expected returns) not job ideas; for capital-limited give realistic work/visa paths; for stayers give the honest case for building at home with their existing network. Then: a direct verdict, three matching countries/paths with real numbers, and a six month plan. Never assume everyone wants to leave, and never assume everyone is broke.";
     }
   },
 
@@ -9145,7 +9156,7 @@ function useHabitTracker(userId){
     const next={...data,[key]:{...(data[key]||{}),committed:true,status:data[key]?.status||"active",startedAt:data[key]?.startedAt||new Date().toISOString()}};
     persist(next);
     try{ addProgressPoints(userId, `habit_commit_${key}`, 1); }catch{}
-    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"✓ Practice committed — +1 point"})); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:humanToast("habit")})); }catch{}
   };
   const uncommit=(key)=>{
     const next={...data,[key]:{...(data[key]||{}),committed:false}};
@@ -12103,12 +12114,22 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
           </div>
         </div>
         <div style={{display:"flex",gap:5}}>
-          {["M","T","W","T","F","S","S"].map((d,i)=>(
-            <div key={i} style={{textAlign:"center"}}>
-              <div style={{fontSize:7,color:"var(--cream-20)",marginBottom:2}}>{d}</div>
-              <div style={{width:7,height:7,borderRadius:"50%",background:i<(streak||1)%7?"var(--gold)":"var(--cream-10)"}}/>
-            </div>
-          ))}
+          {(()=>{
+            const labels=["S","M","T","W","T","F","S"];
+            const todayIdx=new Date().getDay();
+            const s=Math.min(streak||1,7);
+            // last 7 days ending today; lit = the trailing `s` days
+            return Array.from({length:7},(_,k)=>{
+              const dayIdx=(todayIdx-6+k+7)%7;
+              const lit=k>=7-s;
+              return(
+                <div key={k} style={{textAlign:"center"}}>
+                  <div style={{fontSize:7,color:k===6?"var(--gold)":"var(--cream-20)",marginBottom:2}}>{labels[dayIdx]}</div>
+                  <div style={{width:7,height:7,borderRadius:"50%",background:lit?"var(--gold)":"var(--cream-10)"}}/>
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
       {!isPaid&&(
@@ -12340,11 +12361,11 @@ function FollowUpCard({userId, G, card}){
   const yes=()=>{
     save({...entry,done:true});
     try{ addProgressPoints(userId,"followup_done",3); }catch{}
-    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"🎉 You said it, you did it. +3 points."})); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:humanToast("followup")})); }catch{}
   };
   const notYet=()=>{
     save({...entry,asked:todayKey});
-    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"No shame — it carries to tomorrow. Small steps count."})); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:humanToast("notyet")})); }catch{}
   };
   return(
     <div style={{...card,marginBottom:14,border:"1px solid rgba(240,180,41,0.25)",
@@ -12489,9 +12510,11 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
     if(ri&&ri.length>20){
       // Strip common AI preambles
       ri=ri.replace(/^(here'?s|here is|sure[,!]?|of course[,!]?|absolutely[,!]?)[^.!?]*[.!?:]\s*/i,"").trim();
-      const sents=ri.split(/(?<=[.!?])\s+/);
-      let out=sents.slice(0,2).join(" ");
-      if(out.length>220) out=out.slice(0,217).replace(/\s+\S*$/,"")+"…";
+      // Keep only COMPLETE sentences (ending .!?) — never chop mid-thought
+      const sents=(ri.match(/[^.!?]+[.!?]+/g)||[]).map(s=>s.trim());
+      if(sents.length===0) return ri.length<=180?ri:null; // nothing complete → tiny raw or skip
+      let out=sents[0];
+      if(sents[1]&&(out.length+sents[1].length)<=300) out+=" "+sents[1];
       return out;
     }
     const bl=(Array.isArray(formData?.blockers)?formData.blockers.join(" "):(formData?.challenge||"")).toLowerCase();
@@ -12578,11 +12601,8 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
                 display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{focusIcon}</div>
               <div style={{flex:1}}>
                 <div style={{fontSize:16,fontWeight:700,color:G.cream,marginBottom:3}}>{focus}</div>
-                <div style={{fontSize:12,color:G.dim,marginBottom:10}}>Your primary growth area</div>
-                <div style={{height:4,borderRadius:4,background:"rgba(255,255,255,0.07)",marginBottom:4}}>
-                  <div style={{height:"100%",borderRadius:4,background:G.gold,width:journeyPct+"%",transition:"width .8s ease"}}/>
-                </div>
-                <div style={{fontSize:11,color:G.dimmer}}>{journeyPct}% in progress</div>
+                <div style={{fontSize:12,color:G.dim,marginBottom:6}}>Your primary growth area</div>
+                <div style={{fontSize:11,color:G.dimmer,lineHeight:1.5}}>New cards, tools and AI ideas are waiting in this area — one small step today counts.</div>
               </div>
             </div>
             <button onClick={()=>setNav("explore")}
@@ -15099,10 +15119,10 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           </div>
           <div>
             <h3 style={{fontSize:19,fontWeight:800,color:G.cream,margin:"0 0 9px",lineHeight:1.2}}>
-              Your journey starts now
+              Turn this report into action
             </h3>
             <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:380}}>
-              You've unlocked powerful insights about yourself. It's time to take action and create real change.
+              Reading changes nothing — doing does. Pick ONE insight from above and ask your coach how to start it this week.
             </p>
           </div>
         </div>
