@@ -202,7 +202,7 @@ function useThemeColors(){
     gold:      isDark? "#f0b429" : "#8a6a10",
     goldBright:isDark? "#ffd166" : "#6e5308",
     cream:     isDark? "#e8dcc8" : "#231c0c",
-    dim:       isDark? "rgba(232,220,200,0.5)"  : "rgba(35,28,12,0.55)",
+    dim:       isDark? "var(--cream-50)"  : "rgba(35,28,12,0.55)",
     dimmer:    isDark? "rgba(232,220,200,0.27)" : "rgba(35,28,12,0.32)",
     bg:        isDark? "#0a0800" : "#f5f2ea",
     card:      isDark? "#111008" : "#ffffff",
@@ -226,7 +226,7 @@ class ErrorBoundary extends React.Component {
         <div style={{maxWidth:600,textAlign:"center"}}>
           <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
           <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
-          <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
+          <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
           <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:16}}>Refresh page</button>
           <div style={{textAlign:"left",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:16,fontSize:11,color:"#F87171",fontFamily:"monospace",overflow:"auto",maxHeight:300,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
             <div style={{color:"#FCA5A5",fontWeight:700,marginBottom:8}}>{this.state.error?.toString()}</div>
@@ -389,6 +389,8 @@ async function hydrateUserData(userId) {
   } catch (e) {
     console.warn("hydrateUserData:", e.message);
   }
+  // Let mounted components (e.g. Week in Review) recount now that data is in.
+  try { window.dispatchEvent(new CustomEvent("diqDataHydrated")); } catch {}
 }
 
 /** Upsert a momentum log entry. */
@@ -4776,7 +4778,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
     <div style={{padding:"60px 0"}}>
       {onBack&&(
         <div style={{padding:"0 20px 0",maxWidth:700,margin:"0 auto"}}>
-          <button onClick={onBack} style={{background:"none",border:"none",color:"rgba(232,220,200,0.45)",cursor:"pointer",fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,padding:"8px 0",marginBottom:8}}>← Back</button>
+          <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,padding:"8px 0",marginBottom:8}}>← Back</button>
         </div>
       )}
       <div className="cx-md" style={{textAlign:"center"}}>
@@ -5969,7 +5971,7 @@ function FAQItem({q, a, G}){
           transform:open?"rotate(45deg)":"rotate(0deg)"}}>+</span>
       </button>
       {open&&(
-        <div style={{fontSize:14,color:"rgba(232,220,200,0.6)",lineHeight:1.8,paddingBottom:18}}>
+        <div style={{fontSize:14,color:"var(--cream-60)",lineHeight:1.8,paddingBottom:18}}>
           {a}
         </div>
       )}
@@ -6799,7 +6801,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                     <span style={{fontSize:24,flexShrink:0}}>{m.icon}</span>
                     <div style={{flex:1}}>
                       <div style={{fontSize:15,fontWeight:700,color:sel?G.cream:G.dim,marginBottom:4}}>{m.label}</div>
-                      <div style={{fontSize:12,color:"rgba(232,220,200,0.38)",lineHeight:1.5}}>{m.desc}</div>
+                      <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{m.desc}</div>
                     </div>
                     <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,
                       border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
@@ -10346,7 +10348,7 @@ function AudioPlayer({text,label="Listen",mini=false}){
         </span>
       )}
       {state==="unsupported"&&(
-        <span style={{padding:"6px 14px",fontSize:12,color:"rgba(232,220,200,0.4)"}}>
+        <span style={{padding:"6px 14px",fontSize:12,color:"var(--cream-40)"}}>
           🔊 Audio isn't available here right now — try again, or open in Chrome.
         </span>
       )}
@@ -11704,7 +11706,7 @@ function PracticesView({userId}){
                   style={{width:28,height:28,borderRadius:"50%",flexShrink:0,border:"none",
                     cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",
                     background:isIn?(isMast?"rgba(240,180,41,0.2)":"rgba(26,184,154,0.2)"):"rgba(255,255,255,0.06)",
-                    color:isIn?(isMast?G.gold:"#1ab89a"):"rgba(232,220,200,0.3)",
+                    color:isIn?(isMast?G.gold:"#1ab89a"):"var(--cream-30)",
                     transition:"all .2s"}}>
                   {isMast?"✦":isIn?"✓":"○"}
                 </button>
@@ -12655,6 +12657,7 @@ function StreakCelebration({streak, onClose}){
 
 // ── SidebarNav ───────────────────────────────────────────────────────────
 function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formData,navPhotoURL,onNotif}){
+  const {theme,toggleTheme}=useTheme();
   const ITEMS=[
     {id:"home",    icon:"🏠",label:"Home"},
     {id:"explore", icon:"🔍",label:"Explore"},
@@ -12738,14 +12741,20 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
               overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
               {formData?.name?.split(" ")[0]||"User"}
             </div>
-            <div style={{fontSize:10,color:"rgba(232,220,200,0.4)"}}>
+            <div style={{fontSize:10,color:"var(--cream-40)"}}>
               {isPaid?(isPremium?"✦ Pro Max":"◆ Pro"):"Free Plan"}
             </div>
           </div>
         </div>
+        <button onClick={toggleTheme}
+          title={theme==="dark"?"Switch to light mode":"Switch to dark mode"}
+          style={{background:"none",border:"none",color:"var(--cream-40)",
+            cursor:"pointer",fontSize:15,padding:"4px",flexShrink:0,lineHeight:1}}>
+          {theme==="dark"?"☀️":"🌙"}
+        </button>
         {onNotif&&(
           <button onClick={onNotif}
-            style={{background:"none",border:"none",color:"rgba(232,220,200,0.4)",
+            style={{background:"none",border:"none",color:"var(--cream-40)",
               cursor:"pointer",fontSize:16,padding:"4px",flexShrink:0,lineHeight:1}}>
             🔔
           </button>
@@ -12972,15 +12981,26 @@ function FollowUpCard({userId, G, card}){
 
 // ── WEEKLY REVEAL — Sunday/Monday week-in-review ─────────────────────────────
 function WeeklyRevealCard({userId, G, card, setNav}){
+  const [stats,setStats]=useState({ci7:0,wins:0});
+  useEffect(()=>{
+    const compute=()=>{
+      let ci7=0, wins=0;
+      try{
+        const log=getMomentumLog(userId)||[];
+        const weekAgo=Date.now()-7*86400000;
+        ci7=log.filter(e=>{ const t=new Date(e.date||0).getTime(); return t>weekAgo; }).length;
+      }catch{}
+      try{ wins=(loadWins(userId)||[]).length; }catch{}
+      setStats({ci7,wins});
+    };
+    compute(); // may run before DB data arrives —
+    window.addEventListener("diqDataHydrated",compute);  // — so recount when it does,
+    window.addEventListener("checkinComplete",compute);  // and after each new check-in.
+    return()=>{window.removeEventListener("diqDataHydrated",compute);window.removeEventListener("checkinComplete",compute);};
+  },[userId]);
   const day=new Date().getDay();
   if(day!==0&&day!==1) return null; // Sunday + Monday only
-  let ci7=0, wins=0;
-  try{
-    const log=getMomentumLog(userId)||[];
-    const weekAgo=Date.now()-7*86400000;
-    ci7=log.filter(e=>{ const t=new Date(e.date||0).getTime(); return t>weekAgo; }).length;
-  }catch{}
-  try{ wins=(loadWins(userId)||[]).length; }catch{}
+  const {ci7,wins}=stats;
   return(
     <div style={{...card,marginBottom:14,border:"1px solid rgba(155,114,207,0.3)",
       background:"linear-gradient(135deg,rgba(155,114,207,0.10),rgba(0,0,0,0))"}}>
@@ -14026,7 +14046,7 @@ function IntelligenceCard({card, catColor, onSelect, userId}){
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,flexShrink:0}}>
             <button onClick={toggleSave}
               style={{background:"none",border:"none",cursor:"pointer",
-                fontSize:18,color:saved?"#f0b429":"rgba(232,220,200,0.25)",padding:0,lineHeight:1}}>
+                fontSize:18,color:saved?"#f0b429":"var(--cream-20)",padding:0,lineHeight:1}}>
               {saved?"★":"☆"}
             </button>
             <span style={{color:G.dimmer,fontSize:18}}>›</span>
@@ -14306,7 +14326,7 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
           whiteSpace:"nowrap",fontSize:14,fontWeight:700,color:G.cream}}>{card.title}</div>
         <button onClick={toggleSave}
           style={{background:"none",border:"none",cursor:"pointer",
-            fontSize:20,color:saved?"#f0b429":"rgba(232,220,200,0.3)",padding:0,flexShrink:0}}>
+            fontSize:20,color:saved?"#f0b429":"var(--cream-30)",padding:0,flexShrink:0}}>
           {saved?"★":"☆"}
         </button>
       </div>
@@ -16601,13 +16621,27 @@ Rules:
     try{localStorage.setItem("diq_nav",s);}catch{}
   },[navSection]);
   const goBack=useCallback(()=>{
-    if(!navHistory.length) return;
-    const prev=navHistory[navHistory.length-1];
-    setNavHistory(h=>h.slice(0,-1));
-    setNavSection(prev);
-    try{localStorage.setItem("diq_nav",prev);}catch{}
-  },[navHistory]);
-  const canGoBack=navHistory.length>0;
+    if(navHistory.length){
+      const prev=navHistory[navHistory.length-1];
+      setNavHistory(h=>h.slice(0,-1));
+      setNavSection(prev);
+      try{localStorage.setItem("diq_nav",prev);}catch{}
+      return;
+    }
+    // History is empty but we're on a sub-page. This happens after the tab/
+    // WebView silently reloads in the background (Chrome + Android both do
+    // this to save memory): navSection restores from localStorage, but
+    // navHistory starts fresh as [] — leaving the back button dead.
+    // Fall back to the sensible parent instead of doing nothing.
+    const fallback =
+      navSection?.startsWith("topic:")    ? "category:"+navSection.slice(6).split(".")[0] :
+      navSection?.startsWith("tool:")     ? "explore" :
+      navSection?.startsWith("category:") ? "explore" :
+      "home";
+    setNavSection(fallback);
+    try{localStorage.setItem("diq_nav",fallback);}catch{}
+  },[navHistory,navSection]);
+  const canGoBack=navHistory.length>0||(navSection!=="home"&&navSection!=="explore");
   const isCat   = navSection?.startsWith("category:");
   const isTool  = navSection?.startsWith("tool:");
   const isTopic = navSection?.startsWith("topic:");
@@ -16745,26 +16779,26 @@ Rules:
               <span style={{fontSize:9,fontWeight:700,letterSpacing:".8px",color:"var(--gold)",fontFamily:"monospace"}}>SAVED</span>
             </div>
             <h2 style={{fontSize:"clamp(16px,4.5vw,24px)",fontWeight:800,color:"var(--cream)",margin:"0 0 8px"}}>Saved</h2>
-            <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",margin:"0 0 24px",lineHeight:1.6}}>Tools and reports you've starred for quick access.</p>
+            <p style={{fontSize:14,color:"var(--cream-50)",margin:"0 0 24px",lineHeight:1.6}}>Tools and reports you've starred for quick access.</p>
 
             {/* ── Intelligence Report (always shown) ── */}
-            <div style={{marginBottom:10,fontSize:11,fontWeight:700,color:"rgba(232,220,200,0.3)",letterSpacing:".08em",textTransform:"uppercase"}}>Your Report</div>
+            <div style={{marginBottom:10,fontSize:11,fontWeight:700,color:"var(--cream-30)",letterSpacing:".08em",textTransform:"uppercase"}}>Your Report</div>
             <div style={{background:"var(--night)",border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"18px",marginBottom:24,cursor:"pointer",display:"flex",alignItems:"center",gap:14}} onClick={()=>setNav("report")}>
               <div style={{width:44,height:44,borderRadius:12,background:"rgba(240,180,41,0.1)",border:"1px solid rgba(240,180,41,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📊</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:2}}>Personal Intelligence Report</div>
-                <div style={{fontSize:11,color:"rgba(232,220,200,0.4)"}}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+                <div style={{fontSize:11,color:"var(--cream-40)"}}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
               </div>
               <span style={{color:"var(--gold)",fontSize:18,flexShrink:0}}>›</span>
             </div>
 
             {/* ── Saved Tools ── */}
-            <div style={{marginBottom:10,fontSize:11,fontWeight:700,color:"rgba(232,220,200,0.3)",letterSpacing:".08em",textTransform:"uppercase"}}>Saved Tools {_savedIds.length>0&&`(${_savedIds.length})`}</div>
+            <div style={{marginBottom:10,fontSize:11,fontWeight:700,color:"var(--cream-30)",letterSpacing:".08em",textTransform:"uppercase"}}>Saved Tools {_savedIds.length>0&&`(${_savedIds.length})`}</div>
             {_savedIds.length===0?(
               <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"32px",textAlign:"center"}}>
                 <div style={{fontSize:32,marginBottom:10}}>☆</div>
                 <div style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginBottom:6}}>No saved tools yet</div>
-                <div style={{fontSize:13,color:"rgba(232,220,200,0.4)",lineHeight:1.6,marginBottom:16}}>Open any tool and tap <strong style={{color:"var(--gold)"}}>☆ Save</strong> to pin it here for quick access.</div>
+                <div style={{fontSize:13,color:"var(--cream-40)",lineHeight:1.6,marginBottom:16}}>Open any tool and tap <strong style={{color:"var(--gold)"}}>☆ Save</strong> to pin it here for quick access.</div>
                 <button onClick={()=>setNav("explore")} style={{background:"var(--gold)",color:"#000",border:"none",borderRadius:10,padding:"11px 22px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Browse Tools →</button>
               </div>
             ):(
@@ -16777,9 +16811,9 @@ Rules:
                       <div style={{width:40,height:40,borderRadius:11,background:`${tm.color||"var(--gold)"}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{tm.icon||"✦"}</div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:14,fontWeight:700,color:"var(--cream)",marginBottom:2}}>{tm.label||tid}</div>
-                        {savedDate&&<div style={{fontSize:11,color:"rgba(232,220,200,0.35)"}}>Saved {savedDate}</div>}
+                        {savedDate&&<div style={{fontSize:11,color:"var(--cream-30)"}}>Saved {savedDate}</div>}
                       </div>
-                      <span style={{color:"rgba(232,220,200,0.25)",fontSize:18,flexShrink:0}}>›</span>
+                      <span style={{color:"var(--cream-20)",fontSize:18,flexShrink:0}}>›</span>
                     </div>
                   );
                 })}
@@ -19186,7 +19220,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                 width:"40%",
               }}/>
             </div>
-            <div style={{marginTop:20,fontSize:12,color:"rgba(232,220,200,0.3)",
+            <div style={{marginTop:20,fontSize:12,color:"var(--cream-30)",
               letterSpacing:".1em",fontFamily:"monospace"}}>
               LOADING YOUR INTELLIGENCE
             </div>
@@ -19219,7 +19253,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                   </p>
                   <button onClick={()=>{setEmailConfirmPending(false);setScreen("auth");}}
                     style={{background:"none",border:"1px solid rgba(232,220,200,0.15)",borderRadius:10,
-                      padding:"10px 24px",color:"rgba(232,220,200,0.5)",cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+                      padding:"10px 24px",color:"var(--cream-50)",cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
                     ← Back to sign in
                   </button>
                 </div>
@@ -19364,7 +19398,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
               Install
             </button>
             <button onClick={()=>setShowInstall(false)}
-              style={{background:"none",border:"none",color:"rgba(232,220,200,0.3)",cursor:"pointer",fontSize:18,padding:0,flexShrink:0}}>
+              style={{background:"none",border:"none",color:"var(--cream-30)",cursor:"pointer",fontSize:18,padding:0,flexShrink:0}}>
               ×
             </button>
           </div>
