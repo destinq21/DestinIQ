@@ -6196,15 +6196,15 @@ function Landing({onStart,ipLocation}){
           </p>
         </div>
 
-        <div style={{background:"linear-gradient(145deg,#0f0820,#130c08)",
-          border:"1px solid rgba(120,80,200,0.2)",borderRadius:20,overflow:"hidden",
+        <div style={{background:G.isDark?"linear-gradient(145deg,#0f0820,#130c08)":"linear-gradient(145deg,#faf7ff,#fef8ee)",
+          border:"1px solid "+(G.isDark?"rgba(120,80,200,0.2)":"rgba(120,80,200,0.15)"),borderRadius:20,overflow:"hidden",
           padding:"28px",position:"relative",maxWidth:520}}>
           {/* Decorative glow */}
           <div style={{position:"absolute",top:0,right:0,width:"55%",height:"100%",
             background:"radial-gradient(ellipse at 80% 40%,rgba(90,50,180,0.2),transparent 65%)",
             pointerEvents:"none"}}/>
           <div style={{position:"relative"}}>
-            <div style={{fontSize:9,color:"rgba(200,160,255,0.6)",letterSpacing:".12em",
+            <div style={{fontSize:9,color:"#7a5cc0",letterSpacing:".12em",
               marginBottom:14,fontFamily:"monospace"}}>YOUR CORE INSIGHT</div>
 
             <blockquote style={{fontSize:14,fontWeight:600,color:G.cream,lineHeight:1.75,
@@ -13246,8 +13246,8 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
         {/* ══ 3. TODAY'S INTELLIGENCE INSIGHT ══ */}
         <div style={{...card,marginBottom:14,
-          background:G.isDark?"linear-gradient(135deg,#0e0820,#0a0810)":"linear-gradient(135deg,#f2edfb,#f7f2fc)",
-          border:"1px solid rgba(120,80,200,"+(G.isDark?"0.14":"0.25")+")"}}>
+          background:G.isDark?"linear-gradient(135deg,#0e0820,#0a0810)":G.card,
+          border:"1px solid "+(G.isDark?"rgba(120,80,200,0.14)":G.border)}}>
           <div style={{fontSize:9,color:G.isDark?"rgba(200,160,255,0.6)":"#5a3fa0",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>TODAY'S INSIGHT FOR YOU</div>
           <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
             <span style={{fontSize:20,color:G.gold,flexShrink:0,marginTop:2}}>✦</span>
@@ -15635,8 +15635,8 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
       <div style={{...card,marginBottom:20,
         background:G.isDark
           ?"linear-gradient(135deg,#0f0820 0%,#130c08 55%,#0a0810 100%)"
-          :"linear-gradient(135deg,#f2edfb 0%,#fdf6e9 55%,#f4eff9 100%)",
-        border:"1px solid rgba(120,80,200,"+(G.isDark?"0.14":"0.25")+")",position:"relative",
+          :G.card,
+        border:"1px solid "+(G.isDark?"rgba(120,80,200,0.14)":G.border),position:"relative",
         overflow:"hidden",padding:"30px 32px"}}>
 
         {/* Decorative: warm glow top-right */}
