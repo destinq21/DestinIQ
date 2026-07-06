@@ -202,7 +202,7 @@ function useThemeColors(){
     gold:      isDark? "#f0b429" : "#8a6a10",
     goldBright:isDark? "#ffd166" : "#6e5308",
     cream:     isDark? "#e8dcc8" : "#231c0c",
-    dim:       isDark? "var(--cream-50)"  : "rgba(35,28,12,0.55)",
+    dim:       isDark? "rgba(232,220,200,0.5)"  : "rgba(35,28,12,0.55)",
     dimmer:    isDark? "rgba(232,220,200,0.27)" : "rgba(35,28,12,0.32)",
     bg:        isDark? "#0a0800" : "#f5f2ea",
     card:      isDark? "#111008" : "#ffffff",
@@ -226,9 +226,9 @@ class ErrorBoundary extends React.Component {
         <div style={{maxWidth:600,textAlign:"center"}}>
           <div style={{fontSize:48,marginBottom:16}}>⚠️</div>
           <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"#e8dcc8",marginBottom:8}}>Something went wrong</div>
-          <p style={{fontSize:14,color:"var(--cream-50)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
+          <p style={{fontSize:14,color:"rgba(232,220,200,0.5)",marginBottom:24,lineHeight:1.7}}>Your data is safe. Please refresh to continue.</p>
           <button onClick={()=>window.location.reload()} style={{background:"#d4af37",border:"none",borderRadius:12,padding:"12px 28px",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer",marginBottom:16}}>Refresh page</button>
-          <div style={{textAlign:"left",background:"rgba(255,255,255,0.05)",borderRadius:12,padding:16,fontSize:11,color:"#F87171",fontFamily:"monospace",overflow:"auto",maxHeight:300,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+          <div style={{textAlign:"left",background:"var(--cream-05)",borderRadius:12,padding:16,fontSize:11,color:"#F87171",fontFamily:"monospace",overflow:"auto",maxHeight:300,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
             <div style={{color:"#FCA5A5",fontWeight:700,marginBottom:8}}>{this.state.error?.toString()}</div>
             <div>{this.state.error?.stack}</div>
             {this.state.info?.componentStack&&<div style={{marginTop:12,color:"#FDBA74"}}>{this.state.info.componentStack}</div>}
@@ -962,6 +962,10 @@ const CSS = `
   color:#231c0c;
   border-color:rgba(35,28,12,0.15);
 }
+/* Gold buttons: in light mode --gold darkens for text contrast, so button text flips to white */
+[data-theme="light"] .btn-gold{ color:#fff; }
+[data-theme="light"] .chat-send{ color:#fff; }
+[data-theme="light"] .h-resume-btn{ color:#fff; }
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder{
   color:rgba(35,28,12,0.35);
@@ -5149,7 +5153,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
           </div>
           <div style={{display:"flex",gap:10}}>
             <button onClick={()=>{try{localStorage.removeItem(ciResultKey);}catch{}setResult(null);}}
-              style={{flex:1,padding:"13px",background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,
+              style={{flex:1,padding:"13px",background:"var(--cream-05)",border:"1px solid "+G.border,
                 borderRadius:12,color:G.dim,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
               ↺ Check in again
             </button>
@@ -5460,7 +5464,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
             <div style={{width:28,height:28,borderRadius:"50%",
               background:"rgba(155,114,207,0.2)",border:"1px solid rgba(155,114,207,0.25)",
               display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>🤖</div>
-            <div style={{padding:"12px 16px",background:"rgba(255,255,255,0.04)",
+            <div style={{padding:"12px 16px",background:"var(--cream-05)",
               border:"1px solid "+G.border,borderRadius:"16px 16px 16px 4px"}}>
               <div style={{display:"flex",gap:4,alignItems:"center"}}>
                 {[0,1,2].map(i=>(
@@ -5689,10 +5693,10 @@ HOW TO RESPOND:
           <div style={{padding:"14px 16px",borderBottom:"1px solid "+G.border,background:G.card,display:"flex",alignItems:"center",gap:10,flexShrink:0,paddingTop:`max(14px, env(safe-area-inset-top, 14px))`}}>
             <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>⚡</div>
             <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#ede8d8"}}>DestinIQ Support</div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>DestinIQ Support</div>
               <div style={{fontSize:10,color:"#1fa89a",fontFamily:"monospace",letterSpacing:".04em"}}>● Online</div>
             </div>
-            {isMobile&&<button onClick={()=>setOpen(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.5)",fontSize:22,cursor:"pointer",padding:"4px 8px",lineHeight:1,WebkitTapHighlightColor:"transparent"}}>✕</button>}
+            {isMobile&&<button onClick={()=>setOpen(false)} style={{background:"none",border:"none",color:"var(--cream-50)",fontSize:22,cursor:"pointer",padding:"4px 8px",lineHeight:1,WebkitTapHighlightColor:"transparent"}}>✕</button>}
           </div>
 
           <div style={{display:"flex",borderBottom:"1px solid "+G.border,background:G.card,flexShrink:0}}>
@@ -5737,7 +5741,7 @@ HOW TO RESPOND:
                 ))}
                 {loading&&(
                   <div style={{display:"flex",justifyContent:"flex-start"}}>
-                    <div style={{padding:"10px 14px",borderRadius:"16px 16px 16px 4px",background:"rgba(255,255,255,0.06)",display:"flex",gap:5,alignItems:"center"}}>
+                    <div style={{padding:"10px 14px",borderRadius:"16px 16px 16px 4px",background:"var(--cream-05)",display:"flex",gap:5,alignItems:"center"}}>
                       {[0,1,2].map(i=><span key={i} style={{width:6,height:6,borderRadius:"50%",background:"rgba(210,175,90,0.5)",display:"inline-block",animation:`tdot 1.2s ease-in-out ${i*0.2}s infinite`}}/>)}
                     </div>
                   </div>
@@ -5758,10 +5762,10 @@ HOW TO RESPOND:
                   onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()}
                   placeholder="Ask anything..."
                   style={{
-                    flex:1,background:"rgba(255,255,255,0.05)",
-                    border:"1px solid rgba(255,255,255,0.1)",
+                    flex:1,background:"var(--cream-05)",
+                    border:"1px solid var(--cream-10)",
                     borderRadius:12,padding:"11px 14px",
-                    color:"#ede8d8",fontSize:14,outline:"none",
+                    color:"var(--cream)",fontSize:14,outline:"none",
                     WebkitAppearance:"none",
                     minHeight:44,boxSizing:"border-box",
                   }}
@@ -5935,7 +5939,7 @@ function ShareCard({report, formData, onClose}){
         </div>
 
         {/* Share text preview */}
-        <div style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"12px 14px",fontSize:12,color:G.dim,lineHeight:1.6,marginBottom:16,whiteSpace:"pre-line"}}>
+        <div style={{background:"var(--cream-05)",borderRadius:10,padding:"12px 14px",fontSize:12,color:G.dim,lineHeight:1.6,marginBottom:16,whiteSpace:"pre-line"}}>
           {shareText}
         </div>
 
@@ -5950,7 +5954,7 @@ function ShareCard({report, formData, onClose}){
             Share on Twitter / X
           </button>
           <button onClick={copy}
-            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"12px",color:G.cream,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            style={{background:"var(--cream-05)",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:G.cream,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
             {copied?"✅ Copied!":"Copy text"}
           </button>
         </div>
@@ -6086,7 +6090,7 @@ function Landing({onStart,ipLocation}){
           <button
             style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,
               background:"transparent",color:G.dim,
-              border:"1px solid rgba(232,220,200,0.14)",
+              border:"1px solid var(--cream-15)",
               borderRadius:13,padding:"15px 28px",fontSize:14,fontWeight:500,cursor:"pointer",opacity:.85}} onClick={()=>window.open("https://www.loom.com/share/destiniq-demo","_blank")}>
             <span style={{fontSize:12,opacity:.7}}>▶</span> Watch Demo
           </button>
@@ -6111,12 +6115,12 @@ function Landing({onStart,ipLocation}){
 
         <button onClick={onStart}
           style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",
-            fontSize:13,padding:"4px 0",textDecoration:"underline",textDecorationColor:"rgba(232,220,200,0.2)"}}>
+            fontSize:13,padding:"4px 0",textDecoration:"underline",textDecorationColor:"var(--cream-20)"}}>
           I already have an account
         </button>
 
         {/* Press logos */}
-        <div style={{borderTop:"1px solid rgba(232,220,200,0.07)",paddingTop:28,marginTop:36}}>
+        <div style={{borderTop:"1px solid var(--cream-10)",paddingTop:28,marginTop:36}}>
           <div style={{fontSize:9,color:G.dimmer,letterSpacing:"1.6px",marginBottom:14,textTransform:"uppercase",fontFamily:"monospace"}}>Featured in</div>
           <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
             {["Forbes","TechCrunch","Business Insider"].map(n=>(
@@ -6160,7 +6164,7 @@ function Landing({onStart,ipLocation}){
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
           {features.map((f)=>(
-            <div key={f.title} style={{background:G.card,border:"1px solid rgba(232,220,200,0.06)",
+            <div key={f.title} style={{background:G.card,border:"1px solid var(--cream-05)",
               borderRadius:16,padding:"22px",display:"flex",gap:16,alignItems:"flex-start",
               transition:"border-color 0.2s"}}>
               <div style={{width:48,height:48,borderRadius:13,
@@ -6267,7 +6271,7 @@ function Landing({onStart,ipLocation}){
           onMouseEnter={e=>e.currentTarget.style.animationPlayState="paused"}
           onMouseLeave={e=>e.currentTarget.style.animationPlayState="running"}>
           {[...testimonials,...testimonials].map((t,i)=>(
-            <div key={t.name+"_"+i} style={{background:G.card,border:"1px solid rgba(232,220,200,0.06)",
+            <div key={t.name+"_"+i} style={{background:G.card,border:"1px solid var(--cream-05)",
               borderRadius:16,padding:"22px",width:300,flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
                 <div style={{width:40,height:40,borderRadius:"50%",
@@ -6305,7 +6309,7 @@ function Landing({onStart,ipLocation}){
           {[
             {name:"Free",price:"$0",period:"forever",color:"rgba(255,255,255,0.06)",border:"rgba(255,255,255,0.1)",badge:null,
              features:["1 Intelligence Report","Decisions tool free + preview all 42","Daily Check-in","Win Tracker (up to 5)","AI Advisor (short daily chats)"],
-             cta:"Get Started Free",ctaStyle:{background:"rgba(255,255,255,0.08)",color:G.cream},
+             cta:"Get Started Free",ctaStyle:{background:"var(--cream-10)",color:G.cream},
              action:()=>onStart()},
             {name:"Pro",price:"$9.99",period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
              features:["3 Intelligence Reports/month","All 42 AI tools","Unlimited Check-ins","Unlimited Win Tracker","AI Advisor — full daily conversations","Practices & habits","Progress tracking","Audio report read-aloud"],
@@ -6394,7 +6398,7 @@ function Landing({onStart,ipLocation}){
       {/* ══════════════════════════════════════════
           FOOTER
       ══════════════════════════════════════════ */}
-      <footer style={{borderTop:"1px solid rgba(232,220,200,0.06)",padding:"28px 24px 36px",
+      <footer style={{borderTop:"1px solid var(--cream-05)",padding:"28px 24px 36px",
         maxWidth:860,margin:"0 auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
           flexWrap:"wrap",gap:12,marginBottom:16}}>
@@ -6632,7 +6636,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
           <div style={{flex:1,display:"flex",gap:4}}>
             {[0,1,2,3,4,5,6].map(i=>(
               <div key={i} style={{flex:1,height:4,borderRadius:2,
-                background:i<step?"#f0b429":i===step?"rgba(240,180,41,0.5)":"rgba(232,220,200,0.1)",
+                background:i<step?"#f0b429":i===step?"rgba(240,180,41,0.5)":"var(--cream-10)",
                 transition:"background 0.3s"}}/>
             ))}
           </div>
@@ -6769,7 +6773,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                       <span style={{fontSize:15,color:sel?G.cream:G.dim,fontWeight:sel?600:400}}>{p.label}</span>
                     </div>
                     <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
-                      border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
+                      border:"2px solid "+(sel?G.gold:"var(--cream-20)"),
                       background:sel?G.gold:"transparent",
                       display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {sel&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
@@ -6804,7 +6808,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                       <div style={{fontSize:12,color:"var(--cream-40)",lineHeight:1.5}}>{m.desc}</div>
                     </div>
                     <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,
-                      border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
+                      border:"2px solid "+(sel?G.gold:"var(--cream-20)"),
                       background:sel?G.gold:"transparent",
                       display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {sel&&<div style={{width:8,height:8,borderRadius:"50%",background:"#000"}}/>}
@@ -6841,7 +6845,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                       <span style={{fontSize:15,color:sel?G.cream:G.dim,fontWeight:sel?600:400}}>{b.label}</span>
                     </div>
                     <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
-                      border:"2px solid "+(sel?G.gold:"rgba(232,220,200,0.2)"),
+                      border:"2px solid "+(sel?G.gold:"var(--cream-20)"),
                       background:sel?G.gold:"transparent",
                       display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {sel&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
@@ -7110,7 +7114,7 @@ function CompleteProfile({savedFormData, onSubmit}){
                 return(
                   <div key={b} onClick={()=>{toggleB(b);setErr("");}}
                     style={{display:"flex",alignItems:"center",gap:12,padding:"12px 15px",background:chk?"rgba(212,175,55,0.07)":"var(--night)",border:`1.5px solid ${chk?"var(--gold)":"var(--cream-10)"}`,borderRadius:10,cursor:"pointer",transition:"all .15s"}}>
-                    <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${chk?"var(--gold)":"rgba(232,220,200,0.2)"}`,background:chk?"var(--gold)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
+                    <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${chk?"var(--gold)":"var(--cream-20)"}`,background:chk?"var(--gold)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
                       {chk&&<span style={{color:"#000",fontSize:11,fontWeight:900,lineHeight:1}}>✓</span>}
                     </div>
                     <span style={{fontSize:14,color:chk?"var(--cream)":"var(--cream-60)"}}>{b}</span>
@@ -7132,7 +7136,7 @@ function CompleteProfile({savedFormData, onSubmit}){
 
         {/* What we already have — reassurance */}
         {(savedFormData?.name||savedFormData?.country||savedFormData?.focus)&&(
-          <div style={{marginTop:20,padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid var(--cream-10)",borderRadius:12}}>
+          <div style={{marginTop:20,padding:"14px 16px",background:"var(--cream-05)",border:"1px solid var(--cream-10)",borderRadius:12}}>
             <div style={{fontSize:10,color:"var(--cream-30)",letterSpacing:".1em",marginBottom:10,fontFamily:"var(--f-mono)",textTransform:"uppercase"}}>Already on your profile</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
               {[
@@ -8606,7 +8610,7 @@ function AuthScreen({onAuth, onBack}){
             {/* Google */}
             <button onClick={handleGoogle} disabled={loading}
               style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
-                padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+                padding:"14px",background:"var(--cream-05)",border:"1px solid var(--cream-10)",
                 borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
                 color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
               onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
@@ -8623,7 +8627,7 @@ function AuthScreen({onAuth, onBack}){
             {/* Apple */}
             <button onClick={handleApple} disabled={loading}
               style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
-                padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+                padding:"14px",background:"var(--cream-05)",border:"1px solid var(--cream-10)",
                 borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
                 color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
               onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
@@ -8638,7 +8642,7 @@ function AuthScreen({onAuth, onBack}){
             {!showEmailForm&&(
               <button onClick={()=>setTab("email")}
                 style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
-                  padding:"14px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",
+                  padding:"14px",background:"var(--cream-05)",border:"1px solid var(--cream-10)",
                   borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:20,
                   color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
                 onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
@@ -8651,9 +8655,9 @@ function AuthScreen({onAuth, onBack}){
             {/* OR divider */}
             {!showEmailForm&&(
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-                <div style={{flex:1,height:1,background:"rgba(232,220,200,0.08)"}}/>
+                <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
                 <span style={{fontSize:11,color:G.dimmer,letterSpacing:".08em"}}>OR</span>
-                <div style={{flex:1,height:1,background:"rgba(232,220,200,0.08)"}}/>
+                <div style={{flex:1,height:1,background:"var(--cream-10)"}}/>
               </div>
             )}
 
@@ -8858,7 +8862,7 @@ function RelocGovPortals({country}){
       </p>
       <div style={{display:"grid",gap:8}}>
         {portals.map(p=>(
-          <div key={p.url} style={{background:"rgba(255,255,255,0.03)",
+          <div key={p.url} style={{background:"var(--cream-05)",
             border:"1px solid "+G.border,borderRadius:11,padding:"12px 13px"}}>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",
               gap:10,flexWrap:"wrap",marginBottom:4}}>
@@ -8992,7 +8996,7 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
             {["relocate","changeTown","timeAway"].map(k=>{
               const a = verdict[k]||{};
               return (
-                <div key={k} style={{background:"rgba(255,255,255,0.03)",
+                <div key={k} style={{background:"var(--cream-05)",
                   border:"1px solid "+G.border,borderRadius:12,padding:"12px 13px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5}}>
                     <span style={{fontSize:16}}>{AX[k].icon}</span>
@@ -9203,7 +9207,7 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
           </div>
 
           {data.capital_needed&&(
-            <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,
+            <div style={{background:"var(--cream-05)",border:"1px solid "+G.border,
               borderRadius:10,padding:"10px 12px",marginBottom:12}}>
               <div style={{fontSize:8,fontWeight:700,letterSpacing:".08em",color:G.dimmer,
                 fontFamily:"monospace",marginBottom:3}}>FUNDS THIS ROUTE NEEDS</div>
@@ -9400,7 +9404,7 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
               {["Canada","UK","Germany","Australia","UAE","Portugal","Singapore","Ghana"].map(c=>(
                 <button key={c} onClick={()=>runReport(c==="UK"?"United Kingdom":c)}
                   style={{padding:"7px 14px",borderRadius:20,fontSize:12,fontWeight:600,
-                    border:"1px solid "+G.border,background:"rgba(255,255,255,0.03)",
+                    border:"1px solid "+G.border,background:"var(--cream-05)",
                     color:G.dim,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor=G.gold+"60";e.currentTarget.style.color=G.cream;}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=G.border;e.currentTarget.style.color=G.dim;}}>
@@ -9464,7 +9468,7 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
                 {label:"COST",        val:report.cost,        col:report.cost==="low"?"#81c784":report.cost==="medium"?"#f0b429":"#e05c6e"},
                 {label:"OPPORTUNITY", val:report.opportunity+"/100", col:G.gold},
               ].map(s=>(
-                <div key={s.label} style={{background:"rgba(255,255,255,0.03)",
+                <div key={s.label} style={{background:"var(--cream-05)",
                   border:"1px solid "+G.border,borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
                   <div style={{fontSize:8,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginBottom:3}}>{s.label}</div>
                   <div style={{fontSize:13,fontWeight:800,color:s.col,textTransform:"capitalize"}}>{s.val}</div>
@@ -9590,7 +9594,7 @@ Return ONLY valid JSON, no markdown, no code fences. Start { end }:
 
           {/* Try another */}
           <button onClick={()=>{setReport(null);setQuery("");setError("");setSectionData({});setOpenSection(null);}}
-            style={{width:"100%",padding:"13px",background:"rgba(255,255,255,0.04)",
+            style={{width:"100%",padding:"13px",background:"var(--cream-05)",
               border:"1px solid "+G.border,borderRadius:14,color:G.dim,
               fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
             🌍 Explore Another Country
@@ -9768,11 +9772,11 @@ function HabitButton({itemKey, userId, compact=false}){
                 <option value="paused">Paused</option>
               </select>
               <button onClick={()=>setShowNote(n=>!n)}
-                style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"4px 8px",color:"var(--cream-40)",fontSize:10,cursor:"pointer"}}>
+                style={{background:"var(--cream-05)",border:"1px solid var(--cream-10)",borderRadius:8,padding:"4px 8px",color:"var(--cream-40)",fontSize:10,cursor:"pointer"}}>
                 {showNote?"▲":"📝"}
               </button>
               <button onClick={()=>ht.uncommit(itemKey)}
-                style={{background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"4px 8px",color:"var(--cream-30)",fontSize:10,cursor:"pointer"}}
+                style={{background:"none",border:"1px solid var(--cream-10)",borderRadius:8,padding:"4px 8px",color:"var(--cream-30)",fontSize:10,cursor:"pointer"}}
                 title="Remove from tracker">✕</button>
             </div>
           </div>
@@ -9784,7 +9788,7 @@ function HabitButton({itemKey, userId, compact=false}){
                 onBlur={()=>{ht.addNote(itemKey,noteVal);setNoteSaved(true);setTimeout(()=>setNoteSaved(false),1500);}}
                 placeholder="Add a note — how is this going? What have you noticed?"
                 rows={2}
-                style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
+                style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid var(--cream-10)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
               />
               {noteSaved&&<div style={{fontSize:10,color:sm.color,marginTop:4,fontFamily:"var(--f-mono)"}}>✓ Saved</div>}
             </div>
@@ -9848,7 +9852,7 @@ function HabitTrackerPanel({userId, onClose, onNavigate}){
 
           {/* Master progress bar */}
           <div style={{marginBottom:6}}>
-            <div style={{height:8,background:"rgba(255,255,255,0.06)",borderRadius:4,overflow:"hidden",marginBottom:6}}>
+            <div style={{height:8,background:"var(--cream-05)",borderRadius:4,overflow:"hidden",marginBottom:6}}>
               <div style={{height:"100%",width:`${ht.pct}%`,background:"linear-gradient(90deg,var(--teal),var(--gold))",borderRadius:4,transition:"width .6s ease"}}/>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>
@@ -9870,7 +9874,7 @@ function HabitTrackerPanel({userId, onClose, onNavigate}){
               return(
                 <div key={mod} onClick={()=>setFilter(mod)} style={{cursor:"pointer",padding:"6px 8px",background:filter===mod?"var(--lift)":"var(--midnight)",borderRadius:8,border:`1px solid ${filter===mod?"var(--line-gold)":"rgba(255,255,255,0.06)"}`,transition:"all .2s"}}>
                   <div style={{fontSize:9,color:"var(--cream-30)",marginBottom:4,fontFamily:"var(--f-mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{MODULE_LABELS[mod].split(" ")[0]}</div>
-                  <div style={{height:3,background:"rgba(255,255,255,0.06)",borderRadius:2,marginBottom:3}}>
+                  <div style={{height:3,background:"var(--cream-05)",borderRadius:2,marginBottom:3}}>
                     <div style={{height:"100%",width:`${pct}%`,background:"var(--gold)",borderRadius:2}}/>
                   </div>
                   <div style={{fontSize:9,color:"var(--cream-40)",fontFamily:"var(--f-mono)"}}>{done}/{items.length}</div>
@@ -10003,7 +10007,7 @@ function NoteEditor({itemKey, ht}){
       <textarea value={val} onChange={e=>setVal(e.target.value)} onBlur={handleBlur}
         placeholder="How is this going? What have you noticed? What's hard?"
         rows={2}
-        style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
+        style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid var(--cream-10)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
       />
       {saved&&<div style={{fontSize:10,color:"var(--teal)",marginTop:4,fontFamily:"var(--f-mono)"}}>✓ Saved</div>}
     </div>
@@ -10327,7 +10331,7 @@ function AudioPlayer({text,label="Listen",mini=false}){
     return(
       <button onClick={()=>{ if(state==="idle"||state==="unsupported") play(); else stop(); }}
         title={state==="playing"?"Stop":state==="loading"?"Preparing…":"Listen"}
-        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:"50%",background:state!=="idle"?"rgba(210,175,90,0.12)":"none",border:`1.5px solid ${state!=="idle"?"rgba(210,175,90,0.5)":"rgba(255,255,255,0.1)"}`,cursor:"pointer",fontSize:11,marginTop:6,color:state!=="idle"?"var(--gold)":"rgba(255,255,255,0.25)",transition:"all .2s",flexShrink:0}}>
+        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:24,height:24,borderRadius:"50%",background:state!=="idle"?"rgba(210,175,90,0.12)":"none",border:`1.5px solid ${state!=="idle"?"rgba(210,175,90,0.5)":"var(--cream-10)"}`,cursor:"pointer",fontSize:11,marginTop:6,color:state!=="idle"?"var(--gold)":"rgba(255,255,255,0.25)",transition:"all .2s",flexShrink:0}}>
         {state==="loading"?"…":state==="playing"?"⏹":"🔊"}
       </button>
     );
@@ -10335,7 +10339,7 @@ function AudioPlayer({text,label="Listen",mini=false}){
   return(
     <div style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:8,flexWrap:"wrap"}}>
       {state==="idle"&&(
-        <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 14px",color:"rgba(255,255,255,0.45)",fontSize:12,cursor:"pointer",transition:"all .2s"}}
+        <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:7,background:"none",border:"1px solid var(--cream-10)",borderRadius:20,padding:"6px 14px",color:"var(--cream-40)",fontSize:12,cursor:"pointer",transition:"all .2s"}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)";}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.1)";e.currentTarget.style.color="rgba(255,255,255,0.45)";}}>
           🔊 {label}
@@ -10355,15 +10359,15 @@ function AudioPlayer({text,label="Listen",mini=false}){
       {state==="playing"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
           <button onClick={pause} style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(210,175,90,0.1)",border:"1px solid rgba(210,175,90,0.4)",borderRadius:20,padding:"6px 14px",color:"var(--gold)",fontSize:12,cursor:"pointer"}}>⏸ Pause</button>
-          <button onClick={stop} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 12px",color:"rgba(255,255,255,0.3)",fontSize:12,cursor:"pointer"}}>⏹</button>
+          <button onClick={stop} style={{background:"none",border:"1px solid var(--cream-10)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>⏹</button>
           <span style={{display:"inline-flex",gap:2,alignItems:"center"}}>{[0,1,2].map(i=><span key={i} style={{display:"inline-block",width:2,borderRadius:2,background:"var(--gold)",height:i===1?13:8,animation:`tdot 1.1s ease-in-out ${i*0.18}s infinite`}}/>)}</span>
-          <span style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"var(--f-mono)",letterSpacing:".05em"}}>AI voice</span>
+          <span style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".05em"}}>AI voice</span>
         </div>
       )}
       {state==="paused"&&(
         <div style={{display:"inline-flex",alignItems:"center",gap:5}}>
           <button onClick={play} style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(20,184,154,0.08)",border:"1px solid rgba(20,184,154,0.35)",borderRadius:20,padding:"6px 14px",color:"var(--teal)",fontSize:12,cursor:"pointer"}}>▶ Resume</button>
-          <button onClick={stop} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,padding:"6px 12px",color:"rgba(255,255,255,0.3)",fontSize:12,cursor:"pointer"}}>⏹</button>
+          <button onClick={stop} style={{background:"none",border:"1px solid var(--cream-10)",borderRadius:20,padding:"6px 12px",color:"var(--cream-30)",fontSize:12,cursor:"pointer"}}>⏹</button>
         </div>
       )}
     </div>
@@ -10634,13 +10638,13 @@ function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loadi
           {audioText&&isPaid&&<AudioPlayer text={audioText} label="Listen"/>}
           <button onClick={handleRegen} disabled={loading}
             title={isPaid?"Get a new set":"Upgrade to refresh with new ideas"}
-            style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.12)",background:"none",color:"rgba(255,255,255,0.35)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4}}>
+            style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid var(--cream-15)",background:"none",color:"var(--cream-30)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4}}>
             {loading?"…":isPaid?"↺ Refresh":<>🔒 Refresh</>}
           </button>
         </div>
       </div>
       {err&&<div className="err-box" style={{marginBottom:10}}>⚠ {err} <button onClick={handleRegen} style={{marginLeft:8,background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11}}>Retry</button></div>}
-      {loading&&<div style={{textAlign:"center",padding:"24px 0"}}><div style={{width:28,height:28,border:"2.5px solid rgba(255,255,255,0.08)",borderTop:"2.5px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 10px"}}/><p style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>Building your {title.toLowerCase()}…</p></div>}
+      {loading&&<div style={{textAlign:"center",padding:"24px 0"}}><div style={{width:28,height:28,border:"2.5px solid rgba(255,255,255,0.08)",borderTop:"2.5px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 10px"}}/><p style={{fontSize:12,color:"var(--cream-30)"}}>Building your {title.toLowerCase()}…</p></div>}
       {!loading&&children}
     </div>
   );
@@ -11150,7 +11154,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div>
           <div className="d3" style={{marginBottom:4}}>Win Tracker</div>
-          <p style={{fontSize:13,color:"rgba(255,255,255,0.4)"}}>Every small win builds the bigger one. Log what you did today.</p>
+          <p style={{fontSize:13,color:"var(--cream-40)"}}>Every small win builds the bigger one. Log what you did today.</p>
           {!isPaid&&<p style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",marginTop:4}}>
             {wins.length}/{FREE_WIN_LIMIT} free wins · <button onClick={()=>onUnlock&&onUnlock()} style={{background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11,padding:0,fontFamily:"var(--f-mono)"}}>Upgrade for unlimited →</button>
           </p>}
@@ -11158,11 +11162,11 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(210,175,90,0.08)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:10}}>
             <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"var(--gold)",lineHeight:1}}>{currentStreak}</div>
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>WIN STREAK 🏆</div>
+            <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginTop:2}}>WIN STREAK 🏆</div>
           </div>
           <div style={{textAlign:"center",padding:"8px 16px",background:"rgba(20,184,154,0.06)",border:"1px solid rgba(20,184,154,0.2)",borderRadius:10}}>
             <div style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:700,color:"var(--teal)",lineHeight:1}}>{totalWins}</div>
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"var(--f-mono)",marginTop:2}}>TOTAL WINS</div>
+            <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginTop:2}}>TOTAL WINS</div>
           </div>
         </div>
       </div>
@@ -11171,7 +11175,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
       <div style={{display:"flex",gap:6,marginBottom:20}}>
         {[{id:"log",l:"Log a Win"},{id:"calendar",l:"Calendar"},{id:"stats",l:"My Progress"}].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
-            style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${tab===t.id?"rgba(210,175,90,0.4)":"rgba(255,255,255,0.1)"}`,background:tab===t.id?"rgba(210,175,90,0.08)":"none",color:tab===t.id?"var(--gold)":"rgba(255,255,255,0.4)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)"}}>
+            style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${tab===t.id?"rgba(210,175,90,0.4)":"var(--cream-10)"}`,background:tab===t.id?"rgba(210,175,90,0.08)":"none",color:tab===t.id?"var(--gold)":"rgba(255,255,255,0.4)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)"}}>
             {t.l}
           </button>
         ))}
@@ -11192,7 +11196,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
           <div style={{position:"relative",marginBottom:12}}>
             <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addWin();}}}
               placeholder="What did you accomplish today? Even tiny things count — showing up, making a call, finishing a task…"
-              style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:"13px 50px 13px 16px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6,fontFamily:"inherit"}} rows={3} maxLength={300}/>
+              style={{width:"100%",background:"var(--cream-05)",border:"1px solid var(--cream-10)",borderRadius:12,padding:"13px 50px 13px 16px",color:"var(--cream)",fontSize:13,outline:"none",boxSizing:"border-box",resize:"none",lineHeight:1.6,fontFamily:"inherit"}} rows={3} maxLength={300}/>
             <button onClick={addWin} disabled={!input.trim()||loading}
               style={{position:"absolute",right:10,bottom:10,width:32,height:32,borderRadius:"50%",border:"none",background:input.trim()?"var(--gold)":"rgba(255,255,255,0.1)",color:input.trim()?"#000":"rgba(255,255,255,0.2)",cursor:input.trim()?"pointer":"default",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
               {loading?"…":"→"}
@@ -11206,23 +11210,23 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
           {/* Today's wins */}
           {todayWins.length>0&&(
             <div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)",marginBottom:10,letterSpacing:".1em"}}>TODAY'S WINS · {todayWins.length}</div>
+              <div style={{fontSize:9,color:"var(--cream-20)",fontFamily:"var(--f-mono)",marginBottom:10,letterSpacing:".1em"}}>TODAY'S WINS · {todayWins.length}</div>
               {todayWins.map((w,i)=>(
                 <div key={w.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",borderBottom:i<todayWins.length-1?"1px solid rgba(255,255,255,0.05)":"none"}}>
                   <span style={{fontSize:16,flexShrink:0}}>✅</span>
                   <div style={{flex:1}}>
-                    <p style={{fontSize:13,color:"rgba(255,255,255,0.7)",margin:0,lineHeight:1.6}}>{w.text}</p>
-                    {w.mood&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{w.mood}</span>}
+                    <p style={{fontSize:13,color:"var(--cream-70)",margin:0,lineHeight:1.6}}>{w.text}</p>
+                    {w.mood&&<span style={{fontSize:10,color:"var(--cream-30)"}}>{w.mood}</span>}
                   </div>
                   <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);
-                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).catch(()=>{});}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).catch(()=>{});}} style={{background:"none",border:"none",color:"var(--cream-15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
           )}
           {todayWins.length===0&&(
             <div style={{textAlign:"center",padding:"16px 0 8px"}}>
-              <p style={{fontSize:13,color:"rgba(255,255,255,0.3)",marginBottom:16}}>No wins logged yet today. What&apos;s one small thing you&apos;ll do before the day ends?</p>
+              <p style={{fontSize:13,color:"var(--cream-30)",marginBottom:16}}>No wins logged yet today. What&apos;s one small thing you&apos;ll do before the day ends?</p>
               <div style={{padding:"14px 18px",background:"rgba(210,175,90,0.04)",border:"1px solid rgba(210,175,90,0.12)",borderRadius:12,textAlign:"left"}}>
                 <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--gold)",letterSpacing:".12em",marginBottom:8}}>NEED MOTIVATION?</div>
                 <div style={{display:"flex",flexDirection:"column",gap:7}}>
@@ -11251,7 +11255,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
       {/* CALENDAR TAB */}
       {tab==="calendar"&&(
         <div>
-          <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"var(--f-mono)",marginBottom:14,letterSpacing:".1em"}}>LAST 30 DAYS</div>
+          <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:14,letterSpacing:".1em"}}>LAST 30 DAYS</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5}}>
             {last30.map(d=>(
               <div key={d.key} title={`${d.key}: ${d.count} win${d.count!==1?"s":""}`}
@@ -11262,7 +11266,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
           </div>
           <div style={{display:"flex",gap:12,marginTop:14,flexWrap:"wrap"}}>
             {[{c:"rgba(210,175,90,0.2)",l:"3+ wins"},{c:"rgba(210,175,90,0.1)",l:"2 wins"},{c:"rgba(210,175,90,0.06)",l:"1 win"},{c:"transparent",l:"No log"}].map(x=>(
-              <div key={x.l} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"rgba(255,255,255,0.3)"}}>
+              <div key={x.l} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"var(--cream-30)"}}>
                 <div style={{width:12,height:12,borderRadius:3,background:x.c,border:"1px solid rgba(210,175,90,0.2)"}}/>
                 {x.l}
               </div>
@@ -11270,11 +11274,11 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
           </div>
           {wins.length>0&&(
             <div style={{marginTop:20}}>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"var(--f-mono)",marginBottom:12,letterSpacing:".1em"}}>RECENT WINS</div>
+              <div style={{fontSize:9,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:12,letterSpacing:".1em"}}>RECENT WINS</div>
               {wins.slice(0,8).map(w=>(
                 <div key={w.id} style={{display:"flex",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                  <span style={{fontSize:9,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)",flexShrink:0,paddingTop:3}}>{w.date}</span>
-                  <p style={{fontSize:12,color:"rgba(255,255,255,0.55)",margin:0,lineHeight:1.5}}>{w.text}</p>
+                  <span style={{fontSize:9,color:"var(--cream-20)",fontFamily:"var(--f-mono)",flexShrink:0,paddingTop:3}}>{w.date}</span>
+                  <p style={{fontSize:12,color:"var(--cream-50)",margin:0,lineHeight:1.5}}>{w.text}</p>
                 </div>
               ))}
             </div>
@@ -11292,16 +11296,16 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
               {label:"Active Days",val:streakDays.length,icon:"📅",c:"#9b72cf"},
               {label:"Avg per Day",val:avgPerDay,icon:"📈",c:"var(--gold)"},
             ].map(s=>(
-              <div key={s.label} style={{padding:"14px",background:"rgba(255,255,255,0.03)",borderRadius:12,border:"1px solid rgba(255,255,255,0.07)"}}>
+              <div key={s.label} style={{padding:"14px",background:"var(--cream-05)",borderRadius:12,border:"1px solid rgba(255,255,255,0.07)"}}>
                 <div style={{fontSize:24,marginBottom:4}}>{s.icon}</div>
                 <div style={{fontSize:20,fontWeight:700,color:s.c,lineHeight:1}}>{s.val}</div>
-                <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:4,fontFamily:"var(--f-mono)"}}>{s.label.toUpperCase()}</div>
+                <div style={{fontSize:10,color:"var(--cream-30)",marginTop:4,fontFamily:"var(--f-mono)"}}>{s.label.toUpperCase()}</div>
               </div>
             ))}
           </div>
           {currentStreak>=7&&<div style={{padding:"14px 16px",background:"rgba(210,175,90,0.07)",border:"1px solid rgba(210,175,90,0.2)",borderRadius:12,fontSize:13,color:"var(--gold)",lineHeight:1.6}}>🏆 You've maintained a {currentStreak}-day streak. Most people quit by day 3. You didn't.</div>}
-          {currentStreak===0&&totalWins>0&&<div style={{padding:"14px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,fontSize:13,color:"rgba(255,255,255,0.5)",lineHeight:1.6}}>You've logged {totalWins} wins total. Today is a new day — log one thing and restart your streak.</div>}
-          {totalWins===0&&<div style={{textAlign:"center",padding:"20px 0",color:"rgba(255,255,255,0.25)",fontSize:13}}>Start logging wins daily. Even small ones. After 7 days you&apos;ll see something change.</div>}
+          {currentStreak===0&&totalWins>0&&<div style={{padding:"14px 16px",background:"var(--cream-05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,fontSize:13,color:"var(--cream-50)",lineHeight:1.6}}>You've logged {totalWins} wins total. Today is a new day — log one thing and restart your streak.</div>}
+          {totalWins===0&&<div style={{textAlign:"center",padding:"20px 0",color:"var(--cream-20)",fontSize:13}}>Start logging wins daily. Even small ones. After 7 days you&apos;ll see something change.</div>}
 
           {/* Streak Leaderboard */}
           <StreakLeaderboard userId={userId}/>
@@ -11440,7 +11444,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
           {PROGRESS_TAGS.map(t=>(
             <button key={t.id} onClick={()=>setTag(t.id)}
-              style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${tag===t.id?t.color:"rgba(255,255,255,0.1)"}`,background:tag===t.id?`${t.color}18`:"none",color:tag===t.id?t.color:"rgba(255,255,255,0.4)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",transition:"all .2s"}}>
+              style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${tag===t.id?t.color:"var(--cream-10)"}`,background:tag===t.id?`${t.color}18`:"none",color:tag===t.id?t.color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"var(--f-mono)",transition:"all .2s"}}>
               {t.label}
             </button>
           ))}
@@ -11456,7 +11460,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
           />
         </div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-          <span style={{fontSize:11,color:"rgba(255,255,255,0.2)",fontFamily:"var(--f-mono)"}}>{input.length}/600</span>
+          <span style={{fontSize:11,color:"var(--cream-20)",fontFamily:"var(--f-mono)"}}>{input.length}/600</span>
           {!isPaid && entries.length >= FREE_PROGRESS_LIMIT ? (
             <button onClick={()=>onUnlock&&onUnlock()} className="btn btn-gold" style={{fontSize:13}}>
               🔒 Upgrade to post more updates
@@ -11473,11 +11477,11 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
       {/* Filter */}
       {entries.length>0&&(
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
-          <button onClick={()=>setFilter("all")} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filter==="all"?"var(--gold)":"rgba(255,255,255,0.1)"}`,background:filter==="all"?"rgba(210,175,90,0.08)":"none",color:filter==="all"?"var(--gold)":"rgba(255,255,255,0.35)",fontSize:11,cursor:"pointer"}}>
+          <button onClick={()=>setFilter("all")} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filter==="all"?"var(--gold)":"var(--cream-10)"}`,background:filter==="all"?"rgba(210,175,90,0.08)":"none",color:filter==="all"?"var(--gold)":"rgba(255,255,255,0.35)",fontSize:11,cursor:"pointer"}}>
             All ({entries.length})
           </button>
           {PROGRESS_TAGS.filter(t=>entries.some(e=>e.tag===t.id)).map(t=>(
-            <button key={t.id} onClick={()=>setFilter(t.id)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filter===t.id?t.color:"rgba(255,255,255,0.1)"}`,background:filter===t.id?`${t.color}18`:"none",color:filter===t.id?t.color:"rgba(255,255,255,0.35)",fontSize:11,cursor:"pointer"}}>
+            <button key={t.id} onClick={()=>setFilter(t.id)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${filter===t.id?t.color:"var(--cream-10)"}`,background:filter===t.id?`${t.color}18`:"none",color:filter===t.id?t.color:"var(--cream-30)",fontSize:11,cursor:"pointer"}}>
               {t.label} ({entries.filter(e=>e.tag===t.id).length})
             </button>
           ))}
@@ -11490,7 +11494,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
           <div style={{textAlign:"center",marginBottom:24}}>
             <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>📈</div>
             <div className="d3" style={{marginBottom:8}}>Your progress story starts here</div>
-            <p style={{fontSize:13,color:"rgba(255,255,255,0.35)",maxWidth:380,margin:"0 auto",lineHeight:1.7}}>
+            <p style={{fontSize:13,color:"var(--cream-30)",maxWidth:380,margin:"0 auto",lineHeight:1.7}}>
               Every time you try something from your roadmap, career path, or business plan — come back and tell your coach what happened. They&apos;ll help you adjust and keep moving.
             </p>
           </div>
@@ -11540,18 +11544,18 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,gap:8,flexWrap:"wrap"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:9,color:meta.color,fontFamily:"var(--f-mono)",background:`${meta.color}18`,border:`1px solid ${meta.color}40`,borderRadius:4,padding:"2px 8px"}}>{meta.label.toUpperCase()}</span>
-                    <span style={{fontSize:10,color:"rgba(255,255,255,0.25)",fontFamily:"var(--f-mono)"}}>{dateStr}</span>
+                    <span style={{fontSize:10,color:"var(--cream-20)",fontFamily:"var(--f-mono)"}}>{dateStr}</span>
                   </div>
-                  <button onClick={()=>setEntries(entries.filter(e=>e.id!==entry.id))||saveProgress(entries.filter(e=>e.id!==entry.id))} style={{background:"none",border:"none",color:"rgba(255,255,255,0.15)",cursor:"pointer",fontSize:12}}>✕</button>
+                  <button onClick={()=>setEntries(entries.filter(e=>e.id!==entry.id))||saveProgress(entries.filter(e=>e.id!==entry.id))} style={{background:"none",border:"none",color:"var(--cream-15)",cursor:"pointer",fontSize:12}}>✕</button>
                 </div>
-                <p style={{fontSize:13,color:"rgba(255,255,255,0.75)",lineHeight:1.7,margin:0}}>{entry.text}</p>
+                <p style={{fontSize:13,color:"var(--cream-70)",lineHeight:1.7,margin:0}}>{entry.text}</p>
               </div>
 
               {/* Coach reply */}
               {entry.loading?(
                 <div style={{padding:"12px 16px",borderTop:"1px solid rgba(255,255,255,0.06)",background:"rgba(210,175,90,0.03)",display:"flex",alignItems:"center",gap:8}}>
                   <div style={{width:20,height:20,border:"2px solid rgba(210,175,90,0.2)",borderTop:"2px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",flexShrink:0}}/>
-                  <span style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>Your coach is reading your update…</span>
+                  <span style={{fontSize:12,color:"var(--cream-30)"}}>Your coach is reading your update…</span>
                 </div>
               ):entry.reply?(
                 <div style={{padding:"14px 16px",borderTop:"1px solid rgba(255,255,255,0.06)",background:"rgba(210,175,90,0.04)"}}>
@@ -11576,7 +11580,7 @@ Respond as their personal coach who knows their full story. Be direct, warm, spe
             {emoji:"💸",label:"Deel — get paid globally",url:"https://www.deel.com"},
           ].map((lk,i)=>(
             <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer"
-              style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:20,textDecoration:"none",transition:"opacity .15s"}}
+              style={{display:"inline-flex",alignItems:"center",gap:6,padding:"6px 12px",background:"var(--cream-05)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:20,textDecoration:"none",transition:"opacity .15s"}}
               onMouseEnter={e=>e.currentTarget.style.opacity=".7"}
               onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
               <span style={{fontSize:12}}>{lk.emoji}</span>
@@ -11660,7 +11664,7 @@ function PracticesView({userId}){
             <div style={{fontSize:10,color:G.dimmer,fontFamily:"monospace",letterSpacing:".08em",marginTop:2}}>COMPLETE</div>
           </div>
         </div>
-        <div style={{height:6,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden"}}>
+        <div style={{height:6,background:"var(--cream-05)",borderRadius:3,overflow:"hidden"}}>
           <div style={{height:"100%",width:`${ht.pct}%`,
             background:"linear-gradient(90deg,#1ab89a,#f0b429)",
             borderRadius:3,transition:"width .4s ease"}}/>
@@ -11674,7 +11678,7 @@ function PracticesView({userId}){
             style={{padding:"7px 16px",borderRadius:20,flexShrink:0,fontFamily:"inherit",
               fontSize:12,cursor:"pointer",transition:"all .15s",
               background:filter===id?"rgba(240,180,41,0.1)":"none",
-              border:`1px solid ${filter===id?"rgba(240,180,41,0.4)":"rgba(232,220,200,0.1)"}`,
+              border:`1px solid ${filter===id?"rgba(240,180,41,0.4)":"var(--cream-10)"}`,
               color:filter===id?G.gold:G.dim}}>
             {label}
           </button>
@@ -11747,8 +11751,8 @@ function PracticesView({userId}){
                     )}
                     {!isPaus?(
                       <button onClick={()=>ht.pause?.(item.key)}
-                        style={{padding:"7px 14px",background:"rgba(255,255,255,0.04)",
-                          border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
+                        style={{padding:"7px 14px",background:"var(--cream-05)",
+                          border:"1px solid var(--cream-10)",borderRadius:20,
                           color:G.dim,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
                         ⏸ Pause
                       </button>
@@ -12724,7 +12728,7 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
       )}
 
       {/* User info + notification bell at bottom */}
-      <div style={{borderTop:"1px solid rgba(232,220,200,0.07)",padding:"14px 16px",
+      <div style={{borderTop:"1px solid var(--cream-10)",padding:"14px 16px",
         display:"flex",alignItems:"center",gap:10,marginTop:"auto"}}>
         <div onClick={()=>setNav("profile")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
           <div style={{width:32,height:32,borderRadius:"50%",flexShrink:0,
@@ -12969,7 +12973,7 @@ function FollowUpCard({userId, G, card}){
           borderRadius:10,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
           ✓ Done it
         </button>
-        <button onClick={notYet} style={{flex:1,background:"rgba(255,255,255,0.05)",color:G.dim,
+        <button onClick={notYet} style={{flex:1,background:"var(--cream-05)",color:G.dim,
           border:"1px solid "+G.border,borderRadius:10,padding:"11px",fontSize:13,fontWeight:600,
           cursor:"pointer",fontFamily:"inherit"}}>
           Not yet
@@ -13068,7 +13072,7 @@ function IdentityStrip({userId, streak, G}){
       {[streak>1&&`🔥 Day ${streak}`, wins>0&&`🏆 ${wins} win${wins!==1?"s":""}`, habits>0&&`⚡ ${habits} practice${habits!==1?"s":""} committed`]
         .filter(Boolean).map(t=>(
         <span key={t} style={{fontSize:11,fontWeight:600,color:G.dim,padding:"6px 12px",
-          background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,borderRadius:20}}>{t}</span>
+          background:"var(--cream-05)",border:"1px solid "+G.border,borderRadius:20}}>{t}</span>
       ))}
     </div>
   );
@@ -13186,8 +13190,8 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       <div style={{padding:"0 20px"}}>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
         {/* ══ CONTINUE JOURNEY (Hero card) ══ */}
-        <div style={{background:"linear-gradient(135deg,#131008,#0f0c05)",
-          border:"1px solid rgba(240,180,41,0.2)",borderRadius:18,padding:"24px",
+        <div style={{background:G.isDark?"linear-gradient(135deg,#131008,#0f0c05)":"linear-gradient(135deg,#fffdf6,#faf5e8)",
+          border:"1px solid rgba(240,180,41,"+(G.isDark?"0.2":"0.35")+")",borderRadius:18,padding:"24px",
           marginBottom:14,position:"relative",overflow:"hidden",
           boxShadow:"0 0 40px rgba(240,180,41,0.05)"}}>
           <div style={{position:"absolute",top:0,right:0,width:"45%",height:"100%",
@@ -13242,9 +13246,9 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
         {/* ══ 3. TODAY'S INTELLIGENCE INSIGHT ══ */}
         <div style={{...card,marginBottom:14,
-          background:"linear-gradient(135deg,#0e0820,#0a0810)",
-          border:"1px solid rgba(120,80,200,0.14)"}}>
-          <div style={{fontSize:9,color:"rgba(200,160,255,0.6)",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>TODAY'S INSIGHT FOR YOU</div>
+          background:G.isDark?"linear-gradient(135deg,#0e0820,#0a0810)":"linear-gradient(135deg,#f2edfb,#f7f2fc)",
+          border:"1px solid rgba(120,80,200,"+(G.isDark?"0.14":"0.25")+")"}}>
+          <div style={{fontSize:9,color:G.isDark?"rgba(200,160,255,0.6)":"#5a3fa0",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>TODAY'S INSIGHT FOR YOU</div>
           <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
             <span style={{fontSize:20,color:G.gold,flexShrink:0,marginTop:2}}>✦</span>
             <p style={{fontSize:14,color:G.dim,lineHeight:1.72,margin:0}}>
@@ -13564,7 +13568,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
             transform:"translateY(-50%)",fontSize:14,opacity:.4}}>🔍</span>
           <input value={query} onChange={e=>setQuery(e.target.value)}
             placeholder="What do you want to improve today?"
-            style={{width:"100%",background:"rgba(255,255,255,0.06)",
+            style={{width:"100%",background:"var(--cream-05)",
               border:"1px solid "+G.border,borderRadius:14,
               padding:"12px 40px 12px 40px",fontSize:13,color:G.cream,
               outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
@@ -13576,7 +13580,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
         {query.trim()&&(
           <div style={{marginBottom:28}}>
             {filteredTools.length===0&&filteredCats.length===0?(
-              <div style={{padding:"28px 20px",background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,borderRadius:16,textAlign:"center"}}>
+              <div style={{padding:"28px 20px",background:"var(--cream-05)",border:"1px solid "+G.border,borderRadius:16,textAlign:"center"}}>
                 <div style={{fontSize:13,color:G.dimmer}}>No results for "{query}"</div>
               </div>
             ):(
@@ -13587,7 +13591,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                     <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:filteredCats.length>0?20:0}}>
                       {filteredTools.map(item=>(
                         <div key={item.id} onClick={()=>setNav(item.id)}
-                          style={{background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,borderRadius:14,
+                          style={{background:"var(--cream-05)",border:"1px solid "+G.border,borderRadius:14,
                             padding:"13px 16px",display:"flex",alignItems:"center",gap:14,cursor:"pointer"}}
                           onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                           onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
@@ -13617,7 +13621,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {filteredCats.map(cat=>(
                         <div key={cat.id} onClick={()=>setNav("category:"+cat.id)}
-                          style={{background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,borderRadius:14,
+                          style={{background:"var(--cream-05)",border:"1px solid "+G.border,borderRadius:14,
                             padding:"13px 16px",display:"flex",alignItems:"center",gap:14,cursor:"pointer"}}
                           onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.07)"}
                           onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
@@ -13696,7 +13700,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
               <button key={s.label} onClick={()=>setNav(s.nav)}
                 style={{padding:"8px 14px",borderRadius:20,fontSize:12,fontWeight:600,
                   border:"1px solid "+G.border,
-                  background:"rgba(255,255,255,0.04)",
+                  background:"var(--cream-05)",
                   color:G.cream,cursor:"pointer",
                   fontFamily:"inherit",transition:"all .15s"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=G.gold;e.currentTarget.style.color=G.gold;}}
@@ -13768,7 +13772,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                     Last visited {i===0?"2 days ago":i===1?"3 days ago":"5 days ago"}
                   </div>
                   {/* Progress bar */}
-                  <div style={{height:3,background:"rgba(255,255,255,0.08)",
+                  <div style={{height:3,background:"var(--cream-10)",
                     borderRadius:2,marginBottom:10,overflow:"hidden"}}>
                     <div style={{height:"100%",width:progress+"%",
                       background:G.gold,borderRadius:2}}/>
@@ -14027,7 +14031,7 @@ function IntelligenceCard({card, catColor, onSelect, userId}){
             {/* Key metric: startup cost only */}
             {card.startupCost&&(
               <div style={{display:"inline-flex",alignItems:"center",gap:6,
-                background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,
+                background:"var(--cream-05)",border:"1px solid "+G.border,
                 borderRadius:8,padding:"4px 10px"}}>
                 <span style={{fontSize:10,color:G.dimmer}}>Startup Cost</span>
                 <span style={{fontSize:12,fontWeight:800,color:G.cream}}>{card.startupCost}</span>
@@ -14035,7 +14039,7 @@ function IntelligenceCard({card, catColor, onSelect, userId}){
             )}
             {card.incomeRange&&!card.startupCost&&(
               <div style={{display:"inline-flex",alignItems:"center",gap:6,
-                background:"rgba(255,255,255,0.04)",border:"1px solid "+G.border,
+                background:"var(--cream-05)",border:"1px solid "+G.border,
                 borderRadius:8,padding:"4px 10px"}}>
                 <span style={{fontSize:10,color:G.dimmer}}>Income</span>
                 <span style={{fontSize:12,fontWeight:800,color:"#81c784"}}>{card.incomeRange}</span>
@@ -14367,7 +14371,7 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
           {/* Startup cost — prominent */}
           {card.startupCost&&(
             <div style={{display:"inline-flex",alignItems:"center",gap:10,
-              background:"rgba(255,255,255,0.05)",border:"1px solid "+G.border,
+              background:"var(--cream-05)",border:"1px solid "+G.border,
               borderRadius:12,padding:"10px 16px"}}>
               <span style={{fontSize:13,color:G.dim}}>Startup Cost</span>
               <span style={{fontSize:18,fontWeight:900,color:G.cream}}>{card.startupCost}</span>
@@ -14375,7 +14379,7 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
           )}
           {card.incomeRange&&(
             <div style={{display:"inline-flex",alignItems:"center",gap:10,
-              background:"rgba(255,255,255,0.05)",border:"1px solid "+G.border,
+              background:"var(--cream-05)",border:"1px solid "+G.border,
               borderRadius:12,padding:"10px 16px",marginLeft:card.startupCost?10:0}}>
               <span style={{fontSize:13,color:G.dim}}>Income Range</span>
               <span style={{fontSize:18,fontWeight:900,color:"#81c784"}}>{card.incomeRange}</span>
@@ -14386,7 +14390,7 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
         {/* ── WHY IT WORKS ── */}
         {card.whyItWorks&&(
           <div style={{marginBottom:20,padding:"16px 18px",
-            background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,borderRadius:14}}>
+            background:"var(--cream-05)",border:"1px solid "+G.border,borderRadius:14}}>
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",color:G.accent,
               fontFamily:"monospace",marginBottom:8}}>WHY IT WORKS</div>
             <p style={{fontSize:13,color:G.dim,lineHeight:1.8,margin:0}}>{card.whyItWorks}</p>
@@ -14402,7 +14406,7 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
               {card.suppliers.map(s=>(
                 <a key={s.name} href={s.url} target="_blank" rel="noreferrer"
                   style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",
-                    background:"rgba(255,255,255,0.03)",border:"1px solid "+G.border,
+                    background:"var(--cream-05)",border:"1px solid "+G.border,
                     borderRadius:12,textDecoration:"none",transition:"border-color .15s"}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=G.accent+"55"}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
@@ -14614,7 +14618,7 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
 
           {/* AI Coach feedback on what they logged */}
           {actionFeedbackLoading&&(
-            <div style={{padding:"12px 14px",background:"rgba(255,255,255,0.03)",
+            <div style={{padding:"12px 14px",background:"var(--cream-05)",
               border:"1px solid "+G.border,borderRadius:12,
               display:"flex",alignItems:"center",gap:8}}>
               <span style={{width:6,height:6,borderRadius:"50%",background:G.accent,display:"inline-block"}}/>
@@ -14955,8 +14959,8 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
           </p>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
             <span onClick={()=>setNav("tool:decisions")}
-              style={{padding:"4px 10px",background:"rgba(255,255,255,0.05)",
-                border:"1px solid rgba(255,255,255,0.1)",borderRadius:20,
+              style={{padding:"4px 10px",background:"var(--cream-05)",
+                border:"1px solid var(--cream-10)",borderRadius:20,
                 fontSize:11,color:G.dim,cursor:"pointer"}}>
               {TOOL_META["decisions"]?.icon} Try Decisions free →
             </span>
@@ -15350,7 +15354,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
             <button onClick={()=>!uploading&&fileRef.current?.click()}
               style={{background:"none",border:"none",color:G.dimmer,cursor:"pointer",
                 fontSize:11,padding:"4px 0 0",fontFamily:"inherit",textDecoration:"underline",
-                textDecorationColor:"rgba(232,220,200,0.15)"}}>
+                textDecorationColor:"var(--cream-15)"}}>
               {uploading?"Uploading…":"Change photo"}
             </button>
           </div>
@@ -15577,7 +15581,7 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
         {isProMax&&<ScoreComparisonCard userId={userId} currentScores={scores} currentOverall={overall}/>}
         {/* Right: Overall Intelligence Score ring */}
         <div style={{...card,flex:"0 0 240px",textAlign:"center",padding:"28px 24px",
-          background:"linear-gradient(145deg,#111008,#0e0c05)",
+          background:G.isDark?"linear-gradient(145deg,#111008,#0e0c05)":"linear-gradient(145deg,#fffdf6,#f8f3e6)",
           boxShadow:"0 0 50px rgba(240,180,41,0.05)"}}>
           <div style={{fontSize:9,color:G.dimmer,letterSpacing:".14em",
             fontFamily:"monospace",marginBottom:18}}>OVERALL INTELLIGENCE SCORE ℹ</div>
@@ -15629,8 +15633,10 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           3. PERSONALIZED SUMMARY
       ══════════════════════════════════════════ */}
       <div style={{...card,marginBottom:20,
-        background:"linear-gradient(135deg,#0f0820 0%,#130c08 55%,#0a0810 100%)",
-        border:"1px solid rgba(120,80,200,0.14)",position:"relative",
+        background:G.isDark
+          ?"linear-gradient(135deg,#0f0820 0%,#130c08 55%,#0a0810 100%)"
+          :"linear-gradient(135deg,#f2edfb 0%,#fdf6e9 55%,#f4eff9 100%)",
+        border:"1px solid rgba(120,80,200,"+(G.isDark?"0.14":"0.25")+")",position:"relative",
         overflow:"hidden",padding:"30px 32px"}}>
 
         {/* Decorative: warm glow top-right */}
@@ -15989,7 +15995,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
             style={{padding:"7px 16px",borderRadius:20,fontFamily:"inherit",fontSize:12,
               cursor:"pointer",transition:"all .15s",
               background:view===id?"rgba(240,180,41,0.1)":"none",
-              border:`1px solid ${view===id?"rgba(240,180,41,0.4)":"rgba(232,220,200,0.1)"}`,
+              border:`1px solid ${view===id?"rgba(240,180,41,0.4)":"var(--cream-10)"}`,
               color:view===id?G.gold:G.dim}}>
             {label}
           </button>
@@ -16344,7 +16350,7 @@ function ScoreComparisonCard({userId, currentScores, currentOverall}){
           const d=diff(m.cur,m.prv);
           return(
             <div key={m.label} style={{textAlign:"center",padding:"10px 4px",
-              background:"rgba(255,255,255,0.03)",borderRadius:10}}>
+              background:"var(--cream-05)",borderRadius:10}}>
               <div style={{fontSize:11,color:G.dimmer,marginBottom:4}}>{m.label}</div>
               <div style={{fontSize:18,fontWeight:800,color:G.cream}}>{m.cur||"—"}</div>
               {d!==0&&<div style={{fontSize:11,fontWeight:700,color:col(d),marginTop:2}}>{fmt(d)}</div>}
@@ -16795,7 +16801,7 @@ Rules:
             {/* ── Saved Tools ── */}
             <div style={{marginBottom:10,fontSize:11,fontWeight:700,color:"var(--cream-30)",letterSpacing:".08em",textTransform:"uppercase"}}>Saved Tools {_savedIds.length>0&&`(${_savedIds.length})`}</div>
             {_savedIds.length===0?(
-              <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"32px",textAlign:"center"}}>
+              <div style={{background:"var(--cream-05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:16,padding:"32px",textAlign:"center"}}>
                 <div style={{fontSize:32,marginBottom:10}}>☆</div>
                 <div style={{fontSize:14,fontWeight:600,color:"var(--cream)",marginBottom:6}}>No saved tools yet</div>
                 <div style={{fontSize:13,color:"var(--cream-40)",lineHeight:1.6,marginBottom:16}}>Open any tool and tap <strong style={{color:"var(--gold)"}}>☆ Save</strong> to pin it here for quick access.</div>
@@ -17522,7 +17528,7 @@ function PolicyPage({type,onBack}){
         <div style={{display:"flex",gap:6,marginBottom:32,flexWrap:"wrap"}}>
           {[["terms","Terms of Service"],["privacy","Privacy Policy"],["contact","Contact Us"]].map(([id,label])=>(
             <button key={id} onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:id}))}
-              style={{padding:"8px 18px",borderRadius:20,border:`1px solid ${type===id?"rgba(240,180,41,0.4)":"rgba(232,220,200,0.1)"}`,
+              style={{padding:"8px 18px",borderRadius:20,border:`1px solid ${type===id?"rgba(240,180,41,0.4)":"var(--cream-10)"}`,
                 background:type===id?"rgba(240,180,41,0.08)":"none",
                 color:type===id?G.gold:G.dim,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
               {label}
@@ -19211,7 +19217,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
               Destin<span style={{color:G.gold}}>IQ</span>
             </div>
             {/* Animated bar */}
-            <div style={{width:160,height:3,background:"rgba(255,255,255,0.06)",
+            <div style={{width:160,height:3,background:"var(--cream-05)",
               borderRadius:2,overflow:"hidden"}}>
               <div style={{
                 height:"100%",borderRadius:2,
@@ -19252,7 +19258,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                     We sent a confirmation link to your email. Click it to activate your account and start your journey.
                   </p>
                   <button onClick={()=>{setEmailConfirmPending(false);setScreen("auth");}}
-                    style={{background:"none",border:"1px solid rgba(232,220,200,0.15)",borderRadius:10,
+                    style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,
                       padding:"10px 24px",color:"var(--cream-50)",cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
                     ← Back to sign in
                   </button>
