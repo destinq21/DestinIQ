@@ -5021,20 +5021,22 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
             </span>
           </button>
 
-          {/* Tester code redemption */}
+          {/* Access code redemption */}
           <div style={{textAlign:"center",marginBottom:18}}>
             {!showCode?(
               <button onClick={()=>setShowCode(true)}
-                style={{background:"none",border:"none",color:"var(--cream-30)",fontSize:12,
-                  cursor:"pointer",fontFamily:"inherit",textDecoration:"underline"}}>
-                Have a tester code?
+                style={{background:"rgba(240,180,41,0.07)",border:"1px solid rgba(240,180,41,0.22)",
+                  color:"var(--cream)",fontSize:13,fontWeight:600,padding:"10px 20px",
+                  borderRadius:10,cursor:"pointer",fontFamily:"inherit",
+                  display:"inline-flex",alignItems:"center",gap:8}}>
+                🎟️ Have an access code?
               </button>
             ):(
               <div style={{maxWidth:340,margin:"0 auto"}}>
                 <div style={{display:"flex",gap:8}}>
                   <input value={codeInput} onChange={e=>{setCodeInput(e.target.value);setCodeStatus("");}}
                     onKeyDown={e=>e.key==="Enter"&&redeemCode()}
-                    placeholder="Enter tester code"
+                    placeholder="Enter access code"
                     style={{flex:1,padding:"11px 14px",background:"var(--raised)",
                       border:"1px solid "+(codeStatus==="invalid"?"rgba(224,92,110,0.5)":"var(--line)"),
                       borderRadius:10,color:"var(--cream)",fontSize:13,fontFamily:"inherit",
@@ -6404,15 +6406,15 @@ function Landing({onStart,ipLocation}){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,maxWidth:900,margin:"0 auto"}}>
           {[
             {name:"Free",price:"$0",period:"forever",color:"rgba(255,255,255,0.06)",border:"rgba(255,255,255,0.1)",badge:null,
-             features:["1 Intelligence Report","Decisions tool free + preview all 42","Daily Check-in","Win Tracker (up to 5)","AI Advisor (short daily chats)"],
+             features:["1 Intelligence Report","Decisions tool free + preview all 42","AI Advisor — short daily chats","Daily Check-in","Win Tracker (up to 5)","Journal — 1 entry"],
              cta:"Get Started Free",ctaStyle:{background:"var(--cream-10)",color:G.cream},
              action:()=>onStart()},
             {name:"Pro",price:"$9.99",period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
-             features:["3 Intelligence Reports/month","All 42 AI tools","Unlimited Check-ins","Unlimited Win Tracker","AI Advisor — full daily conversations","Practices & habits","Progress tracking","Audio report read-aloud"],
+             features:["3 Intelligence Reports/month","All 42 AI tools unlocked","AI Advisor — full conversations","Unlimited journal + win tracker","Practices & habit tracking","Progress analytics","Audio read-aloud + saved reports"],
              cta:"Start Pro →",ctaStyle:{background:G.gold,color:"#000"},
              action:()=>onStart()},
             {name:"Pro Max",price:"$24.99",period:"per month",color:"rgba(155,114,207,0.06)",border:"rgba(155,114,207,0.3)",badge:"Everything",
-             features:["Unlimited Intelligence Reports","All 42 AI tools","Unlimited AI Advisor","Weekly AI Digest","PDF export","Score comparison history","Priority everything"],
+             features:["Unlimited Intelligence Reports","Unlimited AI Advisor — 2.5× deeper responses","Weekly AI Digest every Monday","PDF export of your report","Score comparison history","Priority speed + early access"],
              cta:"Start Pro Max →",ctaStyle:{background:"#9b72cf",color:"#fff"},
              action:()=>onStart()},
           ].map(plan=>(
