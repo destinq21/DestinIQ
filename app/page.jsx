@@ -3456,6 +3456,42 @@ Write a SHORT personal response (3-5 sentences max):
 Plain text, warm tone, personal. Use their name once. No headers or lists.${isPremium?" Be specific and insightful.":""}`
 }
 
+
+// ── JSON REPAIR — salvage truncated AI responses instead of losing everything ──
+function repairTruncatedJSON(s){
+  if(!s) return null;
+  try{ return JSON.parse(s); }catch(_e){}
+  let t = s.slice(s.indexOf("{"));
+  if(!t) return null;
+  let cut = t.length;
+  for(let attempts=0; attempts<40 && cut>120; attempts++){
+    let chunk = t.slice(0,cut);
+    // strip a trailing incomplete key/value fragment
+    chunk = chunk.replace(/,\s*"[^"]*$/,"").replace(/,\s*$/,"");
+    // balance quotes (count unescaped)
+    let inStr=false;
+    for(let i=0;i<chunk.length;i++){
+      if(chunk[i]==='"' && chunk[i-1]!=="\\") inStr=!inStr;
+    }
+    let candidate = chunk + (inStr?'"':'');
+    // close open brackets outside strings
+    let opens=0, opensq=0; inStr=false;
+    for(let i=0;i<candidate.length;i++){
+      const ch=candidate[i];
+      if(ch==='"' && candidate[i-1]!=="\\") inStr=!inStr;
+      if(inStr) continue;
+      if(ch==="{") opens++; else if(ch==="}") opens--;
+      else if(ch==="[") opensq++; else if(ch==="]") opensq--;
+    }
+    candidate += "]".repeat(Math.max(0,opensq)) + "}".repeat(Math.max(0,opens));
+    try{ return JSON.parse(candidate); }catch(_e){}
+    const lastComma = chunk.lastIndexOf(",");
+    if(lastComma < 120) break;
+    cut = lastComma;
+  }
+  return null;
+}
+
 function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const today=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const ageNum=parseInt(f.age)||26;
@@ -10517,7 +10553,18 @@ function getLocalCurrency(country){
   if(c.includes("ethiopia"))     return {code:"ETB",symbol:"Birr"};
   if(c.includes("egypt"))        return {code:"EGP",symbol:"E£"};
   if(c.includes("morocco"))      return {code:"MAD",symbol:"MAD"};
-  if(c.includes("senegal")||c.includes("côte")||c.includes("mali")||c.includes("burkina")||c.includes("togo")||c.includes("benin")) return {code:"XOF",symbol:"CFA"};
+  if(c.includes("senegal")||c.includes("côte")||c.includes("ivory coast")||c.includes("mali")||c.includes("burkina")||c.includes("togo")||c.includes("benin")||c.includes("niger")||c.includes("guinea-bissau")) return {code:"XOF",symbol:"CFA"};
+  // Central African CFA franc (BEAC)
+  if(c.includes("cameroon")||c.includes("chad")||c.includes("gabon")||c.includes("central african")||c.includes("equatorial guinea")||(c.includes("congo")&&!c.includes("democratic"))) return {code:"XAF",symbol:"FCFA"};
+  if(c.includes("democratic republic")||c.includes("dr congo")||c.includes("drc")) return {code:"CDF",symbol:"FC"};
+  // More Africa
+  if(c.includes("angola"))       return {code:"AOA",symbol:"Kz"};
+  if(c.includes("mozambique"))   return {code:"MZN",symbol:"MT"};
+  if(c.includes("botswana"))     return {code:"BWP",symbol:"P"};
+  if(c.includes("namibia"))      return {code:"NAD",symbol:"N$"};
+  if(c.includes("malawi"))       return {code:"MWK",symbol:"MK"};
+  if(c.includes("tunisia"))      return {code:"TND",symbol:"DT"};
+  if(c.includes("algeria"))      return {code:"DZD",symbol:"DA"};
   if(c.includes("united kingdom")||c.includes("uk")) return {code:"GBP",symbol:"£"};
   if(c.includes("europe")||c.includes("france")||c.includes("germany")||c.includes("spain")||c.includes("italy")||c.includes("netherlands")||c.includes("portugal")||c.includes("belgium")) return {code:"EUR",symbol:"€"};
   if(c.includes("india"))        return {code:"INR",symbol:"₹"};
@@ -10534,6 +10581,40 @@ function getLocalCurrency(country){
   if(c.includes("china"))        return {code:"CNY",symbol:"¥"};
   if(c.includes("uae")||c.includes("dubai")||c.includes("emirates")) return {code:"AED",symbol:"AED"};
   if(c.includes("saudi"))        return {code:"SAR",symbol:"SAR"};
+  // More Asia
+  if(c.includes("thailand"))     return {code:"THB",symbol:"฿"};
+  if(c.includes("malaysia"))     return {code:"MYR",symbol:"RM"};
+  if(c.includes("singapore"))    return {code:"SGD",symbol:"S$"};
+  if(c.includes("hong kong"))    return {code:"HKD",symbol:"HK$"};
+  if(c.includes("south korea")||c.includes("korea")) return {code:"KRW",symbol:"₩"};
+  if(c.includes("turkey")||c.includes("türkiye")) return {code:"TRY",symbol:"₺"};
+  if(c.includes("sri lanka"))    return {code:"LKR",symbol:"Rs"};
+  if(c.includes("nepal"))        return {code:"NPR",symbol:"Rs"};
+  // Non-euro Europe
+  if(c.includes("ireland")||c.includes("austria")||c.includes("finland")||c.includes("greece")||c.includes("croatia")||c.includes("slovakia")||c.includes("slovenia")||c.includes("luxembourg")||c.includes("estonia")||c.includes("latvia")||c.includes("lithuania")||c.includes("cyprus")||c.includes("malta")) return {code:"EUR",symbol:"€"};
+  if(c.includes("switzerland"))  return {code:"CHF",symbol:"CHF"};
+  if(c.includes("sweden"))       return {code:"SEK",symbol:"kr"};
+  if(c.includes("norway"))       return {code:"NOK",symbol:"kr"};
+  if(c.includes("denmark"))      return {code:"DKK",symbol:"kr"};
+  if(c.includes("poland"))       return {code:"PLN",symbol:"zł"};
+  if(c.includes("czech"))        return {code:"CZK",symbol:"Kč"};
+  if(c.includes("hungary"))      return {code:"HUF",symbol:"Ft"};
+  if(c.includes("romania"))      return {code:"RON",symbol:"lei"};
+  if(c.includes("russia"))       return {code:"RUB",symbol:"₽"};
+  if(c.includes("ukraine"))      return {code:"UAH",symbol:"₴"};
+  // Middle East
+  if(c.includes("qatar"))        return {code:"QAR",symbol:"QR"};
+  if(c.includes("kuwait"))       return {code:"KWD",symbol:"KD"};
+  if(c.includes("bahrain"))      return {code:"BHD",symbol:"BD"};
+  if(c.includes("oman"))         return {code:"OMR",symbol:"OMR"};
+  if(c.includes("israel"))       return {code:"ILS",symbol:"₪"};
+  if(c.includes("jordan"))       return {code:"JOD",symbol:"JD"};
+  // Americas + Oceania
+  if(c.includes("argentina"))    return {code:"ARS",symbol:"$"};
+  if(c.includes("colombia"))     return {code:"COP",symbol:"$"};
+  if(c.includes("chile"))        return {code:"CLP",symbol:"$"};
+  if(c.includes("peru"))         return {code:"PEN",symbol:"S/"};
+  if(c.includes("new zealand"))  return {code:"NZD",symbol:"NZ$"};
   return {code:"USD",symbol:"$"}; // default
 }
 
@@ -19052,12 +19133,46 @@ Beyond the standard report sections, you MUST include these additional sections 
 - product_business: 3 physical product ideas with supplier links. Startup cost in LOCAL CURRENCY.
 - real_estate_hack: Real estate income method for their country with local platforms. Amounts in local currency.
 
-All other rules: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.`,
+All other rules: personalized, use their name, no markdown asterisks, ONLY valid JSON, complete and parseable.\nLENGTH DISCIPLINE: Keep every field tight — no single field longer than 4 sentences, arrays max 5 items. The COMPLETE JSON must fit in your response. A complete short report beats a truncated long one.`,
         userId,isPremium
       });
       const cleaned=raw.replace(/```json|```/g,"").trim();
       const jStart=cleaned.indexOf("{"); const jEnd=cleaned.lastIndexOf("}");
-      const parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
+      let parsed=null;
+      try{
+        parsed=JSON.parse(jStart>=0?cleaned.slice(jStart,jEnd+1):cleaned);
+      }catch(parseErr){
+        // Response was truncated — salvage what the AI wrote instead of losing it all
+        parsed=repairTruncatedJSON(cleaned);
+        if(!parsed) throw parseErr;
+        const fbBase=fallback(f,ipLocation);
+        parsed={...fbBase,...parsed,scores:parsed.scores||fbBase.scores};
+        console.warn("Report was truncated — salvaged "+Object.keys(parsed).length+" sections");
+      }
+      // ── SECOND PASS: complete any missing sections with one small follow-up ──
+      try{
+        const REQUIRED=["life_hacks","money_protection","emotional_strength","online_income","zero_income_business","product_business","real_estate_hack","roadmap","strengths","risks"];
+        const missing=REQUIRED.filter(k=>{
+          const v=parsed[k];
+          return v==null||(Array.isArray(v)&&v.length===0)||(typeof v==="string"&&v.trim()==="");
+        });
+        if(missing.length){
+          const {code:cc2,symbol:cs2}=getLocalCurrency(f.country||"");
+          const fill=await callAPI({
+            messages:[{role:"user",content:`Continue ${f.name||"the user"}'s life report. They are ${f.age||""} in ${f.country||""}, income ${f.income||""}, goal: ${f.goals||""}, challenge: ${f.challenge||""}, skills: ${f.skills||""}. Generate ONLY these missing sections as ONE valid JSON object with exactly these keys: ${missing.join(", ")}. Everything must be specific to ${f.country||"their country"} — local platforms, local businesses, local prices in ${cc2} (${cs2}); online earnings in USD. Same depth and personal tone as the full report. ONLY JSON, no markdown, no fences.`}],
+            system:`You complete missing sections of a personal life report for someone in ${f.country||"their country"}. Output ONLY valid JSON with exactly the requested keys. Costs in ${cs2}, online earnings in USD. Be specific to their country — never generic.`,
+            userId,isPremium
+          });
+          const fClean=fill.replace(/```json|```/g,"").trim();
+          let fParsed=null;
+          try{ fParsed=JSON.parse(fClean.slice(fClean.indexOf("{"),fClean.lastIndexOf("}")+1)); }
+          catch(_e){ fParsed=repairTruncatedJSON(fClean); }
+          if(fParsed){
+            for(const k of missing){ if(fParsed[k]) parsed[k]=fParsed[k]; }
+            console.log("✓ Completed missing sections:",missing.join(", "));
+          }
+        }
+      }catch(fillErr){ console.warn("Section completion failed:",fillErr?.message); }
       pushToMemory(userId,"assistant","Report generated: scores="+JSON.stringify(parsed.scores||{}));
       setReport(parsed);
       // Always compute overall from pillar scores so it stays consistent with what's shown
