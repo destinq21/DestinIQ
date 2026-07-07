@@ -6196,15 +6196,15 @@ function Landing({onStart,ipLocation}){
           </p>
         </div>
 
-        <div style={{background:G.isDark?"linear-gradient(145deg,#0f0820,#130c08)":"linear-gradient(145deg,#faf7ff,#fef8ee)",
-          border:"1px solid "+(G.isDark?"rgba(120,80,200,0.2)":"rgba(120,80,200,0.15)"),borderRadius:20,overflow:"hidden",
+        <div style={{background:"linear-gradient(145deg,#0f0820,#130c08)",
+          border:"1px solid rgba(120,80,200,0.2)",borderRadius:20,overflow:"hidden",
           padding:"28px",position:"relative",maxWidth:520}}>
           {/* Decorative glow */}
           <div style={{position:"absolute",top:0,right:0,width:"55%",height:"100%",
             background:"radial-gradient(ellipse at 80% 40%,rgba(90,50,180,0.2),transparent 65%)",
             pointerEvents:"none"}}/>
           <div style={{position:"relative"}}>
-            <div style={{fontSize:9,color:"#7a5cc0",letterSpacing:".12em",
+            <div style={{fontSize:9,color:"rgba(200,160,255,0.6)",letterSpacing:".12em",
               marginBottom:14,fontFamily:"monospace"}}>YOUR CORE INSIGHT</div>
 
             <blockquote style={{fontSize:14,fontWeight:600,color:G.cream,lineHeight:1.75,
@@ -12660,20 +12660,50 @@ function StreakCelebration({streak, onClose}){
 
 
 // ── SidebarNav ───────────────────────────────────────────────────────────
+// ── DQIcon — real line icons (Lucide geometry) replacing emoji nav icons.
+// Inherits currentColor, so it takes the gold/theme color of its parent.
+const DQ_ICON_PATHS={
+  home:'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  chart:'<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+  trending:'<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
+  report:'<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/>',
+  check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+  gem:'<path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>',
+  target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  trophy:'<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  bot:'<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+  user:'<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  bookmark:'<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+};
+function DQIcon({name,size=18,strokeWidth=2,style}){
+  const p=DQ_ICON_PATHS[name];
+  if(!p) return <span style={style}>{name}</span>; // fallback: show raw (covers any missed emoji)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round"
+      strokeLinejoin="round" style={{flexShrink:0,display:"block",...style}}
+      dangerouslySetInnerHTML={{__html:p}}/>
+  );
+}
+
 function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formData,navPhotoURL,onNotif}){
   const {theme,toggleTheme}=useTheme();
   const ITEMS=[
-    {id:"home",    icon:"🏠",label:"Home"},
-    {id:"explore", icon:"🔍",label:"Explore"},
-    {id:"progress",icon:"📊",label:"Progress"},
-    {id:"report",  icon:"📋",label:"My Report"},
-    {id:"checkin", icon:"✅",label:"Check-in"},
-    {id:"tool:dailywisdom",    icon:"💎",label:"Daily Wisdom"},
-    {id:"tool:weeklychallenge",icon:"🎲",label:"Weekly Challenge"},
-    {id:"wins",    icon:"🏆",label:"Wins"},
-    {id:"practices",icon:"⚡",label:"My Practices"},
-    {id:"tool:advisor",icon:"⬡",label:"My Advisor"},
-    {id:"profile", icon:"👤",label:"Profile"},
+    {id:"home",    icon:"home",label:"Home"},
+    {id:"explore", icon:"search",label:"Explore"},
+    {id:"progress",icon:"chart",label:"Progress"},
+    {id:"report",  icon:"report",label:"My Report"},
+    {id:"checkin", icon:"check",label:"Check-in"},
+    {id:"tool:dailywisdom",    icon:"gem",label:"Daily Wisdom"},
+    {id:"tool:weeklychallenge",icon:"target",label:"Weekly Challenge"},
+    {id:"wins",    icon:"trophy",label:"Wins"},
+    {id:"practices",icon:"activity",label:"My Practices"},
+    {id:"tool:advisor",icon:"bot",label:"My Advisor"},
+    {id:"profile", icon:"user",label:"Profile"},
   ];
   return(
     <nav className="sidebar">
@@ -12687,7 +12717,7 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
         {ITEMS.map(item=>(
           <button key={item.id} className={`s-item ${nav===item.id||nav?.startsWith(item.id)?"active":""}`}
             onClick={()=>setNav(item.id)}>
-            <span style={{fontSize:15,width:20,textAlign:"center",flexShrink:0}}>{item.icon}</span>
+            <span style={{width:20,display:"inline-flex",justifyContent:"center",flexShrink:0}}><DQIcon name={item.icon} size={17}/></span>
             {item.label}
           </button>
         ))}
@@ -12773,10 +12803,10 @@ function BottomNav({nav,setNav}){
   return(
     <div className="bot-nav">
       <div className="bot-items">
-        {[{id:"home",icon:"🏠",label:"Home"},{id:"explore",icon:"🔍",label:"Explore"},{id:"checkin",icon:"✅",label:"Check-in"},{id:"progress",icon:"📊",label:"Progress"},{id:"profile",icon:"👤",label:"Profile"}]
+        {[{id:"home",icon:"home",label:"Home"},{id:"explore",icon:"search",label:"Explore"},{id:"checkin",icon:"check",label:"Check-in"},{id:"progress",icon:"chart",label:"Progress"},{id:"profile",icon:"user",label:"Profile"}]
           .map(t=>(
             <button key={t.id} className={`bot-item ${nav===t.id||nav?.startsWith(t.id)?"active":""}`} onClick={()=>setNav(t.id)}>
-              <span className="bot-icon">{t.icon}</span>
+              <span className="bot-icon"><DQIcon name={t.icon} size={22}/></span>
               <span className="bot-label">{t.label}</span>
             </button>
           ))}
@@ -13246,8 +13276,8 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
         {/* ══ 3. TODAY'S INTELLIGENCE INSIGHT ══ */}
         <div style={{...card,marginBottom:14,
-          background:G.isDark?"linear-gradient(135deg,#0e0820,#0a0810)":G.card,
-          border:"1px solid "+(G.isDark?"rgba(120,80,200,0.14)":G.border)}}>
+          background:G.isDark?"linear-gradient(135deg,#0e0820,#0a0810)":"linear-gradient(135deg,#f2edfb,#f7f2fc)",
+          border:"1px solid rgba(120,80,200,"+(G.isDark?"0.14":"0.25")+")"}}>
           <div style={{fontSize:9,color:G.isDark?"rgba(200,160,255,0.6)":"#5a3fa0",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>TODAY'S INSIGHT FOR YOU</div>
           <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
             <span style={{fontSize:20,color:G.gold,flexShrink:0,marginTop:2}}>✦</span>
@@ -13327,15 +13357,15 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
   const name = formData?.name || "You";
 
   const navItems=[
-    {id:"home",      icon:"🏠", label:"Home"},
-    {id:"explore",   icon:"🔍", label:"Explore"},
-    {id:"report",    icon:"📊", label:"My Report"},
-    {id:"progress",  icon:"📈", label:"Progress"},
-    {id:"checkin",   icon:"✅", label:"Check-in"},
-    {id:"tool:advisor",icon:"🤖",label:"AI Coach"},
-    {id:"savedreports",icon:"🔖",label:"Saved"},
-    {id:"wins",      icon:"🏆", label:"My Wins"},
-    {id:"profile",   icon:"⚙️", label:"Settings"},
+    {id:"home",      icon:"home", label:"Home"},
+    {id:"explore",   icon:"search", label:"Explore"},
+    {id:"report",    icon:"chart", label:"My Report"},
+    {id:"progress",  icon:"trending", label:"Progress"},
+    {id:"checkin",   icon:"check", label:"Check-in"},
+    {id:"tool:advisor",icon:"bot",label:"AI Coach"},
+    {id:"savedreports",icon:"bookmark",label:"Saved"},
+    {id:"wins",      icon:"trophy", label:"My Wins"},
+    {id:"profile",   icon:"settings", label:"Settings"},
   ];
 
   const go=(id)=>{ setNav(id); onClose(); };
@@ -13384,7 +13414,7 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
                   border:"none",cursor:"pointer",fontFamily:"inherit",
                   borderLeft:isActive?"3px solid #f0b429":"3px solid transparent",
                   transition:"all .15s"}}>
-                <span style={{fontSize:18,width:24,textAlign:"center"}}>{item.icon}</span>
+                <span style={{width:24,display:"inline-flex",justifyContent:"center",color:isActive?G.gold:G.cream}}><DQIcon name={item.icon} size={19}/></span>
                 <span style={{fontSize:14,fontWeight:isActive?700:500,
                   color:isActive?G.gold:G.cream}}>{item.label}</span>
               </button>
@@ -13396,7 +13426,7 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
             style={{width:"100%",display:"flex",alignItems:"center",gap:14,
               padding:"13px 20px",background:"none",border:"none",cursor:"pointer",
               fontFamily:"inherit",borderLeft:"3px solid transparent",marginTop:4}}>
-            <span style={{fontSize:18,width:24,textAlign:"center"}}>🚪</span>
+            <span style={{width:24,display:"inline-flex",justifyContent:"center",color:"#e05c6e"}}><DQIcon name="logout" size={19}/></span>
             <span style={{fontSize:14,fontWeight:500,color:"#e05c6e"}}>Log out</span>
           </button>
         </div>
@@ -15635,8 +15665,8 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
       <div style={{...card,marginBottom:20,
         background:G.isDark
           ?"linear-gradient(135deg,#0f0820 0%,#130c08 55%,#0a0810 100%)"
-          :G.card,
-        border:"1px solid "+(G.isDark?"rgba(120,80,200,0.14)":G.border),position:"relative",
+          :"linear-gradient(135deg,#f2edfb 0%,#fdf6e9 55%,#f4eff9 100%)",
+        border:"1px solid rgba(120,80,200,"+(G.isDark?"0.14":"0.25")+")",position:"relative",
         overflow:"hidden",padding:"30px 32px"}}>
 
         {/* Decorative: warm glow top-right */}
