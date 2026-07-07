@@ -1424,7 +1424,7 @@ const TOOL_META={
   earnonline:    {label:"Earn Online",      icon:"🌐",cat:"money",  color:"#c8a84b"},
   business:      {label:"Business",         icon:"📦",cat:"money",  color:"#c8a84b"},
   lifehacks:     {label:"Life Hacks",       icon:"💡",cat:"money",  color:"#c8a84b"},
-  debtfreedom:   {label:"Debt Freedom",     icon:"⛓️",cat:"money",  color:"#c8a84b"},
+  debtfreedom:   {label:"Debt Freedom",     icon:"🔓",cat:"money",  color:"#c8a84b"},
   sidehustle:    {label:"Side Hustle",      icon:"📊",cat:"money",  color:"#c8a84b"},
   investment101: {label:"Investment 101",   icon:"📈",cat:"money",  color:"#c8a84b"},
   jimrohn:       {label:"Jim Rohn",         icon:"📚",cat:"money",  color:"#c8a84b"},
@@ -2925,7 +2925,7 @@ const MODULE_GROUPS=[
     group:"Money Deep Dives",
     color:"#ffd54f",
     items:[
-      {id:"debtfreedom",    icon:"⛓️", label:"Debt Freedom"},
+      {id:"debtfreedom",    icon:"🔓", label:"Debt Freedom"},
       {id:"sidehustle",     icon:"📊", label:"Side Hustle"},
       {id:"investment101",  icon:"📈", label:"Investment 101"},
     ],
@@ -3349,6 +3349,14 @@ HOW TO SHOW UP IN THIS CONVERSATION:
 - Match their energy. Short message → short reply. Deep question → go deep.
 - Never give generic advice. Everything is specific to ${name} in ${country}.
 - You remember everything said earlier in this conversation. Refer back to it naturally.
+
+EMOJIS — USE THEM LIKE A REAL FRIEND TEXTING:
+- Use emojis naturally and sparingly (0-2 per message) to add warmth — like a close friend would in WhatsApp, not like a marketing bot.
+- When they're hurting (breakup, loss, failure, loneliness): lead with gentle warmth — ❤️ 🫂 sparingly. Never celebratory emojis. Sometimes the most caring reply has NO emoji at all — just presence.
+- When they win or make progress: celebrate with them — 🎉 🔥 💪 feel earned.
+- When encouraging or motivating: 💪 ✨ 🚀 where natural.
+- Casual chat: match their energy — if they use emojis, you can too; if they write plainly, stay plain.
+- Never stack multiple emojis, never start a message with one, never use them in serious practical advice about money or major decisions.
 ${isPremium?`- Give your fullest, most detailed thinking. They have full access.`:`- Give real value, but let them know deeper analysis is available if they want to go further.`}`;
 }
 
@@ -12745,6 +12753,30 @@ function StreakCelebration({streak, onClose}){
 // Inherits currentColor, so it takes the gold/theme color of its parent.
 const DQ_ICON_PATHS={
   home:'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  coins:'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  briefcase:'<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  unlock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  barchart:'<path d="M3 3v18h18"/><rect x="7" y="13" width="3" height="5"/><rect x="12" y="9" width="3" height="9"/><rect x="17" y="5" width="3" height="13"/>',
+  linechart:'<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+  book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  smile:'<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/>',
+  message:'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  compass:'<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  flame:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  sparkles:'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  eye:'<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  pen:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  scale:'<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
+  plane:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  handshake:'<path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>',
+  baby:'<path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
   search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   chart:'<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
   trending:'<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
@@ -12777,6 +12809,20 @@ function DQIcon({name,size=18,strokeWidth=2,style}){
       dangerouslySetInnerHTML={{__html:p}}/>
   );
 }
+
+// ── TOOL → SVG ICON MAP (professional icons instead of emojis) ──────────────
+const TOOL_ICONS={
+  money:"coins", earnonline:"globe", business:"briefcase", lifehacks:"zap",
+  debtfreedom:"unlock", sidehustle:"barchart", investment101:"linechart", jimrohn:"book",
+  invest:"linechart", success:"trophy", discipline:"target", mindsettenx:"brain",
+  career:"briefcase", roadmap:"map", decisions:"scale", relocate:"plane", advisor:"bot",
+  innerpeace:"leaf", angerstress:"flame", sleepcoach:"moon", anxietytool:"cloud",
+  griefloss:"heart", glowup:"sparkles", nogym:"dumbbell", posture:"activity", bodyfuel:"zap",
+  confidencelab:"shield", relationshipiq:"heart", smalltalk:"message", negotiation:"handshake",
+  digitallife:"settings", parenting:"baby", visionboard:"eye", legacyletter:"pen",
+  fearaudit:"shield", morningritual:"sun", dailywisdom:"book", lettertoself:"pen",
+  dreaminterp:"moon", peopledecoder:"user", hardconvo:"message", weeklychallenge:"trophy",
+};
 
 function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formData,navPhotoURL,onNotif}){
   const {theme,toggleTheme}=useTheme();
@@ -14004,7 +14050,10 @@ function CategoryPage({catId,setNav,goBack,userId}){
                 <div style={{width:48,height:48,borderRadius:13,flexShrink:0,
                   background:`linear-gradient(135deg,${cat.color}28,${cat.color}10)`,
                   border:`1px solid ${cat.color}35`,display:"flex",alignItems:"center",
-                  justifyContent:"center",fontSize:22}}>{topic.icon}</div>
+                  justifyContent:"center",fontSize:22,color:cat.color}}>
+                  {TOOL_ICONS[topic.id]
+                    ? <DQIcon name={TOOL_ICONS[topic.id]} size={22} strokeWidth={1.8}/>
+                    : topic.icon}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:700,color:G.cream,marginBottom:3}}>{topic.label}</div>
                   <div style={{fontSize:12,color:G.dim,lineHeight:1.5,
@@ -15195,7 +15244,8 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
           <div style={{fontSize:9,fontFamily:"var(--f-mono)",color:"var(--cream-30)",letterSpacing:".1em",marginBottom:10,textTransform:"uppercase"}}>Related Tools</div>
           {related.map(t=>{const m=TOOL_META[t];if(!m)return null;return(
             <div key={t} className="tool-row" onClick={()=>setNav("tool:"+t)}>
-              <div className="tr-ico" style={{background:`${m.color}18`}}>{m.icon}</div>
+              <div className="tr-ico" style={{background:`${m.color}18`,color:m.color}}>
+                {TOOL_ICONS[t]?<DQIcon name={TOOL_ICONS[t]} size={18} strokeWidth={1.8}/>:m.icon}</div>
               <span className="tr-lbl">{m.label}</span>
               <span style={{color:"var(--cream-20)",fontSize:18}}>›</span>
             </div>
@@ -16017,7 +16067,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
     try{
       const reply=await callAPI({
         messages:newMsgs,
-        system:`You are the FUTURE SELF of ${profile?.name||"this person"} — 3 years from now. They made it through what they're facing today. You remember writing these journal entries because you wrote them. Speak in first person as them, older and wiser. Reference their actual past entries when relevant ("I remember when we wrote…"). Be warm, real, specific — never generic motivation. Keep replies under 120 words.\n\nWHO THEY ARE: ${profile?.name||""}, ${profile?.age||""}, from ${profile?.country||""}. Goal: ${profile?.goals||profile?.bigGoal||""}. Challenge: ${profile?.challenge||""}.${memoryContext()}`,
+        system:`You are the FUTURE SELF of ${profile?.name||"this person"} — 3 years from now. They made it through what they're facing today. You remember writing these journal entries because you wrote them. Speak in first person as them, older and wiser. Reference their actual past entries when relevant ("I remember when we wrote…"). Be warm, real, specific — never generic motivation. Use an emoji occasionally like a real person texting (0-1 per message) — warmth when they hurt, celebration when they win, none when the moment calls for quiet seriousness. Keep replies under 120 words.\n\nWHO THEY ARE: ${profile?.name||""}, ${profile?.age||""}, from ${profile?.country||""}. Goal: ${profile?.goals||profile?.bigGoal||""}. Challenge: ${profile?.challenge||""}.${memoryContext()}`,
         userId,isPremium,
       });
       setFmMsgs(m=>[...m,{role:"assistant",content:reply.trim()}]);
