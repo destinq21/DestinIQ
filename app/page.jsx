@@ -3324,6 +3324,57 @@ function buildOriginFacts(f){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADVISOR SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ── COMMITMENT FOLLOW-UP — the coach remembers what you said you'd do ────────
+const commitKey = (uid)=>`diq_commits_${uid}`;
+function getCommitments(uid){
+  if(typeof window==="undefined"||!uid) return [];
+  try{ return JSON.parse(localStorage.getItem(commitKey(uid))||"[]"); }catch(_e){ return []; }
+}
+function saveCommitment(uid, text){
+  if(typeof window==="undefined"||!uid||!text) return;
+  try{
+    const list=getCommitments(uid);
+    // avoid near-duplicates
+    if(list.some(cm=>cm.text.toLowerCase()===text.toLowerCase())) return;
+    list.unshift({text:text.slice(0,140), madeAt:Date.now(), status:"open"});
+    localStorage.setItem(commitKey(uid), JSON.stringify(list.slice(0,12)));
+  }catch(_e){}
+}
+function buildCommitmentContext(uid){
+  const now=Date.now();
+  const open=getCommitments(uid).filter(cm=>
+    cm.status==="open" && (now-cm.madeAt)>20*60*60*1000 && (now-cm.madeAt)<7*24*60*60*1000
+  );
+  if(!open.length) return "";
+  // mark as asked so we only follow up once per commitment
+  try{
+    const list=getCommitments(uid).map(cm=>
+      open.some(o=>o.madeAt===cm.madeAt)?{...cm,status:"asked",askedAt:now}:cm);
+    localStorage.setItem(commitKey(uid), JSON.stringify(list));
+  }catch(_e){}
+  const lines=open.slice(0,2).map(cm=>{
+    const days=Math.max(1,Math.round((now-cm.madeAt)/86400000));
+    return `- "${cm.text}" (said ${days} day${days>1?"s":""} ago)`;
+  }).join("\n");
+  return `\n\nFOLLOW-UP — THINGS THEY COMMITTED TO EARLIER:\n${lines}\nNear the START of this conversation, warmly ask whether they followed through — like a friend who genuinely remembered, not a manager checking a task list. Ask about ONE of these only. If they did it: celebrate genuinely (an emoji fits here). If they didn't: zero guilt — help them find the smaller next step. If they're clearly here to talk about something else urgent, address that first and follow up later in the conversation.`;
+}
+const COMMIT_PATTERNS=/\b(i(?:'| wi)ll|i am going to|i'm going to|going to|i plan to|i promise|tomorrow|tonight|this week|next week|by (?:mon|tues|wednes|thurs|fri|satur|sun)day|by the end of)\b/i;
+async function detectCommitment(uid, userText, isPremium){
+  if(!uid||!userText||userText.length<12||!COMMIT_PATTERNS.test(userText)) return;
+  try{
+    const out=await callAPI({
+      messages:[{role:"user",content:`Message: "${userText.slice(0,400)}"\n\nDoes this contain a SPECIFIC personal commitment to do something (an action they say they will take)? If yes, reply with ONLY the commitment as a short phrase in first person, max 12 words, e.g. "talk to my boss about the raise tomorrow". If no clear commitment, reply exactly: NONE`}],
+      system:"You extract personal commitments from messages. Reply with only the short commitment phrase or NONE. Nothing else.",
+      userId:uid, isPremium
+    });
+    const t=(out||"").trim();
+    if(t && t.toUpperCase()!=="NONE" && t.length<150 && !t.includes("\n")){
+      saveCommitment(uid, t.replace(/^["']|["']$/g,""));
+    }
+  }catch(_e){}
+}
+
 function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
   const name    = profile?.name    ||"there";
   const country = profile?.country ||"their country";
@@ -5368,7 +5419,8 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
       setCharsUsed(next);
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
     }
-    const updated=[...msgs,{role:"user",content:msg}];setMsgs(updated);setLoading(true);
+    const updated=[...msgs,{role:"user",content:msg}];setMsgs(updated);
+    detectCommitment(userId, msg, isPremium); // fire-and-forget: remember what they say they'll dosetLoading(true);
     // Award small points for engaging with coach
     addProgressPoints(userId, "coach_msg_"+Date.now(), PROGRESS_POINTS.coach_message);
     pushToMemory(userId,"user",msg);
@@ -5379,7 +5431,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         .filter((_,i)=>!(i===0&&updated[0].role==="assistant"))
         .map(m=>({role:m.role,content:m.content}));
       if(!apiMsgs.length||apiMsgs[0].role!=="user") throw new Error("No user message");
-      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId))+langPrompt(),userId,isPremium,isProMax});
+      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId))+buildCommitmentContext(userId)+langPrompt(),userId,isPremium,isProMax});
       pushToMemory(userId,"assistant",reply);setMsgs(p=>[...p,{role:"assistant",content:reply}]);
     }catch(e){
       console.error("Advisor error:",e.message,e);
@@ -5957,7 +6009,7 @@ function ShareCard({report, formData, onClose}){
   const [copied, setCopied] = React.useState(false);
   const [sent,   setSent]   = React.useState(false);
 
-  const shareText = `I just got my DestinIQ Intelligence Score: ${score}/100 🔥\n\nDestinIQ analysed my life, career & mindset and gave me a full personalised action plan.\n\nGet yours free 👉 destiniq.vercel.app`;
+  const shareText = `I just got my DestinIQ Intelligence Score: ${score}/100 🔥\n\nDestinIQ analysed my life, career & mindset and gave me a full personalised action plan.\n\nGet yours free 👉 destiniq.app`;
 
   const copy = ()=>{
     try{ navigator.clipboard.writeText(shareText); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch{}
@@ -5979,7 +6031,7 @@ function ShareCard({report, formData, onClose}){
         <div style={{background:"linear-gradient(135deg,rgba(240,180,41,0.1),rgba(155,114,207,0.08))",border:"1px solid rgba(240,180,41,0.15)",borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
           <div style={{fontSize:11,color:G.gold,letterSpacing:".15em",fontFamily:"monospace",marginBottom:8}}>MY DESTINIQ SCORE</div>
           <div style={{fontSize:64,fontWeight:900,color:G.cream,lineHeight:1}}>{score}</div>
-          <div style={{fontSize:12,color:G.dim,marginTop:4}}>out of 100 · destiniq.vercel.app</div>
+          <div style={{fontSize:12,color:G.dim,marginTop:4}}>out of 100 · destiniq.app</div>
         </div>
 
         {/* Share text preview */}
@@ -7520,7 +7572,7 @@ Be culturally aware. Parenting advice needs to respect local values while introd
   // ── MONEY DEEP DIVES ──────────────────────────────────────────────────────
   debtfreedom: {
     title: "Debt Freedom Plan",
-    icon: "⛓️",
+    icon: "🔓",
     subtitle: "Step by step plan based on your income and country",
     prompt: (p,cur) => `You are a debt elimination specialist. User: ${p.name||"someone"} from ${p.country||"their country"}, income: "${p.income||""}".
 Build their Debt Freedom Plan:
@@ -13332,11 +13384,11 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
   const recom=getRecom();
 
   const quickActions=[
-    {icon:"✅",label:"Daily Check-in",bg:"rgba(26,184,154,.12)",brd:"rgba(26,184,154,.25)",color:"#1ab89a",action:()=>setNav("checkin")},
-    {icon:"🤖",label:"AI Coach",     bg:"rgba(155,114,207,.12)",brd:"rgba(155,114,207,.25)",color:"#9b72cf", action:()=>setNav("tool:advisor")},
-    {icon:"⚡",label:"Challenge",    bg:"rgba(229,115,115,.12)",brd:"rgba(229,115,115,.25)",color:"#e57373", action:()=>setNav("tool:weeklychallenge")},
-    {icon:"🏆",label:"My Wins",      bg:"rgba(255,213,79,.10)", brd:"rgba(255,213,79,.25)", color:"#ffd54f", action:()=>setNav("wins")},
-    {icon:"📓",label:"Journal",      bg:"rgba(100,181,246,.12)",brd:"rgba(100,181,246,.25)",color:"#64b5f6", action:()=>setNav("journal")},
+    {icon:"check",label:"Daily Check-in",bg:"rgba(26,184,154,.12)",brd:"rgba(26,184,154,.25)",color:"#1ab89a",action:()=>setNav("checkin")},
+    {icon:"bot",label:"AI Coach",     bg:"rgba(155,114,207,.12)",brd:"rgba(155,114,207,.25)",color:"#9b72cf", action:()=>setNav("tool:advisor")},
+    {icon:"zap",label:"Challenge",    bg:"rgba(229,115,115,.12)",brd:"rgba(229,115,115,.25)",color:"#e57373", action:()=>setNav("tool:weeklychallenge")},
+    {icon:"trophy",label:"My Wins",      bg:"rgba(255,213,79,.10)", brd:"rgba(255,213,79,.25)", color:"#ffd54f", action:()=>setNav("wins")},
+    {icon:"pen",label:"Journal",      bg:"rgba(100,181,246,.12)",brd:"rgba(100,181,246,.25)",color:"#64b5f6", action:()=>setNav("journal")},
   ]
 
   return(
@@ -13432,7 +13484,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
                   fontFamily:"inherit",outline:"none",transition:"all .15s"}}
                 onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.3)"; }}
                 onMouseLeave={e=>{ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}>
-                <div style={{fontSize:22,marginBottom:7}}>{a.icon}</div>
+                <div style={{marginBottom:7,display:"flex",justifyContent:"center",color:a.color}}><DQIcon name={a.icon} size={22} strokeWidth={1.8}/></div>
                 <div style={{fontSize:10,color:a.color||G.dim,fontWeight:600,lineHeight:1.3}}>{a.label}</div>
               </button>
             ))}
@@ -15197,7 +15249,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
     window.dispatchEvent(new CustomEvent("toolRefresh",{detail:{modId:toolId}}));
   };
   const handleShare=async()=>{
-    const url=typeof window!=="undefined"?window.location.origin:"https://www.destiniq.app";
+    const url=typeof window!=="undefined"?window.location.origin:"https://destiniq.app";
     const title=`${meta?.label||toolId} — DestinIQ`;
     try{
       if(navigator.share){ await navigator.share({title, text:`Check out ${meta?.label||toolId} on DestinIQ`, url}); }
@@ -16447,7 +16499,7 @@ function exportReportPDF(formData, data, scores, overall){
 ${strengths.length?`<div class="section"><div class="section-title">Your Top Strengths</div><ul>${strengths.map(s=>`<li>${s}</li>`).join("")}</ul></div>`:""}
 ${blinds.length?`<div class="section"><div class="section-title">Blind Spots to Address</div><ul>${blinds.map(s=>`<li>${s}</li>`).join("")}</ul></div>`:""}
 ${opps.length?`<div class="section"><div class="section-title">Key Opportunities</div><ul>${opps.map(s=>`<li>${s}</li>`).join("")}</ul></div>`:""}
-<div class="footer">DestinIQ · Personal Intelligence Platform · destiniq.vercel.app · Generated for ${name} only</div>
+<div class="footer">DestinIQ · Personal Intelligence Platform · destiniq.app · Generated for ${name} only</div>
 </body></html>`;
 
   const w = window.open("","_blank","width=900,height=700");
@@ -17177,12 +17229,12 @@ function EditProfileModal({formData, userId, onSave, onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // REFERRAL SYSTEM
 // Each user gets a unique referral code based on their userId (first 8 chars)
-// Share link: destiniq.vercel.app?ref=CODE
+// Share link: destiniq.app?ref=CODE
 // Reward: both referrer and referee get 7 days Pro free (tracked in Supabase)
 // ═══════════════════════════════════════════════════════════════════════════════
 function ReferralWidget({userId, isPaid}){
   const code = userId ? userId.replace(/-/g,"").slice(0,8).toUpperCase() : "";
-  const link = `https://www.destiniq.app?ref=${code}`;
+  const link = `https://destiniq.app?ref=${code}`;
   const [copied, setCopied] = useState(false);
   const [referrals, setReferrals] = useState(0);
 
@@ -17231,7 +17283,7 @@ function ReferralWidget({userId, isPaid}){
       {/* Referral link */}
       <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
         <div style={{flex:1,padding:"10px 14px",background:"var(--midnight)",border:"1px solid var(--line)",borderRadius:10,fontSize:12,color:"var(--cream-50)",fontFamily:"var(--f-mono)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>
-          destiniq.vercel.app?ref={code}
+          destiniq.app?ref={code}
         </div>
         <button onClick={copy} style={{background:copied?"var(--teal)":"var(--gold)",border:"none",borderRadius:10,padding:"10px 18px",color:"#000",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,transition:"background .2s"}}>
           {copied?"✓ Copied!":"Copy link"}
@@ -17728,9 +17780,9 @@ function PolicyPage({type,onBack}){
                 </div>
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:G.cream,marginBottom:4}}>🌍 Website</div>
-                  <a href="https://www.destiniq.app" target="_blank" rel="noreferrer"
+                  <a href="https://destiniq.app" target="_blank" rel="noreferrer"
                     style={{fontSize:14,color:G.gold,textDecoration:"none"}}>
-                    destiniq.vercel.app
+                    destiniq.app
                   </a>
                 </div>
                 <div>
@@ -19386,13 +19438,13 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
     setMeta("description","DestinIQ gives you a personalised life intelligence report — built around your goals, your country, and your real situation. Not generic advice.");
     setMeta("og:title","DestinIQ — Your Personal Clarity Report",true);
     setMeta("og:description","Find out exactly where you are, what's holding you back, and what to do next. Built for you, not for everyone.",true);
-    setMeta("og:image","https://www.destiniq.app/og-image.png",true);
-    setMeta("og:url","https://www.destiniq.app",true);
+    setMeta("og:image","https://destiniq.app/og-image.png",true);
+    setMeta("og:url","https://destiniq.app",true);
     setMeta("og:type","website",true);
     setMeta("twitter:card","summary_large_image");
     setMeta("twitter:title","DestinIQ — Your Personal Clarity Report");
     setMeta("twitter:description","A personalised life intelligence report built around your goals and situation.");
-    setMeta("twitter:image","https://www.destiniq.app/og-image.png");
+    setMeta("twitter:image","https://destiniq.app/og-image.png");
   },[]);
 
   return(
