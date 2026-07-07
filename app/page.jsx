@@ -1400,16 +1400,16 @@ const PILLARS=[
 
 const CATEGORIES=[
   // Daily-life first — what you need every single day
-  {id:"body",    label:"Body",            icon:"💪", color:"#4db6ac",desc:"Wake up, move, groom — fuel your body daily",      tools:["nogym","posture","bodyfuel","glowup"]},
-  {id:"wellness",label:"Wellness",        icon:"🌿", color:"#81c784",desc:"Mental health, sleep & emotional resilience",       tools:["innerpeace","sleepcoach","anxietytool","griefloss","angerstress"]},
-  {id:"mindset", label:"Mindset",         icon:"🧠", color:"#9b72cf",desc:"Daily discipline, habits & how you think",         tools:["mindsettenx","success","fearaudit","dailywisdom","innerpeace","angerstress"]},
-  {id:"skills",  label:"Skills & Career", icon:"⚡", color:"#ffd54f",desc:"Level up professionally every day",                tools:["invest","discipline","career","negotiation","digitallife"]},
+  {id:"body",    label:"Body",            icon:"dumbbell", color:"#4db6ac",desc:"Wake up, move, groom — fuel your body daily",      tools:["nogym","posture","bodyfuel","glowup"]},
+  {id:"wellness",label:"Wellness",        icon:"leaf", color:"#81c784",desc:"Mental health, sleep & emotional resilience",       tools:["innerpeace","sleepcoach","anxietytool","griefloss","angerstress"]},
+  {id:"mindset", label:"Mindset",         icon:"brain", color:"#9b72cf",desc:"Daily discipline, habits & how you think",         tools:["mindsettenx","success","fearaudit","dailywisdom","innerpeace","angerstress"]},
+  {id:"skills",  label:"Skills & Career", icon:"activity", color:"#ffd54f",desc:"Level up professionally every day",                tools:["invest","discipline","career","negotiation","digitallife"]},
   // Then wealth and relationships
-  {id:"money",   label:"Money+",          icon:"💰", color:"#c8a84b",desc:"Build wealth & financial intelligence",            tools:["money","earnonline","business","lifehacks","debtfreedom","sidehustle","investment101","jimrohn"]},
-  {id:"social",  label:"Social & People", icon:"❤️", color:"#e05c6e",desc:"Relationships, people skills & communication",    tools:["relationshipiq","smalltalk","peopledecoder","hardconvo","parenting","confidencelab"]},
+  {id:"money",   label:"Money+",          icon:"wallet", color:"#c8a84b",desc:"Build wealth & financial intelligence",            tools:["money","earnonline","business","lifehacks","debtfreedom","sidehustle","investment101","jimrohn"]},
+  {id:"social",  label:"Social & People", icon:"heart", color:"#e05c6e",desc:"Relationships, people skills & communication",    tools:["relationshipiq","smalltalk","peopledecoder","hardconvo","parenting","confidencelab"]},
   // Then direction and strategy
-  {id:"purpose", label:"Purpose",         icon:"🚀", color:"#64b5f6",desc:"Define your direction, legacy & why",             tools:["visionboard","legacyletter","morningritual","lettertoself","dreaminterp","weeklychallenge"]},
-  {id:"plan",    label:"Plan & Decide",   icon:"🗺️", color:"#ff8a65",desc:"Strategic planning, big decisions & next moves",  tools:["roadmap","decisions","relocate","advisor"]},
+  {id:"purpose", label:"Purpose",         icon:"rocket", color:"#64b5f6",desc:"Define your direction, legacy & why",             tools:["visionboard","legacyletter","morningritual","lettertoself","dreaminterp","weeklychallenge"]},
+  {id:"plan",    label:"Plan & Decide",   icon:"map", color:"#ff8a65",desc:"Strategic planning, big decisions & next moves",  tools:["roadmap","decisions","relocate","advisor"]},
 ];
 const TOOL_META={
   relationshipiq:{label:"Relationship IQ", icon:"🤝",cat:"social", color:"#e05c6e"},
@@ -3472,7 +3472,7 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
   const challenge=f.challenge||"getting started";
   const income=f.income||"Under $500";
   const situation=f.situation||"figuring things out";
-  const loc=ipLocation?.city?`${ipLocation.city}, ${country}`:country;
+  const loc=(ipLocation?.city && ipLocation?.country && country && ipLocation.country.toLowerCase()===country.toLowerCase())?`${ipLocation.city}, ${country}`:country;
 
   // Currency rules baked in
   // Resolve local currency for this user's country
@@ -6454,8 +6454,8 @@ function Intake({onSubmit, savedFormData, ipLocation}){
     return {
       name:       sd.name       || draft.name       || "",
       age:        sd.age        || draft.age         || "",
-      country:    sd.country    || draft.country     || detectedCountry || "Ghana",
-      cSearch:    sd.country    || draft.country     || detectedCountry || "Ghana",
+      country:    sd.country    || draft.country     || detectedCountry || "",
+      cSearch:    sd.country    || draft.country     || detectedCountry || "",
       occupation: sd.career     || draft.occupation  || "",
       income:     sd.income     || draft.income      || "",
       priorities: Array.isArray(sd.blockers)&&sd.priorities ? sd.priorities
@@ -6956,8 +6956,8 @@ function CompleteProfile({savedFormData, onSubmit}){
   // Pre-fill whatever we already have
   const [name,   setName   ]=useState(savedFormData?.name||"");
   const [age,    setAge    ]=useState(savedFormData?.age||"");
-  const [country,setCountry]=useState(savedFormData?.country||"Ghana");
-  const [cSearch,setCSearch]=useState(savedFormData?.country||"Ghana");
+  const [country,setCountry]=useState(savedFormData?.country||"");
+  const [cSearch,setCSearch]=useState(savedFormData?.country||"");
   const [showDrop,setShowDrop]=useState(false);
   const [goal,   setGoal   ]=useState(savedFormData?.goals||savedFormData?.goal||"");
   const [blockers,setBlockers]=useState(()=>{
@@ -12678,10 +12678,17 @@ const DQ_ICON_PATHS={
   bookmark:'<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
   settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  dumbbell:'<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>',
+  leaf:'<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/>',
+  brain:'<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>',
+  wallet:'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  rocket:'<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+  map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
 };
 function DQIcon({name,size=18,strokeWidth=2,style}){
   const p=DQ_ICON_PATHS[name];
-  if(!p) return <span style={style}>{name}</span>; // fallback: show raw (covers any missed emoji)
+  if(!p) return <span style={{fontSize:size,lineHeight:1,...style}}>{name}</span>; // fallback: raw emoji, sized
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round"
@@ -13481,7 +13488,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
   ];
 
   const recommended = CATEGORIES.slice(0,4).map(cat=>({
-    icon:cat.icon, name:cat.label,
+    icon:cat.icon, color:cat.color, name:cat.label,
     reason:"Recommended because it aligns with your goals.",
     id:"category:"+cat.id
   }));
@@ -13658,8 +13665,8 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                           <div style={{width:40,height:40,borderRadius:11,
                             background:`linear-gradient(135deg,${cat.color}33,${cat.color}18)`,
                             border:`1px solid ${cat.color}44`,
-                            display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                            {cat.icon}
+                            display:"flex",alignItems:"center",justifyContent:"center",color:cat.color,flexShrink:0}}>
+                            <DQIcon name={cat.icon} size={20}/>
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:14,fontWeight:700,color:G.cream}}>{cat.label}</div>
@@ -13697,9 +13704,8 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                 <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
                   background:`linear-gradient(135deg,${cat.color}33,${cat.color}18)`,
                   border:`1px solid ${cat.color}44`,
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:24}}>
-                  {cat.icon}
+                  display:"flex",alignItems:"center",justifyContent:"center",color:cat.color}}>
+                  <DQIcon name={cat.icon} size={24}/>
                 </div>
                 {/* Text */}
                 <div style={{flex:1,minWidth:0}}>
@@ -13760,7 +13766,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                   transition:"all .15s"}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.2)"}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
-                <div style={{fontSize:28,lineHeight:1}}>{item.icon}</div>
+                <div style={{display:"inline-flex",lineHeight:1,color:item.color||"var(--gold)"}}><DQIcon name={item.icon} size={26}/></div>
                 <div style={{fontSize:13,fontWeight:700,color:G.cream,
                   lineHeight:1.3}}>{item.name}</div>
                 <div style={{fontSize:11,color:G.dimmer,lineHeight:1.5,flex:1}}>
@@ -13795,7 +13801,7 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
                   style={{flexShrink:0,width:"clamp(140px,42vw,170px)",
                     background:G.card,border:"1px solid "+G.border,
                     borderRadius:14,padding:"14px 12px",cursor:"pointer"}}>
-                  <div style={{fontSize:22,marginBottom:8}}>{cat.icon}</div>
+                  <div style={{marginBottom:8,color:cat.color}}><DQIcon name={cat.icon} size={22}/></div>
                   <div style={{fontSize:13,fontWeight:700,color:G.cream,
                     marginBottom:2}}>{cat.label}</div>
                   <div style={{fontSize:10,color:G.dimmer,marginBottom:10}}>
@@ -13893,7 +13899,7 @@ function CategoryPage({catId,setNav,goBack,userId}){
           display:"flex",alignItems:"center",gap:16}}>
           <div style={{width:52,height:52,borderRadius:15,background:`${cat.color}20`,
             border:`1px solid ${cat.color}30`,display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:26,flexShrink:0}}>{cat.icon}</div>
+            justifyContent:"center",color:cat.color,flexShrink:0}}><DQIcon name={cat.icon} size={26}/></div>
           <div style={{flex:1,minWidth:0}}>
             <h2 style={{fontSize:20,fontWeight:800,color:G.cream,margin:"0 0 3px"}}>{cat.label}</h2>
             <p style={{fontSize:12,color:G.dim,margin:0,lineHeight:1.5}}>{cat.desc}</p>
@@ -15239,8 +15245,8 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
           return(
             <div key={cat.id} style={{marginBottom:16,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:36,height:36,borderRadius:"50%",background:`${cat.color}18`,border:`1px solid ${cat.color}28`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
-                  {cat.icon}
+                <div style={{width:36,height:36,borderRadius:"50%",background:`${cat.color}18`,border:`1px solid ${cat.color}28`,display:"flex",alignItems:"center",justifyContent:"center",color:cat.color,flexShrink:0}}>
+                  <DQIcon name={cat.icon} size={17}/>
                 </div>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
