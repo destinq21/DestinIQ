@@ -1422,7 +1422,7 @@ const TOOL_META={
   confidencelab: {label:"Confidence Lab",   icon:"🦁",cat:"social", color:"#e05c6e"},
   money:         {label:"Money",            icon:"💰",cat:"money",  color:"#c8a84b"},
   earnonline:    {label:"Earn Online",      icon:"🌐",cat:"money",  color:"#c8a84b"},
-  business:      {label:"Business",         icon:"📦",cat:"money",  color:"#c8a84b"},
+  business:      {label:"Business",         icon:"🏢",cat:"money",  color:"#c8a84b"},
   lifehacks:     {label:"Life Hacks",       icon:"💡",cat:"money",  color:"#c8a84b"},
   debtfreedom:   {label:"Debt Freedom",     icon:"🔓",cat:"money",  color:"#c8a84b"},
   sidehustle:    {label:"Side Hustle",      icon:"📊",cat:"money",  color:"#c8a84b"},
@@ -1462,12 +1462,187 @@ const TOOL_META={
 // CARD-BASED INTELLIGENCE ARCHITECTURE
 // Category → Topic → Intelligence Cards → Deep AI
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DEVELOPED-MARKET CARD DECKS — US/UK/CA/EU/AU users see these instead
+// ═══════════════════════════════════════════════════════════════════════════
+const DEV_MARKETS=["united states","usa","america","united kingdom","uk","britain","canada","australia","germany","france","netherlands","sweden","norway","switzerland","singapore","japan","new zealand","ireland","denmark","finland","austria","belgium","italy","spain","portugal","south korea","israel","luxembourg","iceland"];
+const isDevMarket=(country)=>{const q=String(country||"").toLowerCase().trim();return DEV_MARKETS.some(d=>q===d||q.includes(d));};
+
+const DEV_BUSINESS_CARDS=[
+  {
+    id:"vending", title:"Vending Machine Route", badge:"Semi-Passive", badgeColor:"#81c784",
+    tags:["Trending"],
+    tagline:"Machines earn while you sleep",
+    startupCost:"$1,500–$3,000", profitPerSale:"$300–$600/mo per machine", margin:"50–70%", profitability:"High",
+    whyItWorks:"Each placed machine generates $300–600/month with a few hours of restocking. Operators scale to 10–20 machine routes serving offices, gyms, laundromats and schools — turning one machine into a real income stream.",
+    suppliers:[{name:"Facebook Marketplace",url:"https://facebook.com/marketplace",note:"Used machines $800–1,500"},{name:"eBay",url:"https://ebay.com",note:"Refurbished units"},{name:"Sam's Club / Costco",url:"https://samsclub.com",note:"Bulk snacks & drinks"}],
+    pricing:{cost:"$0.30–$0.60/item",selling:"$1.50–$3.00/item",profit:"$1.00–$2.40/item"},
+    steps:["Buy one used machine (test the coin/card reader first)","Find a location — offices, gyms, barbershops (offer 10–20% commission)","Stock top sellers: water, energy drinks, chips, candy","Collect and restock weekly, track what sells","Reinvest profit into machine #2 — repeat"],
+    actions:["Find Locations Near Me Strategy","Calculate Route Profitability","Write a Location Pitch","Compare Machine Types"],
+  },
+  {
+    id:"freezedried", title:"Freeze-Dried Candy Business", badge:"Trending", badgeColor:"#64b5f6",
+    tags:["Trending","Online"],
+    tagline:"Viral treat with 5–10x markup",
+    startupCost:"$2,500–$5,000", profitPerSale:"$5–$15/bag", margin:"60–80%", profitability:"High",
+    whyItWorks:"Freeze-dried Skittles and taffy are viral on TikTok — the texture transformation sells itself on camera. Sellers move product at farmers markets, gas stations, and TikTok Shop at 5–10x the candy cost.",
+    suppliers:[{name:"Harvest Right",url:"https://harvestright.com",note:"Home freeze dryers"},{name:"Costco / Sam's Club",url:"https://costco.com",note:"Bulk candy"},{name:"TikTok Shop",url:"https://shop.tiktok.com",note:"Primary sales channel"}],
+    pricing:{cost:"$1–$3/bag",selling:"$8–$15/bag",profit:"$5–$12/bag"},
+    steps:["Buy a freeze dryer (start with the medium size)","Test 5 candy types — Skittles and saltwater taffy are proven","Design simple branded bags","Post the process on TikTok — the transformation IS the marketing","Sell via TikTok Shop + local markets, expand to wholesale"],
+    actions:["Generate Candy Menu & Pricing","Write Viral Video Hooks","Calculate Machine Payback Time","Plan Market Booth Setup"],
+  },
+  {
+    id:"laserengrave", title:"Laser Engraving & Custom Gifts", badge:"High Profit", badgeColor:"#e0b64f",
+    tags:["Low Capital","Online"],
+    tagline:"Personalization sells at 4–8x cost",
+    startupCost:"$400–$2,000", profitPerSale:"$15–$60/item", margin:"70–85%", profitability:"High",
+    whyItWorks:"Personalized tumblers, cutting boards, pet tags and wedding gifts sell year-round on Etsy with huge margins. A $10 blank becomes a $45 personalized product with 3 minutes of machine time.",
+    suppliers:[{name:"xTool",url:"https://xtool.com",note:"Popular starter lasers"},{name:"Amazon",url:"https://amazon.com",note:"Blanks: tumblers, boards, tags"},{name:"Etsy",url:"https://etsy.com",note:"Primary sales channel"}],
+    pricing:{cost:"$5–$12/blank",selling:"$25–$60/item",profit:"$15–$50/item"},
+    steps:["Start with a diode laser (xTool F1 or similar)","Pick a niche: pet memorials, wedding, or corporate gifts","List 10 designs on Etsy with mockup photos","Fulfil orders same-week, ask every buyer for a review","Add local corporate clients — bulk orders at holidays"],
+    actions:["Pick My Engraving Niche","Generate 10 Product Ideas","Write Etsy Listings That Rank","Price My Products"],
+  },
+  {
+    id:"permjewelry", title:"Permanent Jewelry Pop-Ups", badge:"Trending", badgeColor:"#9b72cf",
+    tags:["Low Capital","Trending"],
+    tagline:"$50–$150 per bracelet, event-based",
+    startupCost:"$900–$1,500", profitPerSale:"$40–$130/customer", margin:"75–85%", profitability:"High",
+    whyItWorks:"Welded 'forever' bracelets are an experience purchase — customers pay $50–150 for 5 minutes of work and gold-filled chain that costs $8–20. Pop-ups at boutiques, markets and private parties book out.",
+    suppliers:[{name:"Sunstone / Orion welders",url:"https://sunstonewelders.com",note:"Micro pulse welders"},{name:"Permanent jewelry chain suppliers",url:"https://etsy.com",note:"Gold-filled chain wholesale"},{name:"Instagram",url:"https://instagram.com",note:"Booking channel"}],
+    pricing:{cost:"$8–$20/bracelet",selling:"$50–$150/bracelet",profit:"$40–$130/bracelet"},
+    steps:["Take a weekend training + buy a pulse welder kit","Practice on 20 friends — post every single one","Partner with a boutique for your first pop-up (they take 10–15%)","Book private parties — bachelorette groups pay premium","Add anklets, rings and charm upsells"],
+    actions:["Plan My First Pop-Up","Price My Menu","Write My Instagram Bio","Find Boutique Partners Strategy"],
+  },
+  {
+    id:"furnitureflip", title:"Furniture Flipping", badge:"Low Capital", badgeColor:"#81c784",
+    tags:["Low Capital"],
+    tagline:"Free finds → $200–$800 profit each",
+    startupCost:"$100–$300", profitPerSale:"$150–$800/piece", margin:"80–95%", profitability:"Medium-High",
+    whyItWorks:"Facebook Marketplace is full of free and $20 solid-wood furniture. Sand, paint, new hardware — resell for $250–900. Zero-risk way to build capital for a bigger business.",
+    suppliers:[{name:"Facebook Marketplace",url:"https://facebook.com/marketplace",note:"Free & cheap finds"},{name:"Home Depot / Lowe's",url:"https://homedepot.com",note:"Paint & supplies"},{name:"OfferUp",url:"https://offerup.com",note:"Second sales channel"}],
+    pricing:{cost:"$0–$50/piece",selling:"$200–$900/piece",profit:"$150–$850/piece"},
+    steps:["Check Marketplace 'free' section daily — grab solid wood only","Learn 3 finishes: paint, stain, limewash","Stage photos in good light — staging doubles the price","List on Marketplace + OfferUp, price 20% above your target","Reinvest into better pieces — dressers and buffets pay most"],
+    actions:["What To Look For Guide","Calculate Profit On A Piece","Write Listings That Sell","Plan My First 5 Flips"],
+  },
+];
+
+const DEV_EARNONLINE_CARDS=[
+  {
+    id:"ugccreator", title:"UGC Creator", badge:"Hot Right Now", badgeColor:"#e0b64f",
+    tags:["Content","Freelancing"],
+    tagline:"Brands pay per video — no followers needed",
+    incomeRange:"$150–$500/video", setupTime:"3–7 days", difficulty:"Beginner",
+    whyItWorks:"Brands need endless short-video ads and pay creators $150–500 per video — you never need an audience because the brand posts it. A phone, decent lighting and a portfolio of 3 sample videos is enough to start.",
+    platformLink:"https://ugc.farm",
+    steps:["Film 3 sample product videos with items you own","Build a one-page portfolio (Canva)","Create accounts on UGC job boards + pitch on Twitter/X and LinkedIn","Deliver fast, ask for testimonial + referral","Raise rates every 5 clients — experienced creators charge $400+"],
+    actions:["Write My UGC Pitch","Script My First 3 Videos","Price My Packages","Find Brands To Pitch"],
+  },
+  {
+    id:"digitalproducts", title:"Digital Products", badge:"Passive", badgeColor:"#81c784",
+    tags:["Passive","Content"],
+    tagline:"Make once, sell forever",
+    incomeRange:"$500–$20,000/mo", setupTime:"1–3 weeks", difficulty:"Intermediate",
+    whyItWorks:"Notion templates, budget spreadsheets, digital planners and Canva template packs sell on Etsy and Gumroad with zero inventory and 95%+ margins. Top template sellers clear five figures monthly.",
+    platformLink:"https://gumroad.com",
+    steps:["Pick ONE problem you can systemize (budgeting, planning, meal prep)","Build the product in Notion/Canva/Google Sheets","List on Etsy (traffic) + Gumroad (higher margin)","Make 3 TikToks/Reels showing the product in use","Bundle products at a discount — bundles triple average order value"],
+    actions:["Find My Product Idea","Outline My First Template","Write My Etsy Listing","Plan My Launch Content"],
+  },
+  {
+    id:"newsletterbiz", title:"Paid Newsletter", badge:"Long-Term", badgeColor:"#e0b64f",
+    tags:["Content","Passive"],
+    tagline:"5,000 readers ≈ $2–5k/month",
+    incomeRange:"$500–$10,000/mo", setupTime:"1–2 weeks", difficulty:"Intermediate",
+    whyItWorks:"Beehiiv and Substack made newsletters a real business: sponsorships pay $25–50 per 1,000 subscribers per send, plus paid tiers. Niche beats size — 3,000 engaged readers in a specific niche out-earns 30,000 random ones.",
+    platformLink:"https://beehiiv.com",
+    steps:["Pick a niche where people have money or a burning problem","Publish weekly — same day, same time, no exceptions","Grow with Twitter/X threads + Reddit value posts + recommendations","At 1,000 subs: open sponsorship slots","At 3,000+: add a paid tier with premium content"],
+    actions:["Pick My Niche","Name My Newsletter","Write My First Issue","Plan 12 Weeks Of Topics"],
+  },
+  {
+    id:"kdppublishing", title:"Amazon KDP Publishing", badge:"Passive", badgeColor:"#81c784",
+    tags:["Passive"],
+    tagline:"Royalties from books that sell while you sleep",
+    incomeRange:"$100–$5,000/mo", setupTime:"1–2 weeks", difficulty:"Beginner",
+    whyItWorks:"Kindle Direct Publishing lets you publish journals, planners, workbooks and ebooks free — Amazon prints and ships on demand and pays royalties monthly. A catalog of 20–50 good low-content books compounds into steady income.",
+    platformLink:"https://kdp.amazon.com",
+    steps:["Research niches with demand but weak covers (use Amazon search)","Create your first planner/journal interior (Canva or Book Bolt)","Design a cover that looks better than page-1 competitors","Publish, price at $6.99–$9.99, use all 7 keyword slots","Publish weekly — the catalog is the business"],
+    actions:["Find My First Niche","Outline A Planner Interior","Write My Book Description","Plan A 20-Book Catalog"],
+  },
+];
+
+
+const UK_BUSINESS_CARDS=[
+  {
+    id:"vintedflip", title:"Vinted & Car Boot Reselling", badge:"Trending", badgeColor:"#64b5f6",
+    tags:["Low Capital","Trending"],
+    tagline:"Car boot finds → 5–10x on Vinted",
+    startupCost:"£50–£200", profitPerSale:"£10–£60/item", margin:"70–90%", profitability:"High",
+    whyItWorks:"Vinted is the UK's biggest reselling boom — zero seller fees. Branded clothes from car boots and charity shops (£1–5) resell for £15–60. Top UK resellers clear £1,000–3,000/month part-time.",
+    suppliers:[{name:"Car boot sales",url:"https://carbootjunction.com",note:"Sunday mornings — arrive early"},{name:"Charity shops",url:"https://www.charityretail.org.uk",note:"Wealthy-area branches best"},{name:"Vinted",url:"https://vinted.co.uk",note:"Zero seller fees"}],
+    pricing:{cost:"£1–£5/item",selling:"£15–£60/item",profit:"£10–£55/item"},
+    steps:["Learn 10 brands that always sell (Carhartt, Ralph Lauren, North Face, Levi's)","Hit 2 car boots + 3 charity shops every weekend","Photograph in daylight on a plain background","List daily on Vinted — consistency beats volume","Reinvest into higher-value pieces: coats, trainers, workwear"],
+    actions:["Brands Cheat Sheet For My Area","Write Listings That Sell","Price Check A Find","Plan My First £500 Month"],
+  },
+  {
+    id:"candleuk", title:"Candle & Wax Melt Business", badge:"High Profit", badgeColor:"#e0b64f",
+    tags:["Low Capital","Online"],
+    tagline:"£2 to make, £12–£25 to sell",
+    startupCost:"£150–£400", profitPerSale:"£8–£20/item", margin:"70–85%", profitability:"High",
+    whyItWorks:"UK candle culture is enormous — Etsy UK, craft fairs and Instagram shops sell luxury-looking candles at 5–8x cost. Wax melts add a repeat-purchase product with even better margins.",
+    suppliers:[{name:"Candle Shack",url:"https://candle-shack.co.uk",note:"UK wax, jars & fragrance"},{name:"Craftovator",url:"https://craftovator.co.uk",note:"Fragrance oils & kits"},{name:"Etsy UK",url:"https://etsy.com/uk",note:"Primary sales channel"}],
+    pricing:{cost:"£2–£4/candle",selling:"£12–£25/candle",profit:"£8–£21/candle"},
+    steps:["Order a starter kit and master ONE vessel size first","Develop 5 signature scents — name them well (naming sells)","CLP labels are legally required in the UK — sort them day one","Launch on Etsy + Instagram, batch weekly","Book a Christmas market stall by September — Q4 is half the year's sales"],
+    actions:["Name My 5 Scents","Cost & Price My Range","Write My Etsy Story","Plan My Christmas Market Stall"],
+  },
+  {
+    id:"laserengraveuk", title:"Laser Engraving & Custom Gifts", badge:"High Profit", badgeColor:"#e0b64f",
+    tags:["Low Capital","Online"],
+    tagline:"Personalisation sells at 4–8x cost",
+    startupCost:"£350–£1,600", profitPerSale:"£12–£50/item", margin:"70–85%", profitability:"High",
+    whyItWorks:"Personalised tumblers, chopping boards, pet tags and wedding gifts sell year-round on Etsy UK and at craft fairs with huge margins. An £8 blank becomes a £35 personalised product in minutes.",
+    suppliers:[{name:"xTool UK",url:"https://xtool.com",note:"Starter diode lasers"},{name:"Amazon UK",url:"https://amazon.co.uk",note:"Blanks: tumblers, boards, slate"},{name:"Etsy UK",url:"https://etsy.com/uk",note:"Primary sales channel"}],
+    pricing:{cost:"£4–£10/blank",selling:"£20–£50/item",profit:"£12–£45/item"},
+    steps:["Start with a diode laser (xTool F1 or similar)","Pick a niche: pet memorials, weddings or new-home gifts","List 10 designs on Etsy with clean mockups","Turn orders around same-week, chase every review","Add corporate Christmas orders — bulk pays best"],
+    actions:["Pick My Engraving Niche","Generate 10 Product Ideas","Write Etsy Listings That Rank","Price My Products"],
+  },
+  {
+    id:"pressurewashuk", title:"Driveway & Patio Cleaning", badge:"Always In Demand", badgeColor:"#81c784",
+    tags:["Trending"],
+    tagline:"£80–£250 per job, book solid in summer",
+    startupCost:"£300–£800", profitPerSale:"£70–£220/job", margin:"80–90%", profitability:"High",
+    whyItWorks:"UK driveways, patios and decking turn green every winter — homeowners happily pay £80–250 for a transformation that takes 2–4 hours. Before/after videos are marketing gold on Facebook local groups.",
+    suppliers:[{name:"Screwfix",url:"https://screwfix.com",note:"Pressure washers & surface cleaners"},{name:"B&Q",url:"https://diy.com",note:"Chemicals & kit"},{name:"Facebook local groups",url:"https://facebook.com/groups",note:"Where the customers are"}],
+    pricing:{cost:"£5–£15/job (fuel+chem)",selling:"£80–£250/job",profit:"£70–£235/job"},
+    steps:["Buy a petrol washer + rotary surface cleaner","Do 3 neighbours' drives free — film everything","Post before/afters in every local Facebook group","Quote by the square metre, upsell resealing","Book Saturday slots solid; add gutter cleaning in autumn"],
+    actions:["Price My Services","Write My Facebook Post","Plan My First 10 Jobs","Quote Calculator Setup"],
+  },
+  {
+    id:"furnitureflipuk", title:"Furniture Flipping", badge:"Low Capital", badgeColor:"#81c784",
+    tags:["Low Capital"],
+    tagline:"Free finds → £150–£600 profit each",
+    startupCost:"£80–£250", profitPerSale:"£100–£600/piece", margin:"80–95%", profitability:"Medium-High",
+    whyItWorks:"Facebook Marketplace UK and Freecycle are full of free solid-wood furniture. Sand, paint, new handles — resell for £180–650. Mid-century and oak pieces move fastest.",
+    suppliers:[{name:"Facebook Marketplace",url:"https://facebook.com/marketplace",note:"Free & cheap section"},{name:"Freecycle",url:"https://freecycle.org",note:"Completely free finds"},{name:"B&Q / Wilko",url:"https://diy.com",note:"Paint & hardware"}],
+    pricing:{cost:"£0–£40/piece",selling:"£150–£650/piece",profit:"£110–£610/piece"},
+    steps:["Check Marketplace free section daily — solid wood only","Master 3 finishes: chalk paint, stain, limewash","Stage photos in good light — staging doubles the price","List on Marketplace + Vinterior for quality pieces","Reinvest into sideboards and dressers — they pay most"],
+    actions:["What To Look For Guide","Calculate Profit On A Piece","Write Listings That Sell","Plan My First 5 Flips"],
+  },
+];
+
+const DEV_DECKS={ startbusiness: DEV_BUSINESS_CARDS, earnonline: DEV_EARNONLINE_CARDS };
+const isUKCountry=(country)=>/united kingdom|great britain|(^|\b)uk(\b|$)|england|scotland|wales|northern ireland/.test(String(country||"").toLowerCase());
+function pickDeck(country, topicId, defaultCards){
+  if(isUKCountry(country)&&topicId==="startbusiness") return UK_BUSINESS_CARDS;
+  if(isDevMarket(country)&&DEV_DECKS[topicId]) return DEV_DECKS[topicId];
+  return defaultCards;
+}
+
 const TOPIC_CONFIGS = {
   // ─── MONEY+ ───────────────────────────────────────────────────────────────
   money: {
     topics: [
       {
-        id:"startbusiness", label:"Start a Business", icon:"📦",
+        id:"startbusiness", label:"Start a Business", icon:"🏢",
         desc:"Find profitable business ideas, suppliers, costs, and step-by-step guides.",
         tags:["All Ideas","Low Capital","Online","Trending"],
         cards:[
@@ -1629,8 +1804,8 @@ const TOPIC_CONFIGS = {
             whyItWorks:"Global average remittance cost is around 6% — meaning someone sending $200 monthly loses roughly $144/year to fees and hidden exchange rate markups. The banks and legacy services are consistently the most expensive routes; the markup hides in the exchange rate, not the stated fee. Comparing total received (not fees charged) is the only honest comparison.",
             steps:[
               "Compare by amount RECEIVED, not fee charged — a '$0 fee' service with a bad exchange rate costs more than a $4 fee with a fair rate",
-              "Check comparison sites that track live rates across providers for your specific corridor (e.g. UK→Ghana, US→Nigeria)",
-              "Mobile money endpoints (M-Pesa, MoMo) are usually cheaper than cash pickup — and safer for the receiver",
+              "Check comparison sites that track live rates across providers for your specific corridor (e.g. US→Mexico, UK→Ghana, UAE→India)",
+              "Where the receiver uses mobile money (M-Pesa, MoMo etc.), those endpoints are usually cheaper than cash pickup — and safer",
               "Batch transfers: one monthly transfer costs less than four weekly ones — fixed fees hit small amounts hardest",
               "Recalculate every 6 months — rates and providers change, and the best route last year may not be the best now"
             ],
@@ -2787,7 +2962,7 @@ const TOPIC_CONFIGS = {
             steps:[
               "Calculate your real cost of relocation: visa fees, flights, first 3 months living costs, emergency buffer — what's the actual number?",
               "Research realistic starting salary in your target country for your exact role — not best case, median case",
-              "Convert to purchasing power: GBP 2,500/month in London after rent is often less comfortable than GHC 8,000/month in Accra",
+              "Convert to purchasing power: a big salary in an expensive city after rent is often less comfortable than a good local salary back home — run the numbers for YOUR two cities before deciding",
               "What is your ceiling here? Map the realistic 5-year trajectory if you stay and execute — don't compare your worst case here to their best case abroad",
               "What do you lose? Family proximity, cultural comfort, existing network, local business opportunities — these have real value"
             ],
@@ -2811,7 +2986,7 @@ const TOPIC_CONFIGS = {
             id:"staywin", title:"If You Stay — How To Win Here", badge:"Underrated Path", badgeColor:"#81c784",
             tags:["Africa","Financial","Career"],
             tagline:"The people building the most meaningful wealth in Africa are the ones who stayed",
-            whyItWorks:"The most common regret among Africans abroad isn't that they left — it's that they left too early, before building the skills and capital that would have made them significantly more valuable and effective back home. The people building the most generational wealth in Ghana, Nigeria, Kenya, and South Africa right now are those who treated local constraints as puzzles to solve, not reasons to leave.",
+            whyItWorks:"The most common regret among people who move abroad isn't that they left — it's that they left too early, before building the skills and capital that would have made them significantly more valuable and effective back home. The people building the most generational wealth in Ghana, Nigeria, Kenya, and South Africa right now are those who treated local constraints as puzzles to solve, not reasons to leave.",
             steps:[
               "Identify the gap in your local market that your skills could fill — constraints create niches that don't exist abroad",
               "Build your Africa-relevant skill stack: languages, local networks, understanding of local systems and informal economies",
@@ -7718,7 +7893,7 @@ Be specific to their country's economy and digital access. Real opportunities, n
     prompt: (p,cur) => `You are an investment educator who knows ${p.country||"African"} financial markets.
 User: ${p.name||"someone"} from ${p.country||"their country"}, income: "${p.income||""}".
 Build their Investment 101 guide:
-1. The investment options available in ${p.country||"their country"} right now (stocks, treasury bills, mobile money savings, real estate — what's actually accessible)
+1. The investment options available in ${p.country||"their country"} right now (stocks, treasury bills, savings apps or mobile money savings where available, real estate — what's actually accessible)
 2. Where to start with small amounts in ${p.country||"their country"} (specific platforms or banks)
 3. Treasury bills / government bonds in ${p.country||"their country"} — how they work and current rates
 4. The biggest investment mistake beginners make in ${p.country||"their market"}
@@ -10849,7 +11024,7 @@ const JIM_ROHN_PRINCIPLES = [
       "10% — active capital: money that WORKS. A skill course. Starting your side hustle. Buying stock in a company you understand.",
       "10% — passive savings: open a separate account. Name it 'Wealth Account'. Never withdraw from it. Ever.",
     ],
-    application:"If you earn GH₵2,000/month: GH₵1,400 is your life budget. GH₵200 goes to giving. GH₵200 goes to a skill or micro-business. GH₵200 goes into your wealth account. In 12 months you'll have GH₵2,400 saved and a skill or business that generates more.",
+    application:"Whatever you earn each month, split it 70/10/10/10: 70% is your life budget. 10% goes to giving. 10% goes to a skill or micro-business. 10% gets invested — no matter how small the amounts feel at first.",
   },
   {
     id:"profits",
@@ -10860,7 +11035,7 @@ const JIM_ROHN_PRINCIPLES = [
     body:"This was the idea that changed Jim Rohn's life at age 25, when his mentor Earl Shoaff first said it to him. A wage is what someone gives you for your time. A profit is what you earn because you created value beyond your own labor. The difference is not just financial — it is psychological. A wage-earner asks 'how much am I worth per hour?' A profit-earner asks 'how much value can I create?' Wages have a ceiling set by someone else. Profits have a ceiling set by your creativity, your market, and your execution. This does not mean quit your job tomorrow. It means start building something alongside your job — anything — that generates profit rather than just a paycheck. A small business. A skill you sell. A product. A course. Something that pays you whether you show up or not.",
     steps:[
       "Keep your job (wages) — it funds your life while you build your profits.",
-      "Start a micro-business alongside it — even GH₵50/month profit is the beginning of a different identity.",
+      "Start a micro-business alongside it — even the smallest monthly profit is the beginning of a different identity.",
       "Reinvest every profit back into the business for the first 12 months. Do not spend what the business makes.",
       "When profits equal 50% of your wages, you have options. That is the target.",
     ],
@@ -10887,9 +11062,9 @@ const JIM_ROHN_PRINCIPLES = [
     color:"var(--rose)",
     title:"It Is Not the Amount — It Is the Habit",
     quote:"It's not the amount that counts, it's the plan that counts. It's not what you save but that you save.",
-    body:"One of the most damaging financial beliefs is: 'I don't earn enough to save.' Jim Rohn destroyed this belief with one argument: if you cannot save out of GH₵500, you cannot save out of GH₵5,000. The problem is not the amount — it is the absence of a saving habit. A person who saves GH₵10 a month consistently is building something more important than money: they are building the identity of someone who saves. And that identity, once real, will apply at every income level. The amount will grow as the income grows, because the habit is already there. The person who doesn't save GH₵10 at GH₵500 will not save GH₵500 at GH₵5,000. The habit must be built now, at whatever level you are at.",
+    body:"One of the most damaging financial beliefs is: 'I don't earn enough to save.' Jim Rohn destroyed this belief with one argument: if you cannot save out of a small income, you will not save out of ten times that income. The problem is not the amount — it is the absence of a saving habit. A person who saves even a tiny amount every month is building something more important than money: they are building the identity of someone who saves. And that identity, once real, will apply at every income level. The amount will grow as the income grows, because the habit is already there. The person who saves nothing at a small income will save nothing at a large one. The habit must be built now, at whatever level you are at.",
     steps:[
-      "Start with any amount — GH₵5, ₦500, KSh 100. The number does not matter yet.",
+      "Start with any amount — even the smallest note in your wallet. The number does not matter yet.",
       "Save it on the day you receive income — not after expenses. Before anything else.",
       "Keep a visible record of what you've saved. Watch the number. Celebrate it.",
       "Increase the amount by any small percentage every 3 months. 5% more than last time.",
@@ -12903,6 +13078,7 @@ function DQIcon({name,size=18,strokeWidth=2,style}){
 
 // ── TOOL → SVG ICON MAP (professional icons instead of emojis) ──────────────
 const TOOL_ICONS={
+  startbusiness:"briefcase",
   money:"coins", earnonline:"globe", business:"briefcase", lifehacks:"zap",
   debtfreedom:"unlock", sidehustle:"barchart", investment101:"linechart", jimrohn:"book",
   invest:"linechart", success:"trophy", discipline:"target", mindsettenx:"brain",
@@ -14221,7 +14397,56 @@ function CategoryPage({catId,setNav,goBack,userId}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTELLIGENCE CARD — Expandable card with compact/expanded/AI action states
 // ═══════════════════════════════════════════════════════════════════════════════
-function IntelligenceCard({card, catColor, onSelect, userId}){
+
+
+// ── LOCALIZE USD RANGES — show "$50–$120" as "≈GH₵740–1,780" for non-USD users ──
+function localizeUSDRange(usdStr, country){
+  try{
+    if(!usdStr||!country) return "";
+    if(!String(usdStr).includes("$")) return ""; // only convert USD-denominated values
+    const {code,symbol}=getLocalCurrency(country);
+    if(!code||code==="USD") return "";
+    const rate=FX_RATES[code];
+    if(!rate) return "";
+    const nums=(usdStr.match(/[\d,]+(?:\.\d+)?/g)||[]).map(n=>parseFloat(n.replace(/,/g,"")));
+    if(!nums.length) return "";
+    const fmt=(v)=>{
+      const x=v*rate;
+      const r=x>=1000?Math.round(x/10)*10:Math.round(x);
+      return r.toLocaleString();
+    };
+    return nums.length>1
+      ? `≈${symbol}${fmt(nums[0])}–${fmt(nums[1])}`
+      : `≈${symbol}${fmt(nums[0])}`;
+  }catch(_e){ return ""; }
+}
+
+// ── CARD ICON RESOLVER — proper SVG icons for intelligence cards (no more 📦) ──
+function cardIconName(card){
+  const s=((card?.id||"")+" "+(card?.title||"")).toLowerCase();
+  if(/blender|phoneacc|caracc|gift|business|supplier/.test(s)) return "briefcase";
+  if(/fiverr|freelanc|client|charge|getpaid|salary|job|career|pitch/.test(s)) return "coins";
+  if(/tiktok|youtube|affiliate|creator|content|online/.test(s)) return "globe";
+  if(/invest|funds|crypto|realestate|asset|oppcost/.test(s)) return "linechart";
+  if(/budget|money|remit|transfer|waste|wealth|rule/.test(s)) return "wallet";
+  if(/rohn|philosophy|book|study/.test(s)) return "book";
+  if(/conflict|attach|family|dating|attract|firstdate|love/.test(s)) return "heart";
+  if(/convers|speak|social|sayno|pleaser|no\b/.test(s)) return "message";
+  if(/10x|identity|fear|failure|belief|imposter|thought|brain/.test(s)) return "brain";
+  if(/sleep|dopamine|screen|moon/.test(s)) return "moon";
+  if(/anxiety|stress|mood|dread|reset/.test(s)) return "cloud";
+  if(/gratitude|reframe|legacy|direction|ikigai|values|strength|meaning|purpose/.test(s)) return "compass";
+  if(/japa|stay|reloc|leave/.test(s)) return "plane";
+  if(/decis|regret|systems|framework/.test(s)) return "scale";
+  if(/bodyweight|calisthenic|cardio|fitness/.test(s)) return "dumbbell";
+  if(/meal|protein|nutrition|food/.test(s)) return "leaf";
+  if(/teeth|hair|skin|eyebrow|nail|glow/.test(s)) return "sparkles";
+  if(/morning|wake|5am|routine|habit|stack/.test(s)) return "sun";
+  if(/energy|network|create/.test(s)) return "zap";
+  return "sparkles";
+}
+
+function IntelligenceCard({card, catColor, onSelect, userId, country}){
   const [saved, setSaved] = useState(()=>{
     try{
       const k=userId?`diq_saved_tools_${userId}`:"diq_saved_tools_guest";
@@ -14262,8 +14487,8 @@ function IntelligenceCard({card, catColor, onSelect, userId}){
           <div style={{width:68,height:68,borderRadius:14,flexShrink:0,
             background:`linear-gradient(135deg,${G.accent}22,${G.accent}08)`,
             border:`1px solid ${G.accent}28`,display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:30}}>
-            {card.emoji||"📦"}
+            justifyContent:"center",fontSize:30,color:catColor}}>
+            <DQIcon name={cardIconName(card)} size={26} strokeWidth={1.7}/>
           </div>
           {/* Content */}
           <div style={{flex:1,minWidth:0}}>
@@ -14292,6 +14517,11 @@ function IntelligenceCard({card, catColor, onSelect, userId}){
                 borderRadius:8,padding:"4px 10px"}}>
                 <span style={{fontSize:10,color:G.dimmer}}>Startup Cost</span>
                 <span style={{fontSize:12,fontWeight:800,color:G.cream}}>{card.startupCost}</span>
+                {localizeUSDRange(card.startupCost,country)&&(
+                  <span style={{fontSize:10,color:"#81c784",fontWeight:700}}>
+                    {localizeUSDRange(card.startupCost,country)}
+                  </span>
+                )}
               </div>
             )}
             {card.incomeRange&&!card.startupCost&&(
@@ -14600,8 +14830,8 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
           <div style={{display:"flex",alignItems:"flex-start",gap:16,marginBottom:14}}>
             <div style={{width:64,height:64,borderRadius:16,flexShrink:0,
               background:`${G.accent}22`,border:`1px solid ${G.accent}35`,
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:32}}>
-              {card.emoji||"📦"}
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,color:catColor}}>
+              <DQIcon name={cardIconName(card)} size={28} strokeWidth={1.7}/>
             </div>
             <div style={{flex:1}}>
               <div style={{display:"flex",gap:7,marginBottom:6,flexWrap:"wrap"}}>
@@ -14632,6 +14862,11 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
               borderRadius:12,padding:"10px 16px"}}>
               <span style={{fontSize:13,color:G.dim}}>Startup Cost</span>
               <span style={{fontSize:18,fontWeight:900,color:G.cream}}>{card.startupCost}</span>
+                {localizeUSDRange(card.startupCost,formData?.country)&&(
+                  <span style={{fontSize:12,color:"#81c784",fontWeight:700,marginLeft:6}}>
+                    {localizeUSDRange(card.startupCost,formData?.country)}
+                  </span>
+                )}
             </div>
           )}
           {card.incomeRange&&(
@@ -14969,7 +15204,7 @@ function TopicPage({catId, topicId, setNav, goBack, formData, userId, isPaid, is
     const goals   = formData?.goals   || formData?.bigGoal || "grow and improve";
     const income  = formData?.income  || "not specified";
     const skills  = formData?.skills  || "not specified";
-    const existing = topic.cards.map(c=>c.title).join(", ");
+    const existing = pickDeck(formData?.country, topicId, topic.cards).map(c=>c.title).join(", ");
     try{
       const prompt = `Generate 4 NEW and DIFFERENT "${topic.label}" ideas/opportunities for ${name} from ${country} (skills: ${skills}, income: ${income}, goal: ${goals}).
 
@@ -15015,9 +15250,10 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
     </div>
   );
 
+  const deckCards = pickDeck(formData?.country, topicId, topic.cards);
   const filteredCards = activeTag==="All"
-    ? topic.cards
-    : topic.cards.filter(c=>
+    ? deckCards
+    : deckCards.filter(c=>
         (Array.isArray(c.tags)&&c.tags.includes(activeTag)) ||
         c.badge===activeTag || c.profitability===activeTag ||
         c.difficulty===activeTag || c.risk===activeTag
@@ -15083,7 +15319,7 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
           ? filteredCards.map(card=>(
               <IntelligenceCard
                 key={card.id} card={card} catColor={cat.color}
-                userId={userId}
+                userId={userId} country={formData?.country}
                 onSelect={setSelectedCard}
               />
             ))
@@ -15123,7 +15359,7 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
             {aiCards.map(card=>(
               <IntelligenceCard
                 key={card.id} card={card} catColor={cat.color}
-                userId={userId}
+                userId={userId} country={formData?.country}
                 onSelect={setSelectedCard}
               />
             ))}
