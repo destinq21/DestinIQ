@@ -5892,97 +5892,210 @@ HOW TO RESPOND:
 const COUNTRIES_LIST = [
   {name:"Afghanistan",currency:"AFN",symbol:"؋"},
   {name:"Albania",currency:"ALL",symbol:"L"},
-  {name:"Algeria",currency:"DZD",symbol:"DZD"},
+  {name:"Algeria",currency:"DZD",symbol:"DA"},
+  {name:"Andorra",currency:"EUR",symbol:"€"},
   {name:"Angola",currency:"AOA",symbol:"Kz"},
+  {name:"Antigua and Barbuda",currency:"XCD",symbol:"EC$"},
   {name:"Argentina",currency:"ARS",symbol:"$"},
+  {name:"Armenia",currency:"AMD",symbol:"֏"},
   {name:"Australia",currency:"AUD",symbol:"A$"},
   {name:"Austria",currency:"EUR",symbol:"€"},
+  {name:"Azerbaijan",currency:"AZN",symbol:"₼"},
+  {name:"Bahamas",currency:"BSD",symbol:"B$"},
+  {name:"Bahrain",currency:"BHD",symbol:"BD"},
   {name:"Bangladesh",currency:"BDT",symbol:"৳"},
+  {name:"Barbados",currency:"BBD",symbol:"Bds$"},
+  {name:"Belarus",currency:"BYN",symbol:"Br"},
   {name:"Belgium",currency:"EUR",symbol:"€"},
+  {name:"Belize",currency:"BZD",symbol:"BZ$"},
   {name:"Benin",currency:"XOF",symbol:"CFA"},
+  {name:"Bhutan",currency:"BTN",symbol:"Nu."},
   {name:"Bolivia",currency:"BOB",symbol:"Bs"},
+  {name:"Bosnia and Herzegovina",currency:"BAM",symbol:"KM"},
+  {name:"Botswana",currency:"BWP",symbol:"P"},
   {name:"Brazil",currency:"BRL",symbol:"R$"},
+  {name:"Brunei",currency:"BND",symbol:"B$"},
+  {name:"Bulgaria",currency:"BGN",symbol:"лв"},
   {name:"Burkina Faso",currency:"XOF",symbol:"CFA"},
+  {name:"Burundi",currency:"BIF",symbol:"FBu"},
+  {name:"Cabo Verde",currency:"CVE",symbol:"$"},
+  {name:"Cambodia",currency:"KHR",symbol:"៛"},
   {name:"Cameroon",currency:"XAF",symbol:"FCFA"},
   {name:"Canada",currency:"CAD",symbol:"C$"},
+  {name:"Central African Republic",currency:"XAF",symbol:"FCFA"},
+  {name:"Chad",currency:"XAF",symbol:"FCFA"},
   {name:"Chile",currency:"CLP",symbol:"$"},
   {name:"China",currency:"CNY",symbol:"¥"},
   {name:"Colombia",currency:"COP",symbol:"$"},
+  {name:"Comoros",currency:"KMF",symbol:"CF"},
+  {name:"Congo (Brazzaville)",currency:"XAF",symbol:"FCFA"},
   {name:"Congo (DRC)",currency:"CDF",symbol:"FC"},
+  {name:"Costa Rica",currency:"CRC",symbol:"₡"},
   {name:"Côte d'Ivoire",currency:"XOF",symbol:"CFA"},
+  {name:"Croatia",currency:"EUR",symbol:"€"},
+  {name:"Cuba",currency:"CUP",symbol:"$"},
+  {name:"Cyprus",currency:"EUR",symbol:"€"},
+  {name:"Czech Republic",currency:"CZK",symbol:"Kč"},
   {name:"Denmark",currency:"DKK",symbol:"kr"},
+  {name:"Djibouti",currency:"DJF",symbol:"Fdj"},
+  {name:"Dominica",currency:"XCD",symbol:"EC$"},
+  {name:"Dominican Republic",currency:"DOP",symbol:"RD$"},
   {name:"Ecuador",currency:"USD",symbol:"$"},
-  {name:"Egypt",currency:"EGP",symbol:"EE"},
+  {name:"Egypt",currency:"EGP",symbol:"E£"},
+  {name:"El Salvador",currency:"USD",symbol:"$"},
+  {name:"Equatorial Guinea",currency:"XAF",symbol:"FCFA"},
+  {name:"Eritrea",currency:"ERN",symbol:"Nfk"},
+  {name:"Estonia",currency:"EUR",symbol:"€"},
+  {name:"Eswatini",currency:"SZL",symbol:"E"},
   {name:"Ethiopia",currency:"ETB",symbol:"Br"},
+  {name:"Fiji",currency:"FJD",symbol:"FJ$"},
+  {name:"Finland",currency:"EUR",symbol:"€"},
   {name:"France",currency:"EUR",symbol:"€"},
+  {name:"Gabon",currency:"XAF",symbol:"FCFA"},
   {name:"Gambia",currency:"GMD",symbol:"D"},
+  {name:"Georgia",currency:"GEL",symbol:"₾"},
   {name:"Germany",currency:"EUR",symbol:"€"},
   {name:"Ghana",currency:"GHS",symbol:"GH₵"},
+  {name:"Greece",currency:"EUR",symbol:"€"},
+  {name:"Grenada",currency:"XCD",symbol:"EC$"},
+  {name:"Guatemala",currency:"GTQ",symbol:"Q"},
   {name:"Guinea",currency:"GNF",symbol:"FG"},
+  {name:"Guinea-Bissau",currency:"XOF",symbol:"CFA"},
+  {name:"Guyana",currency:"GYD",symbol:"G$"},
+  {name:"Haiti",currency:"HTG",symbol:"G"},
+  {name:"Honduras",currency:"HNL",symbol:"L"},
+  {name:"Hong Kong",currency:"HKD",symbol:"HK$"},
+  {name:"Hungary",currency:"HUF",symbol:"Ft"},
+  {name:"Iceland",currency:"ISK",symbol:"kr"},
   {name:"India",currency:"INR",symbol:"₹"},
   {name:"Indonesia",currency:"IDR",symbol:"Rp"},
+  {name:"Iran",currency:"IRR",symbol:"﷼"},
+  {name:"Iraq",currency:"IQD",symbol:"ع.د"},
+  {name:"Ireland",currency:"EUR",symbol:"€"},
+  {name:"Israel",currency:"ILS",symbol:"₪"},
   {name:"Italy",currency:"EUR",symbol:"€"},
+  {name:"Jamaica",currency:"JMD",symbol:"J$"},
   {name:"Japan",currency:"JPY",symbol:"¥"},
   {name:"Jordan",currency:"JOD",symbol:"JD"},
+  {name:"Kazakhstan",currency:"KZT",symbol:"₸"},
   {name:"Kenya",currency:"KES",symbol:"KSh"},
+  {name:"Kiribati",currency:"AUD",symbol:"A$"},
+  {name:"Kosovo",currency:"EUR",symbol:"€"},
   {name:"Kuwait",currency:"KWD",symbol:"KD"},
-  {name:"Lebanon",currency:"LBP",symbol:"LL"},
+  {name:"Kyrgyzstan",currency:"KGS",symbol:"с"},
+  {name:"Laos",currency:"LAK",symbol:"₭"},
+  {name:"Latvia",currency:"EUR",symbol:"€"},
+  {name:"Lebanon",currency:"LBP",symbol:"L£"},
+  {name:"Lesotho",currency:"LSL",symbol:"L"},
   {name:"Liberia",currency:"LRD",symbol:"L$"},
   {name:"Libya",currency:"LYD",symbol:"LD"},
+  {name:"Liechtenstein",currency:"CHF",symbol:"CHF"},
+  {name:"Lithuania",currency:"EUR",symbol:"€"},
+  {name:"Luxembourg",currency:"EUR",symbol:"€"},
   {name:"Madagascar",currency:"MGA",symbol:"Ar"},
   {name:"Malawi",currency:"MWK",symbol:"MK"},
   {name:"Malaysia",currency:"MYR",symbol:"RM"},
+  {name:"Maldives",currency:"MVR",symbol:"Rf"},
   {name:"Mali",currency:"XOF",symbol:"CFA"},
-  {name:"Mauritius",currency:"MUR",symbol:"Rs"},
+  {name:"Malta",currency:"EUR",symbol:"€"},
+  {name:"Marshall Islands",currency:"USD",symbol:"$"},
+  {name:"Mauritania",currency:"MRU",symbol:"UM"},
+  {name:"Mauritius",currency:"MUR",symbol:"₨"},
   {name:"Mexico",currency:"MXN",symbol:"MX$"},
-  {name:"Morocco",currency:"MAD",symbol:"MAD"},
+  {name:"Micronesia",currency:"USD",symbol:"$"},
+  {name:"Moldova",currency:"MDL",symbol:"L"},
+  {name:"Monaco",currency:"EUR",symbol:"€"},
+  {name:"Mongolia",currency:"MNT",symbol:"₮"},
+  {name:"Montenegro",currency:"EUR",symbol:"€"},
+  {name:"Morocco",currency:"MAD",symbol:"DH"},
   {name:"Mozambique",currency:"MZN",symbol:"MT"},
   {name:"Myanmar",currency:"MMK",symbol:"K"},
   {name:"Namibia",currency:"NAD",symbol:"N$"},
+  {name:"Nauru",currency:"AUD",symbol:"A$"},
+  {name:"Nepal",currency:"NPR",symbol:"₨"},
   {name:"Netherlands",currency:"EUR",symbol:"€"},
   {name:"New Zealand",currency:"NZD",symbol:"NZ$"},
+  {name:"Nicaragua",currency:"NIO",symbol:"C$"},
   {name:"Niger",currency:"XOF",symbol:"CFA"},
   {name:"Nigeria",currency:"NGN",symbol:"₦"},
+  {name:"North Korea",currency:"KPW",symbol:"₩"},
+  {name:"North Macedonia",currency:"MKD",symbol:"ден"},
   {name:"Norway",currency:"NOK",symbol:"kr"},
+  {name:"Oman",currency:"OMR",symbol:"ر.ع."},
   {name:"Pakistan",currency:"PKR",symbol:"₨"},
+  {name:"Palau",currency:"USD",symbol:"$"},
+  {name:"Palestine",currency:"ILS",symbol:"₪"},
+  {name:"Panama",currency:"PAB",symbol:"B/."},
+  {name:"Papua New Guinea",currency:"PGK",symbol:"K"},
+  {name:"Paraguay",currency:"PYG",symbol:"₲"},
   {name:"Peru",currency:"PEN",symbol:"S/"},
   {name:"Philippines",currency:"PHP",symbol:"₱"},
   {name:"Poland",currency:"PLN",symbol:"zł"},
   {name:"Portugal",currency:"EUR",symbol:"€"},
   {name:"Qatar",currency:"QAR",symbol:"QR"},
   {name:"Romania",currency:"RON",symbol:"lei"},
-  {name:"Rwanda",currency:"RWF",symbol:"RF"},
-  {name:"Saudi Arabia",currency:"SAR",symbol:"SR"},
+  {name:"Russia",currency:"RUB",symbol:"₽"},
+  {name:"Rwanda",currency:"RWF",symbol:"FRw"},
+  {name:"Saint Kitts and Nevis",currency:"XCD",symbol:"EC$"},
+  {name:"Saint Lucia",currency:"XCD",symbol:"EC$"},
+  {name:"Saint Vincent and the Grenadines",currency:"XCD",symbol:"EC$"},
+  {name:"Samoa",currency:"WST",symbol:"T"},
+  {name:"San Marino",currency:"EUR",symbol:"€"},
+  {name:"Sao Tome and Principe",currency:"STN",symbol:"Db"},
+  {name:"Saudi Arabia",currency:"SAR",symbol:"SAR"},
   {name:"Senegal",currency:"XOF",symbol:"CFA"},
+  {name:"Serbia",currency:"RSD",symbol:"дин"},
+  {name:"Seychelles",currency:"SCR",symbol:"₨"},
   {name:"Sierra Leone",currency:"SLL",symbol:"Le"},
   {name:"Singapore",currency:"SGD",symbol:"S$"},
+  {name:"Slovakia",currency:"EUR",symbol:"€"},
+  {name:"Slovenia",currency:"EUR",symbol:"€"},
+  {name:"Solomon Islands",currency:"SBD",symbol:"SI$"},
   {name:"Somalia",currency:"SOS",symbol:"Sh"},
   {name:"South Africa",currency:"ZAR",symbol:"R"},
   {name:"South Korea",currency:"KRW",symbol:"₩"},
+  {name:"South Sudan",currency:"SSP",symbol:"£"},
   {name:"Spain",currency:"EUR",symbol:"€"},
   {name:"Sri Lanka",currency:"LKR",symbol:"Rs"},
-  {name:"Sudan",currency:"SDG",symbol:"SDG"},
+  {name:"Sudan",currency:"SDG",symbol:"ج.س."},
+  {name:"Suriname",currency:"SRD",symbol:"$"},
   {name:"Sweden",currency:"SEK",symbol:"kr"},
   {name:"Switzerland",currency:"CHF",symbol:"CHF"},
+  {name:"Syria",currency:"SYP",symbol:"£"},
+  {name:"Taiwan",currency:"TWD",symbol:"NT$"},
+  {name:"Tajikistan",currency:"TJS",symbol:"ЅМ"},
   {name:"Tanzania",currency:"TZS",symbol:"TSh"},
   {name:"Thailand",currency:"THB",symbol:"฿"},
+  {name:"Timor-Leste",currency:"USD",symbol:"$"},
   {name:"Togo",currency:"XOF",symbol:"CFA"},
+  {name:"Tonga",currency:"TOP",symbol:"T$"},
+  {name:"Trinidad and Tobago",currency:"TTD",symbol:"TT$"},
   {name:"Tunisia",currency:"TND",symbol:"DT"},
   {name:"Turkey",currency:"TRY",symbol:"₺"},
+  {name:"Turkmenistan",currency:"TMT",symbol:"m"},
+  {name:"Tuvalu",currency:"AUD",symbol:"A$"},
   {name:"Uganda",currency:"UGX",symbol:"USh"},
   {name:"Ukraine",currency:"UAH",symbol:"₴"},
   {name:"United Arab Emirates",currency:"AED",symbol:"AED"},
   {name:"United Kingdom",currency:"GBP",symbol:"£"},
   {name:"United States",currency:"USD",symbol:"$"},
+  {name:"Uruguay",currency:"UYU",symbol:"$U"},
+  {name:"Uzbekistan",currency:"UZS",symbol:"сўм"},
+  {name:"Vanuatu",currency:"VUV",symbol:"VT"},
+  {name:"Vatican City",currency:"EUR",symbol:"€"},
   {name:"Venezuela",currency:"VES",symbol:"Bs"},
   {name:"Vietnam",currency:"VND",symbol:"₫"},
+  {name:"Yemen",currency:"YER",symbol:"﷼"},
   {name:"Zambia",currency:"ZMW",symbol:"ZK"},
-  {name:"Zimbabwe",currency:"ZWL",symbol:"Z$"},
+  {name:"Zimbabwe",currency:"USD",symbol:"$"},
 ];
 
 // Get currency info for a country name
 function getCurrencyForCountry(countryName){
-  const found = COUNTRIES_LIST.find(c=>c.name.toLowerCase()===countryName?.toLowerCase());
+  if(!countryName) return {currency:"USD",symbol:"$"};
+  const q=String(countryName).toLowerCase().trim();
+  let found = COUNTRIES_LIST.find(c=>c.name.toLowerCase()===q);
+  if(!found) found = COUNTRIES_LIST.find(c=>c.name.toLowerCase().includes(q)||q.includes(c.name.toLowerCase()));
   return found || {currency:"USD",symbol:"$"};
 }
 
@@ -10598,86 +10711,10 @@ function VoiceInput({value,onChange,rows=4,maxLength=600,placeholder=""}){
   );
 }
 
-
-// ─── MODULE REGENERATE HELPER ─────────────────────────────────────────────────
-// Detects the correct local currency from the user's country name.
 function getLocalCurrency(country){
-  if(!country) return {code:"USD",symbol:"$"};
-  const c=(country||"").toLowerCase();
-  if(c.includes("ghana"))        return {code:"GHS",symbol:"GH₵"};
-  if(c.includes("nigeria"))      return {code:"NGN",symbol:"₦"};
-  if(c.includes("kenya"))        return {code:"KES",symbol:"KSh"};
-  if(c.includes("south africa")) return {code:"ZAR",symbol:"R"};
-  if(c.includes("rwanda"))       return {code:"RWF",symbol:"RWF"};
-  if(c.includes("uganda"))       return {code:"UGX",symbol:"USh"};
-  if(c.includes("tanzania"))     return {code:"TZS",symbol:"TSh"};
-  if(c.includes("zambia"))       return {code:"ZMW",symbol:"ZK"};
-  if(c.includes("ethiopia"))     return {code:"ETB",symbol:"Birr"};
-  if(c.includes("egypt"))        return {code:"EGP",symbol:"E£"};
-  if(c.includes("morocco"))      return {code:"MAD",symbol:"MAD"};
-  if(c.includes("senegal")||c.includes("côte")||c.includes("ivory coast")||c.includes("mali")||c.includes("burkina")||c.includes("togo")||c.includes("benin")||c.includes("niger")||c.includes("guinea-bissau")) return {code:"XOF",symbol:"CFA"};
-  // Central African CFA franc (BEAC)
-  if(c.includes("cameroon")||c.includes("chad")||c.includes("gabon")||c.includes("central african")||c.includes("equatorial guinea")||(c.includes("congo")&&!c.includes("democratic"))) return {code:"XAF",symbol:"FCFA"};
-  if(c.includes("democratic republic")||c.includes("dr congo")||c.includes("drc")) return {code:"CDF",symbol:"FC"};
-  // More Africa
-  if(c.includes("angola"))       return {code:"AOA",symbol:"Kz"};
-  if(c.includes("mozambique"))   return {code:"MZN",symbol:"MT"};
-  if(c.includes("botswana"))     return {code:"BWP",symbol:"P"};
-  if(c.includes("namibia"))      return {code:"NAD",symbol:"N$"};
-  if(c.includes("malawi"))       return {code:"MWK",symbol:"MK"};
-  if(c.includes("tunisia"))      return {code:"TND",symbol:"DT"};
-  if(c.includes("algeria"))      return {code:"DZD",symbol:"DA"};
-  if(c.includes("united kingdom")||c.includes("uk")) return {code:"GBP",symbol:"£"};
-  if(c.includes("europe")||c.includes("france")||c.includes("germany")||c.includes("spain")||c.includes("italy")||c.includes("netherlands")||c.includes("portugal")||c.includes("belgium")) return {code:"EUR",symbol:"€"};
-  if(c.includes("india"))        return {code:"INR",symbol:"₹"};
-  if(c.includes("pakistan"))     return {code:"PKR",symbol:"₨"};
-  if(c.includes("bangladesh"))   return {code:"BDT",symbol:"৳"};
-  if(c.includes("philippines"))  return {code:"PHP",symbol:"₱"};
-  if(c.includes("indonesia"))    return {code:"IDR",symbol:"Rp"};
-  if(c.includes("vietnam"))      return {code:"VND",symbol:"₫"};
-  if(c.includes("brazil"))       return {code:"BRL",symbol:"R$"};
-  if(c.includes("mexico"))       return {code:"MXN",symbol:"MX$"};
-  if(c.includes("canada"))       return {code:"CAD",symbol:"C$"};
-  if(c.includes("australia"))    return {code:"AUD",symbol:"A$"};
-  if(c.includes("japan"))        return {code:"JPY",symbol:"¥"};
-  if(c.includes("china"))        return {code:"CNY",symbol:"¥"};
-  if(c.includes("uae")||c.includes("dubai")||c.includes("emirates")) return {code:"AED",symbol:"AED"};
-  if(c.includes("saudi"))        return {code:"SAR",symbol:"SAR"};
-  // More Asia
-  if(c.includes("thailand"))     return {code:"THB",symbol:"฿"};
-  if(c.includes("malaysia"))     return {code:"MYR",symbol:"RM"};
-  if(c.includes("singapore"))    return {code:"SGD",symbol:"S$"};
-  if(c.includes("hong kong"))    return {code:"HKD",symbol:"HK$"};
-  if(c.includes("south korea")||c.includes("korea")) return {code:"KRW",symbol:"₩"};
-  if(c.includes("turkey")||c.includes("türkiye")) return {code:"TRY",symbol:"₺"};
-  if(c.includes("sri lanka"))    return {code:"LKR",symbol:"Rs"};
-  if(c.includes("nepal"))        return {code:"NPR",symbol:"Rs"};
-  // Non-euro Europe
-  if(c.includes("ireland")||c.includes("austria")||c.includes("finland")||c.includes("greece")||c.includes("croatia")||c.includes("slovakia")||c.includes("slovenia")||c.includes("luxembourg")||c.includes("estonia")||c.includes("latvia")||c.includes("lithuania")||c.includes("cyprus")||c.includes("malta")) return {code:"EUR",symbol:"€"};
-  if(c.includes("switzerland"))  return {code:"CHF",symbol:"CHF"};
-  if(c.includes("sweden"))       return {code:"SEK",symbol:"kr"};
-  if(c.includes("norway"))       return {code:"NOK",symbol:"kr"};
-  if(c.includes("denmark"))      return {code:"DKK",symbol:"kr"};
-  if(c.includes("poland"))       return {code:"PLN",symbol:"zł"};
-  if(c.includes("czech"))        return {code:"CZK",symbol:"Kč"};
-  if(c.includes("hungary"))      return {code:"HUF",symbol:"Ft"};
-  if(c.includes("romania"))      return {code:"RON",symbol:"lei"};
-  if(c.includes("russia"))       return {code:"RUB",symbol:"₽"};
-  if(c.includes("ukraine"))      return {code:"UAH",symbol:"₴"};
-  // Middle East
-  if(c.includes("qatar"))        return {code:"QAR",symbol:"QR"};
-  if(c.includes("kuwait"))       return {code:"KWD",symbol:"KD"};
-  if(c.includes("bahrain"))      return {code:"BHD",symbol:"BD"};
-  if(c.includes("oman"))         return {code:"OMR",symbol:"OMR"};
-  if(c.includes("israel"))       return {code:"ILS",symbol:"₪"};
-  if(c.includes("jordan"))       return {code:"JOD",symbol:"JD"};
-  // Americas + Oceania
-  if(c.includes("argentina"))    return {code:"ARS",symbol:"$"};
-  if(c.includes("colombia"))     return {code:"COP",symbol:"$"};
-  if(c.includes("chile"))        return {code:"CLP",symbol:"$"};
-  if(c.includes("peru"))         return {code:"PEN",symbol:"S/"};
-  if(c.includes("new zealand"))  return {code:"NZD",symbol:"NZ$"};
-  return {code:"USD",symbol:"$"}; // default
+  // Single source of truth — resolves from the full COUNTRIES_LIST (198 countries).
+  const found = getCurrencyForCountry(country);
+  return {code: found.currency || "USD", symbol: found.symbol || "$"};
 }
 
 async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
@@ -17888,6 +17925,7 @@ function buildProfileContext(p){
   if(p.challenge)    parts.push(`Biggest challenge: ${p.challenge}`);
   if(p.goals||p.bigGoal) parts.push(`Main goal: ${p.goals||p.bigGoal}`);
   if(p.wantFrom)     parts.push(`What they want from DestinIQ: ${p.wantFrom}`);
+  if(p.country)      parts.push(`\n⚑ COUNTRY-SPECIFIC RULE (critical): This person lives in ${p.country}. Tailor EVERY suggestion to what is realistic, legal and actually available in ${p.country} — its local economy, job market, business ideas that sell there, and ways to earn (online and offline) that people in ${p.country} can genuinely access. What works in one country often does NOT work in another: a hustle common in one place may be irrelevant or unavailable elsewhere, and richer markets have earning options that poorer ones don't, and vice versa. Never default to US/Western advice unless they live there. When you name apps, platforms, marketplaces, payment methods, banks or services, choose ones that operate in ${p.country}.`);
   return parts.join("\n");
 }
 
