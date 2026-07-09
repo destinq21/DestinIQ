@@ -5,6 +5,15 @@ export const metadata: Metadata = {
   title: "DestinIQ — Personal Intelligence Platform",
   description: "AI-powered personal intelligence. Know your strengths, blind spots and next move.",
   metadataBase: new URL("https://destiniq.app"),
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
   openGraph: {
     title: "DestinIQ — Personal Intelligence Platform",
     description: "AI that knows your next move before you do.",
@@ -35,11 +44,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-        <meta name="theme-color" content="#f0b429" />
-        <link rel="manifest" href="/manifest.json" />
-      </head>
       <body>{children}</body>
     </html>
   );

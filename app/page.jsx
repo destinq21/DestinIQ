@@ -6431,9 +6431,10 @@ function Landing({onStart,ipLocation}){
         borderBottom:scrolled?"1px solid rgba(240,180,41,0.1)":"1px solid transparent",
         padding:"14px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",
         transition:"all 0.3s ease",maxWidth:"100%",boxSizing:"border-box"}}>
-        <div style={{fontWeight:800,fontSize:20,color:G.cream,cursor:"pointer",letterSpacing:"-.3px"}}
+        <div style={{fontWeight:800,fontSize:20,color:G.cream,cursor:"pointer",letterSpacing:"-.3px",display:"flex",alignItems:"center",gap:8}}
           onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>
-          Destin<span style={{color:G.gold}}>IQ</span>
+          <img src="/mark-gold-transparent.png" alt="" style={{height:24,width:"auto"}} onError={e=>{e.currentTarget.style.display="none";}}/>
+          <span>Destin<span style={{color:G.gold}}>IQ</span></span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <button onClick={onStart}
@@ -13109,7 +13110,7 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
   return(
     <nav className="sidebar">
       <div className="sidebar-logo">
-        <div className="logo" style={{fontSize:18}}>Destin<b>IQ</b></div>
+        <div className="logo" style={{fontSize:18,display:"flex",alignItems:"center",gap:8}}><img src="/mark-gold-transparent.png" alt="" style={{height:22,width:"auto"}} onError={e=>{e.currentTarget.style.display="none";}}/><span>Destin<b>IQ</b></span></div>
         {isPaid&&<div style={{fontSize:10,fontFamily:"var(--f-mono)",color:isProMax?"#9b72cf":"var(--gold)",marginTop:3}}>
           {isProMax?"✦ PRO MAX":"◆ PRO"}
         </div>}
@@ -13249,8 +13250,9 @@ function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPho
       <div style={{flex:1,textAlign:"center"}}>
         {title
           ? <span style={{fontSize:14,fontWeight:600,color:G.cream}}>{title}</span>
-          : <span style={{fontSize:17,fontWeight:900,color:G.cream,letterSpacing:"-.3px"}}>
-              Destin<span style={{color:G.gold}}>IQ</span>
+          : <span style={{fontSize:17,fontWeight:900,color:G.cream,letterSpacing:"-.3px",display:"inline-flex",alignItems:"center",gap:7}}>
+              <img src="/mark-gold-transparent.png" alt="" style={{height:20,width:"auto"}} onError={e=>{e.currentTarget.style.display="none";}}/>
+              <span>Destin<span style={{color:G.gold}}>IQ</span></span>
             </span>
         }
       </div>
