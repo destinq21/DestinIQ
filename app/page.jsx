@@ -330,6 +330,29 @@ const HUMAN_TOASTS={
 };
 const humanToast=(k)=>{const p=HUMAN_TOASTS[k]||[];return p[Math.floor(Math.random()*p.length)]||"Nice.";};
 
+// ── NATIVE SESSION STORAGE (Capacitor) ──────────────────────────────────────
+// In the Android APK, WebView localStorage is disposable — Android can clear
+// it, and when it does Supabase loses the session → user is forced to sign in
+// again on every app open. Fix: store the auth session in NATIVE storage
+// (@capacitor/preferences → Android SharedPreferences), which survives
+// everything. On the website this is undefined and localStorage is used as
+// normal. Requires: npm install @capacitor/preferences && npx cap sync
+const _capPrefs = (typeof window !== "undefined" && window.Capacitor?.Plugins?.Preferences) || null;
+const _nativeAuthStorage = _capPrefs ? {
+  getItem: async (key) => {
+    try { const { value } = await _capPrefs.get({ key }); return value ?? null; }
+    catch(_e){ try { return localStorage.getItem(key); } catch(_e2){ return null; } }
+  },
+  setItem: async (key, value) => {
+    try { await _capPrefs.set({ key, value }); } catch(_e){}
+    try { localStorage.setItem(key, value); } catch(_e){} // mirror for instant reads
+  },
+  removeItem: async (key) => {
+    try { await _capPrefs.remove({ key }); } catch(_e){}
+    try { localStorage.removeItem(key); } catch(_e){}
+  },
+} : undefined;
+
 const supabase = createClient(
   "https://cuocngswamioyyvzozaf.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA",
@@ -343,6 +366,7 @@ const supabase = createClient(
       detectSessionInUrl: true,
       persistSession: true,
       autoRefreshToken: true,
+      ...(_nativeAuthStorage ? { storage: _nativeAuthStorage } : {}),
     },
   }
 );
