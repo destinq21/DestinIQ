@@ -18759,6 +18759,10 @@ function AdminDashboard({user,onBack}){
   const [testimonials,setTestimonials]=useState([]);
   const [users,setUsers]=useState([]);
   const [loading,setLoading]=useState(true);
+  // ── Email compose (sends via Resend through /api/email) ──
+  const [compose,setCompose]=useState(null); // {to?, userId?, name?, subject, body} | null
+  const [sending,setSending]=useState(false);
+  const [sendMsg,setSendMsg]=useState("");
   const isAdmin=ADMIN_EMAILS.includes(user?.email);
 
   useEffect(()=>{
@@ -18786,6 +18790,39 @@ function AdminDashboard({user,onBack}){
   const approveTestimonial=async(id,approved)=>{
     await supabase.from("testimonials").update({approved}).eq("id",id);
     setTestimonials(t=>t.map(x=>x.id===id?{...x,approved}:x));
+  };
+
+  // Send an email as support@destiniq.app via the /api/email route (Resend).
+  // Pass either `to` (an address) or `userId` (server resolves the address).
+  const sendEmail=async()=>{
+    if(!compose) return;
+    const subject=(compose.subject||"").trim();
+    const body=(compose.body||"").trim();
+    if(!subject||!body){ setSendMsg("Add a subject and a message."); return; }
+    if(!compose.to&&!compose.userId){ setSendMsg("No recipient."); return; }
+    setSending(true); setSendMsg("");
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      const token=session?.access_token;
+      if(!token){ setSendMsg("Session expired — sign in again."); setSending(false); return; }
+      const res=await fetch("/api/email",{
+        method:"POST",
+        headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
+        body:JSON.stringify({
+          to:compose.to||undefined,
+          userId:compose.userId||undefined,
+          subject,
+          // Send both a nice HTML version and a plain-text fallback.
+          html:`<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a;white-space:pre-wrap">${body.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")}</div>`,
+          text:body,
+        }),
+      });
+      const json=await res.json().catch(()=>({}));
+      if(!res.ok){ setSendMsg(json.error||`Failed (${res.status})`); setSending(false); return; }
+      setSendMsg("✓ Sent");
+      setTimeout(()=>{ setCompose(null); setSendMsg(""); },900);
+    }catch(e){ setSendMsg(e.message||"Send failed"); }
+    setSending(false);
   };
 
   if(!isAdmin) return(
@@ -18843,16 +18880,22 @@ function AdminDashboard({user,onBack}){
 
             {/* Recent users */}
             <div className="card">
-              <div style={{fontSize:13,fontWeight:700,color:"var(--cream)",marginBottom:16}}>Recent Users</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>Recent Users</div>
+                <button onClick={()=>{setCompose({to:"",subject:"",body:""});setSendMsg("");}}
+                  style={{background:"var(--gold)",border:"none",borderRadius:8,padding:"6px 12px",color:"#000",fontSize:11,fontWeight:700,cursor:"pointer"}}>✉ Compose</button>
+              </div>
               {users.map(u=>(
                 <div key={u.user_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid var(--line)"}}>
                   <div>
                     <div style={{fontSize:13,color:"var(--cream)"}}>{u.name||"Unknown"}</div>
                     <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)"}}>{new Date(u.created_at).toLocaleDateString()} · 🔥{u.streak||0} streak</div>
                   </div>
-                  <div style={{display:"flex",gap:6}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
                     {u.is_paid&&<span style={{fontSize:10,color:"var(--gold)",fontFamily:"var(--f-mono)",border:"1px solid var(--line-gold)",borderRadius:4,padding:"2px 6px"}}>PAID</span>}
                     {u.is_premium&&<span style={{fontSize:10,color:"var(--teal)",fontFamily:"var(--f-mono)",border:"1px solid rgba(20,184,154,0.3)",borderRadius:4,padding:"2px 6px"}}>PREMIUM</span>}
+                    <button title="Email this user" onClick={()=>{setCompose({userId:u.user_id,name:u.name||"Unknown",subject:"",body:""});setSendMsg("");}}
+                      style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:6,padding:"3px 8px",color:"var(--cream-40)",fontSize:11,cursor:"pointer"}}>✉</button>
                   </div>
                 </div>
               ))}
@@ -18860,6 +18903,63 @@ function AdminDashboard({user,onBack}){
           </>
         )}
       </div>
+
+      {/* ── Compose / reply modal (sends via Resend as support@destiniq.app) ── */}
+      {compose&&(
+        <div onClick={()=>!sending&&setCompose(null)}
+          style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:"var(--card,#16130f)",border:"1px solid var(--line)",borderRadius:16,padding:22,width:"100%",maxWidth:460,maxHeight:"90vh",overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--cream)"}}>
+                {compose.userId?`Email ${compose.name||"user"}`:"New email"}
+              </div>
+              <button onClick={()=>!sending&&setCompose(null)}
+                style={{background:"none",border:"none",color:"var(--cream-40)",fontSize:20,cursor:"pointer",lineHeight:1}}>×</button>
+            </div>
+
+            <div style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:14}}>
+              From: DestinIQ Support &lt;support@destiniq.app&gt;
+            </div>
+
+            {/* Recipient — free-text when composing new; locked when emailing a listed user */}
+            {compose.userId?(
+              <div style={{fontSize:12,color:"var(--cream-50)",marginBottom:12}}>
+                To: <span style={{color:"var(--cream)"}}>{compose.name}</span>
+                <span style={{color:"var(--cream-30)"}}> (address resolved securely on send)</span>
+              </div>
+            ):(
+              <input value={compose.to||""} onChange={e=>setCompose(c=>({...c,to:e.target.value}))}
+                placeholder="recipient@email.com" type="email"
+                style={{width:"100%",boxSizing:"border-box",background:"var(--lift,#1e1a14)",border:"1px solid var(--line)",borderRadius:10,padding:"10px 12px",color:"var(--cream)",fontSize:13,marginBottom:10,fontFamily:"inherit"}}/>
+            )}
+
+            <input value={compose.subject} onChange={e=>setCompose(c=>({...c,subject:e.target.value}))}
+              placeholder="Subject"
+              style={{width:"100%",boxSizing:"border-box",background:"var(--lift,#1e1a14)",border:"1px solid var(--line)",borderRadius:10,padding:"10px 12px",color:"var(--cream)",fontSize:13,marginBottom:10,fontFamily:"inherit"}}/>
+
+            <textarea value={compose.body} onChange={e=>setCompose(c=>({...c,body:e.target.value}))}
+              placeholder="Write your message…" rows={8}
+              style={{width:"100%",boxSizing:"border-box",background:"var(--lift,#1e1a14)",border:"1px solid var(--line)",borderRadius:10,padding:"12px",color:"var(--cream)",fontSize:13,lineHeight:1.6,resize:"vertical",fontFamily:"inherit",marginBottom:12}}/>
+
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <span style={{fontSize:12,color:sendMsg.startsWith("✓")?"var(--teal)":"var(--rose,#c4645a)"}}>{sendMsg}</span>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>!sending&&setCompose(null)}
+                  style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:8,padding:"8px 14px",color:"var(--cream-40)",fontSize:12,cursor:"pointer"}}>Cancel</button>
+                <button onClick={sendEmail} disabled={sending}
+                  style={{background:"var(--gold)",border:"none",borderRadius:8,padding:"8px 18px",color:"#000",fontSize:12,fontWeight:700,cursor:sending?"default":"pointer",opacity:sending?0.6:1}}>
+                  {sending?"Sending…":"Send"}
+                </button>
+              </div>
+            </div>
+
+            <div style={{fontSize:10,color:"var(--cream-20)",marginTop:12,lineHeight:1.5}}>
+              Replies from the recipient go to support@destiniq.app (your inbox).
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -18874,11 +18974,24 @@ function AdminDashboard({user,onBack}){
 // ═══════════════════════════════════════════════════════════════════════════════
 async function triggerWelcomeEmail(user){
   try{
-    await supabase.functions.invoke("welcome-email",{
-      body:{
-        to: user.email,
-        name: user.name||user.email?.split("@")[0]||"there",
-      }
+    const {data:{session}}=await supabase.auth.getSession();
+    const token=session?.access_token;
+    if(!token) return;
+    const name=user.name||user.email?.split("@")[0]||"there";
+    await fetch("/api/email",{
+      method:"POST",
+      headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
+      body:JSON.stringify({
+        to:user.email, // self-send: the route allows a user to email their own address
+        subject:"Welcome to DestinIQ ✨",
+        html:`<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a">
+          <p>Hi ${name},</p>
+          <p>Welcome to DestinIQ — your space to build momentum, make clearer decisions, and check in with yourself.</p>
+          <p>Whenever you need us, just reply to this email and it reaches our team directly.</p>
+          <p>— The DestinIQ team</p>
+        </div>`,
+        text:`Hi ${name},\n\nWelcome to DestinIQ — your space to build momentum, make clearer decisions, and check in with yourself.\n\nWhenever you need us, just reply to this email and it reaches our team directly.\n\n— The DestinIQ team`,
+      }),
     });
   }catch(e){ console.warn("Welcome email:",e.message); }
 }
