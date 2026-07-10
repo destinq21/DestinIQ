@@ -16322,6 +16322,68 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
   const todayKey=new Date().toISOString().slice(0,10);
   const firstName=profile?.name?.split(" ")[0]||"me";
 
+  // ── SEALED FUTURE LETTERS ──────────────────────────────────────────────────
+  const [sealing,setSealing]=useState(false);        // seal-duration picker open
+  const [customDate,setCustomDate]=useState("");
+  const [openingLetter,setOpeningLetter]=useState(null); // a due letter being opened
+  const [thenNowAnswer,setThenNowAnswer]=useState("");
+  const [thenNowReply,setThenNowReply]=useState("");
+  const [thenNowLoading,setThenNowLoading]=useState(false);
+
+  const SEAL_OPTIONS=[
+    {label:"1 month", months:1},
+    {label:"6 months", months:6},
+    {label:"1 year", months:12},
+    {label:"5 years", months:60},
+  ];
+  const addMonths=(m)=>{const d=new Date();d.setMonth(d.getMonth()+m);return d.toISOString().slice(0,10);};
+
+  const sealLetter=async(openAt)=>{
+    if(!letter.trim())return;
+    const entry={
+      id:Date.now(), date:todayKey, dateLabel:todayStr,
+      mood, letter:letter.trim(),
+      sealed:true, openAt, openedAt:null,
+      reflection:"", achievements:[], memory:"", ending:"", reply:"",
+    };
+    save(entry);
+    // Fire-and-forget: store in Supabase so the email cron can deliver it
+    try{
+      const email=profile?.email||null;
+      if(userId){
+        await supabase.from("future_letters").insert({
+          user_id:userId, email, name:firstName,
+          letter:entry.letter, mood:entry.mood||null,
+          written_at:todayKey, open_at:openAt, sent:false,
+        });
+      }
+    }catch(_e){ /* table may not exist yet — in-app sealing still works */ }
+    setLetter("");setMood(null);setSealing(false);setCustomDate("");
+  };
+
+  const dueLetters=entries.filter(e=>e.sealed&&!e.openedAt&&e.openAt&&e.openAt<=todayKey);
+
+  const markOpened=(entry)=>{
+    const updated=entries.map(e=>e.id===entry.id?{...e,openedAt:todayKey}:e);
+    setEntries(updated);
+    try{localStorage.setItem(STORE_KEY,JSON.stringify(updated));}catch{}
+  };
+
+  const submitThenNow=async()=>{
+    if(!thenNowAnswer.trim()||thenNowLoading||!openingLetter)return;
+    setThenNowLoading(true);
+    try{
+      const monthsAgo=Math.max(1,Math.round((Date.now()-new Date(openingLetter.date))/2629800000));
+      const reply=await callAPI({
+        messages:[{role:"user",content:`${firstName} wrote this letter to their future self ${monthsAgo} month(s) ago:\n"${openingLetter.letter}"\n\nToday they opened it and reflected: "${thenNowAnswer.trim()}"\n\nTheir goal: ${profile?.goals||profile?.bigGoal||""}. Write a warm, specific then-vs-now reflection (4-6 sentences): honour what past-them hoped for, name what actually changed, celebrate real growth without exaggerating, and end with one gentle question or thought for the road ahead. Speak directly to them.`}],
+        system:"You write moving, honest then-vs-now reflections when someone opens a letter from their past self. Warm, specific, never generic. No markdown.",
+        userId,isPremium,
+      });
+      setThenNowReply(reply.trim());
+    }catch{ setThenNowReply("Something went wrong — but your letter is safe. Try again in a moment."); }
+    setThenNowLoading(false);
+  };
+
   // ── MOODS ──
   const MOODS=[
     {id:"happy",    emoji:"🙂", label:"Happy"},
@@ -16483,6 +16545,76 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
     </div>
   );}
 
+  // ── OPENING A SEALED LETTER ──
+  if(openingLetter){
+    const monthsAgo=Math.max(1,Math.round((Date.now()-new Date(openingLetter.date))/2629800000));
+    return(
+      <div style={{padding:"20px 20px 90px",maxWidth:620,margin:"0 auto",color:G.cream,
+        fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+        <button onClick={()=>{markOpened(openingLetter);setOpeningLetter(null);}}
+          style={{background:"none",border:"none",color:G.dim,cursor:"pointer",fontSize:13,
+            padding:"0 0 18px"}}>← Back to Journal</button>
+
+        <div style={{textAlign:"center",marginBottom:22}}>
+          <div style={{fontSize:40,marginBottom:8}}>📬</div>
+          <h2 style={{fontSize:20,fontWeight:900,color:G.cream,margin:"0 0 6px"}}>A message from past you</h2>
+          <div style={{fontSize:12,color:G.dimmer}}>
+            Written {openingLetter.dateLabel} — {monthsAgo} month{monthsAgo>1?"s":""} ago
+            {openingLetter.mood?` · you were feeling ${openingLetter.mood}`:""}
+          </div>
+        </div>
+
+        <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.25)",
+          borderRadius:16,padding:"24px",marginBottom:22}}>
+          <div style={{fontSize:11,color:G.gold,letterSpacing:".1em",fontFamily:"monospace",marginBottom:12}}>
+            DEAR FUTURE {firstName.toUpperCase()},
+          </div>
+          <p style={{fontSize:15,color:G.cream,lineHeight:1.9,margin:0,whiteSpace:"pre-wrap"}}>
+            {openingLetter.letter}
+          </p>
+        </div>
+
+        {!thenNowReply?(
+          <>
+            <div style={{fontSize:14,fontWeight:700,color:G.cream,marginBottom:6}}>
+              Did you achieve what you hoped for?
+            </div>
+            <div style={{fontSize:12,color:G.dimmer,marginBottom:12,lineHeight:1.6}}>
+              What's changed since you wrote this? What do you think, {firstName}?
+            </div>
+            <textarea value={thenNowAnswer} onChange={e=>setThenNowAnswer(e.target.value)} rows={5}
+              placeholder="Honestly… "
+              style={{width:"100%",background:G.inp,border:"1px solid "+G.inpBorder,
+                borderRadius:12,padding:"14px 16px",color:G.cream,fontSize:14,
+                outline:"none",fontFamily:"inherit",lineHeight:1.8,resize:"none",boxSizing:"border-box"}}/>
+            <button onClick={submitThenNow} disabled={thenNowLoading||!thenNowAnswer.trim()}
+              style={{width:"100%",marginTop:12,padding:"14px",
+                background:thenNowAnswer.trim()?G.gold:"rgba(240,180,41,0.25)",
+                border:"none",borderRadius:12,fontSize:14,fontWeight:700,color:"#000",
+                cursor:thenNowAnswer.trim()?"pointer":"default",fontFamily:"inherit"}}>
+              {thenNowLoading?"Comparing then and now…":"Reflect on the journey ✨"}
+            </button>
+          </>
+        ):(
+          <>
+            <div style={{background:"rgba(91,159,214,0.06)",border:"1px solid rgba(91,159,214,0.25)",
+              borderRadius:16,padding:"22px",marginBottom:16}}>
+              <div style={{fontSize:10,color:"#5b9fd6",letterSpacing:".12em",fontFamily:"monospace",marginBottom:10}}>
+                🧭 THEN vs NOW
+              </div>
+              <p style={{fontSize:14,color:G.cream,lineHeight:1.9,margin:0,whiteSpace:"pre-wrap"}}>{thenNowReply}</p>
+            </div>
+            <button onClick={()=>{markOpened(openingLetter);setOpeningLetter(null);}}
+              style={{width:"100%",padding:"13px",background:G.card,border:"1px solid "+G.border,
+                borderRadius:12,fontSize:13,fontWeight:600,color:G.cream,cursor:"pointer",fontFamily:"inherit"}}>
+              Keep this memory ✓
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return(
     <div style={{padding:"20px 20px 90px",maxWidth:620,margin:"0 auto",color:G.cream,
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
@@ -16495,6 +16627,23 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
         </div>
         <p style={{fontSize:13,color:G.dimmer,margin:0}}>Write honestly. Your future self will thank you.</p>
       </div>
+
+      {/* 📬 Due letter banner */}
+      {dueLetters.length>0&&!openingLetter&&(
+        <div onClick={()=>{setOpeningLetter(dueLetters[0]);setThenNowAnswer("");setThenNowReply("");}}
+          style={{background:"linear-gradient(135deg,rgba(240,180,41,0.14),rgba(155,114,207,0.10))",
+            border:"1px solid rgba(240,180,41,0.4)",borderRadius:14,padding:"16px 18px",
+            marginBottom:18,cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+          <span style={{fontSize:26}}>📬</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:800,color:G.cream}}>You have a message from your past self</div>
+            <div style={{fontSize:12,color:G.dimmer,marginTop:2}}>
+              Written on {dueLetters[0].dateLabel} · sealed until today. Tap to open.
+            </div>
+          </div>
+          <span style={{color:G.gold,fontSize:18}}>→</span>
+        </div>
+      )}
 
       {/* Growth stats */}
       <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
@@ -16570,12 +16719,58 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
                 onBlur={e=>e.target.style.borderColor=G.inpBorder}/>
 
               {canWriteToday?(
+                <>
                 <button onClick={submit} disabled={loading||!letter.trim()}
                   style={{width:"100%",marginTop:14,padding:"14px",background:letter.trim()?G.gold:"rgba(240,180,41,0.25)",
                     border:"none",borderRadius:12,fontSize:14,fontWeight:700,color:"#000",
                     cursor:letter.trim()?"pointer":"default",fontFamily:"inherit"}}>
                   {loading?"Reading your words…":"Get Reflection ✨"}
                 </button>
+                {!sealing?(
+                  <button onClick={()=>letter.trim()&&setSealing(true)}
+                    style={{width:"100%",marginTop:8,padding:"12px",background:"none",
+                      border:"1px dashed "+(letter.trim()?"rgba(240,180,41,0.4)":G.border),borderRadius:12,
+                      fontSize:13,fontWeight:600,color:letter.trim()?G.gold:G.dimmer,
+                      cursor:letter.trim()?"pointer":"default",fontFamily:"inherit"}}>
+                    🔒 Seal this — send it to Future Me
+                  </button>
+                ):(
+                  <div style={{marginTop:10,background:G.card,border:"1px solid "+G.border,
+                    borderRadius:14,padding:"16px"}}>
+                    <div style={{fontSize:11,color:G.dimmer,letterSpacing:".08em",fontFamily:"monospace",marginBottom:10}}>
+                      OPEN THIS LETTER IN…
+                    </div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+                      {SEAL_OPTIONS.map(o=>(
+                        <button key={o.label} onClick={()=>sealLetter(addMonths(o.months))}
+                          style={{padding:"9px 14px",borderRadius:10,background:"rgba(240,180,41,0.08)",
+                            border:"1px solid rgba(240,180,41,0.3)",color:G.gold,fontSize:12,
+                            fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                      <input type="date" value={customDate} min={new Date(Date.now()+86400000).toISOString().slice(0,10)}
+                        onChange={e=>setCustomDate(e.target.value)}
+                        style={{flex:1,background:G.inp,border:"1px solid "+G.inpBorder,borderRadius:10,
+                          padding:"9px 12px",color:G.cream,fontSize:13,fontFamily:"inherit",outline:"none",colorScheme:G.isDark?"dark":"light"}}/>
+                      <button onClick={()=>customDate&&sealLetter(customDate)}
+                        style={{padding:"9px 16px",borderRadius:10,background:customDate?G.gold:"rgba(240,180,41,0.25)",
+                          border:"none",color:"#000",fontSize:12,fontWeight:700,
+                          cursor:customDate?"pointer":"default",fontFamily:"inherit"}}>
+                        Seal 🔒
+                      </button>
+                    </div>
+                    <div style={{fontSize:11,color:G.dimmer,marginTop:10,lineHeight:1.5}}>
+                      It disappears until that day — then returns as a message from past you{profile?.email?", in-app and by email":""}.
+                    </div>
+                    <button onClick={()=>setSealing(false)}
+                      style={{background:"none",border:"none",color:G.dimmer,fontSize:11,
+                        cursor:"pointer",fontFamily:"inherit",marginTop:8,padding:0}}>Cancel</button>
+                  </div>
+                )}
+                </>
               ):(
                 <button onClick={()=>onUnlock&&onUnlock()}
                   style={{width:"100%",marginTop:14,padding:"14px",background:"rgba(240,180,41,0.1)",
@@ -16720,7 +16915,31 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
               No entries yet. Your story starts with the first one.
             </div>
           )}
-          {entries.map(e=>(
+          {entries.map(e=>{
+            if(e.sealed&&!e.openedAt){
+              const ready=e.openAt<=todayKey;
+              return(
+                <div key={e.id}
+                  onClick={()=>{if(ready){setOpeningLetter(e);setThenNowAnswer("");setThenNowReply("");}}}
+                  style={{background:ready?"rgba(240,180,41,0.06)":G.card,
+                    border:"1px solid "+(ready?"rgba(240,180,41,0.35)":G.border),borderRadius:14,
+                    padding:"16px 18px",cursor:ready?"pointer":"default",opacity:ready?1:0.75}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:20}}>{ready?"📬":"🔒"}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:G.cream}}>
+                        {ready?"Ready to open — a message from past you":"Sealed letter to Future "+firstName}
+                      </div>
+                      <div style={{fontSize:11,color:G.dimmer,marginTop:2}}>
+                        Written {e.dateLabel}{ready?"":" · opens "+new Date(e.openAt+"T00:00:00").toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}
+                      </div>
+                    </div>
+                    {ready&&<span style={{color:G.gold}}>→</span>}
+                  </div>
+                </div>
+              );
+            }
+            return(
             <div key={e.id} onClick={()=>setReading(e)}
               style={{background:G.card,border:"1px solid "+G.border,borderRadius:14,
                 padding:"16px 18px",cursor:"pointer",transition:"border-color .15s"}}
@@ -16735,7 +16954,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
               <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,overflow:"hidden",
                 display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{e.letter}</p>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </div>
@@ -17249,6 +17468,9 @@ Rules:
 
   return(
     <div className="app-shell">
+
+      {/* Streak celebrations — top level so they show after check-in from ANY view */}
+
 
       <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 

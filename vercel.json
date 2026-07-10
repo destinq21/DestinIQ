@@ -7,6 +7,10 @@
     {
       "path": "/api/push",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/future-letters",
+      "schedule": "0 8 * * *"
     }
   ]
 }
