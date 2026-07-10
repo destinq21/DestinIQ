@@ -16347,9 +16347,28 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
       reflection:"", achievements:[], memory:"", ending:"", reply:"",
     };
     save(entry);
+    // Confirmation moment — without this, sealing feels like the letter vanished
+    const openLabel=new Date(openAt+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"🔒 Sealed. It returns "+openLabel+" — as a message from past you."})); }catch{}
+    // Schedule the "message from your past self" notification for the open day (APK)
+    try{
+      const LN = window?.Capacitor?.Plugins?.LocalNotifications;
+      if(LN && window?.Capacitor?.isNativePlatform?.()){
+        const at=new Date(openAt+"T09:00:00");
+        if(at.getTime()>Date.now()){
+          await LN.schedule({notifications:[{
+            id: 7000 + (entry.id % 100000),
+            title:"💌 A message from your past self",
+            body:"You wrote yourself a letter on "+entry.dateLabel+". It unlocks today — open DestinIQ to read it.",
+            schedule:{at},
+          }]});
+        }
+      }
+    }catch(_e){ /* notifications unavailable — in-app banner still delivers it */ }
     // Fire-and-forget: store in Supabase so the email cron can deliver it
     try{
-      const email=profile?.email||null;
+      let email=profile?.email||null;
+      if(!email){ try{ const{data}=await supabase.auth.getUser(); email=data?.user?.email||null; }catch{} }
       if(userId){
         await supabase.from("future_letters").insert({
           user_id:userId, email, name:firstName,
@@ -16379,7 +16398,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
         system:"You write moving, honest then-vs-now reflections when someone opens a letter from their past self. Warm, specific, never generic. No markdown.",
         userId,isPremium,
       });
-      setThenNowReply(reply.trim());
+      setThenNowReply((typeof reply==="string"?reply:(reply?.content?.[0]?.text||String(reply||""))).trim());
     }catch{ setThenNowReply("Something went wrong — but your letter is safe. Try again in a moment."); }
     setThenNowLoading(false);
   };
@@ -16751,7 +16770,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
                       ))}
                     </div>
                     <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                      <input type="date" value={customDate} min={new Date(Date.now()+86400000).toISOString().slice(0,10)}
+                      <input type="date" value={customDate} min={new Date().toISOString().slice(0,10)}
                         onChange={e=>setCustomDate(e.target.value)}
                         style={{flex:1,background:G.inp,border:"1px solid "+G.inpBorder,borderRadius:10,
                           padding:"9px 12px",color:G.cream,fontSize:13,fontFamily:"inherit",outline:"none",colorScheme:G.isDark?"dark":"light"}}/>
@@ -16763,7 +16782,7 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
                       </button>
                     </div>
                     <div style={{fontSize:11,color:G.dimmer,marginTop:10,lineHeight:1.5}}>
-                      It disappears until that day — then returns as a message from past you{profile?.email?", in-app and by email":""}.
+                      It disappears until that day — then returns here as a message from past you, in-app and by email.
                     </div>
                     <button onClick={()=>setSealing(false)}
                       style={{background:"none",border:"none",color:G.dimmer,fontSize:11,
