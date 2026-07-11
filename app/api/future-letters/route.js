@@ -28,7 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const FROM = "DestinIQ <onboarding@resend.dev>"; // after domain verify: "DestinIQ <hello@destiniq.app>"
+const FROM = "DestinIQ <hello@destiniq.app>"; // after domain verify: "DestinIQ <hello@destiniq.app>"
 const APP_URL = "https://destiniq.app";
 
 function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>"); }
