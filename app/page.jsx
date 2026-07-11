@@ -19158,6 +19158,47 @@ function SubscriptionCard({isPaid,isPremium,isProMax,userId,onManageSubscription
   );
 }
 
+// Shown when a logged-in session has no profile data yet. If the profile fetch
+// stalls (slow network, failed request, stale token), this stops being an
+// infinite wait after 8s and offers a way out.
+function RestoreStallScreen(){
+  const [stalled,setStalled]=useState(false);
+  useEffect(()=>{ const t=setTimeout(()=>setStalled(true),8000); return()=>clearTimeout(t); },[]);
+  const startFresh=async()=>{
+    try{ await supabase.auth.signOut(); }catch{}
+    try{ localStorage.removeItem("diq_nav"); }catch{}
+    if(typeof window!=="undefined") window.location.reload();
+  };
+  return (
+    <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center",maxWidth:320,padding:"0 20px"}}>
+        <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)",letterSpacing:".08em",marginBottom:14}}>
+          Restoring your session…
+        </div>
+        <div style={{width:36,height:36,border:"3px solid var(--cream-10)",borderTop:"3px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto"}}/>
+        {stalled&&(
+          <div style={{marginTop:26}}>
+            <div style={{fontSize:13,color:"var(--cream-50)",lineHeight:1.6,marginBottom:16}}>
+              This is taking longer than it should. Your data is safe — try one of these:
+            </div>
+            <button onClick={()=>{ if(typeof window!=="undefined") window.location.reload(); }}
+              style={{width:"100%",padding:"12px",background:"var(--gold)",color:"#000",border:"none",
+                borderRadius:11,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:9}}>
+              ↻ Refresh
+            </button>
+            <button onClick={startFresh}
+              style={{width:"100%",padding:"11px",background:"none",color:"var(--cream-50)",
+                border:"1px solid var(--cream-15)",borderRadius:11,fontSize:12,fontWeight:600,
+                cursor:"pointer",fontFamily:"inherit"}}>
+              Log out & sign in again
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DestinIQInner(){
   const G = useThemeColors();
   const [user, setUser]=useState(null);
@@ -20357,9 +20398,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
           </div>
         )}
         {screen==="results"  &&!formData&&(
-          <div style={{minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <div style={{fontFamily:"var(--f-mono)",fontSize:12,color:"var(--cream-30)"}}>Restoring your session…</div>
-          </div>
+          <RestoreStallScreen/>
         )}
 
 
