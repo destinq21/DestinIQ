@@ -19756,10 +19756,11 @@ function DestinIQInner(){
     } catch(e) {
       console.warn("restoreUserSession error:", e.message);
       const savedScreen = typeof window!=="undefined" ? localStorage.getItem("diq_screen") : null;
-      if (savedScreen && savedScreen !== "intake" && savedScreen !== "loading") {
+      const VALID_SCREENS=["results","paywall","complete-profile"];
+      if (savedScreen && VALID_SCREENS.includes(savedScreen)) {
         setScreen(savedScreen);
       } else {
-        setScreen("results");
+        setScreen("results"); // formData may be null → RestoreStallScreen with retry
       }
     } finally {
       setProfileLoading(false);
@@ -20698,8 +20699,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {screen==="results"  &&!formData&&(
           <RestoreStallScreen/>
         )}
-
-
+        {/* CATCH-ALL: if `screen` ever holds a value no branch renders (stale
+            localStorage, retired screen names), show recovery — never a blank page. */}
+        {!["landing","intake","complete-profile","loading","paywall","results"].includes(screen)&&(
+          <RestoreStallScreen/>
+        )}
         {showTracker&&(
           <HabitTrackerPanel userId={userId} onClose={()=>setShowTracker(false)}/>
         )}
