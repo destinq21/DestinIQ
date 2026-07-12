@@ -19014,7 +19014,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 // 5. ADMIN DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-const ADMIN_EMAILS=["support@destiniq.app"]; // Add your email here
+const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -19617,6 +19617,13 @@ function DestinIQInner(){
           try { localStorage.setItem(`diq_promax_${u.id}`, "1"); } catch(_){}
         } else {
           try { localStorage.removeItem(`diq_promax_${u.id}`); } catch(_){}
+        }
+        // ── FOUNDER OVERRIDE (last word) ────────────────────────────────
+        // Admin accounts get full Pro Max automatically — the founder should
+        // never hit his own paywalls. Runs AFTER DB resolution so a not-paid
+        // DB row can't downgrade it. Session-only; writes nothing to the DB.
+        if (ADMIN_EMAILS.includes(u.email)) {
+          setIsPaid(true); setIsPremium(true); setIsProMax(true);
         }
         // ── STREAK RESTORATION ──────────────────────────────────────────────
         // Single source of truth: Supabase last_checkin_date + localStorage backup
