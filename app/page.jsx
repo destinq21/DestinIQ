@@ -449,22 +449,27 @@ async function saveUserProfile(userId, data) {
   if (error) throw new Error(error.message);
 }
 
-/** Load user profile from Supabase. Returns null if not found or on error. */
+/** Load user profile from Supabase. Returns null if not found or on error.
+ * Duplicate-proof: if multiple rows exist for a user (historic upsert bugs),
+ * prefer the newest row that actually has form_data instead of erroring out. */
 async function loadUserProfile(userId) {
   try {
     const { data, error } = await supabase
       .from("user_profiles")
       .select("*")
       .eq("user_id", userId)
-      .single();
-    // PGRST116 = "no rows returned" — not an error, just means new user
-    if (error && error.code !== "PGRST116") {
+      .order("updated_at", { ascending: false })
+      .limit(5);
+    if (error) {
       console.warn("loadUserProfile error:", error.message);
+      return "FETCH_ERROR"; // database didn't answer — NOT the same as "new user"
     }
-    return data || null;
+    const rows = Array.isArray(data) ? data : (data ? [data] : []);
+    if (!rows.length) return null;                       // genuinely new user
+    return rows.find(r => r && r.form_data) || rows[0];  // prefer the data-rich row
   } catch (e) {
     console.warn("loadUserProfile exception:", e.message);
-    return null;
+    return "FETCH_ERROR";
   }
 }
 
@@ -19531,6 +19536,13 @@ function DestinIQInner(){
     // Load saved profile (onboarding answers + subscription)
     try{
       const profile = await loadUserProfile(u.id);
+      if (profile === "FETCH_ERROR") {
+        // Database didn't answer (outage / network). Do NOT treat as a new
+        // user — that path leads to onboarding, where completing the form
+        // would overwrite their real profile. Show the retry screen instead.
+        setScreen("results");   // with formData null → RestoreStallScreen (Refresh / re-login)
+        return;
+      }
       if (profile) {
         // ── SUBSCRIPTION STATUS ─────────────────────────────────────────
         // Source 1: Supabase (authoritative)
