@@ -19000,7 +19000,16 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
           <button onClick={()=>{window.dispatchEvent(new CustomEvent("showAbout"));}} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>About DestinIQ</button>
           <button onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"terms"}))} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:8}}>Terms of Service</button>
           <button onClick={()=>window.dispatchEvent(new CustomEvent("showPolicy",{detail:"privacy"}))} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Privacy Policy</button>
-          <button onClick={onSignOut} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Sign out</button>
+          {/* Admin dashboard entry — founder eyes only */}
+        {ADMIN_EMAILS.includes(user?.email)&&(
+          <button onClick={()=>{ try{ window.dispatchEvent(new CustomEvent("diqOpenAdmin")); }catch{} }}
+            style={{width:"100%",background:"rgba(240,180,41,0.06)",border:"1px solid rgba(240,180,41,0.3)",
+              borderRadius:10,padding:"12px",color:"var(--gold)",fontSize:13,fontWeight:700,
+              cursor:"pointer",marginBottom:10,fontFamily:"inherit"}}>
+            ⚙ Admin Dashboard
+          </button>
+        )}
+        <button onClick={onSignOut} style={{width:"100%",background:"none",border:"1px solid var(--cream-10)",borderRadius:10,padding:"12px",color:"var(--cream-40)",fontSize:13,cursor:"pointer",marginBottom:10}}>Sign out</button>
           <p style={{fontSize:11,color:"var(--cream-20)",textAlign:"center",margin:0}}>To delete your account and all data, contact us via the support chat.</p>
         </div>
       </div>
@@ -19532,6 +19541,12 @@ function DestinIQInner(){
   const [userId, setUserId]=useState(null);
   const [showProfile, setShowProfile]=useState(false);
   const [showAdmin,   setShowAdmin  ]=useState(false);
+  // ProfilePage's Admin row opens the dashboard via this event bridge
+  useEffect(()=>{
+    const h=()=>setShowAdmin(true);
+    window.addEventListener("diqOpenAdmin",h);
+    return()=>window.removeEventListener("diqOpenAdmin",h);
+  },[]);
   const [showPolicy,  setShowPolicy ]=useState(null); // "privacy"|"terms"|null
   const [showAbout,      setShowAbout     ]=useState(false);
   const [showEditProfile,setShowEditProfile]=useState(false);
@@ -20543,7 +20558,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {/* Admin access lived only in the retired nav — give it a discreet home */}
         {ADMIN_EMAILS.includes(user?.email)&&(
           <button onClick={()=>setShowAdmin(true)} title="Admin panel"
-            style={{position:"fixed",bottom:96,left:12,zIndex:350,background:"rgba(0,0,0,0.55)",
+            style={{position:"fixed",bottom:96,left:12,zIndex:1200,background:"rgba(0,0,0,0.55)",
               border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 12px",
               color:"var(--cream-40)",fontSize:11,fontWeight:600,cursor:"pointer",
               fontFamily:"var(--f-mono)",backdropFilter:"blur(6px)"}}>
