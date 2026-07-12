@@ -1661,6 +1661,47 @@ function pickDeck(country, topicId, defaultCards){
   return defaultCards;
 }
 
+// ── FOR-YOU LAYER — zero-cost personalization over the card libraries ────────
+// Scores every card against what the user actually said at onboarding
+// (goals, challenge, skills, income), floats their matches to the top and
+// badges them "✦ FOR YOU". No AI calls — pure matching, instant, free.
+const _FY_STOP=new Set(["with","that","this","from","have","want","need","more","make","making","like","really","just","been","them","they","their","your","about","time","life","work","working","every","would","could","should","being","things","thing","people","month","start","better"]);
+function _profileKeywords(p){
+  const src=[p?.goals,p?.bigGoal,p?.challenge,p?.skills,p?.career,p?.situation]
+    .filter(Boolean).join(" ").toLowerCase();
+  return Array.from(new Set(src.split(/[^a-z]+/).filter(w=>w.length>=4&&!_FY_STOP.has(w))));
+}
+function scoreCardForUser(card,p){
+  try{
+    if(!p||!card) return 0;
+    const kws=_profileKeywords(p);
+    if(!kws.length) return 0;
+    const hay=[card.title,card.tagline,card.whyItWorks,(card.tags||[]).join(" ")]
+      .filter(Boolean).join(" ").toLowerCase();
+    let s=0;
+    kws.forEach(w=>{ if(hay.includes(w)) s+=2; });
+    // Capital fit: low income → favour low-capital ideas
+    const inc=String(p.income||"").toLowerCase();
+    const lowIncome=/under|less than|<|\b[1-4]?\d{2}\b/.test(inc);
+    if(lowIncome&&(card.tags||[]).includes("Low Capital")) s+=2;
+    // Online affinity
+    const digital=/online|digital|internet|remote|social media|tiktok|content|tech|coding|design/
+      .test(((p.skills||"")+" "+(p.goals||p.bigGoal||"")).toLowerCase());
+    if(digital&&(card.tags||[]).includes("Online")) s+=1;
+    return s;
+  }catch{ return 0; }
+}
+function personalizeDeck(cards,p){
+  try{
+    if(!Array.isArray(cards)||cards.length<2||!p) return cards;
+    const scored=cards.map(c=>({c,s:scoreCardForUser(c,p)}));
+    if(!scored.some(x=>x.s>0)) return cards;      // no signal → leave untouched
+    scored.sort((a,b)=>b.s-a.s);                   // stable: ties keep library order
+    const top=new Set(scored.filter(x=>x.s>0).slice(0,3).map(x=>x.c));
+    return scored.map(x=> top.has(x.c) ? {...x.c,_forYou:true} : x.c);
+  }catch{ return cards; }
+}
+
 const TOPIC_CONFIGS = {
   // ─── MONEY+ ───────────────────────────────────────────────────────────────
   money: {
@@ -6317,6 +6358,81 @@ function getIncomeRanges(currencySymbol){
 }
 
 
+// ── PROOF-OF-GROWTH SHARE CARDS ───────────────────────────────────────────────
+// Generates a branded 1080x1350 image (WhatsApp-status / IG-story friendly)
+// entirely on-device with canvas — zero cost, works in browser and the APK.
+function generateShareCardBlob({emoji="🔥", headline="", sub="", name=""}){
+  return new Promise((resolve)=>{
+    try{
+      const W=1080,H=1350;
+      const c=document.createElement("canvas"); c.width=W; c.height=H;
+      const x=c.getContext("2d");
+      // Background
+      x.fillStyle="#0a0800"; x.fillRect(0,0,W,H);
+      const g=x.createRadialGradient(W/2,H*0.42,60,W/2,H*0.42,620);
+      g.addColorStop(0,"rgba(240,180,41,0.16)"); g.addColorStop(1,"rgba(240,180,41,0)");
+      x.fillStyle=g; x.fillRect(0,0,W,H);
+      // Border frame
+      x.strokeStyle="rgba(240,180,41,0.35)"; x.lineWidth=3;
+      x.strokeRect(40,40,W-80,H-80);
+      // Brand
+      x.textAlign="center";
+      x.fillStyle="#f0b429"; x.font="700 34px monospace";
+      x.fillText("D E S T I N I Q",W/2,140);
+      x.fillStyle="rgba(232,220,200,0.4)"; x.font="26px sans-serif";
+      x.fillText("Personal Intelligence",W/2,182);
+      // Emoji
+      x.font="200px sans-serif"; x.fillText(emoji,W/2,H*0.40);
+      // Headline (auto-shrink to fit)
+      let size=92; x.fillStyle="#e8dcc8";
+      do{ x.font=`900 ${size}px sans-serif`; size-=4; }while(x.measureText(headline).width>W-160&&size>40);
+      x.fillText(headline,W/2,H*0.55);
+      // Sub line (wraps to two lines max)
+      x.fillStyle="rgba(232,220,200,0.65)"; x.font="34px sans-serif";
+      const words=(sub||"").split(" "); let line="",lines=[];
+      for(const w of words){ const t=line?line+" "+w:w;
+        if(x.measureText(t).width>W-220){ lines.push(line); line=w; } else line=t; }
+      if(line) lines.push(line);
+      lines.slice(0,2).forEach((l,i)=>x.fillText(l,W/2,H*0.62+i*48));
+      // Name
+      if(name){ x.fillStyle="#f0b429"; x.font="600 32px sans-serif";
+        x.fillText("— "+name,W/2,H*0.74); }
+      // Footer
+      x.fillStyle="rgba(232,220,200,0.35)"; x.font="28px sans-serif";
+      x.fillText("Get yours free",W/2,H-160);
+      x.fillStyle="#f0b429"; x.font="700 40px sans-serif";
+      x.fillText("destiniq.app",W/2,H-108);
+      c.toBlob(b=>resolve(b),"image/png",0.95);
+    }catch(e){ resolve(null); }
+  });
+}
+
+// Share the card image via the native share sheet; falls back to
+// downloading the image + opening WhatsApp with the text.
+async function shareGrowthCard(opts, shareText){
+  const blob=await generateShareCardBlob(opts);
+  if(blob && typeof navigator!=="undefined" && navigator.share){
+    try{
+      const file=new File([blob],"destiniq.png",{type:"image/png"});
+      if(!navigator.canShare || navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], text:shareText||""});
+        return true;
+      }
+    }catch(e){ if(e&&e.name==="AbortError") return true; /* else fall through */ }
+  }
+  // Fallback: download the image, then open WhatsApp with the text
+  try{
+    if(blob){
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=url; a.download="destiniq-card.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>{ try{URL.revokeObjectURL(url);}catch{} },4000);
+    }
+    openExternal("https://wa.me/?text="+encodeURIComponent(shareText||""));
+  }catch{}
+  return false;
+}
+
 function ShareCard({report, formData, onClose}){
   const score = report?.overall || report?.score || 0;
   const name  = formData?.name || "You";
@@ -6330,6 +6446,9 @@ function ShareCard({report, formData, onClose}){
   };
   const shareWhatsApp = ()=> window.open("https://wa.me/?text="+encodeURIComponent(shareText),"_blank");
   const shareTwitter  = ()=> window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(shareText),"_blank");
+  const shareImage    = ()=> shareGrowthCard(
+    {emoji:"🧠", headline:`SCORE: ${score}/100`, sub:"My life, career & mindset — analysed and scored", name},
+    shareText);
 
   const G={...useThemeColors()};
 
@@ -6355,6 +6474,10 @@ function ShareCard({report, formData, onClose}){
 
         {/* Share buttons */}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button onClick={shareImage}
+            style={{background:"var(--gold)",border:"none",borderRadius:10,padding:"12px",color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            📸 Share as image card
+          </button>
           <button onClick={shareWhatsApp}
             style={{background:"#25D366",border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
             Share on WhatsApp
@@ -8462,6 +8585,7 @@ Write a focused, personalised, practical breakdown of JUST this one point — no
             alignItems:"center",gap:8}}>
             ↺ Generate New Points
           </button>
+          <RecommendedResources toolId={modId} country={profile?.country} G={G}/>
         </div>
       ) : (
         <div className="card" style={{textAlign:"center",padding:"40px 20px"}}>
@@ -11002,6 +11126,80 @@ How can ${name} in ${country} earn from real estate with little money? Cover: pr
 }
 
 
+// ═════════════════════════════════════════════════════════════════════════════
+// AFFILIATE RESOURCES — "Recommended resources" under money-making tools.
+// ─────────────────────────────────────────────────────────────────────────────
+// HOW IT WORKS: each entry is a partner you've joined. Replace url:"" with your
+// real affiliate/referral link as you get approved — entries with an empty url
+// are automatically hidden, so this ships safely with zero links and lights up
+// one partner at a time. `countries:[]` = show everywhere; otherwise only shown
+// when the user's country matches (Jumia only in Jumia countries, etc.).
+// RULES (non-negotiable): the disclosure line always renders; only ever add
+// products you'd honestly recommend — commissions must never bend the advice.
+// ═════════════════════════════════════════════════════════════════════════════
+const AFFILIATE_RESOURCES = [
+  // ── Global digital (work in every country — join these first) ──
+  {id:"fiverr",   name:"Fiverr",       tagline:"Sell your skills as services — design, writing, video, anything",
+   url:"", countries:[], tools:["sidehustle","earnonline","money","business","career"]},
+  {id:"hostinger",name:"Hostinger",    tagline:"Cheap hosting + domain to launch your website or store",
+   url:"", countries:[], tools:["business","earnonline","sidehustle","digitallife"]},
+  {id:"systeme",  name:"Systeme.io",   tagline:"Free all-in-one funnel/email tool to sell digital products",
+   url:"", countries:[], tools:["business","earnonline","money"]},
+  {id:"coursera", name:"Coursera",     tagline:"Certificates that actually move your CV — many courses free to audit",
+   url:"", countries:[], tools:["career","invest","discipline"]},
+  {id:"canva",    name:"Canva Pro",    tagline:"Design anything — thumbnails, flyers, products — no designer needed",
+   url:"", countries:[], tools:["sidehustle","earnonline","business"]},
+  // ── Africa commerce (huge for your core market) ──
+  {id:"jumia",    name:"Jumia",        tagline:"Buy tools & stock for your hustle — Africa's biggest marketplace",
+   url:"", countries:["Ghana","Nigeria","Kenya","Egypt","Morocco","Uganda","Senegal","Algeria"],
+   tools:["sidehustle","business","money","lifehacks"]},
+];
+
+// Which tools show a resources section at all (money-making contexts only —
+// wellbeing tools must never carry shopping links).
+const AFFILIATE_TOOLS = new Set(["sidehustle","earnonline","money","business","career","invest","discipline","lifehacks","digitallife"]);
+
+function getAffiliateResources(toolId, country){
+  if(!AFFILIATE_TOOLS.has(toolId)) return [];
+  const c=(country||"").toLowerCase();
+  return AFFILIATE_RESOURCES.filter(r=>
+    r.url &&                                             // only partners you've actually joined
+    r.tools.includes(toolId) &&
+    (r.countries.length===0 || r.countries.some(x=>c.includes(x.toLowerCase())))
+  ).slice(0,3);                                          // max 3 — curation, not a mall
+}
+
+function RecommendedResources({toolId, country, G}){
+  const items=getAffiliateResources(toolId, country);
+  if(items.length===0) return null;
+  return (
+    <div style={{marginTop:18,padding:"16px",background:G.card,
+      border:"1px solid "+G.border,borderRadius:14}}>
+      <div style={{fontSize:9,fontWeight:700,letterSpacing:".12em",color:G.gold,
+        fontFamily:"var(--f-mono)",marginBottom:4}}>🛠 RECOMMENDED RESOURCES</div>
+      <div style={{fontSize:10.5,color:G.dimmer,marginBottom:12,lineHeight:1.5}}>
+        Tools that fit this plan. These are affiliate links — DestinIQ may earn a small commission at no extra cost to you.
+      </div>
+      <div style={{display:"grid",gap:8}}>
+        {items.map(r=>(
+          <a key={r.id} href={r.url}
+            onClick={(e)=>{e.preventDefault(); openExternal(r.url);}}
+            target="_blank" rel="noopener noreferrer sponsored"
+            style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,
+              padding:"12px 14px",background:"rgba(240,180,41,0.05)",
+              border:"1px solid rgba(240,180,41,0.18)",borderRadius:11,textDecoration:"none"}}>
+            <div>
+              <div style={{fontSize:13.5,fontWeight:700,color:G.cream}}>{r.name}</div>
+              <div style={{fontSize:11.5,color:G.dim,lineHeight:1.5,marginTop:2}}>{r.tagline}</div>
+            </div>
+            <span style={{color:G.gold,fontSize:15,flexShrink:0}}>→</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loading,err,isPaid,onUnlock}){
   const handleRegen=()=>{
     if(!isPaid){ onUnlock&&onUnlock(); return; }
@@ -11407,7 +11605,7 @@ function loadWins(uid){try{const v=JSON.parse(localStorage.getItem(WIN_STORE_KEY
 function saveWins(w,uid){try{localStorage.setItem(WIN_STORE_KEY(uid),JSON.stringify(Array.isArray(w)?w:[]));}catch{}}
 
 // ─── FREE TIER LIMITS & TOOL LIST (module-level) ─────────────────────────────
-const FREE_JOURNAL_LIMIT = 1;   // Free: 1 journal entry
+const FREE_JOURNAL_LIMIT = 3;   // Free: 3 journal entries per calendar month
 const FREE_REPORT_LIMIT  = 1;   // Free: 1 intelligence report
 const PRO_REPORT_LIMIT   = 3;   // Pro: 3 reports/month
 // 5 free tools — one from each major area to hook users, Pro unlocks all 42
@@ -13009,6 +13207,14 @@ function StreakCelebration({streak, onClose}){
         }}>
           Keep going 🔥
         </button>
+        <button onClick={()=>shareGrowthCard(
+            {emoji:milestone.emoji||"🔥", headline:`${streak}-DAY STREAK`, sub:"Showing up for myself, every single day", name:""},
+            `🔥 ${streak}-day streak on DestinIQ! Showing up for myself every single day.\n\nStart yours free 👉 destiniq.app`)}
+          style={{display:"block",margin:"12px auto 0",background:"none",
+            border:"1px solid var(--cream-15)",borderRadius:13,padding:"12px 32px",
+            fontSize:13,fontWeight:600,color:"var(--cream-50)",cursor:"pointer",fontFamily:"inherit"}}>
+          📸 Share this milestone
+        </button>
         <p style={{fontSize:11,color:"var(--cream-30)",marginTop:12,fontFamily:"var(--f-mono)"}}>
           Tap anywhere to dismiss
         </p>
@@ -13482,23 +13688,32 @@ function WeeklyRevealCard({userId, G, card, setNav}){
 
 // ── TODAY'S CARD — one rotating daily pick from the whole library ────────────
 let _allCardsCache=null;
-function getTodaysCard(){
+function getTodaysCard(profile){
   try{
     if(!_allCardsCache){
       _allCardsCache=[];
       Object.entries(TOPIC_CONFIGS).forEach(([catId,cfg])=>{
         (cfg.topics||[]).forEach(t=>(t.cards||[]).forEach(c=>{
-          _allCardsCache.push({catId, topicId:t.id, topicLabel:t.label, icon:t.icon, title:c.title, tagline:c.tagline||""});
+          _allCardsCache.push({catId, topicId:t.id, topicLabel:t.label, icon:t.icon, title:c.title, tagline:c.tagline||"", tags:c.tags||[], whyItWorks:c.whyItWorks||""});
         }));
       });
     }
     if(!_allCardsCache.length) return null;
-    const seed=Number(new Date().toISOString().slice(0,10).replace(/-/g,""))%_allCardsCache.length;
-    return _allCardsCache[seed];
+    const seed=Number(new Date().toISOString().slice(0,10).replace(/-/g,""));
+    // Personal pick: rotate daily among their top-matching cards
+    if(profile){
+      const scored=_allCardsCache.map(c=>({c,s:scoreCardForUser(c,profile)})).filter(x=>x.s>0);
+      if(scored.length){
+        scored.sort((a,b)=>b.s-a.s);
+        const pool=scored.slice(0,Math.min(7,scored.length)).map(x=>x.c);
+        return pool[seed%pool.length];
+      }
+    }
+    return _allCardsCache[seed%_allCardsCache.length];
   }catch{ return null; }
 }
-function TodaysCardBanner({G, card, setNav}){
-  const tc=getTodaysCard();
+function TodaysCardBanner({G, card, setNav, profile}){
+  const tc=getTodaysCard(profile);
   if(!tc) return null;
   return(
     <button onClick={()=>setNav(`topic:${tc.catId}.${tc.topicId}`)}
@@ -13679,7 +13894,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
         <IdentityStrip userId={userId} streak={streak} G={G}/>
         <FollowUpCard userId={userId} G={G} card={card}/>
         <WeeklyRevealCard userId={userId} G={G} card={card} setNav={setNav}/>
-        <TodaysCardBanner G={G} card={card} setNav={setNav}/>
+        <TodaysCardBanner G={G} card={card} setNav={setNav} profile={formData}/>
 
         {/* ══ SMART HOOK — context-aware nudge (day + time aware) ══ */}
         {(()=>{
@@ -14519,6 +14734,13 @@ function IntelligenceCard({card, catColor, onSelect, userId, country}){
           {/* Content */}
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5,flexWrap:"wrap"}}>
+              {card._forYou&&(
+                <span style={{fontSize:9,fontWeight:800,letterSpacing:".08em",
+                  background:"rgba(240,180,41,0.14)",border:"1px solid rgba(240,180,41,0.45)",
+                  color:"var(--gold)",borderRadius:6,padding:"2px 7px"}}>
+                  ✦ FOR YOU
+                </span>
+              )}
               {card.badge&&(
                 <span style={{fontSize:9,fontWeight:700,letterSpacing:".06em",
                   background:`${card.badgeColor||G.accent}18`,border:`1px solid ${card.badgeColor||G.accent}35`,
@@ -15276,7 +15498,7 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
     </div>
   );
 
-  const deckCards = pickDeck(formData?.country, topicId, topic.cards);
+  const deckCards = personalizeDeck(pickDeck(formData?.country, topicId, topic.cards), formData);
   const filteredCards = activeTag==="All"
     ? deckCards
     : deckCards.filter(c=>
@@ -16291,7 +16513,9 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
   const G={...useThemeColors()};
   const STORE_KEY=`diq_journal_${userId}`;
   const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY)||"[]");}catch{return [];}});
-  const canWriteToday = isPremium || isPaid || entries.length < FREE_JOURNAL_LIMIT;
+  const thisMonthKey=new Date().toISOString().slice(0,7);
+  const entriesThisMonth=entries.filter(e=>(e.date||"").slice(0,7)===thisMonthKey).length;
+  const canWriteToday = isPremium || isPaid || entriesThisMonth < FREE_JOURNAL_LIMIT;
   const [letter,setLetter]=useState("");
   const [mood,setMood]=useState(null);
   const [result,setResult]=useState(null); // {reflection,scores,theme,achievements,ending,memory}
