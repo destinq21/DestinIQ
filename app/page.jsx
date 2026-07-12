@@ -17485,6 +17485,12 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
     return localStorage.getItem("diq_active_tab")||"today";
   });
   const [streakCelebration,setStreakCelebration]=useState(null);
+  // Admin test hook: lets the ⚙ Admin panel fire the celebration on demand
+  useEffect(()=>{
+    const h=(e)=>setStreakCelebration(Number(e?.detail)||30);
+    window.addEventListener("diqTestCelebrate",h);
+    return()=>window.removeEventListener("diqTestCelebrate",h);
+  },[]);
   const [miniStreak,setMiniStreak]=useState(null); // for non-milestone days
   useEffect(()=>{
     try{ localStorage.setItem("diq_active_tab",mod); }catch{}
@@ -19098,6 +19104,17 @@ function AdminDashboard({user,onBack}){
       <div className="cx">
         <button onClick={onBack} style={{background:"none",border:"none",color:"var(--cream-40)",cursor:"pointer",fontSize:13,marginBottom:24,display:"flex",alignItems:"center",gap:6}}>← Back</button>
         <div style={{fontFamily:"var(--f-display)",fontSize:32,color:"var(--cream)",marginBottom:4}}>Admin Dashboard</div>
+        {/* ── TEST TOOLS ── fire app moments on demand */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"10px 0 18px"}}>
+          {[7,30,100].map(n=>(
+            <button key={n} onClick={()=>{ onBack&&onBack(); setTimeout(()=>{ try{ window.dispatchEvent(new CustomEvent("diqTestCelebrate",{detail:n})); }catch{} },250); }}
+              style={{background:"rgba(240,180,41,0.08)",border:"1px solid rgba(240,180,41,0.3)",
+                borderRadius:16,padding:"6px 14px",color:"var(--gold)",fontSize:11,fontWeight:700,
+                cursor:"pointer",fontFamily:"var(--f-mono)"}}>
+              🎉 Test {n}-day celebration
+            </button>
+          ))}
+        </div>
         <div style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:32}}>DestinIQ · Internal</div>
 
         {loading?<div style={{color:"var(--cream-30)"}}>Loading…</div>:(
