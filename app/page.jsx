@@ -19535,7 +19535,12 @@ function DestinIQInner(){
 
     // Load saved profile (onboarding answers + subscription)
     try{
-      const profile = await loadUserProfile(u.id);
+      const profile = await Promise.race([
+        loadUserProfile(u.id),
+        // A fetch that never settles (throttled tab, dying connection) must not
+        // hang the whole boot — after 12s treat it as a fetch error → retry screen.
+        new Promise(res=>setTimeout(()=>res("FETCH_ERROR"), 12000)),
+      ]);
       if (profile === "FETCH_ERROR") {
         // Database didn't answer (outage / network). Do NOT treat as a new
         // user — that path leads to onboarding, where completing the form
@@ -19904,10 +19909,13 @@ function DestinIQInner(){
     // both call restoreUserSession, and the second (unguarded) call races with
     // the first and can reset screen back to "intake" after it was set to "results".
     let mountRestored = false;
+    let restoringNow = false;     // prevents overlapping restores
+    let lastRestoredUid = null;   // prevents tab-focus SIGNED_IN re-fires
 
     supabase.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
-        await restoreUserSession(session.user);
+        restoringNow = true; lastRestoredUid = session.user.id;
+        try{ await restoreUserSession(session.user); } finally { restoringNow = false; }
       }
       mountRestored = true;
       setAuthLoading(false);
@@ -19919,8 +19927,14 @@ function DestinIQInner(){
       // Skip the automatic initial fire — we already handled it above
       // Skip INITIAL_SESSION — getSession() above already handles it with await
       if(!mountRestored && (_event==="INITIAL_SESSION")) return;
+      // Hourly token refreshes are not logins — re-running the full restore on
+      // them resets screens mid-use and can strand the app if a fetch hangs.
+      if(_event==="TOKEN_REFRESHED"||_event==="USER_UPDATED") return;
       if(session?.user){
-        restoreUserSession(session.user);
+        if(restoringNow) return;                                    // restore already running
+        if(_event==="SIGNED_IN"&&mountRestored&&session.user.id===lastRestoredUid) return; // tab-focus re-fire
+        restoringNow = true; lastRestoredUid = session.user.id;
+        Promise.resolve(restoreUserSession(session.user)).finally(()=>{ restoringNow = false; });
         // Track referral if URL has ?ref=
         if(_event==="SIGNED_IN"&&typeof window!=="undefined"){
           const ref=new URLSearchParams(window.location.search).get("ref");
