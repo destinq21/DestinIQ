@@ -20469,6 +20469,16 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                       <button className="btn btn-gold" style={{fontSize:12,padding:"8px 18px"}} onClick={()=>setScreen("auth")}>Get started free →</button>
                     </div>
                   </nav>
+        {/* Admin access lived only in the retired nav — give it a discreet home */}
+        {ADMIN_EMAILS.includes(user.email)&&(
+          <button onClick={()=>setShowAdmin(true)} title="Admin panel"
+            style={{position:"fixed",bottom:96,left:12,zIndex:350,background:"rgba(0,0,0,0.55)",
+              border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 12px",
+              color:"var(--cream-40)",fontSize:11,fontWeight:600,cursor:"pointer",
+              fontFamily:"var(--f-mono)",backdropFilter:"blur(6px)"}}>
+            ⚙ Admin
+          </button>
+        )}
                   {showAbout &&<AboutUsPage onBack={()=>setShowAbout(false)}/>}
       {showTutorial&&<OnboardingTutorial onDone={()=>setShowTutorial(false)}/>}
       {showPolicy&&<PolicyPage type={showPolicy} onBack={()=>setShowPolicy(null)}/>}
@@ -20486,7 +20496,11 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
         {!profileLoading&&<>
 
         <SupportWidget/>
-        <nav className="nav" style={{display:["results","intake","loading","complete-profile"].includes(screen)?"none":"flex"}}>
+        {/* Legacy v1 top-nav — retired. The premium shell (sidebar / top bar /
+            drawer) owns navigation now; this only ever showed on stray screens
+            (paywall, error limbo) and looked like the old design. Kept in the
+            tree but never displayed, so nothing that references it breaks. */}
+        <nav className="nav" style={{display:"none"}}>
           <div className="logo" onClick={()=>{
             if(report) setScreen("results");
             else setScreen("intake");
