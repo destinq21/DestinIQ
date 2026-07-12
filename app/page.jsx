@@ -13699,7 +13699,7 @@ function getTodaysCard(profile){
       _allCardsCache=[];
       Object.entries(TOPIC_CONFIGS).forEach(([catId,cfg])=>{
         (cfg.topics||[]).forEach(t=>(t.cards||[]).forEach(c=>{
-          _allCardsCache.push({catId, topicId:t.id, topicLabel:t.label, icon:t.icon, title:c.title, tagline:c.tagline||"", tags:c.tags||[], whyItWorks:c.whyItWorks||""});
+          _allCardsCache.push({catId, topicId:t.id, topicLabel:t.label, icon:t.icon, title:c.title, tagline:c.tagline||"", tags:c.tags||[], whyItWorks:c.whyItWorks||"", step:(Array.isArray(c.steps)&&c.steps[0])||""});
         }));
       });
     }
@@ -13719,19 +13719,52 @@ function getTodaysCard(profile){
 }
 function TodaysCardBanner({G, card, setNav, profile}){
   const tc=getTodaysCard(profile);
+  const todayKey=new Date().toISOString().slice(0,10);
+  const [done,setDone]=useState(()=>{ try{return localStorage.getItem("diq_dtd")===todayKey;}catch{return false;} });
   if(!tc) return null;
-  return(
-    <button onClick={()=>setNav(`topic:${tc.catId}.${tc.topicId}`)}
-      style={{...card,marginBottom:14,width:"100%",textAlign:"left",cursor:"pointer",fontFamily:"inherit",
-        display:"flex",alignItems:"center",gap:14,border:"1px solid "+G.border}}>
-      <span style={{fontSize:24,flexShrink:0}}>🎴</span>
+  const action=tc.step||`Open ${tc.title} and take the first step`;
+  const markDone=(e)=>{
+    e.stopPropagation();
+    setDone(true);
+    try{ localStorage.setItem("diq_dtd",todayKey); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"✅ Done — that's how momentum is built. See you tomorrow."})); }catch{}
+  };
+  if(done) return(
+    <div style={{...card,marginBottom:14,display:"flex",alignItems:"center",gap:14,
+      border:"1px solid rgba(76,175,125,0.3)",background:"rgba(76,175,125,0.06)"}}>
+      <span style={{fontSize:22,flexShrink:0}}>✅</span>
       <span style={{flex:1}}>
-        <span style={{display:"block",fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:4}}>TODAY'S CARD · {tc.topicLabel.toUpperCase()} · GONE AT MIDNIGHT</span>
-        <span style={{display:"block",fontSize:14,fontWeight:700,color:G.cream}}>{tc.title}</span>
-        {tc.tagline&&<span style={{display:"block",fontSize:11,color:G.dim,marginTop:3,lineHeight:1.5}}>{tc.tagline.slice(0,90)}</span>}
+        <span style={{display:"block",fontSize:9,color:"#4caf7d",letterSpacing:".12em",fontFamily:"monospace",marginBottom:3}}>TODAY'S MOVE · DONE</span>
+        <span style={{display:"block",fontSize:13,fontWeight:600,color:G.cream}}>You did the thing. Tomorrow brings the next one.</span>
       </span>
-      <span style={{fontSize:18,color:G.gold,flexShrink:0}}>→</span>
-    </button>
+    </div>
+  );
+  return(
+    <div style={{...card,marginBottom:14,border:"1px solid rgba(240,180,41,0.3)",
+      background:"linear-gradient(135deg,rgba(240,180,41,0.06),transparent 60%)"}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
+        <span style={{fontSize:24,flexShrink:0,marginTop:2}}>🎯</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:9,color:G.gold,letterSpacing:".12em",fontFamily:"monospace",marginBottom:5}}>
+            DO THIS TODAY · {tc.topicLabel.toUpperCase()}
+          </div>
+          <div style={{fontSize:14.5,fontWeight:700,color:G.cream,lineHeight:1.45,marginBottom:3}}>{action}</div>
+          <div style={{fontSize:11,color:G.dim,lineHeight:1.5}}>From: {tc.title}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:12}}>
+        <button onClick={markDone}
+          style={{flex:1,background:G.gold,color:"#000",border:"none",borderRadius:10,
+            padding:"10px",fontSize:12.5,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+          ✓ Done
+        </button>
+        <button onClick={()=>setNav(`topic:${tc.catId}.${tc.topicId}`)}
+          style={{flex:1,background:"none",color:G.dim,border:"1px solid "+G.border,borderRadius:10,
+            padding:"10px",fontSize:12.5,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+          Show me how →
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -19202,6 +19235,7 @@ function AdminDashboard({user,onBack}){
 // This component just triggers it.
 // ═══════════════════════════════════════════════════════════════════════════════
 async function triggerWelcomeEmail(user){
+  if(!user||!user.email) return; // never crash on a null user (outage/async races)
   try{
     const {data:{session}}=await supabase.auth.getSession();
     const token=session?.access_token;
@@ -20484,7 +20518,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                     </div>
                   </nav>
         {/* Admin access lived only in the retired nav — give it a discreet home */}
-        {ADMIN_EMAILS.includes(user.email)&&(
+        {ADMIN_EMAILS.includes(user?.email)&&(
           <button onClick={()=>setShowAdmin(true)} title="Admin panel"
             style={{position:"fixed",bottom:96,left:12,zIndex:350,background:"rgba(0,0,0,0.55)",
               border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 12px",
@@ -20527,10 +20561,10 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
             <button onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"linear-gradient(135deg,var(--gold),var(--teal))",border:"2px solid var(--line-gold)",padding:0,cursor:"pointer",fontSize:13,fontWeight:700,color:"#000",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",flexShrink:0}} title="Profile">
               {navPhotoURL
                 ?<img src={navPhotoURL} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                :(user.name||user.email||"U")[0].toUpperCase()
+                :(user?.name||user?.email||"U")[0].toUpperCase()
               }
             </button>
-            {ADMIN_EMAILS.includes(user.email)&&<button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}} onClick={()=>setShowAdmin(true)}>Admin</button>}
+            {ADMIN_EMAILS.includes(user?.email)&&<button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}} onClick={()=>setShowAdmin(true)}>Admin</button>}
             {screen==="results"&&(
               <button className="btn btn-ghost" style={{fontSize:12,padding:"6px 12px"}} onClick={()=>setShowNotif(true)} title="Set daily notification">
                 🔔
