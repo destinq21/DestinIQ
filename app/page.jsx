@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -1012,7 +1012,7 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .root{position:relative;z-index:1;min-height:100vh;overflow-x:hidden;scroll-behavior:smooth;}
 .screen-fade{animation:screenFadeIn .25s ease;}
 @keyframes drawerSlideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
-@keyframes drawerSlideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes screenFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .cx{width:100%;max-width:1060px;margin:0 auto;padding:0 24px;}
 .cx-sm{width:100%;max-width:640px;margin:0 auto;padding:0 24px;}
@@ -1441,10 +1441,8 @@ const CATEGORIES=[
   {id:"plan",    label:"Plan & Decide",   icon:"map", color:"#ff8a65",desc:"Strategic planning, big decisions & next moves",  tools:["roadmap","decisions","relocate","advisor"]},
 ];
 const TOOL_META={
-  relationshipiq:{label:"Relationship IQ", icon:"🤝",cat:"social", color:"#e05c6e"},
   smalltalk:     {label:"Small Talk",       icon:"💬",cat:"social", color:"#e05c6e"},
   relationshipiq:{label:"Relationship IQ",  icon:"❤️",cat:"social", color:"#e05c6e"},
-  weeklychallenge:{label:"Weekly Challenge",icon:"🏅",cat:"purpose",color:"#64b5f6"},
   peopledecoder: {label:"People Decoder",   icon:"🧩",cat:"social", color:"#e05c6e"},
   hardconvo:     {label:"Hard Conversation",icon:"🗣️",cat:"social", color:"#e05c6e"},
   parenting:     {label:"Parenting",        icon:"👨‍👧",cat:"social", color:"#e05c6e"},
@@ -5407,7 +5405,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
           user_id: userId,
           last_checkin_date: ciToday,
           updated_at: new Date().toISOString(),
-        },{onConflict:"user_id"}).catch(()=>{});
+        },{onConflict:"user_id"}).then(null,()=>{});
         // Update localStorage immediately
         try{ localStorage.setItem(`destiniq_checkin_${userId}`, ciToday); }catch{}
         // Log momentum entry (feeds Progress chart + Growth Snapshot)
@@ -5433,7 +5431,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
         supabase.from("user_profiles").upsert({
           user_id:userId, last_checkin_date:ciToday,
           updated_at:new Date().toISOString(),
-        },{onConflict:"user_id"}).catch(()=>{});
+        },{onConflict:"user_id"}).then(null,()=>{});
         localStorage.setItem(`destiniq_checkin_${userId}`, ciToday);
         addMomentumEntry(userId,{energy:score,focus:score,momentum:score,feeling,note:did,date:new Date().toDateString()});
         window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
@@ -6530,7 +6528,7 @@ function Landing({onStart,ipLocation}){
     const ref=new URLSearchParams(window.location.search).get("ref");
     if(ref)try{localStorage.setItem("diq_ref",ref);}catch{}
     supabase.from("user_profiles").select("user_id",{count:"exact",head:true})
-      .then(({count})=>{if(count&&count>500)setUserCount(count);}).catch(()=>{});
+      .then(({count})=>{if(count&&count>500)setUserCount(count);}).then(null,()=>{});
     const onScroll=()=>setScrolled(window.scrollY>50);
     window.addEventListener("scroll",onScroll,{passive:true});
     return()=>window.removeEventListener("scroll",onScroll);
@@ -11644,7 +11642,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
             saveWins(serverWins, userId);
           }
         }
-      }).catch(()=>{});
+      }).then(null,()=>{});
   },[userId]);
   const [input,setInput]=useState("");
   const [mood,setMood]=useState(null);
@@ -11674,7 +11672,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         supabase.from("user_profiles").upsert({
           user_id:userId, last_checkin_date:ciToday,
           updated_at:new Date().toISOString(),
-        },{onConflict:"user_id"}).catch(()=>{});
+        },{onConflict:"user_id"}).then(null,()=>{});
         window.dispatchEvent(new CustomEvent("checkinComplete",{detail:{userId,date:ciToday}}));
       }catch{}
     }
@@ -11691,7 +11689,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
             wins: updated.slice(0,200), // dedicated wins column (jsonb)
             form_data: JSON.stringify({...fd2, _wins: updated.slice(0,200)}), // fallback
           },{onConflict:"user_id"});
-        }).catch(()=>{});
+        }).then(null,()=>{});
     }
     setInput("");setMood(null);
     // Award progress points for logging a win
@@ -11707,7 +11705,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
         supabase.from("user_profiles").upsert({
           user_id:userId, last_checkin_date:winToday,
           updated_at:new Date().toISOString(),
-        },{onConflict:"user_id"}).catch(()=>{});
+        },{onConflict:"user_id"}).then(null,()=>{});
       }
     }catch{}
     // AI celebration
@@ -11802,7 +11800,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
                     {w.mood&&<span style={{fontSize:10,color:"var(--cream-30)"}}>{w.mood}</span>}
                   </div>
                   <button onClick={()=>{const u=wins.filter(x=>x.id!==w.id);setWins(u);saveWins(u,userId);
-                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).catch(()=>{});}} style={{background:"none",border:"none",color:"var(--cream-15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
+                    if(userId) supabase.from("user_profiles").upsert({user_id:userId,wins:u},{onConflict:"user_id"}).then(null,()=>{});}} style={{background:"none",border:"none",color:"var(--cream-15)",cursor:"pointer",fontSize:12,flexShrink:0}}>✕</button>
                 </div>
               ))}
             </div>
@@ -18055,11 +18053,11 @@ function ReferralWidget({userId, isPaid}){
       .select("user_id", {count:"exact"})
       .eq("referred_by", code)
       .then(({count})=>{ if(count) setReferrals(count); })
-      .catch(()=>{});
+      .then(null,()=>{});
   },[userId, code]);
 
   const copy = ()=>{
-    navigator.clipboard?.writeText(link).catch(()=>{});
+    navigator.clipboard?.writeText(link).then(null,()=>{});
     try{ const el=document.createElement("input"); el.value=link; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); }catch{}
     setCopied(true);
     setTimeout(()=>setCopied(false), 2000);
@@ -19612,7 +19610,7 @@ function DestinIQInner(){
           supabase.from("user_profiles").upsert({
             user_id:u.id, is_paid:false, plan:"free",
             updated_at:new Date().toISOString(),
-          },{onConflict:"user_id"}).catch(()=>{});
+          },{onConflict:"user_id"}).then(null,()=>{});
         } else if (profile.is_paid) {
           setIsPaid(true);
           // Keep localStorage in sync with DB
@@ -19691,7 +19689,7 @@ function DestinIQInner(){
               user_id:u.id, streak:localStreak,
               last_checkin_date: localLast||localCounted,
               updated_at:new Date().toISOString(),
-            },{onConflict:"user_id"}).catch(()=>{});
+            },{onConflict:"user_id"}).then(null,()=>{});
           } else if (!lastSeen) {
             // Never checked in before — keep whatever streak DB has (could be 1 from signup)
             setStreak(bestStreak);
@@ -19726,14 +19724,14 @@ function DestinIQInner(){
               supabase.from("user_profiles").upsert({
                 user_id: u.id, streak: bestStreak,
                 updated_at: new Date().toISOString(),
-              }, {onConflict:"user_id"}).catch(()=>{});
+              }, {onConflict:"user_id"}).then(null,()=>{});
             } else {
               // Streak broken — reset to 1
               setStreak(1);
               supabase.from("user_profiles").upsert({
                 user_id: u.id, streak: 1,
                 updated_at: new Date().toISOString(),
-              }, {onConflict:"user_id"}).catch(()=>{});
+              }, {onConflict:"user_id"}).then(null,()=>{});
               try{ localStorage.removeItem(`destiniq_checkin_${u.id}`); }catch{}
             }
           }
@@ -19873,7 +19871,7 @@ function DestinIQInner(){
             paid_plan:pending.plan,
             hubtel_ref:ref,
             paid_at:new Date().toISOString(),
-          },{onConflict:"user_id"}).catch(()=>{});
+          },{onConflict:"user_id"}).then(null,()=>{});
           // Update UI
           setIsPaid(true);
           if(pending.tier==="promax") setIsPremium(true);
@@ -19946,7 +19944,7 @@ function DestinIQInner(){
     // versions return the handle directly — support both, never call .then blindly.
     try{
       const ret = CapApp.addListener("appUrlOpen",({url})=>{ handleAuthUrl(url); });
-      if(ret && typeof ret.then==="function"){ ret.then(l=>{listener=l;}).catch(()=>{}); }
+      if(ret && typeof ret.then==="function"){ ret.then(l=>{listener=l;}).then(null,()=>{}); }
       else{ listener = ret; }
     }catch{}
     // Cold path: the link LAUNCHED the app (or the WebView reloaded and the
@@ -19954,7 +19952,7 @@ function DestinIQInner(){
     try{
       const lr = CapApp.getLaunchUrl?.();
       if(lr && typeof lr.then==="function"){
-        lr.then(r=>{ if(r?.url && /code=|access_token=/.test(r.url)) handleAuthUrl(r.url); }).catch(()=>{});
+        lr.then(r=>{ if(r?.url && /code=|access_token=/.test(r.url)) handleAuthUrl(r.url); }).then(null,()=>{});
       } else if(lr?.url && /code=|access_token=/.test(lr.url)){
         handleAuthUrl(lr.url);
       }
@@ -20132,7 +20130,7 @@ try{
                   user_id:uid, streak:next,
                   last_checkin_date:new Date().toISOString().slice(0,10),
                   updated_at:new Date().toISOString(),
-                },{onConflict:"user_id"}).catch(()=>{});
+                },{onConflict:"user_id"}).then(null,()=>{});
               }catch{}
             }
             // Fire celebration event for Dashboard to pick up
