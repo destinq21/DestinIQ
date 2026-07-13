@@ -11484,29 +11484,56 @@ function MiniStreakCelebration({streak, onClose}){
   const [visible, setVisible] = useState(false);
   useEffect(()=>{
     setTimeout(()=>setVisible(true), 50);
-    const t = setTimeout(()=>{ setVisible(false); setTimeout(onClose,400); }, 3000);
+    const t = setTimeout(()=>{ setVisible(false); setTimeout(onClose,400); }, 3400);
     return()=>clearTimeout(t);
   },[]);
+  // Warm ember gradient — the everyday "streak alive" glow
+  const c1="#FDE68A", c2="#F0B429", c3="#F97316";
+  const grad=`linear-gradient(120deg, ${c1}, ${c2}, ${c3})`;
   return(
     <div onClick={onClose} style={{
-      position:"fixed", bottom:80, left:"50%", transform:`translateX(-50%) translateY(${visible?0:40}px)`,
-      opacity: visible?1:0, transition:"all .4s cubic-bezier(0.175,0.885,0.32,1.275)",
+      position:"fixed", bottom:80, left:"50%",
+      transform:`translateX(-50%) translateY(${visible?0:40}px) scale(${visible?1:0.9})`,
+      opacity: visible?1:0, transition:"all .45s cubic-bezier(0.175,0.885,0.32,1.275)",
       zIndex:3000, cursor:"pointer",
     }}>
       <div style={{
-        background:"var(--night)", border:"1px solid rgba(210,175,90,0.4)",
-        borderRadius:50, padding:"12px 24px",
-        display:"flex", alignItems:"center", gap:10,
-        boxShadow:"0 8px 32px rgba(0,0,0,0.4)",
+        position:"relative", overflow:"hidden",
+        background:"linear-gradient(150deg, rgba(30,24,12,.94), rgba(14,11,6,.94))",
+        backdropFilter:"blur(14px)", WebkitBackdropFilter:"blur(14px)",
+        borderRadius:50, padding:"13px 24px",
+        display:"flex", alignItems:"center", gap:11,
+        boxShadow:`0 10px 40px rgba(0,0,0,.55), 0 0 34px ${c2}45`,
         whiteSpace:"nowrap",
       }}>
-        <span style={{fontSize:22}}>🔥</span>
-        <div>
-          <span style={{fontSize:16, fontWeight:800, color:"var(--gold)"}}>Day {streak}</span>
-          <span style={{fontSize:13, color:"var(--cream-50)", marginLeft:6}}>streak alive!</span>
+        {/* gradient hairline border */}
+        <div style={{position:"absolute", inset:0, borderRadius:50, padding:1, pointerEvents:"none",
+          background:grad, opacity:.75,
+          WebkitMask:"linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite:"xor", maskComposite:"exclude"}}/>
+        {/* shine sweep */}
+        <span className="diq-mini-shine" style={{position:"absolute",top:0,bottom:0,width:"40%",
+          background:"linear-gradient(100deg, transparent, rgba(255,255,255,.22), transparent)",
+          transform:"skewX(-18deg)", pointerEvents:"none"}}/>
+
+        <span className="diq-mini-fire" style={{fontSize:23, filter:`drop-shadow(0 0 10px ${c2})`}}>🔥</span>
+        <div style={{position:"relative"}}>
+          <span style={{fontSize:16, fontWeight:800,
+            backgroundImage:grad, WebkitBackgroundClip:"text", backgroundClip:"text",
+            WebkitTextFillColor:"transparent", color:"transparent"}}>Day {streak}</span>
+          <span style={{fontSize:13, color:"rgba(255,255,255,.55)", marginLeft:7}}>streak alive!</span>
         </div>
-        <span style={{fontSize:13, color:"var(--cream-30)", marginLeft:4}}>✕</span>
+        <span style={{fontSize:13, color:"rgba(255,255,255,.3)", marginLeft:2, position:"relative"}}>✕</span>
       </div>
+      <style>{`
+        @keyframes diqMiniShine { 0%{left:-50%} 100%{left:120%} }
+        @keyframes diqMiniFire  { from{transform:scale(1) rotate(-6deg)} to{transform:scale(1.16) rotate(6deg)} }
+        .diq-mini-shine { animation: diqMiniShine 2.4s ease-in-out .5s infinite; }
+        .diq-mini-fire  { animation: diqMiniFire 0.9s ease-in-out infinite alternate; }
+        @media (prefers-reduced-motion: reduce){
+          .diq-mini-shine, .diq-mini-fire { animation: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -13107,146 +13134,308 @@ const STREAK_MILESTONES = {
   365: { emoji:"🎯",    title:"365-Day Streak!",  msg:"ONE FULL YEAR. A complete revolution around the sun with DestinIQ. Legendary.", color:"var(--gold)" },
 };
 
+// ── Per-milestone colour themes ───────────────────────────────────────────────
+// Each milestone gets a 3-stop gradient instead of one flat colour, so every
+// celebration feels like its own distinct event.
+const STREAK_THEMES = {
+  1:   ["#5EEAD4","#22D3EE","#38BDF8"], // dawn — teal → sky
+  2:   ["#A7F3D0","#34D399","#10B981"], // mint
+  3:   ["#FDE68A","#FBBF24","#F59E0B"], // ember
+  7:   ["#67E8F9","#22D3EE","#0EA5E9"], // electric
+  10:  ["#FDE68A","#F0B429","#D97706"], // gold
+  14:  ["#FDA4AF","#FB7185","#F43F5E"], // rose
+  21:  ["#DDD6FE","#A78BFA","#7C3AED"], // amethyst
+  30:  ["#FDE68A","#FB923C","#F43F5E"], // nova — gold → orange → red
+  50:  ["#6EE7B7","#22D3EE","#818CF8"], // aurora
+  75:  ["#FCA5A5","#F43F5E","#BE123C"], // magma
+  100: ["#FEF3C7","#FCD34D","#F59E0B"], // crown
+  150: ["#F0ABFC","#C084FC","#7C3AED"], // cosmic
+  200: ["#A7F3D0","#34D399","#059669"], // jade
+  365: ["#FDE68A","#F472B6","#818CF8"], // legend — gold → pink → indigo
+};
+const DEFAULT_THEME = ["#FDE68A","#F0B429","#E8890C"];
+
 function StreakCelebration({streak, onClose}){
   const [animIn, setAnimIn] = useState(false);
   // Hooks FIRST — early returns before hooks break React
   useEffect(()=>{
     const t1=setTimeout(()=>setAnimIn(true), 50);
-    const t2=setTimeout(onClose, 6000);
+    const t2=setTimeout(onClose, 6800);
     return ()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
+
   const milestone = STREAK_MILESTONES[streak] || {
-    emoji:"🔥", color:"var(--gold)",
+    emoji:"🔥",
     title:`${streak} days strong!`,
     msg:"Every day you show up, you become someone slightly harder to stop.",
   };
-  // Confetti particles — deterministic randoms so render is stable
-  const CONFETTI=["🎉","✨","🔥","⭐","💛","🏆"];
-  const parts = Array.from({length:26},(_,i)=>({
-    e:CONFETTI[i%CONFETTI.length],
-    left:(i*37)%100,
-    delay:(i*137)%1400,
-    dur:2600+((i*263)%1800),
-    size:16+((i*97)%22),
+  const C = STREAK_THEMES[streak] || DEFAULT_THEME;
+  const [c1,c2,c3] = C;
+  const grad = `linear-gradient(135deg, ${c1} 0%, ${c2} 50%, ${c3} 100%)`;
+
+  // ── Deterministic particles (no Math.random → stable across renders) ───────
+  const CONFETTI_COLORS = [c1,c2,c3,"#FFFFFF",c1,c2,"#FDE68A",c3];
+  const confetti = Array.from({length:52},(_,i)=>({
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    shape: i % 3,                       // 0 = rect, 1 = circle, 2 = ribbon
+    left:  (i * 19.7) % 100,
+    delay: (i * 137) % 2200,
+    dur:   2800 + ((i * 263) % 2400),
+    size:  7 + ((i * 97) % 9),
+    spin:  ((i * 71) % 720) + 360,
+    drift: (((i * 53) % 60) - 30),      // horizontal drift, -30 → +30 px
+  }));
+  const emojis = Array.from({length:14},(_,i)=>({
+    e: ["🎉","✨","⭐","💫","🌟","🎊"][i % 6],
+    left: (i * 37 + 6) % 100,
+    delay: (i * 211) % 2600,
+    dur: 3400 + ((i * 317) % 2000),
+    size: 18 + ((i * 89) % 16),
+  }));
+  const sparks = Array.from({length:22},(_,i)=>({
+    left: (i * 43.3) % 100,
+    top:  (i * 61.7) % 100,
+    delay:(i * 173) % 2600,
+    size: 3 + ((i * 31) % 5),
   }));
 
   return(
     <div onClick={onClose} style={{
       position:"fixed", inset:0, zIndex:3000,
-      background:"rgba(0,0,0,0.92)",
       display:"flex", alignItems:"center", justifyContent:"center",
       cursor:"pointer", overflow:"hidden",
-      transition:"opacity .3s",
+      background:"radial-gradient(ellipse at 50% 45%, #14121c 0%, #0a0910 55%, #050408 100%)",
+      transition:"opacity .4s ease",
       opacity: animIn ? 1 : 0,
     }}>
-      {/* Confetti rain */}
-      {animIn&&parts.map((p,i)=>(
-        <span key={i} style={{
+
+      {/* ── Aurora blobs — soft drifting colour clouds ─────────────────────── */}
+      <div className="diq-cel-fx" style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
+        <div style={{position:"absolute", top:"12%", left:"8%", width:460, height:460, borderRadius:"50%",
+          background:`radial-gradient(circle, ${c1}40 0%, transparent 68%)`, filter:"blur(50px)",
+          animation:"diqBlob 9s ease-in-out infinite alternate"}}/>
+        <div style={{position:"absolute", bottom:"6%", right:"4%", width:520, height:520, borderRadius:"50%",
+          background:`radial-gradient(circle, ${c3}40 0%, transparent 68%)`, filter:"blur(55px)",
+          animation:"diqBlob 11s ease-in-out 1.2s infinite alternate-reverse"}}/>
+        <div style={{position:"absolute", top:"38%", right:"22%", width:360, height:360, borderRadius:"50%",
+          background:`radial-gradient(circle, ${c2}38 0%, transparent 70%)`, filter:"blur(45px)",
+          animation:"diqBlob 7.5s ease-in-out .6s infinite alternate"}}/>
+      </div>
+
+      {/* ── Rotating light rays behind the number ──────────────────────────── */}
+      <div className="diq-cel-fx" style={{
+        position:"absolute", width:700, height:700, pointerEvents:"none",
+        background:`conic-gradient(from 0deg, transparent 0deg, ${c2}22 12deg, transparent 24deg,
+                    transparent 36deg, ${c1}1c 48deg, transparent 60deg,
+                    transparent 90deg, ${c3}20 102deg, transparent 114deg,
+                    transparent 150deg, ${c2}1c 162deg, transparent 174deg,
+                    transparent 210deg, ${c1}20 222deg, transparent 234deg,
+                    transparent 270deg, ${c3}1c 282deg, transparent 294deg,
+                    transparent 330deg, ${c2}20 342deg, transparent 354deg)`,
+        borderRadius:"50%",
+        animation:"diqRays 26s linear infinite",
+        opacity: animIn?1:0, transition:"opacity 1s ease .3s",
+      }}/>
+
+      {/* ── Expanding ring bursts on entry ─────────────────────────────────── */}
+      {animIn&&[0,1,2].map(i=>(
+        <div key={i} className="diq-cel-fx" style={{
+          position:"absolute", width:200, height:200, borderRadius:"50%",
+          border:`2px solid ${[c1,c2,c3][i]}`, pointerEvents:"none",
+          animation:`diqRing 2.6s cubic-bezier(0.22,0.61,0.36,1) ${i*0.42}s infinite`,
+        }}/>
+      ))}
+
+      {/* ── Twinkling sparks ───────────────────────────────────────────────── */}
+      {animIn&&sparks.map((s,i)=>(
+        <span key={"s"+i} className="diq-cel-fx" style={{
+          position:"absolute", left:s.left+"%", top:s.top+"%",
+          width:s.size, height:s.size, borderRadius:"50%",
+          background:"#fff", boxShadow:`0 0 ${s.size*3}px #fff`,
+          pointerEvents:"none",
+          animation:`diqTwinkle 2.2s ease-in-out ${s.delay}ms infinite`,
+        }}/>
+      ))}
+
+      {/* ── Confetti: coloured geometric pieces ────────────────────────────── */}
+      {animIn&&confetti.map((p,i)=>(
+        <span key={"c"+i} className="diq-cel-fx" style={{
+          position:"absolute", top:-30, left:p.left+"%",
+          width: p.shape===2 ? p.size*0.5 : p.size,
+          height: p.shape===2 ? p.size*2.2 : p.size,
+          background:p.color,
+          borderRadius: p.shape===1 ? "50%" : p.shape===2 ? 2 : 1,
+          pointerEvents:"none",
+          boxShadow:`0 0 8px ${p.color}70`,
+          ["--dx"]: p.drift+"px",
+          ["--spin"]: p.spin+"deg",
+          animation:`diqFall ${p.dur}ms cubic-bezier(.35,.1,.6,1) ${p.delay}ms infinite`,
+        }}/>
+      ))}
+
+      {/* ── Emoji confetti (fewer, larger, playful) ────────────────────────── */}
+      {animIn&&emojis.map((p,i)=>(
+        <span key={"e"+i} className="diq-cel-fx" style={{
           position:"absolute", top:-40, left:p.left+"%",
           fontSize:p.size, lineHeight:1, pointerEvents:"none",
-          animation:`diqConfetti ${p.dur}ms linear ${p.delay}ms infinite`,
+          animation:`diqFallEmoji ${p.dur}ms linear ${p.delay}ms infinite`,
         }}>{p.e}</span>
       ))}
 
-      {/* Glow burst behind the number */}
-      <div style={{position:"absolute", width:420, height:420, borderRadius:"50%",
-        background:`radial-gradient(circle, ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}33 0%, transparent 65%)`,
-        animation: animIn?"diqGlowPulse 1.6s ease-in-out infinite alternate":"none",
-        pointerEvents:"none"}}/>
-
+      {/* ── The card ───────────────────────────────────────────────────────── */}
       <div onClick={e=>e.stopPropagation()} style={{
-        textAlign:"center", padding:"40px 32px",
-        maxWidth:420, width:"100%", position:"relative",
-        transform: animIn ? "scale(1) translateY(0)" : "scale(0.5) translateY(80px)",
-        transition:"transform .55s cubic-bezier(0.175,0.885,0.32,1.4)",
+        textAlign:"center", padding:"44px 30px 34px",
+        maxWidth:430, width:"92%", position:"relative", zIndex:2,
+        borderRadius:32,
+        background:"linear-gradient(165deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter:"blur(18px)", WebkitBackdropFilter:"blur(18px)",
+        boxShadow:`0 30px 90px rgba(0,0,0,.65), 0 0 70px ${c2}30, inset 0 1px 0 rgba(255,255,255,.14)`,
+        transform: animIn ? "scale(1) translateY(0)" : "scale(0.55) translateY(70px)",
+        opacity: animIn ? 1 : 0,
+        transition:"transform .7s cubic-bezier(0.175,0.885,0.32,1.35), opacity .45s ease",
       }}>
+        {/* gradient hairline border */}
+        <div style={{position:"absolute", inset:0, borderRadius:32, padding:1, pointerEvents:"none",
+          background:grad, opacity:.55,
+          WebkitMask:"linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite:"xor", maskComposite:"exclude"}}/>
+
         {/* Emoji */}
-        <div style={{
-          fontSize:96, lineHeight:1, marginBottom:8,
-          filter:"drop-shadow(0 0 40px "+milestone.color+")",
-          animation:"streakBounce 0.6s ease infinite alternate",
+        <div className="diq-cel-bob" style={{
+          fontSize:82, lineHeight:1, marginBottom:2,
+          filter:`drop-shadow(0 0 30px ${c2}) drop-shadow(0 0 60px ${c1}80)`,
         }}>
           {milestone.emoji}
         </div>
 
-        {/* GIANT streak number — the TikTok moment */}
-        <div style={{
-          fontSize:"clamp(120px, 38vw, 190px)", fontWeight:900, lineHeight:0.95,
-          color: milestone.color,
-          fontFamily:"var(--f-display)",
-          textShadow:`0 0 80px ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}90, 0 0 20px ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}60`,
-          animation: animIn?"diqNumberPop .7s cubic-bezier(0.175,0.885,0.32,1.5)":"none",
-        }}>
-          {streak}
-        </div>
-        <div style={{
-          fontSize:16, fontFamily:"var(--f-mono)", letterSpacing:".3em",
-          color:"var(--cream-60)", margin:"6px 0 22px", textTransform:"uppercase",
-          fontWeight:700,
-        }}>
-          DAY STREAK 🔥
+        {/* GIANT gradient streak number */}
+        <div style={{filter:`drop-shadow(0 0 42px ${c2}70)`}}>
+          <div className="diq-cel-num" style={{
+            fontSize:"clamp(112px, 34vw, 176px)", fontWeight:900, lineHeight:0.95,
+            fontFamily:"var(--f-display)",
+            backgroundImage:`linear-gradient(115deg, ${c1} 0%, ${c2} 25%, #ffffff 42%, ${c2} 58%, ${c3} 82%, ${c1} 100%)`,
+            backgroundSize:"260% 100%",
+            WebkitBackgroundClip:"text", backgroundClip:"text",
+            WebkitTextFillColor:"transparent", color:"transparent",
+            animation: animIn?"diqNumberPop .75s cubic-bezier(0.175,0.885,0.32,1.5), diqShimmer 4.5s linear .75s infinite":"none",
+          }}>
+            {streak}
+          </div>
         </div>
 
         <div style={{
-          fontSize:30, fontWeight:800, color:"var(--cream)",
-          marginBottom:12, lineHeight:1.25,
+          fontSize:13, fontFamily:"var(--f-mono)", letterSpacing:".34em",
+          margin:"2px 0 20px", textTransform:"uppercase", fontWeight:700,
+          backgroundImage:grad, WebkitBackgroundClip:"text", backgroundClip:"text",
+          WebkitTextFillColor:"transparent", color:"transparent",
+        }}>
+          Day Streak
+        </div>
+
+        <div style={{
+          fontSize:29, fontWeight:800, color:"#fff",
+          marginBottom:12, lineHeight:1.22, letterSpacing:"-.01em",
+          textShadow:`0 2px 30px ${c2}60`,
         }}>
           {milestone.title}
         </div>
 
         <p style={{
-          fontSize:16, color:"var(--cream-60)", lineHeight:1.75,
-          marginBottom:30,
+          fontSize:15.5, color:"rgba(255,255,255,0.68)", lineHeight:1.72,
+          marginBottom:26, maxWidth:330, marginLeft:"auto", marginRight:"auto",
         }}>
           {milestone.msg}
         </p>
 
-        <button onClick={onClose} style={{
-          background: milestone.color, border:"none", borderRadius:16,
-          padding:"16px 48px", fontSize:16, fontWeight:800,
-          color: milestone.color === "var(--gold)" ? "#000" : "#fff",
-          cursor:"pointer", letterSpacing:".03em",
-          boxShadow:`0 0 40px ${milestone.color==="var(--gold)"?"#f0b429":milestone.color}50`,
+        {/* Primary CTA with shine sweep */}
+        <button onClick={onClose} className="diq-cel-cta" style={{
+          position:"relative", overflow:"hidden",
+          background:grad, border:"none", borderRadius:18,
+          padding:"16px 46px", fontSize:16, fontWeight:800,
+          color:"#0a0910", cursor:"pointer", letterSpacing:".02em",
+          fontFamily:"inherit",
+          boxShadow:`0 10px 34px ${c2}55, 0 0 0 1px rgba(255,255,255,.16) inset`,
         }}>
           Keep going 🔥
         </button>
+
         <button onClick={()=>shareGrowthCard(
             {emoji:milestone.emoji||"🔥", headline:`${streak}-DAY STREAK`, sub:"Showing up for myself, every single day", name:""},
             `🔥 ${streak}-day streak on DestinIQ! Showing up for myself every single day.\n\nStart yours free 👉 destiniq.app`)}
-          style={{display:"block",margin:"12px auto 0",background:"none",
-            border:"1px solid var(--cream-15)",borderRadius:13,padding:"12px 32px",
-            fontSize:13,fontWeight:600,color:"var(--cream-50)",cursor:"pointer",fontFamily:"inherit"}}>
+          style={{display:"block",margin:"14px auto 0",background:"rgba(255,255,255,0.05)",
+            border:"1px solid rgba(255,255,255,0.14)",borderRadius:14,padding:"12px 30px",
+            fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.72)",cursor:"pointer",fontFamily:"inherit"}}>
           📸 Share this milestone
         </button>
-        <p style={{fontSize:11,color:"var(--cream-30)",marginTop:12,fontFamily:"var(--f-mono)"}}>
-          Tap anywhere to dismiss
+        <p style={{fontSize:10.5,color:"rgba(255,255,255,0.32)",marginTop:14,fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
+          TAP ANYWHERE TO DISMISS
         </p>
       </div>
 
       <style>{`
-        @keyframes streakBounce {
-          from { transform: scale(1) rotate(-5deg); }
-          to   { transform: scale(1.18) rotate(5deg); }
+        @keyframes diqFall {
+          0%   { transform: translate3d(0,-30px,0) rotate(0deg); opacity: 0; }
+          8%   { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { transform: translate3d(var(--dx), 108vh, 0) rotate(var(--spin)); opacity: 0; }
         }
-        @keyframes diqConfetti {
-          0%   { transform: translateY(-40px) rotate(0deg); opacity: 1; }
+        @keyframes diqFallEmoji {
+          0%   { transform: translateY(-40px) rotate(0deg) scale(.8); opacity: 0; }
+          10%  { opacity: 1; }
           85%  { opacity: 1; }
-          100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
+          100% { transform: translateY(110vh) rotate(420deg) scale(1); opacity: 0; }
         }
         @keyframes diqNumberPop {
-          0%   { transform: scale(0.2); }
-          60%  { transform: scale(1.15); }
-          100% { transform: scale(1); }
+          0%   { transform: scale(0.25) rotate(-6deg); }
+          55%  { transform: scale(1.16) rotate(2deg); }
+          100% { transform: scale(1) rotate(0deg); }
         }
-        @keyframes diqGlowPulse {
-          from { transform: scale(0.85); opacity: .7; }
-          to   { transform: scale(1.15); opacity: 1; }
+        @keyframes diqShimmer {
+          0%   { background-position: 160% 0; }
+          100% { background-position: -60% 0; }
+        }
+        @keyframes diqRays {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes diqRing {
+          0%   { transform: scale(0.35); opacity: .85; border-width: 3px; }
+          100% { transform: scale(3.6);  opacity: 0;   border-width: 1px; }
+        }
+        @keyframes diqTwinkle {
+          0%, 100% { opacity: 0; transform: scale(.4); }
+          50%      { opacity: .95; transform: scale(1.25); }
+        }
+        @keyframes diqBlob {
+          from { transform: translate(0,0) scale(1); }
+          to   { transform: translate(36px,-30px) scale(1.22); }
+        }
+        @keyframes diqBob {
+          from { transform: translateY(0) scale(1) rotate(-5deg); }
+          to   { transform: translateY(-10px) scale(1.09) rotate(5deg); }
+        }
+        @keyframes diqShine {
+          0%   { left: -60%; }
+          100% { left: 130%; }
+        }
+        .diq-cel-bob { animation: diqBob 1.5s ease-in-out infinite alternate; }
+        .diq-cel-cta::after {
+          content:""; position:absolute; top:0; bottom:0; width:45%;
+          background:linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+          transform: skewX(-18deg);
+          animation: diqShine 2.6s ease-in-out .9s infinite;
+        }
+        .diq-cel-cta:hover { transform: translateY(-2px); }
+        .diq-cel-cta { transition: transform .18s ease; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .diq-cel-fx { display: none !important; }
+          .diq-cel-bob, .diq-cel-num, .diq-cel-cta::after { animation: none !important; }
         }
       `}</style>
     </div>
   );
 }
-
 
 // ── SidebarNav ───────────────────────────────────────────────────────────
 // ── DQIcon — real line icons (Lucide geometry) replacing emoji nav icons.
@@ -17523,7 +17712,7 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
         setStreakCelebration(s); // full milestone celebration
       } else {
         setMiniStreak(s); // mini non-milestone celebration
-        setTimeout(()=>setMiniStreak(null), 3000);
+        setTimeout(()=>setMiniStreak(null), 4200); // > mini's own 3.4s + .4s exit
       }
     };
     window.addEventListener("streakUpdated", handler);
@@ -19550,6 +19739,11 @@ function DestinIQInner(){
     document.documentElement.lang = lang;
   },[lang]);
   const [streak,    setStreak   ]=useState(1);
+  // Mirror of `streak` so the check-in handler (which has [] deps) can read the
+  // current value without a stale closure — lets side effects run OUTSIDE the
+  // setState updater, where they belong.
+  const streakRef = useRef(streak);
+  useEffect(()=>{ streakRef.current = streak; },[streak]);
   const [showCI,    setShowCI   ]=useState(false);
   const [apiError,  setApiError ]=useState("");
   const [showNotif, setShowNotif]=useState(false);
@@ -20154,30 +20348,39 @@ try{
             if(lastCounted === todayKey) return; // already counted today — do nothing
             if(lastCountedKey) localStorage.setItem(lastCountedKey, todayKey);
           }catch{}
-          setStreak(s=>{
-            const next=s+1;
-            if(uid) try{localStorage.setItem(`diq_streak_${uid}`,String(next));}catch{}
-            // Push to Supabase
-            if(uid){
-              try{
-                supabase.from("user_profiles").upsert({
-                  user_id:uid, streak:next,
-                  last_checkin_date:new Date().toISOString().slice(0,10),
-                  updated_at:new Date().toISOString(),
-                },{onConflict:"user_id"}).then(null,()=>{});
-              }catch{}
-            }
-            // Fire celebration event for Dashboard to pick up
-            const isMilestone = [3,7,14,21,30,50,75,100].includes(next);
-            window.dispatchEvent(new CustomEvent("streakUpdated",{
-              detail:{streak:next, celebrate: isMilestone || next%10===0}
-            }));
-            // Award streak milestone points
-            if(next===7)  addProgressPoints(uid,"streak_7",  PROGRESS_POINTS.streak_7);
-            if(next===14) addProgressPoints(uid,"streak_14", PROGRESS_POINTS.streak_14);
-            if(next===30) addProgressPoints(uid,"streak_30", PROGRESS_POINTS.streak_30);
-            return next;
-          });
+
+          // Compute the new streak from the ref, so all side effects below run
+          // exactly ONCE (a setState updater can be invoked twice by React).
+          const next = (streakRef.current || 0) + 1;
+          streakRef.current = next;
+          setStreak(next);
+
+          if(uid) try{localStorage.setItem(`diq_streak_${uid}`,String(next));}catch{}
+
+          // Push to Supabase
+          if(uid){
+            try{
+              supabase.from("user_profiles").upsert({
+                user_id:uid, streak:next,
+                last_checkin_date:new Date().toISOString().slice(0,10),
+                updated_at:new Date().toISOString(),
+              },{onConflict:"user_id"}).then(null,()=>{});
+            }catch{}
+          }
+
+          // Fire celebration event for Dashboard to pick up.
+          // Derive milestones straight from STREAK_MILESTONES so the trigger can
+          // never drift out of sync with the copy again (this previously skipped
+          // day 2 and day 365 entirely). Every 10th day still gets a pop too.
+          const isMilestone = Object.prototype.hasOwnProperty.call(STREAK_MILESTONES, next) || next % 10 === 0;
+          window.dispatchEvent(new CustomEvent("streakUpdated",{
+            detail:{streak:next, celebrate: isMilestone}
+          }));
+
+          // Award streak milestone points
+          if(next===7)  addProgressPoints(uid,"streak_7",  PROGRESS_POINTS.streak_7);
+          if(next===14) addProgressPoints(uid,"streak_14", PROGRESS_POINTS.streak_14);
+          if(next===30) addProgressPoints(uid,"streak_30", PROGRESS_POINTS.streak_30);
         };
         window.addEventListener("checkinComplete",handleCI);
         return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("showNotif",handleShowNotif);window.removeEventListener("photoUpdated",handlePhotoUpdated);window.removeEventListener("checkinComplete",handleCI);};
