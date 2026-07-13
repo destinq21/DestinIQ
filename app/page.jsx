@@ -16176,6 +16176,15 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
           </div>
         )}
 
+        {(IS_ADMIN||ADMIN_EMAILS.includes(user?.email)||ADMIN_EMAILS.includes(formData?.email))&&(
+          <button onClick={()=>{ try{ window.dispatchEvent(new CustomEvent("diqOpenAdmin")); }catch{} }}
+            style={{width:"100%",padding:"15px",background:"rgba(240,180,41,0.07)",color:"var(--gold)",
+              border:"1px solid rgba(240,180,41,0.35)",borderRadius:12,fontSize:14,
+              fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
+              display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+            ⚙ Admin Dashboard
+          </button>
+        )}
         <button onClick={onSignOut}
           style={{width:"100%",padding:"15px",background:"transparent",color:"#e05252",
             border:"1px solid rgba(224,82,82,0.2)",borderRadius:12,fontSize:14,
@@ -16183,6 +16192,9 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
             display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
           <span style={{fontSize:16}}>↗</span> Sign Out
         </button>
+        <div style={{textAlign:"center",marginTop:14,fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
+          DestinIQ · build {DIQ_BUILD}
+        </div>
       </div>
     </div>
   );
@@ -19028,6 +19040,8 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // 5. ADMIN DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
+let IS_ADMIN=false; // set at login from the real auth email; readable by any component
+const DIQ_BUILD="v13.07-admin"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -19652,7 +19666,8 @@ function DestinIQInner(){
         // Admin accounts get full Pro Max automatically — the founder should
         // never hit his own paywalls. Runs AFTER DB resolution so a not-paid
         // DB row can't downgrade it. Session-only; writes nothing to the DB.
-        if (ADMIN_EMAILS.includes(u.email)) {
+        IS_ADMIN = ADMIN_EMAILS.includes(u.email);
+        if (IS_ADMIN) {
           setIsPaid(true); setIsPremium(true); setIsProMax(true);
         }
         // ── STREAK RESTORATION ──────────────────────────────────────────────
@@ -20556,7 +20571,7 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
                     </div>
                   </nav>
         {/* Admin access lived only in the retired nav — give it a discreet home */}
-        {ADMIN_EMAILS.includes(user?.email)&&(
+        {(IS_ADMIN||ADMIN_EMAILS.includes(user?.email))&&(
           <button onClick={()=>setShowAdmin(true)} title="Admin panel"
             style={{position:"fixed",bottom:96,left:12,zIndex:1200,background:"rgba(0,0,0,0.55)",
               border:"1px solid var(--cream-15)",borderRadius:20,padding:"6px 12px",
