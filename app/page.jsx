@@ -17704,8 +17704,7 @@ Rules:
   // Helper: legacy module view (report + existing module content)
   const showModView = ()=>(
     <div style={{paddingTop:8}}>
-      {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
-      {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+      {/* Streak celebrations moved to top level of Dashboard — see main return() */}
       {/* Progress action toast */}
       {toast&&(
         <div style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",
@@ -17755,11 +17754,15 @@ Rules:
   // ── EXPLORE: full-page standalone ──────────────────────────────────────────
   if(navSection==="explore"){
     return(
-      <ExploreScreen
-        setNav={setNav} formData={formData} userId={userId}
-        isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-        onUnlock={onUnlock} streak={streak} navPhotoURL={navPhotoURL}
-      />
+      <>
+        {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+        {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+        <ExploreScreen
+          setNav={setNav} formData={formData} userId={userId}
+          isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
+          onUnlock={onUnlock} streak={streak} navPhotoURL={navPhotoURL}
+        />
+      </>
     );
   }
 
@@ -17767,7 +17770,8 @@ Rules:
     <div className="app-shell">
 
       {/* Streak celebrations — top level so they show after check-in from ANY view */}
-
+      {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+      {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
 
       <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 
