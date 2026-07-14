@@ -2073,6 +2073,21 @@ const EM_INVESTING_CARDS = [
     ],
   },
   {
+    id:"indexfunds", title:"US Stocks & Index Funds — Yes, You Can", badge:"Later Rung", badgeColor:"#64b5f6",
+    tags:["All","Stocks"],
+    tagline:"Reachable from here. Just not through the door everyone points at.",
+    startupCost:"From about $5–$10", returnRange:"7–12%/yr long-term average", risk:"Medium",
+    whyItWorks:"Every finance video tells you to buy an S&P 500 fund — then sends you to Vanguard or Fidelity, who reject you for not being a US resident. That rejection isn't your fault and it doesn't mean the door is shut. Interactive Brokers accepts Ghana, Nigeria, Kenya and most of Africa and Asia, and fractional shares mean you can start with the price of a meal. But this is a LATER rung: emergency fund and T-bills first. Those protect you. This grows you.",
+    suppliers:[{name:"Interactive Brokers",url:"https://interactivebrokers.com",note:"Accepts most African & Asian countries"}],
+    steps:[
+      "Not first. Emergency fund, then T-bills. Only then this",
+      "Open with a broker that genuinely accepts your country — Interactive Brokers is the usual answer",
+      "Expect the paperwork: ID, proof of address, and a W-8BEN tax form. It's routine, not a problem",
+      "⚠️ AVOID 'CFD' platforms advertising US stocks. A CFD is a leveraged bet — you own NO shares. They are marketed hard across Africa and they are not investing",
+      "Buy a broad low-cost index fund and add monthly. Know the tax: Ghana takes ~10% on gains, the US withholds ~15% on dividends",
+    ],
+  },
+  {
     id:"cryptocare", title:"Crypto — Read This First", badge:"Caution", badgeColor:"#e05c6e",
     tags:["All","Crypto"],
     tagline:"Not a first investment. Not a way out.",
@@ -2407,7 +2422,7 @@ const TOPIC_CONFIGS = {
             incomeRange:"$100–$10,000/mo", setupTime:"1–7 days", difficulty:"Intermediate",
             whyItWorks:"TikTok pays creators through the Creator Fund, LIVE gifts, and brand deals. Faceless accounts in niches like motivation, finance, or education grow faster and earn more consistently.",
             platformLink:"https://tiktok.com",
-            steps:["Pick a profitable niche (finance, motivation, lifestyle)","Post 1–3 videos daily for first 30 days","Use trending audio + strong hook in first 2 seconds","Apply for TikTok Creator Fund at 10K followers","Pitch brands once you reach 50K followers"],
+            steps:["Pick a profitable niche (finance, motivation, lifestyle)","Post 1–3 videos daily for first 30 days","Use trending audio + strong hook in first 2 seconds","Check whether the Creator Fund is open in YOUR country before chasing follower counts for it — in much of Africa and Asia it isn't, and nobody tells you","Money comes from brand deals, LIVE gifts, and selling your own product. Start pitching brands from ~5K engaged followers — you don't need 50K"],
             actions:["Generate Content Ideas","Find Trending Niches","Build 30-Day Content Plan","Calculate Creator Earnings"],
           },
           {
@@ -17055,6 +17070,96 @@ function cardIconName(card){
   return "sparkles";
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// AVAILABILITY LAYER — tell the truth about access
+// ───────────────────────────────────────────────────────────────────────────────
+// The right question was never "is this card Western?" — it's "can this person
+// actually DO it?" Fiverr, Upwork, YouTube and affiliate marketing all work
+// perfectly well from Accra or Lagos, and hiding them would rob users of real
+// income. But Vanguard requires US residency, and TikTok's Creator Fund isn't
+// available across most of Africa — and letting someone find that out by getting
+// rejected is how you lose them.
+//
+// So: show everything. Label what's blocked. Give the workaround where one
+// exists. An honest "here's the way around it" beats both hiding and lying.
+//
+// NOTE: platform rules change constantly. These notes are guidance, not gospel —
+// the copy tells users to verify, and it should stay that way.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const AVAIL = { YES:"yes", PARTIAL:"partial", NO:"no" };
+
+// Keyed by card id. `emerging` covers non-developed markets (Ghana, Nigeria,
+// Kenya, India, Lebanon, Brazil…). Anything absent is assumed fine everywhere.
+const CARD_AVAILABILITY = {
+  // ── Earn online ──────────────────────────────────────────────────────────
+  fiverr: { emerging:{ status:AVAIL.YES,
+    note:"Works from your country. Fiverr and Upwork accept freelancers worldwide — get paid via Payoneer or a direct bank transfer." }},
+  youtube: { emerging:{ status:AVAIL.YES,
+    note:"Works from your country. YouTube's Partner Program and AdSense support Ghana, Nigeria, Kenya and most of Africa and Asia." }},
+  affiliate: { emerging:{ status:AVAIL.PARTIAL,
+    note:"Most programmes accept you — but check the PAYOUT before you invest time. Some only pay to a US bank. Look for ones paying via Payoneer, Wise or bank transfer." }},
+  tiktokcreator: { emerging:{ status:AVAIL.PARTIAL,
+    note:"TikTok's Creator Fund is NOT open in most of Africa and South Asia — you cannot earn from views, so ignore any advice about follower thresholds for it. Brand deals, LIVE gifts, and selling your own product all work, and honestly pay better anyway." }},
+
+  // ── Investing ────────────────────────────────────────────────────────────
+  indexfunds: { emerging:{ status:AVAIL.PARTIAL,
+    note:"Vanguard and Fidelity require US residency — they will reject you, and it isn't your fault. Interactive Brokers accepts most African and Asian countries and offers the same funds. Do this AFTER an emergency fund and T-bills." }},
+  crypto: { emerging:{ status:AVAIL.PARTIAL,
+    note:"Accessible from your country, but some banks block transfers to exchanges. Use only major regulated exchanges. Never a first investment." }},
+  cryptocare: { emerging:{ status:AVAIL.PARTIAL,
+    note:"Accessible from your country, but some banks block transfers to exchanges. Use only major regulated exchanges. Never a first investment." }},
+
+  // ── Business ─────────────────────────────────────────────────────────────
+  customgifts: { emerging:{ status:AVAIL.PARTIAL,
+    note:"Etsy and Amazon fight you here — seller verification, shipping and payouts are all hard. The same products sell well locally, on Instagram and WhatsApp, and you get paid faster." }},
+};
+
+// What status applies to THIS user, in THIS country?
+function cardAvailability(cardId, country){
+  const entry = CARD_AVAILABILITY[cardId];
+  if(!entry) return null;
+  if(isEmergingMarket(country) && entry.emerging) return entry.emerging;
+  return null;   // developed markets: no note needed
+}
+
+// If there is genuinely NO path for this person, don't show the card at all.
+// Showing someone an opportunity they can never take doesn't inform them — it
+// wastes their attention and quietly tells them the app isn't built for them.
+// (A card with a real WORKAROUND is not "unavailable" — that one still shows.)
+function isCardBlocked(cardId, country){
+  const a = cardAvailability(cardId, country);
+  return !!a && a.status === AVAIL.NO;
+}
+function filterAvailableCards(cards, country){
+  if(!Array.isArray(cards)) return cards;
+  return cards.filter(c => !isCardBlocked(c?.id, country));
+}
+
+// The little strip we render on a card.
+function AvailabilityNote({cardId, country}){
+  const a = cardAvailability(cardId, country);
+  if(!a) return null;
+  const c = a.status===AVAIL.YES ? "#1d9e75"
+          : a.status===AVAIL.NO  ? "#e05c6e"
+          : "#ffb74d";
+  const label = a.status===AVAIL.YES ? "AVAILABLE WHERE YOU ARE"
+              : a.status===AVAIL.NO  ? "NOT AVAILABLE WHERE YOU ARE"
+              : "WORKS — WITH A CATCH";
+  return(
+    <div style={{marginTop:10,padding:"10px 12px",borderRadius:10,
+      background:c+"12", border:"1px solid "+c+"3a"}}>
+      <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",
+        color:c, fontWeight:700, marginBottom:5}}>
+        {label}
+      </div>
+      <div style={{fontSize:12,color:"var(--cream-60)",lineHeight:1.6}}>
+        {a.note}
+      </div>
+    </div>
+  );
+}
+
 function IntelligenceCard({card, catColor, onSelect, userId, country}){
   const [saved, setSaved] = useState(()=>{
     try{
@@ -17178,6 +17283,9 @@ function IntelligenceCard({card, catColor, onSelect, userId, country}){
             View full intelligence →
           </span>
         </div>
+
+        {/* Can this person actually DO this where they live? Say so plainly. */}
+        <AvailabilityNote cardId={card.id} country={country}/>
       </div>
     </div>
   );
@@ -17866,7 +17974,11 @@ Return ONLY a JSON array of 4 objects. No markdown. No explanation. Start [ end 
     </div>
   );
 
-  const deckCards = personalizeDeck(pickDeck(formData?.country, topicId, topic.cards), formData);
+  // Drop any card that is genuinely impossible in this user's country, then rank.
+  const deckCards = personalizeDeck(
+    filterAvailableCards(pickDeck(formData?.country, topicId, topic.cards), formData?.country),
+    formData
+  );
   const filteredCards = activeTag==="All"
     ? deckCards
     : deckCards.filter(c=>
