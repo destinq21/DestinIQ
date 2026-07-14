@@ -8983,9 +8983,12 @@ Return ONLY a JSON array of exactly 5 objects, no markdown, no explanation, no c
     setLoadingPoints(false);
   };
 
+  // modId MUST be in the deps. Without it, switching tools left the previous
+  // tool's `points` in state, `if(!points)` short-circuited, and the user was
+  // shown Tool A's report under Tool B's name.
   useEffect(()=>{
     if(!points && (profile?.name||profile?.country||profile)) generatePoints();
-  },[profile?.name,profile?.country]);
+  },[modId,profile?.name,profile?.country]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for the ToolPage action bar's Refresh button
   useEffect(()=>{
@@ -14249,10 +14252,12 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
           })()}
         </div>
       </div>
-      {!isPaid&&(
+      {/* Upgrade CTA. Previously gated on !isPaid, which meant a Pro user had
+          NO path to Pro Max — the upgrade button simply vanished once you paid. */}
+      {(!isPaid || !isProMax)&&(
         <div className="s-upgrade">
           <button className="btn btn-gold" style={{width:"100%",fontSize:12}} onClick={onUnlock}>
-            ✦ Upgrade to Pro
+            {!isPaid ? "✦ Upgrade to Pro" : "✦ Upgrade to Pro Max"}
           </button>
         </div>
       )}
@@ -14966,34 +14971,94 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
         {/* The single most important thing on this screen — one action, no menu */}
         <OneThingToday formData={formData} userId={userId} setNav={setNav}/>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
-        {/* ══ CONTINUE JOURNEY (Hero card) ══ */}
-        <div style={{background:G.isDark?"linear-gradient(135deg,#131008,#0f0c05)":"linear-gradient(135deg,#fffdf6,#faf5e8)",
-          border:"1px solid rgba(240,180,41,"+(G.isDark?"0.2":"0.35")+")",borderRadius:18,padding:"24px",
-          marginBottom:14,position:"relative",overflow:"hidden",
-          boxShadow:"0 0 40px rgba(240,180,41,0.05)"}}>
-          <div style={{position:"absolute",top:0,right:0,width:"45%",height:"100%",
-            background:"radial-gradient(ellipse at 80% 20%,rgba(240,180,41,0.07),transparent 60%)",
-            pointerEvents:"none"}}/>
-          <div style={{position:"relative"}}>
-            <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:12}}>CONTINUE YOUR JOURNEY</div>
-            <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:18}}>
-              <div style={{width:50,height:50,borderRadius:13,flexShrink:0,
-                background:"rgba(240,180,41,0.1)",border:"1px solid rgba(240,180,41,0.22)",
-                display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{focusIcon}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:16,fontWeight:700,color:G.cream,marginBottom:3}}>{focus}</div>
-                <div style={{fontSize:12,color:G.dim,marginBottom:6}}>Your primary growth area</div>
-                <div style={{fontSize:11,color:G.dimmer,lineHeight:1.5}}>New cards, tools and AI ideas are waiting in this area — one small step today counts.</div>
+        {/* ══ PICK UP WHERE YOU LEFT OFF ══
+            Replaces the old "Continue Your Journey" card, which said "new cards
+            are waiting" and then dumped everyone into Explore — a generic
+            destination, identical for every user, and now redundant with the
+            One Thing card above. This resumes their ACTUAL last tool and shows
+            real progress toward earning free Pro. ══ */}
+        {(()=>{
+          const last = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_last_tool_${userId}`)||"null"); }catch{ return null; } })();
+          const REWARD_EVERY = 30;
+          const toReward = REWARD_EVERY - ((streak||0) % REWARD_EVERY);
+          const pct = Math.round((((streak||0) % REWARD_EVERY) / REWARD_EVERY) * 100);
+          const lastMeta = last?.id ? TOOL_META[last.id] : null;
+
+          return(
+            <div style={{background:G.isDark?"linear-gradient(135deg,#131008,#0f0c05)":"linear-gradient(135deg,#fffdf6,#faf5e8)",
+              border:"1px solid rgba(240,180,41,"+(G.isDark?"0.2":"0.35")+")",borderRadius:18,padding:"22px",
+              marginBottom:14,position:"relative",overflow:"hidden",
+              boxShadow:"0 0 40px rgba(240,180,41,0.05)"}}>
+              <div style={{position:"absolute",top:0,right:0,width:"45%",height:"100%",
+                background:"radial-gradient(ellipse at 80% 20%,rgba(240,180,41,0.07),transparent 60%)",
+                pointerEvents:"none"}}/>
+              <div style={{position:"relative"}}>
+
+                {/* Resume the actual thing they were doing */}
+                {lastMeta ? (
+                  <>
+                    <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:12}}>PICK UP WHERE YOU LEFT OFF</div>
+                    <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+                      <div style={{width:48,height:48,borderRadius:13,flexShrink:0,
+                        background:(lastMeta.color||"#f0b429")+"1a",
+                        border:"1px solid "+(lastMeta.color||"#f0b429")+"33",
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{lastMeta.icon}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:16,fontWeight:700,color:G.cream,marginBottom:2}}>{lastMeta.label}</div>
+                        <div style={{fontSize:12,color:G.dim}}>You were here last. Finish what you started.</div>
+                      </div>
+                    </div>
+                    <button onClick={()=>setNav("tool:"+last.id)}
+                      style={{display:"flex",alignItems:"center",gap:8,background:G.gold,color:"#000",
+                        border:"none",borderRadius:10,padding:"12px 22px",fontSize:13,fontWeight:700,
+                        cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>
+                      Resume {lastMeta.label} <span style={{fontSize:16}}>→</span>
+                    </button>
+                  </>
+                ):(
+                  <>
+                    <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace",marginBottom:12}}>YOUR FOCUS</div>
+                    <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+                      <div style={{width:48,height:48,borderRadius:13,flexShrink:0,
+                        background:"rgba(240,180,41,0.1)",border:"1px solid rgba(240,180,41,0.22)",
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{focusIcon}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:16,fontWeight:700,color:G.cream,marginBottom:2}}>{focus}</div>
+                        <div style={{fontSize:12,color:G.dim}}>Tools chosen for this are waiting for you.</div>
+                      </div>
+                    </div>
+                    <button onClick={()=>setNav("foryou")}
+                      style={{display:"flex",alignItems:"center",gap:8,background:G.gold,color:"#000",
+                        border:"none",borderRadius:10,padding:"12px 22px",fontSize:13,fontWeight:700,
+                        cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>
+                      See what's for you <span style={{fontSize:16}}>→</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Real, earnable progress — not a vague nudge */}
+                {!isPaid&&(
+                  <div style={{paddingTop:14,borderTop:"1px solid "+(G.isDark?"rgba(240,180,41,0.12)":"rgba(240,180,41,0.2)")}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7,gap:10}}>
+                      <span style={{fontSize:11.5,color:G.dim,lineHeight:1.5}}>
+                        {toReward===REWARD_EVERY
+                          ? "Check in 30 days in a row to earn 7 free days of Pro."
+                          : toReward===1
+                            ? "One more day — then 7 days of Pro, free."
+                            : `${toReward} days from earning 7 free days of Pro.`}
+                      </span>
+                      <span style={{fontSize:11,fontFamily:"monospace",color:G.gold,whiteSpace:"nowrap"}}>{pct}%</span>
+                    </div>
+                    <div style={{height:6,borderRadius:20,background:G.isDark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.06)",overflow:"hidden"}}>
+                      <div style={{height:"100%",width:pct+"%",borderRadius:20,
+                        background:"linear-gradient(90deg,#FDE68A,#F0B429)",transition:"width .6s"}}/>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <button onClick={()=>setNav("explore")}
-              style={{display:"flex",alignItems:"center",gap:8,background:G.gold,color:"#000",
-                border:"none",borderRadius:10,padding:"12px 22px",fontSize:13,fontWeight:700,
-                cursor:"pointer",fontFamily:"inherit"}}>
-              Continue Learning <span style={{fontSize:16}}>→</span>
-            </button>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* ══ IDENTITY STRIP + FOLLOW-UP + WEEKLY REVEAL ══ */}
         <IdentityStrip userId={userId} streak={streak} G={G}/>
@@ -15105,7 +15170,11 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
 
   const navItems=[
     {id:"home",      icon:"home", label:"Home"},
+    {id:"foryou",    icon:"star", label:"For You"},
     {id:"explore",   icon:"search", label:"Explore"},
+    {id:"patterns",  icon:"brain", label:"Patterns"},
+    {id:"review",    icon:"book", label:"Review"},
+    {id:"journal",   icon:"pen", label:"Journal"},
     {id:"report",    icon:"chart", label:"My Report"},
     {id:"progress",  icon:"trending", label:"Progress"},
     {id:"checkin",   icon:"check", label:"Check-in"},
@@ -15178,16 +15247,21 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
           </button>
         </div>
 
-        {/* Upgrade card */}
-        {!isPaid&&(
+        {/* Upgrade card — shown to free users AND to Pro users (who previously
+            had no route to Pro Max at all: this card was gated on !isPaid). */}
+        {(!isPaid || !isProMax)&&(
           <div style={{margin:"0 16px 20px",padding:"16px",
             background:"linear-gradient(135deg,rgba(240,180,41,0.12),rgba(155,114,207,0.08))",
             border:"1px solid rgba(240,180,41,0.2)",borderRadius:16}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
               <span style={{fontSize:22}}>👑</span>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:G.cream}}>Upgrade to Premium</div>
-                <div style={{fontSize:11,color:G.dimmer}}>Unlock unlimited AI insights</div>
+                <div style={{fontSize:13,fontWeight:700,color:G.cream}}>
+                  {!isPaid ? "Upgrade to Pro" : "Upgrade to Pro Max"}
+                </div>
+                <div style={{fontSize:11,color:G.dimmer}}>
+                  {!isPaid ? "Unlock all 42 tools" : "Voice, deep reports & the Life Book"}
+                </div>
               </div>
             </div>
             <button onClick={()=>{onClose();onUnlock&&onUnlock();}}
@@ -17603,7 +17677,7 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
         ? <RelocationExplorer formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
         : toolId==="advisor"
         ? <AdvisorChat profile={formData} reportData={reportData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
-        : <GenericAIModule modId={toolId} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang||"en"}/>
+        : <GenericAIModule key={toolId} modId={toolId} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang||"en"}/>
       }
       </div>
       {toolId!=="advisor"&&(<>
@@ -19523,7 +19597,7 @@ Rules:
           {mod==="advisor"   &&<AdvisorChat profile={formData} reportData={data} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>}
           {mod==="momentum"  &&<MomentumModule profile={formData} userId={userId} isPremium={isPremium} isProMax={isProMax} streak={streak}/>}
           {Object.keys(MODULE_CONFIGS).includes(mod)&&
-            <GenericAIModule modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
+            <GenericAIModule key={mod} modId={mod} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang}/>}
         </div>
       )}
     </div>
@@ -20847,32 +20921,58 @@ function AdminDashboard({user,onBack}){
   const [sendMsg,setSendMsg]=useState("");
   const isAdmin=ADMIN_EMAILS.includes(user?.email);
 
+  const [loadError,setLoadError]=useState("");
+  const [actioning,setActioning]=useState(null);   // testimonial id being acted on
+  const [topCountries,setTopCountries]=useState([]);
+
+  // Admin stats MUST come from the server. Querying user_profiles from the
+  // browser hits Supabase Row Level Security, which only exposes the caller's
+  // OWN row — so the old client-side query could never count other users and
+  // silently reported 0 / 0 / 0 / 0 / 0 with no error shown.
   useEffect(()=>{
     if(!isAdmin) return;
-    Promise.all([
-      supabase.from("user_profiles").select("*",{count:"exact"}),
-      supabase.from("testimonials").select("*").order("created_at",{ascending:false}).limit(20),
-      supabase.from("user_profiles").select("user_id,name,is_paid,is_premium,streak,created_at").order("created_at",{ascending:false}).limit(20),
-      supabase.from("referrals").select("*",{count:"exact"}),
-    ]).then(([prof,test,usr,refs])=>{
-      const paid=prof.data?.filter(p=>p.is_paid).length||0;
-      setStats({
-        totalUsers:prof.count||0,
-        paidUsers:paid,
-        freeUsers:(prof.count||0)-paid,
-        testimonialsPending:test.data?.filter(t=>!t.approved).length||0,
-        totalReferrals:refs.count||0,
-      });
-      setTestimonials(test.data||[]);
-      setUsers(usr.data||[]);
+    (async()=>{
+      setLoading(true); setLoadError("");
+      try{
+        const {data:{session}}=await supabase.auth.getSession();
+        const token=session?.access_token;
+        if(!token){ setLoadError("Session expired — sign in again."); setLoading(false); return; }
+        const res=await fetch("/api/admin/stats",{headers:{Authorization:`Bearer ${token}`}});
+        const j=await res.json().catch(()=>({}));
+        if(!res.ok){ setLoadError(j.error||`Failed to load stats (${res.status})`); setLoading(false); return; }
+        setStats(j.stats||null);
+        setTestimonials(j.testimonials||[]);
+        setUsers(j.users||[]);
+        setTopCountries(j.topCountries||[]);
+      }catch(e){ setLoadError(e.message||"Could not reach /api/admin/stats"); }
       setLoading(false);
-    });
+    })();
   },[isAdmin]);
 
-  const approveTestimonial=async(id,approved)=>{
-    await supabase.from("testimonials").update({approved}).eq("id",id);
-    setTestimonials(t=>t.map(x=>x.id===id?{...x,approved}:x));
+  // Testimonial actions go through the server. The old version called
+  // supabase.from("testimonials").update() FROM THE BROWSER — RLS silently
+  // rejected it, but the UI optimistically flipped the toggle, so approvals
+  // looked like they worked and never actually saved. Now we confirm first.
+  const testimonialAction=async(id,action)=>{
+    setActioning(id);
+    try{
+      const {data:{session}}=await supabase.auth.getSession();
+      const token=session?.access_token;
+      const res=await fetch("/api/admin/stats",{
+        method:"POST",
+        headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
+        body:JSON.stringify({action,id}),
+      });
+      const j=await res.json().catch(()=>({}));
+      if(!res.ok){ setLoadError(j.error||`Action failed (${res.status})`); setActioning(null); return; }
+      // Only update the UI AFTER the server confirms it actually persisted.
+      if(action==="delete") setTestimonials(t=>t.filter(x=>x.id!==id));
+      else setTestimonials(t=>t.map(x=>x.id===id?{...x,approved:action==="approve"}:x));
+      setLoadError("");
+    }catch(e){ setLoadError(e.message||"Action failed"); }
+    setActioning(null);
   };
+  const approveTestimonial=(id,approved)=>testimonialAction(id, approved?"approve":"unapprove");
 
   // Send an email as support@destiniq.app via the /api/email route (Resend).
   // Pass either `to` (an address) or `userId` (server resolves the address).
@@ -20931,16 +21031,94 @@ function AdminDashboard({user,onBack}){
         </div>
         <div style={{fontSize:12,color:"var(--cream-30)",fontFamily:"var(--f-mono)",marginBottom:32}}>DestinIQ · Internal</div>
 
-        {loading?<div style={{color:"var(--cream-30)"}}>Loading…</div>:(
+        {/* Loud failure beats a quiet lie. If stats can't load, SAY SO — the old
+            code swallowed the error and showed five convincing zeros. */}
+        {loadError&&(
+          <div style={{padding:"14px 16px",borderRadius:12,marginBottom:20,
+            background:"rgba(224,92,110,0.09)",border:"1px solid rgba(224,92,110,0.35)"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#e05c6e",marginBottom:4}}>
+              Couldn't load stats
+            </div>
+            <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>
+              {loadError}
+            </div>
+          </div>
+        )}
+
+        {loading?<div style={{color:"var(--cream-30)"}}>Loading…</div>:!stats?(
+          <div style={{color:"var(--cream-30)",fontSize:13}}>No stats available.</div>
+        ):(
           <>
-            {/* Stats */}
+            {/* ── MONEY ─────────────────────────────────────────────── */}
+            <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",
+              letterSpacing:".1em",marginBottom:10}}>MONEY</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:26}}>
+              {[
+                ["💰","Est. MRR","$"+(stats.estMRR??0)],
+                ["📈","Conversion",(stats.conversionRate??0)+"%"],
+                ["👑","Pro Max",stats.promaxUsers??0],
+                ["💳","Paid total",stats.paidUsers??0],
+              ].map(([icon,label,val])=>(
+                <div key={label} style={{background:"var(--raised)",border:"1px solid var(--line-gold)",
+                  borderRadius:14,padding:"16px 14px",textAlign:"center"}}>
+                  <div style={{fontSize:18,marginBottom:5}}>{icon}</div>
+                  <div style={{fontSize:22,fontWeight:800,color:"var(--gold)",lineHeight:1.15}}>{val}</div>
+                  <div style={{fontSize:10,color:"var(--cream-30)",fontFamily:"var(--f-mono)",
+                    marginTop:4,textTransform:"uppercase",letterSpacing:".05em"}}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── GROWTH ────────────────────────────────────────────── */}
+            <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",
+              letterSpacing:".1em",marginBottom:10}}>GROWTH</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:26}}>
+              {[["New today",stats.newToday],["New this week",stats.new7d],
+                ["New this month",stats.new30d],["Total users",stats.totalUsers]].map(([label,val])=>(
+                <div key={label} style={{background:"var(--raised)",border:"1px solid var(--line)",
+                  borderRadius:14,padding:"14px",textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:"var(--cream)",lineHeight:1.15}}>{val??0}</div>
+                  <div style={{fontSize:10,color:"var(--cream-30)",marginTop:4}}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── ENGAGEMENT — the numbers that predict revenue ─────── */}
+            <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",
+              letterSpacing:".1em",marginBottom:10}}>ENGAGEMENT</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:26}}>
+              {[["Checked in today",stats.activeToday],["Active this week",stats.active7d],
+                ["On a 7+ streak",stats.onStreak],["Referrals",stats.totalReferrals]].map(([label,val])=>(
+                <div key={label} style={{background:"var(--raised)",border:"1px solid var(--line)",
+                  borderRadius:14,padding:"14px",textAlign:"center"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:"#1d9e75",lineHeight:1.15}}>{val??0}</div>
+                  <div style={{fontSize:10,color:"var(--cream-30)",marginTop:4}}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── WHERE YOUR USERS ARE — drives regional pricing ────── */}
+            {topCountries.length>0&&(
+              <>
+                <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:"var(--cream-30)",
+                  letterSpacing:".1em",marginBottom:10}}>WHERE YOUR USERS ARE</div>
+                <div className="card" style={{marginBottom:26,padding:"14px 18px"}}>
+                  {topCountries.map(c=>(
+                    <div key={c.country} style={{display:"flex",justifyContent:"space-between",
+                      alignItems:"center",padding:"7px 0",fontSize:13,color:"var(--cream)"}}>
+                      <span>{c.country}</span>
+                      <span style={{fontFamily:"var(--f-mono)",color:"var(--gold)",fontSize:12}}>{c.users}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Legacy summary row */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:14,marginBottom:32}}>
               {[
-                ["👥","Total Users",stats.totalUsers],
-                ["💳","Paid",stats.paidUsers],
                 ["🆓","Free",stats.freeUsers],
                 ["⭐","Testimonials pending",stats.testimonialsPending],
-                ["🔗","Referrals",stats.totalReferrals],
               ].map(([icon,label,val])=>(
                 <div key={label} className="card" style={{textAlign:"center"}}>
                   <div style={{fontSize:24,marginBottom:4}}>{icon}</div>
