@@ -1864,7 +1864,7 @@ const UK_BUSINESS_CARDS=[
   },
 ];
 
-// ── DEV_INVESTING_CARDS ──────────────────────────────────────────────────────
+// ── EM_INVESTING_CARDS (EMERGING markets) ──────────────────────────────────────────────────────
 // The default Investing deck was Index Funds + Crypto. For a user in Accra,
 // Lagos or Nairobi that's two wrong answers: a Vanguard account is usually out
 // of reach, and crypto is not a first rung — it's a cliff.
@@ -1973,7 +1973,7 @@ function describeFollowups(f){
   return out.join("\n");
 }
 
-const DEV_INVESTING_CARDS = [
+const EM_INVESTING_CARDS = [
   {
     id:"tbills", title:"Treasury Bills", badge:"Start Here", badgeColor:"#81c784",
     tags:["All","Saving","Low Risk"],
@@ -2088,7 +2088,7 @@ const DEV_INVESTING_CARDS = [
   },
 ];
 
-// ── DEV_BUDGETING_CARDS ──────────────────────────────────────────────────────
+// ── EM_BUDGETING_CARDS (EMERGING markets) ──────────────────────────────────────────────────────
 // The default Budgeting deck is "Zero-Based Budgeting" — assign every dollar of
 // your monthly salary. That advice assumes a salary. Most people in these
 // markets are traders, drivers, hairdressers, farmers, freelancers: income is
@@ -2098,7 +2098,7 @@ const DEV_INVESTING_CARDS = [
 // East Africa and South Asia — family obligation. You cannot budget in Accra
 // without a line for the relatives who WILL ask. Every budgeting guide that
 // pretends otherwise is written for someone else's life.
-const DEV_BUDGETING_CARDS = [
+const EM_BUDGETING_CARDS = [
   {
     id:"irregular", title:"Budgeting On Income That Changes Daily", badge:"Start Here", badgeColor:"#81c784",
     tags:["All","Saving"],
@@ -2185,7 +2185,7 @@ const DEV_BUDGETING_CARDS = [
   },
 ];
 
-// ── DEV_CAREER_CARDS ─────────────────────────────────────────────────────────
+// ── EM_CAREER_CARDS (EMERGING markets) ─────────────────────────────────────────────────────────
 // The default Career deck teaches you to beat Applicant Tracking Systems and
 // negotiate a $5,000–$20,000 raise. Both assume a Western corporate labour
 // market. In Accra, Lagos, Nairobi and much of South Asia the gatekeeper is not
@@ -2193,7 +2193,7 @@ const DEV_BUDGETING_CARDS = [
 // aren't salaried at all.
 //
 // This deck is written for the market people actually work in.
-const DEV_CAREER_CARDS = [
+const EM_CAREER_CARDS = [
   {
     id:"whoknowsyou", title:"Jobs Come Through People, Not Portals", badge:"Start Here", badgeColor:"#81c784",
     tags:["All","Career"],
@@ -2266,11 +2266,26 @@ const DEV_CAREER_CARDS = [
   },
 ];
 
-const DEV_DECKS={ startbusiness: DEV_BUSINESS_CARDS, earnonline: DEV_EARNONLINE_CARDS, investing: DEV_INVESTING_CARDS, budgeting: DEV_BUDGETING_CARDS, careerpath: DEV_CAREER_CARDS };
+// ⚠️ NAMING TRAP: "DEV" here means DEVELOPED (US, UK, Germany…), NOT developing.
+// This deck is served to WESTERN users.
+const DEV_DECKS={ startbusiness: DEV_BUSINESS_CARDS, earnonline: DEV_EARNONLINE_CARDS };
+
+// EMERGING markets — Ghana, Nigeria, Kenya, India, Lebanon, Brazil and everyone
+// else NOT in DEV_MARKETS. These users were previously served the US default
+// cards: Vanguard index funds, ATS-optimised CVs, "assign every dollar of your
+// monthly salary" — all of it addressed to someone else's life.
+const EMERGING_DECKS={ investing: EM_INVESTING_CARDS, budgeting: EM_BUDGETING_CARDS, careerpath: EM_CAREER_CARDS };
+
+// Anyone with a country set who is NOT a developed market.
+const isEmergingMarket=(country)=>{
+  const q=String(country||"").trim();
+  return !!q && !isDevMarket(q);
+};
 const isUKCountry=(country)=>/united kingdom|great britain|(^|\b)uk(\b|$)|england|scotland|wales|northern ireland/.test(String(country||"").toLowerCase());
 function pickDeck(country, topicId, defaultCards){
   if(isUKCountry(country)&&topicId==="startbusiness") return UK_BUSINESS_CARDS;
-  if(isDevMarket(country)&&DEV_DECKS[topicId]) return DEV_DECKS[topicId];
+  if(isDevMarket(country)&&DEV_DECKS[topicId]) return DEV_DECKS[topicId];          // US/UK/EU…
+  if(isEmergingMarket(country)&&EMERGING_DECKS[topicId]) return EMERGING_DECKS[topicId]; // Ghana, Nigeria, India…
   return defaultCards;
 }
 
