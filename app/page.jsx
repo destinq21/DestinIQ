@@ -666,6 +666,7 @@ const PROGRESS_POINTS = {
   streak_7:         5,   // reached 7-day streak
   streak_14:        5,   // reached 14-day streak
   streak_30:        10,  // reached 30-day streak
+  one_thing:        3,   // completed "your one thing today"
 };
 
 const PROGRESS_PTS_KEY = (uid) => `diq_prog_pts_${uid}`;
@@ -681,7 +682,7 @@ function addProgressPoints(userId, action, amount){
   // Deduplicate daily actions so they can't be farmed
   const dedupeKey = PROGRESS_ACT_KEY(userId);
   const today = new Date().toISOString().slice(0,10);
-  const dailyDeduped = ["checkin","streak_7","streak_14","streak_30"];
+  const dailyDeduped = ["checkin","streak_7","streak_14","streak_30","one_thing"];
   try{
     if(dailyDeduped.includes(action)){
       const done = JSON.parse(localStorage.getItem(dedupeKey)||"{}");
@@ -1484,6 +1485,157 @@ const TOOL_META={
   relocate:      {label:"Relocate",         icon:"✦", cat:"plan",   color:"#ff8a65"},
   advisor:       {label:"My Advisor",       icon:"⬡", cat:"plan",   color:"#ff8a65"},
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERSONALIZATION ENGINE — turns onboarding choices into a real "For you" feed
+// ───────────────────────────────────────────────────────────────────────────────
+// The intake asks what people WANT (priorities) and what's HOLDING THEM BACK
+// (blockers), then flattens both to strings. This maps them back onto actual
+// tools so the app can lead with what each person came for.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Priority id → tools that serve that goal (ordered: most relevant first)
+const PRIORITY_TOOLS = {
+  finances:      ["money","debtfreedom","earnonline","investment101","sidehustle","invest"],
+  habits:        ["discipline","morningritual","mindsettenx","success","digitallife"],
+  purpose:       ["visionboard","lettertoself","legacyletter","roadmap","dailywisdom"],
+  relationships: ["relationshipiq","hardconvo","smalltalk","peopledecoder","parenting"],
+  health:        ["nogym","bodyfuel","sleepcoach","posture","glowup"],
+  business:      ["business","sidehustle","negotiation","roadmap","earnonline"],
+};
+
+// Blocker id → tools that directly attack that obstacle
+const BLOCKER_TOOLS = {
+  discipline:   ["discipline","morningritual","mindsettenx"],
+  overthinking: ["innerpeace","anxietytool","decisions"],
+  money:        ["money","debtfreedom","earnonline","sidehustle"],
+  fear:         ["fearaudit","confidencelab","success"],
+  direction:    ["roadmap","visionboard","advisor","decisions"],
+  time:         ["discipline","digitallife","roadmap"],
+};
+
+// Human-readable "why we picked this" lines
+const PRIORITY_WHY = {
+  finances:"you want to improve your finances",
+  habits:"you want to build better habits",
+  purpose:"you want to find your purpose",
+  relationships:"you want better relationships",
+  health:"you want to improve your health",
+  business:"you want to grow your business",
+};
+const BLOCKER_WHY = {
+  discipline:"discipline is holding you back",
+  overthinking:"overthinking is holding you back",
+  money:"lack of money is holding you back",
+  fear:"fear of failure is holding you back",
+  direction:"lack of direction is holding you back",
+  time:"no time is holding you back",
+};
+
+// Label → id, so users who onboarded BEFORE ids were stored still get
+// personalised results (their profile only kept the labels).
+const PRIORITY_LABEL_TO_ID = {
+  "improve my finances":"finances", "build better habits":"habits",
+  "find my purpose":"purpose", "better relationships":"relationships",
+  "improve my health":"health", "grow my business":"business",
+};
+const BLOCKER_LABEL_TO_ID = {
+  "lack of discipline":"discipline", "overthinking":"overthinking",
+  "lack of money":"money", "fear of failure":"fear",
+  "lack of direction":"direction", "no time":"time",
+};
+
+// Read a profile and recover the chosen ids, whichever era it was saved in.
+function resolveProfileTags(p){
+  if(!p) return {priorities:[], blockers:[]};
+  const norm = s => String(s||"").trim().toLowerCase();
+
+  // Priorities: prefer raw ids; else reverse-map the labels in focus/interests.
+  let priorities = Array.isArray(p.priorityIds) ? p.priorityIds.slice() : [];
+  if(!priorities.length){
+    const labels = [p.focus, ...(String(p.interests||"").split(","))];
+    labels.forEach(l=>{
+      const id = PRIORITY_LABEL_TO_ID[norm(l)];
+      if(id && !priorities.includes(id)) priorities.push(id);
+    });
+  }
+
+  // Blockers: prefer raw ids; else reverse-map from blockers[] / challenge string.
+  let blockers = Array.isArray(p.blockerIds) ? p.blockerIds.slice() : [];
+  if(!blockers.length){
+    const raw = Array.isArray(p.blockers) ? p.blockers : String(p.challenge||"").split(",");
+    raw.forEach(l=>{
+      const id = BLOCKER_LABEL_TO_ID[norm(l)];
+      if(id && !blockers.includes(id)) blockers.push(id);
+    });
+  }
+  return {priorities, blockers};
+}
+
+// Rank tools for this user. Goals and blockers are ranked SEPARATELY, then
+// merged with a quota — otherwise goal tools (which have longer lists) crowd
+// blockers out entirely, and "what's holding you back" gets asked then ignored.
+function getForYouTools(profile, limit=6){
+  const {priorities, blockers} = resolveProfileTags(profile);
+  if(!priorities.length && !blockers.length) return [];
+
+  const rank = (ids, MAP, WHY, firstBonus)=>{
+    const score={}, why={};
+    ids.forEach((id, iIdx)=>{
+      (MAP[id]||[]).forEach((tid, tIdx)=>{
+        const pts = (iIdx===0 ? firstBonus : firstBonus-4) - Math.min(tIdx,4);
+        if(pts > (score[tid]||0)){ score[tid]=pts; why[tid]=WHY[id]; }
+      });
+    });
+    return Object.keys(score)
+      .filter(t=>TOOL_META[t])
+      .sort((a,b)=> score[b]-score[a] || a.localeCompare(b))
+      .map(t=>({id:t, ...TOOL_META[t], why:why[t]||""}));
+  };
+
+  const goalPicks  = rank(priorities, PRIORITY_TOOLS, PRIORITY_WHY, 10);
+  const blockPicks = rank(blockers,   BLOCKER_TOOLS,  BLOCKER_WHY,  10);
+
+  // Reserve roughly a third of the slots for blocker tools (at least 2 when the
+  // user named any), so people always see something aimed at their obstacle.
+  const blockQuota = blockPicks.length
+    ? Math.max(2, Math.round(limit/3))
+    : 0;
+
+  const out=[], seen=new Set();
+  const push = t => { if(t && !seen.has(t.id)){ seen.add(t.id); out.push(t); } };
+
+  blockPicks.slice(0, blockQuota).forEach(push);
+  goalPicks.forEach(t=>{ if(out.length < limit) push(t); });
+  // Backfill if goals ran dry
+  blockPicks.forEach(t=>{ if(out.length < limit) push(t); });
+
+  // Interleave so the top pick is a goal tool but a blocker tool sits near it
+  const goals  = out.filter(t=>goalPicks.some(g=>g.id===t.id));
+  const blocks = out.filter(t=>!goals.includes(t));
+  const merged=[];
+  let gi=0, bi=0;
+  while(merged.length < out.length){
+    if(gi<goals.length)  merged.push(goals[gi++]);
+    if(bi<blocks.length && merged.length<out.length) merged.push(blocks[bi++]);
+    if(gi>=goals.length && bi>=blocks.length) break;
+  }
+  return merged.slice(0, limit);
+}
+
+// Order the category grid so the user's own priorities come first.
+function orderCategoriesForUser(profile){
+  const {priorities, blockers} = resolveProfileTags(profile);
+  if(!priorities.length && !blockers.length) return CATEGORIES;
+
+  const relevant = new Set();
+  priorities.forEach(pid => (PRIORITY_TOOLS[pid]||[]).forEach(t => TOOL_META[t] && relevant.add(TOOL_META[t].cat)));
+  blockers.forEach(bid   => (BLOCKER_TOOLS[bid]||[]).forEach(t  => TOOL_META[t] && relevant.add(TOOL_META[t].cat)));
+
+  const hit  = CATEGORIES.filter(c=>relevant.has(c.id)).map(c=>({...c,_forYou:true}));
+  const rest = CATEGORIES.filter(c=>!relevant.has(c.id));
+  return [...hit, ...rest];
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CARD-BASED INTELLIGENCE ARCHITECTURE
@@ -7104,6 +7256,12 @@ function Intake({onSubmit, savedFormData, ipLocation}){
         bigGoal:         f.vision,
         challenge:       blockerLabels.join(", "),
         blockers:        blockerLabels,
+        // Raw ids — kept so the "For you" engine can match exactly instead of
+        // reverse-mapping from labels. (Older profiles have labels only.)
+        priorityIds:     Array.isArray(f.priorities) ? f.priorities : [],
+        blockerIds:      Array.isArray(f.blockers)   ? f.blockers   : [],
+        mindsetId:       f.mindset || "",
+        moodId:          f.mood    || "",
         skills:          "",
         habits:          "",
         support:         "",
@@ -13441,6 +13599,7 @@ function StreakCelebration({streak, onClose}){
 // ── DQIcon — real line icons (Lucide geometry) replacing emoji nav icons.
 // Inherits currentColor, so it takes the gold/theme color of its parent.
 const DQ_ICON_PATHS={
+  star:'<path d="M11.5 2.9a.6.6 0 0 1 1 0l2.4 4.9 5.4.8a.6.6 0 0 1 .3 1l-3.9 3.8.9 5.4a.6.6 0 0 1-.85.63L12 17l-4.8 2.5a.6.6 0 0 1-.86-.63l.92-5.4-3.9-3.8a.6.6 0 0 1 .33-1l5.4-.8z"/>',
   home:'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   coins:'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
   globe:'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
@@ -13518,11 +13677,12 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
   const {theme,toggleTheme}=useTheme();
   const ITEMS=[
     {id:"home",    icon:"home",label:"Home"},
+    {id:"foryou",  icon:"star",label:"For You"},
     {id:"explore", icon:"search",label:"Explore"},
     {id:"progress",icon:"chart",label:"Progress"},
     {id:"report",  icon:"report",label:"My Report"},
     {id:"checkin", icon:"check",label:"Check-in"},
-    {id:"tool:dailywisdom",    icon:"gem",label:"Daily Wisdom"},
+    {id:"journal", icon:"pen",label:"Journal"},
     {id:"tool:weeklychallenge",icon:"target",label:"Weekly Challenge"},
     {id:"wins",    icon:"trophy",label:"Wins"},
     {id:"practices",icon:"activity",label:"My Practices"},
@@ -13627,7 +13787,7 @@ function BottomNav({nav,setNav}){
   return(
     <div className="bot-nav">
       <div className="bot-items">
-        {[{id:"home",icon:"home",label:"Home"},{id:"explore",icon:"search",label:"Explore"},{id:"checkin",icon:"check",label:"Check-in"},{id:"progress",icon:"chart",label:"Progress"},{id:"profile",icon:"user",label:"Profile"}]
+        {[{id:"home",icon:"home",label:"Home"},{id:"foryou",icon:"star",label:"For You"},{id:"checkin",icon:"check",label:"Check-in"},{id:"explore",icon:"search",label:"Explore"},{id:"progress",icon:"chart",label:"Progress"}]
           .map(t=>(
             <button key={t.id} className={`bot-item ${nav===t.id||nav?.startsWith(t.id)?"active":""}`} onClick={()=>setNav(t.id)}>
               <span className="bot-icon"><DQIcon name={t.icon} size={22}/></span>
@@ -13975,6 +14135,208 @@ function IdentityStrip({userId, streak, G}){
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// YOUR ONE THING TODAY
+// ───────────────────────────────────────────────────────────────────────────────
+// For the user who opens the app tired and closes it because 42 tools is a
+// decision, not a doorway. Shows ONE tiny action, picked from their onboarding
+// answers. No menu, no AI call, no spinner — instant, so there's nothing to
+// bounce off. Deep tools stay one tap below for whoever wants them.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Micro-actions: 2–5 minutes, concrete, doable right now, no prep.
+// `tool` deep-links to the full module for anyone who wants to go further.
+const MICRO_ACTIONS = {
+  // ── by goal ──────────────────────────────────────────────────────────────
+  finances: [
+    {t:"Open your banking app and write down exactly what you spent yesterday. Just look. No judgement.", m:3, tool:"money"},
+    {t:"Cancel one subscription you forgot you had. One is enough.", m:4, tool:"debtfreedom"},
+    {t:"Write down one thing you could sell this week that you no longer use.", m:3, tool:"sidehustle"},
+    {t:"Name the exact amount you want to earn per month. Say the number out loud.", m:2, tool:"money"},
+  ],
+  habits: [
+    {t:"Pick tomorrow's first action and lay it out tonight — clothes, notebook, the app already open.", m:3, tool:"morningritual"},
+    {t:"Do the smallest version of your habit right now. Two push-ups. One page. One line.", m:2, tool:"discipline"},
+    {t:"Write the habit you keep breaking, and the exact time of day you break it.", m:3, tool:"discipline"},
+    {t:"Put your phone in another room for the next 20 minutes. Start now.", m:2, tool:"digitallife"},
+  ],
+  purpose: [
+    {t:"Write one sentence: what would make today feel like it mattered?", m:3, tool:"visionboard"},
+    {t:"Write one line to yourself one year from now. Just one.", m:4, tool:"lettertoself"},
+    {t:"Name one thing you'd do even if nobody ever found out you did it.", m:3, tool:"visionboard"},
+    {t:"Finish this sentence: 'I want to be someone who…'", m:2, tool:"legacyletter"},
+  ],
+  relationships: [
+    {t:"Text one person you've been meaning to reach. Two lines is plenty.", m:2, tool:"relationshipiq"},
+    {t:"Think of the last conversation that went badly. Write what you'd say differently.", m:4, tool:"hardconvo"},
+    {t:"Ask someone a question today and don't say anything about yourself in reply.", m:3, tool:"smalltalk"},
+    {t:"Tell one person, plainly, one thing you appreciate about them.", m:2, tool:"relationshipiq"},
+  ],
+  health: [
+    {t:"Drink a full glass of water. Right now, before you keep scrolling.", m:1, tool:"bodyfuel"},
+    {t:"Stand up and stretch for 60 seconds. That's the whole task.", m:1, tool:"posture"},
+    {t:"Walk for 10 minutes. No podcast, no phone. Just walk.", m:10, tool:"nogym"},
+    {t:"Set the time you'll put your phone down tonight. Write it down.", m:2, tool:"sleepcoach"},
+  ],
+  business: [
+    {t:"Write your offer in one sentence a stranger would understand.", m:4, tool:"business"},
+    {t:"Message one potential customer today. One. Not a campaign.", m:5, tool:"business"},
+    {t:"Write down the single reason someone would pay you instead of someone else.", m:4, tool:"negotiation"},
+    {t:"Name the one task you keep avoiding in your business. Just name it.", m:2, tool:"roadmap"},
+  ],
+
+  // ── by blocker (these hit harder — they're what's actually stopping them) ─
+  discipline: [
+    {t:"Set a 5-minute timer and start the thing you're avoiding. You may stop when it rings.", m:5, tool:"discipline"},
+    {t:"Choose tomorrow's ONE task now, while you still have the energy to decide.", m:3, tool:"discipline"},
+    {t:"Do the task badly. Done badly beats not done. Start.", m:5, tool:"morningritual"},
+  ],
+  overthinking: [
+    {t:"Write the decision you're stuck on. Then write the worst realistic outcome. Look at it.", m:5, tool:"decisions"},
+    {t:"Set a 10-minute timer. Decide before it ends. Ten minutes is enough for most things.", m:10, tool:"decisions"},
+    {t:"Breathe in for 4, hold 4, out for 6. Ten rounds. Your body decides before your mind does.", m:3, tool:"innerpeace"},
+    {t:"Write down the thought looping in your head. On paper it gets smaller.", m:4, tool:"anxietytool"},
+  ],
+  money: [
+    {t:"Write the smallest amount you could save today. Then save it, today.", m:3, tool:"money"},
+    {t:"List every debt with its real number. Not knowing costs more than knowing.", m:6, tool:"debtfreedom"},
+    {t:"Name one skill you already have that someone would pay for.", m:4, tool:"earnonline"},
+  ],
+  fear: [
+    {t:"Write the thing you're scared of. Then write what happens if you never do it.", m:5, tool:"fearaudit"},
+    {t:"Do the smallest version of the scary thing. Send the message. Ask the question.", m:5, tool:"confidencelab"},
+    {t:"Name one time you were afraid and did it anyway. You've done this before.", m:3, tool:"success"},
+  ],
+  direction: [
+    {t:"Write where you want to be in 90 days. One sentence. Vague is fine — just point somewhere.", m:4, tool:"roadmap"},
+    {t:"Pick ONE goal for this week and cross the rest out. You can't chase all of them.", m:3, tool:"roadmap"},
+    {t:"Ask your advisor one honest question about what to do next.", m:4, tool:"advisor"},
+  ],
+  time: [
+    {t:"Find 15 minutes in today by cutting one thing. Write down what you cut.", m:3, tool:"discipline"},
+    {t:"Say no to one thing today. Out loud, to a real person.", m:2, tool:"discipline"},
+    {t:"Check your screen time. Then decide if you really have no time.", m:2, tool:"digitallife"},
+  ],
+};
+
+function OneThingToday({formData, userId, setNav}){
+  const G = useThemeColors();
+  const today = new Date().toISOString().slice(0,10);
+  const doneKey = `diq_onething_${userId}_${today}`;
+  const skipKey = `diq_onething_skip_${userId}_${today}`;
+
+  const [done, setDone] = useState(()=>{ try{ return localStorage.getItem(doneKey)==="1"; }catch{ return false; } });
+  const [skips, setSkips] = useState(()=>{ try{ return parseInt(localStorage.getItem(skipKey)||"0"); }catch{ return 0; } });
+
+  // Build the pool: blockers FIRST (that's what's actually stopping them),
+  // then goals. Falls back to habits if we have no signal at all.
+  const {priorities, blockers} = resolveProfileTags(formData);
+  const pool = (()=>{
+    const out=[];
+    blockers.forEach(b=>(MICRO_ACTIONS[b]||[]).forEach(a=>out.push({...a, why:BLOCKER_WHY[b]})));
+    priorities.forEach(p=>(MICRO_ACTIONS[p]||[]).forEach(a=>out.push({...a, why:PRIORITY_WHY[p]})));
+    if(!out.length) MICRO_ACTIONS.habits.forEach(a=>out.push({...a, why:"small steps compound"}));
+    return out;
+  })();
+
+  // Rotate daily so it's a fresh action each day, plus skips move you along.
+  const dayIdx = Math.floor(Date.parse(today)/86400000);
+  const action = pool[(dayIdx + skips) % pool.length];
+  if(!action) return null;
+
+  const markDone=()=>{
+    try{ localStorage.setItem(doneKey,"1"); }catch{}
+    setDone(true);
+    addProgressPoints(userId,"one_thing",PROGRESS_POINTS.one_thing);
+    window.dispatchEvent(new CustomEvent("showToast",{detail:"One thing done. +3 points"}));
+  };
+  const skip=()=>{
+    const n=skips+1;
+    try{ localStorage.setItem(skipKey,String(n)); }catch{}
+    setSkips(n);
+  };
+
+  // ── Done state: quiet, warm, doesn't nag ────────────────────────────────
+  if(done){
+    return(
+      <div style={{background:G.isDark?"rgba(29,158,117,0.07)":"rgba(29,158,117,0.06)",
+        border:"1px solid rgba(29,158,117,0.28)",borderRadius:18,padding:"18px 20px",
+        marginBottom:14,display:"flex",alignItems:"center",gap:13}}>
+        <div style={{width:38,height:38,borderRadius:"50%",flexShrink:0,
+          background:"rgba(29,158,117,0.15)",border:"1px solid rgba(29,158,117,0.35)",
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>✓</div>
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:"#1d9e75",marginBottom:2}}>
+            You did your one thing today.
+          </div>
+          <div style={{fontSize:12,color:G.dim,lineHeight:1.55}}>
+            That's the whole job. Anything else today is a bonus.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Active state ────────────────────────────────────────────────────────
+  return(
+    <div style={{
+      background:G.isDark?"linear-gradient(140deg,#141109,#0e0c06)":"linear-gradient(140deg,#fffdf5,#faf6ea)",
+      border:"1px solid rgba(240,180,41,0.30)",borderRadius:18,padding:"20px",
+      marginBottom:14,position:"relative",overflow:"hidden",
+      boxShadow:"0 0 44px rgba(240,180,41,0.06)"}}>
+      <div style={{position:"absolute",top:0,right:0,width:"50%",height:"100%",
+        background:"radial-gradient(ellipse at 85% 15%,rgba(240,180,41,0.09),transparent 62%)",
+        pointerEvents:"none"}}/>
+
+      <div style={{position:"relative"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,gap:10}}>
+          <div style={{fontSize:9,color:G.dimmer,letterSpacing:".12em",fontFamily:"monospace"}}>
+            YOUR ONE THING TODAY
+          </div>
+          <div style={{fontSize:9.5,fontFamily:"monospace",color:"var(--gold)",
+            border:"1px solid rgba(240,180,41,0.3)",borderRadius:20,padding:"3px 9px",whiteSpace:"nowrap"}}>
+            {action.m} MIN
+          </div>
+        </div>
+
+        <p style={{fontSize:16.5,lineHeight:1.6,color:G.cream,fontWeight:600,
+          margin:"0 0 10px",letterSpacing:"-.01em"}}>
+          {action.t}
+        </p>
+
+        {action.why&&(
+          <p style={{fontSize:11.5,color:G.dim,margin:"0 0 18px",lineHeight:1.55}}>
+            Because {action.why}.
+          </p>
+        )}
+
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <button onClick={markDone} style={{
+            background:"var(--gold)",border:"none",borderRadius:12,padding:"12px 26px",
+            fontSize:14,fontWeight:800,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+            ✓ Done
+          </button>
+
+          {action.tool&&TOOL_META[action.tool]&&(
+            <button onClick={()=>setNav("tool:"+action.tool)} style={{
+              background:"none",border:"1px solid "+G.border,borderRadius:12,
+              padding:"12px 18px",fontSize:13,fontWeight:600,color:G.dim,
+              cursor:"pointer",fontFamily:"inherit"}}>
+              Show me how →
+            </button>
+          )}
+
+          <button onClick={skip} style={{
+            background:"none",border:"none",padding:"12px 10px",fontSize:12,
+            color:G.dimmer,cursor:"pointer",fontFamily:"inherit",marginLeft:"auto"}}>
+            Not today
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnlock,setNav,setShowCheckin,dailyInsight}){
   const hour = new Date().getHours();
   const timeGreet = hour<12?"Good morning":hour<17?"Good afternoon":"Good evening";
@@ -14085,6 +14447,8 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
       </div>
 
       <div style={{padding:"0 20px"}}>
+        {/* The single most important thing on this screen — one action, no menu */}
+        <OneThingToday formData={formData} userId={userId} setNav={setNav}/>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
         {/* ══ CONTINUE JOURNEY (Hero card) ══ */}
         <div style={{background:G.isDark?"linear-gradient(135deg,#131008,#0f0c05)":"linear-gradient(135deg,#fffdf6,#faf5e8)",
@@ -14328,6 +14692,145 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXPLORE SCREEN — Rebuilt to match premium mobile mockup
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// FOR YOU — the personalised entry point.
+// Leads with the tools that match the goals + blockers picked at onboarding,
+// instead of showing every user the same 42-tool grid.
+// ═══════════════════════════════════════════════════════════════════════════════
+function ForYouScreen({formData, setNav, streak}){
+  const G = useThemeColors();
+  const picks = getForYouTools(formData, 6);
+  const {priorities, blockers} = resolveProfileTags(formData);
+  const cats = orderCategoriesForUser(formData).filter(c=>c._forYou).slice(0,4);
+  const first = formData?.name?.split(" ")[0] || "there";
+
+  // No onboarding signal (rare — very old profiles) → send them to Explore.
+  if(!picks.length){
+    return(
+      <div style={{padding:"28px 32px",maxWidth:760,margin:"0 auto"}}>
+        <div style={{fontFamily:"var(--f-display)",fontSize:30,color:"var(--cream)",marginBottom:10}}>For you</div>
+        <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.7,marginBottom:20}}>
+          We don't have your goals on file yet. Tell us what you're working on and what's getting in the way,
+          and this page will fill up with the tools that actually fit.
+        </p>
+        <button className="btn" onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}
+          style={{background:"var(--gold)",border:"none",borderRadius:12,padding:"12px 24px",
+            color:"#000",fontWeight:700,fontSize:14,cursor:"pointer"}}>
+          Set my goals
+        </button>
+      </div>
+    );
+  }
+
+  const chips = [
+    ...priorities.map(p=>({t:PRIORITY_WHY[p], kind:"goal"})),
+    ...blockers.map(b=>({t:BLOCKER_WHY[b], kind:"block"})),
+  ].filter(c=>c.t);
+
+  return(
+    <div style={{padding:"28px 32px 60px",maxWidth:760,margin:"0 auto"}}>
+      <div style={{fontFamily:"var(--f-display)",fontSize:30,color:"var(--cream)",marginBottom:6}}>
+        For you, {first}
+      </div>
+      <p style={{fontSize:14,color:"var(--cream-50)",lineHeight:1.7,marginBottom:18}}>
+        Built from what you told us at signup — the goals you chose and what you said is holding you back.
+      </p>
+
+      {/* The user's own words, reflected back */}
+      {chips.length>0&&(
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:26}}>
+          {chips.map((c,i)=>(
+            <span key={i} style={{
+              fontSize:11,fontFamily:"var(--f-mono)",padding:"5px 11px",borderRadius:20,
+              background: c.kind==="goal" ? "rgba(200,168,75,0.09)" : "rgba(224,92,110,0.09)",
+              border: "1px solid "+(c.kind==="goal" ? "rgba(200,168,75,0.28)" : "rgba(224,92,110,0.28)"),
+              color: c.kind==="goal" ? "var(--gold)" : "#e05c6e",
+            }}>
+              {c.kind==="goal" ? "◆ " : "▲ "}{c.t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Start here — ranked tools */}
+      <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>
+        START HERE
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:34}}>
+        {picks.map((t,i)=>(
+          <div key={t.id} onClick={()=>setNav("tool:"+t.id)}
+            style={{position:"relative",cursor:"pointer",padding:"16px 16px 14px",borderRadius:16,
+              background:"var(--raised)",border:"1px solid var(--line)",transition:"all .18s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=t.color+"66";e.currentTarget.style.transform="translateY(-2px)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--line)";e.currentTarget.style.transform="none";}}>
+            {i===0&&(
+              <span style={{position:"absolute",top:-8,right:12,fontSize:9,fontFamily:"var(--f-mono)",
+                background:"var(--gold)",color:"#000",padding:"3px 8px",borderRadius:10,fontWeight:800,
+                letterSpacing:".05em"}}>TOP PICK</span>
+            )}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <div style={{width:34,height:34,borderRadius:10,flexShrink:0,
+                background:t.color+"18",border:"1px solid "+t.color+"30",
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                {t.icon}
+              </div>
+              <div style={{fontSize:14,fontWeight:700,color:"var(--cream)"}}>{t.label}</div>
+            </div>
+            {t.why&&(
+              <div style={{fontSize:11.5,color:"var(--cream-40)",lineHeight:1.6}}>
+                Because {t.why}.
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Categories that match them */}
+      {cats.length>0&&(
+        <>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>
+            YOUR AREAS
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:30}}>
+            {cats.map(cat=>(
+              <div key={cat.id} onClick={()=>setNav("category:"+cat.id)}
+                style={{cursor:"pointer",padding:"14px 16px",borderRadius:14,
+                  background:"var(--raised)",border:"1px solid var(--line)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",flexShrink:0,
+                    background:cat.color+"18",border:"1px solid "+cat.color+"28",
+                    display:"flex",alignItems:"center",justifyContent:"center",color:cat.color}}>
+                    <DQIcon name={cat.icon} size={16}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:13.5,fontWeight:700,color:"var(--cream)"}}>{cat.label}</div>
+                    <div style={{fontSize:11,color:"var(--cream-30)"}}>{cat.desc}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Goals change — let them say so */}
+      <div style={{padding:"16px 18px",borderRadius:14,background:"var(--raised)",
+        border:"1px dashed var(--line)",display:"flex",alignItems:"center",
+        justifyContent:"space-between",gap:14,flexWrap:"wrap"}}>
+        <div style={{fontSize:12.5,color:"var(--cream-50)",lineHeight:1.6}}>
+          Goals shifted? Update them and this page rebuilds itself.
+        </div>
+        <button onClick={()=>window.dispatchEvent(new CustomEvent("showEditProfile"))}
+          style={{background:"none",border:"1px solid var(--cream-15)",borderRadius:10,
+            padding:"8px 16px",color:"var(--cream-60)",fontSize:12,cursor:"pointer",
+            whiteSpace:"nowrap",fontFamily:"inherit"}}>
+          Update goals
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, onUnlock, streak, navPhotoURL}){
   const [query,    setQuery]   = useState("");
   const [drawerOpen,setDrawerOpen] = useState(false);
@@ -14347,19 +14850,25 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
     {label:"Purpose",            nav:"category:purpose"},
   ];
 
-  const recommended = CATEGORIES.slice(0,4).map(cat=>({
+  // Real recommendations, built from the priorities + blockers the user picked
+  // at onboarding (was: CATEGORIES.slice(0,4) — identical for every user, while
+  // still claiming "aligns with your goals").
+  const _ordered = orderCategoriesForUser(formData);
+  const recommended = _ordered.slice(0,4).map(cat=>({
     icon:cat.icon, color:cat.color, name:cat.label,
-    reason:"Recommended because it aligns with your goals.",
+    reason: cat._forYou
+      ? "Picked for you, based on your onboarding answers."
+      : cat.desc,
     id:"category:"+cat.id
   }));
 
-  const recentCats = CATEGORIES.slice(0,3);
+  const recentCats = _ordered.slice(0,3);
 
   const filteredCats = query.trim()
-    ? CATEGORIES.filter(cat=>
+    ? _ordered.filter(cat=>
         cat.label.toLowerCase().includes(query.toLowerCase()) ||
         cat.desc.toLowerCase().includes(query.toLowerCase()))
-    : CATEGORIES;
+    : _ordered;
 
   // Search individual tools by label — across ALL categories + TOPIC_CONFIGS
   const filteredTools = query.trim()
@@ -17970,6 +18479,7 @@ Rules:
           onHamburger={()=>setDrawerOpen(true)}
         title={(()=>{
           if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
+          if(navSection==="foryou") return "For You";
           if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
           if(isTool) return TOOL_META[toolId]?.label;
           if(isTopic) return TOPIC_CONFIGS[topicCatId]?.topics?.find(t=>t.id===topicId)?.label||"";
@@ -17991,6 +18501,7 @@ Rules:
           <ToolPage key={toolId} toolId={toolId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang} reportData={data}/>
         )}
         {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
+        {navSection==="foryou"&&<ForYouScreen formData={formData} setNav={setNav} streak={streak}/>}
         {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav} goBack={goBack}/>}
         {navSection==="journal"&&<JournalScreen profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} setNav={setNav} goBack={goBack} onUnlock={onUnlock}/>}
         {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} onUnlock={onUnlock}/></div>}
