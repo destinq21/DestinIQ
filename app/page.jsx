@@ -5150,13 +5150,22 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
   const userCurrency=ipLocation?.currency||"USD";
   const localPrice=(usd)=>formatLocalPrice(usd,userCurrency);
 
+  // ── REGIONAL PRICING ──────────────────────────────────────────────────────
+  // Charge what this country can actually bear, in a currency Paystack can
+  // settle. Was: one hardcoded $9.99 USD for the whole planet.
+  const PRICING = getLocalPricing(ipLocation?.country || "");
+
   const planKey=tier==="promax"
     ?(billing==="annual"?"promax_annual":"promax")
     :(billing==="annual"?"pro_annual":"pro");
   const plan=PLANS[planKey];
-  const baseMonthly = tier==="promax"?PLANS.promax.amount:PLANS.pro.amount;
-  const baseAnnual  = tier==="promax"?PLANS.promax_annual.amount:PLANS.pro_annual.amount;
+  const localPlan = PRICING[planKey];                       // {amount,label} in local currency
+  const baseMonthly = tier==="promax"?PRICING.promax.amount:PRICING.pro.amount;
+  const baseAnnual  = tier==="promax"?PRICING.promax_annual.amount:PRICING.pro_annual.amount;
   const monthlyEquivalent=billing==="annual"?Math.round((baseAnnual/12)*100)/100:baseMonthly;
+  const money = n => PRICING.isLocal
+    ? PRICING.symbol + Math.round(n).toLocaleString()
+    : "$" + Number(n).toFixed(2);
 
   // ── PAYSTACK CHECKOUT ────────────────────────────────────────────────────────
   const handlePaystack=()=>{
@@ -5170,14 +5179,16 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
       const handler=window.PaystackPop.setup({
         key:      PAYSTACK_PUBLIC_KEY,
         email:    email.trim(),
-        amount:   Math.round(plan.amount*100),
-        currency: "USD",
+        amount:   toPaystackAmount(localPlan.amount),
+        currency: PRICING.currency,
         ref,
         label:    "DestinIQ "+plan.name,
         channels: ["card","bank","ussd","qr","mobile_money","bank_transfer"],
         metadata: {
           userId:  userId||"",
           plan:    planKey,
+          price_tier: PRICING.tier,
+          local_currency: PRICING.currency,
           custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}],
         },
         callback: async(response)=>{
@@ -5517,6 +5528,279 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHECK-IN
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATTERN DETECTION — the thing a generic chatbot structurally cannot do
+// ───────────────────────────────────────────────────────────────────────────────
+// ChatGPT can write a better essay than us. It cannot tell you that you always
+// dip on Wednesdays, or that you've avoided the same thing eleven times. That
+// needs YOUR history — which is why this is the Pro anchor and why it can't be
+// copied.
+//
+// Two parts:
+//   1. MEMORY  — check-ins were being thrown away. Now they're logged.
+//   2. PATTERNS— computed STATISTICALLY, not guessed by an AI. Every pattern
+//                shown is arithmetically true, and none is shown until there is
+//                enough data to justify it. A false insight is worse than none.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN PREVIEW — see Patterns / Review / Life Book without waiting 3 months
+// ───────────────────────────────────────────────────────────────────────────────
+// Patterns, Quarterly Review and the Life Book are all gated behind real history
+// (12–20 check-ins), which is correct for users and useless for testing. This
+// lets an admin flip on realistic SAMPLE data.
+//
+// It is NON-DESTRUCTIVE: nothing is written to localStorage, and the real
+// history is restored the moment preview is switched off. Admin also bypasses
+// the paywall on these screens.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let CURRENT_USER_EMAIL = "";                 // set once, at auth
+function setCurrentUserEmail(e){ CURRENT_USER_EMAIL = String(e||"").toLowerCase(); }
+function isAdminUser(){
+  try{ return ADMIN_EMAILS.map(x=>x.toLowerCase()).includes(CURRENT_USER_EMAIL); }
+  catch{ return false; }
+}
+
+let ADMIN_PREVIEW = false;                   // toggled from the Patterns/Review UI
+function isAdminPreview(){ return ADMIN_PREVIEW && isAdminUser(); }
+function setAdminPreview(on){
+  ADMIN_PREVIEW = !!on;
+  try{ localStorage.setItem("diq_admin_preview", ADMIN_PREVIEW?"1":"0"); }catch{}
+  window.dispatchEvent(new CustomEvent("adminPreviewChanged"));
+}
+try{ ADMIN_PREVIEW = localStorage.getItem("diq_admin_preview")==="1"; }catch{}
+
+// A believable 10 weeks: a real Wednesday slump, a real avoidance, real gaps.
+// Generated fresh each call, never persisted.
+function demoCheckinHistory(){
+  const out=[];
+  const start = Date.now() - 70*86400000;
+  const dids = ["shipped the pricing page","worked on the app","called a client",
+                "wrote for an hour","fixed the bug","planned the week","rested properly"];
+  for(let i=0;i<70;i++){
+    const d = new Date(start + i*86400000);
+    const dow = d.getDay();
+    if(dow===0 && i%3===0) continue;              // skips some Sundays → streak gap
+    if(i===31 || i===32) continue;                // a real slump
+    let score = 7;
+    if(dow===3) score = 4;                        // Wednesday dip
+    if(dow===6) score = 9;                        // Saturdays are good
+    if(i>55) score = Math.min(10, score+1);       // recent upward trend
+    out.push({
+      date: d.toISOString().slice(0,10),
+      dow, score,
+      feeling: score>=7 ? "focused" : "flat",
+      did: dids[i % dids.length],
+      avoided: (i%3===0) ? "the gym again" : (i%7===0 ? "that hard conversation" : "nothing"),
+    });
+  }
+  return out;
+}
+function demoWins(){
+  const texts=["Shipped the new pricing","Ran 5k without stopping","Closed my first paying user",
+               "Said no to a bad deal","Called my mother","Finished the report I'd dodged for weeks",
+               "Woke at 5am three days running","Launched the landing page"];
+  const start = Date.now() - 70*86400000;
+  return texts.map((t,i)=>({
+    id: 1000+i,
+    text: t,
+    date: new Date(start + (i*8+3)*86400000).toISOString().slice(0,10),
+  }));
+}
+
+const CI_HIST_KEY = (uid)=>`diq_ci_hist_${uid}`;
+const CI_HIST_MAX = 400;   // ~13 months of daily check-ins
+
+// Append one check-in to the user's history. Called on every submit.
+function logCheckin(userId, entry){
+  if(!userId || !entry) return;
+  try{
+    const hist = getCheckinHistory(userId);
+    const today = new Date();
+    const dateKey = today.toISOString().slice(0,10);
+    // One record per day — re-submitting overwrites rather than duplicates.
+    const rec = {
+      date:    dateKey,
+      dow:     today.getDay(),                  // 0=Sun … 6=Sat
+      score:   Number(entry.score)||null,       // 1–10
+      feeling: String(entry.feeling||""),
+      did:     String(entry.did||"").slice(0,200),
+      avoided: String(entry.avoided||"").slice(0,200),
+    };
+    const next = hist.filter(h=>h.date!==dateKey).concat(rec).slice(-CI_HIST_MAX);
+    localStorage.setItem(CI_HIST_KEY(userId), JSON.stringify(next));
+    // Mirror to Supabase so patterns survive a device change
+    try{
+      supabase.from("user_profiles").upsert({
+        user_id:userId, checkin_history:next.slice(-120),
+        updated_at:new Date().toISOString(),
+      },{onConflict:"user_id"}).then(null,()=>{});
+    }catch{}
+  }catch{}
+}
+
+function getCheckinHistory(userId){
+  if(isAdminPreview()) return demoCheckinHistory();   // admin sample data — never persisted
+  if(!userId) return [];
+  try{ const h=JSON.parse(localStorage.getItem(CI_HIST_KEY(userId))||"[]"); return Array.isArray(h)?h:[]; }
+  catch{ return []; }
+}
+
+const DOW_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+// Words too common to be a "theme"
+const STOPWORDS = new Set(("a an the and or but if then so to of in on at for with without from by is are was were be been being i im i'm my me myself you your it its this that these those do did doing done not no yes just really very much more most some any all can could would should will shall may might must have has had get got go going went make made take took day today tomorrow yesterday time thing things about into out up down over under again still even too only also as than because when while what which who how why way one two now let put see say own off new old lot bit try ago per via feel felt been want need keep kept keeps able like well work works worked working").split(" "));
+
+// People type these when the honest answer is "nothing happened". Treating
+// "nothing" as a recurring avoidance would be both wrong and humiliating —
+// the app would solemnly report that you have avoided nothing 34 times.
+const NULL_ANSWERS = new Set(("nothing none nada nil zero nope nothin anything everything n/a na nothingreally really nothing_much much idk unsure unknown blank empty skip skipped").split(" "));
+
+function topRecurringWord(texts, minCount=3, extraSkip=null){
+  const freq={};
+  texts.forEach(t=>{
+    const raw = String(t||"").trim().toLowerCase();
+    // Whole answer is a non-answer ("nothing", "n/a", "-") → ignore it entirely
+    if(!raw || raw.length<2) return;
+    const bare = raw.replace(/[^a-z]/g,"");
+    if(NULL_ANSWERS.has(bare)) return;
+
+    raw.replace(/[^a-z\s']/g," ").split(/\s+/).forEach(w=>{
+      if(w.length<3 || STOPWORDS.has(w) || NULL_ANSWERS.has(w)) return;
+      if(extraSkip && extraSkip.has(w)) return;
+      freq[w]=(freq[w]||0)+1;
+    });
+  });
+  const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+  if(!sorted.length || sorted[0][1] < minCount) return null;
+  return {word:sorted[0][0], count:sorted[0][1]};
+}
+
+const avg = a => a.length ? a.reduce((s,x)=>s+x,0)/a.length : 0;
+
+// ── The engine ───────────────────────────────────────────────────────────────
+// Returns [{id, icon, title, body, strength}] — only patterns the data supports.
+function detectPatterns(userId){
+  const hist  = getCheckinHistory(userId).filter(h=>h && h.date);
+  const wins  = isAdminPreview() ? demoWins()
+              : (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${userId}`)||"[]"); }catch{ return []; } })();
+  const jour  = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_journal_${userId}`)||"[]"); }catch{ return []; } })();
+  const out=[];
+  const scored = hist.filter(h=>typeof h.score==="number" && h.score>0);
+
+  // ── 1. Best & worst day of the week ────────────────────────────────────────
+  // Needs enough coverage that this isn't noise: ≥12 scored check-ins,
+  // and ≥2 samples in both the best and worst bucket.
+  if(scored.length>=12){
+    const byDow={};
+    scored.forEach(h=>{ (byDow[h.dow] = byDow[h.dow]||[]).push(h.score); });
+    const days=Object.entries(byDow)
+      .filter(([,v])=>v.length>=2)
+      .map(([d,v])=>({dow:+d, mean:avg(v), n:v.length}));
+    if(days.length>=3){
+      days.sort((a,b)=>b.mean-a.mean);
+      const best=days[0], worst=days[days.length-1];
+      // Only claim a pattern if the gap is real (≥1.2 points out of 10)
+      if(best.mean - worst.mean >= 1.2){
+        out.push({
+          id:"dow", icon:"📅", strength:Math.min(1,(best.mean-worst.mean)/3),
+          title:`${DOW_NAMES[worst.dow]}s are your hardest day`,
+          body:`Across ${scored.length} check-ins you average ${worst.mean.toFixed(1)}/10 on ${DOW_NAMES[worst.dow]}s, versus ${best.mean.toFixed(1)}/10 on ${DOW_NAMES[best.dow]}s. That's not a mood — that's a pattern. Plan your lightest load for ${DOW_NAMES[worst.dow]}, and your hardest work for ${DOW_NAMES[best.dow]}.`,
+        });
+      }
+    }
+  }
+
+  // ── 2. Trend: last 7 vs previous 7 ─────────────────────────────────────────
+  if(scored.length>=14){
+    const recent=scored.slice(-7).map(h=>h.score);
+    const prior =scored.slice(-14,-7).map(h=>h.score);
+    const d = avg(recent)-avg(prior);
+    if(Math.abs(d)>=0.8){
+      const up = d>0;
+      out.push({
+        id:"trend", icon: up?"📈":"📉", strength:Math.min(1,Math.abs(d)/2.5),
+        title: up ? "You're climbing right now" : "You've been dipping lately",
+        body: up
+          ? `Your last 7 check-ins average ${avg(recent).toFixed(1)}/10 — up from ${avg(prior).toFixed(1)} the week before. Whatever you changed, it's working. Name it, so you can repeat it on purpose.`
+          : `Your last 7 check-ins average ${avg(recent).toFixed(1)}/10, down from ${avg(prior).toFixed(1)} the week before. This isn't failure — it's information. Something shifted about a week ago. What was it?`,
+      });
+    }
+  }
+
+  // ── 3. The thing you keep avoiding ─────────────────────────────────────────
+  // This is the most valuable one — it's the honest mirror nobody else holds up.
+  const avoidWord = topRecurringWord(hist.map(h=>h.avoided), 3);
+  if(avoidWord){
+    out.push({
+      id:"avoid", icon:"🪞", strength:Math.min(1,avoidWord.count/8),
+      title:`You've avoided "${avoidWord.word}" ${avoidWord.count} times`,
+      body:`It's come up in ${avoidWord.count} of your check-ins as the thing you didn't do. Avoiding it costs you more than doing it would. What's the smallest possible version you could finish today — the one so small it's embarrassing?`,
+    });
+  }
+
+  // ── 4. Do wins move the needle? (correlation, computed honestly) ────────────
+  if(scored.length>=10 && wins.length>=3){
+    const winDays=new Set(wins.map(w=>String(w.date||"").slice(0,10)));
+    const withWin   =scored.filter(h=>winDays.has(h.date)).map(h=>h.score);
+    const withoutWin=scored.filter(h=>!winDays.has(h.date)).map(h=>h.score);
+    if(withWin.length>=3 && withoutWin.length>=3){
+      const d=avg(withWin)-avg(withoutWin);
+      if(d>=0.8){
+        out.push({
+          id:"wins", icon:"🏆", strength:Math.min(1,d/2.5),
+          title:"Logging a win lifts your whole day",
+          body:`On days you log a win you average ${avg(withWin).toFixed(1)}/10. On days you don't: ${avg(withoutWin).toFixed(1)}/10. That's a ${d.toFixed(1)}-point difference from a 20-second action. Log one today.`,
+        });
+      }
+    }
+  }
+
+  // ── 5. Which day do you go quiet? ──────────────────────────────────────────
+  if(hist.length>=21){
+    const first=new Date(hist[0].date), last=new Date(hist[hist.length-1].date);
+    const spanDays=Math.round((last-first)/86400000)+1;
+    if(spanDays>=21){
+      const seen=new Set(hist.map(h=>h.date));
+      const missByDow={};
+      for(let i=0;i<spanDays;i++){
+        const d=new Date(first.getTime()+i*86400000);
+        const k=d.toISOString().slice(0,10);
+        if(!seen.has(k)) missByDow[d.getDay()]=(missByDow[d.getDay()]||0)+1;
+      }
+      const misses=Object.entries(missByDow).sort((a,b)=>b[1]-a[1]);
+      if(misses.length && misses[0][1]>=3){
+        const [dow,n]=misses[0];
+        out.push({
+          id:"gap", icon:"🕳️", strength:Math.min(1,n/6),
+          title:`${DOW_NAMES[+dow]} is where your streak breaks`,
+          body:`You've missed ${n} ${DOW_NAMES[+dow]}s — more than any other day. Your streak doesn't die from lack of will, it dies on ${DOW_NAMES[+dow]}. Set a reminder for that one day and the rest takes care of itself.`,
+        });
+      }
+    }
+  }
+
+  // ── 6. What you keep writing about ─────────────────────────────────────────
+  const theme = topRecurringWord([...wins.map(w=>w.text), ...jour.map(j=>j.letter||j.text||"")], 4);
+  if(theme){
+    out.push({
+      id:"theme", icon:"🧵", strength:Math.min(1,theme.count/10),
+      title:`"${theme.word}" keeps coming back`,
+      body:`It appears ${theme.count} times across your wins and journal. Whatever this is, it's the thread running through your year. That's usually a sign it matters more than you've admitted.`,
+    });
+  }
+
+  return out.sort((a,b)=>b.strength-a.strength);
+}
+
+// How much more data until patterns unlock? (honest, not a tease)
+function patternsReadiness(userId){
+  const n = getCheckinHistory(userId).length;
+  const NEED = 12;
+  return {have:n, need:NEED, ready:n>=NEED, left:Math.max(0,NEED-n)};
+}
+
 function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
   const G = useThemeColors();
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
@@ -5534,6 +5818,9 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
     if(!feeling||!did.trim()) return;
     setLoading(true);setError("");
     const entry={feeling,score,did,avoided};
+    // Record this check-in permanently — it's the raw material for pattern
+    // detection. (Previously every check-in was discarded after the AI reply.)
+    logCheckin(userId, entry);
     // Save tomorrow's commitment for the follow-up loop
     try{
       if(commit.trim()&&userId){
@@ -6493,6 +6780,86 @@ function getCurrencyForCountry(countryName){
   if(!found) found = COUNTRIES_LIST.find(c=>c.name.toLowerCase().includes(q)||q.includes(c.name.toLowerCase()));
   return found || {currency:"USD",symbol:"$"};
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REGIONAL PRICING
+// ───────────────────────────────────────────────────────────────────────────────
+// $9.99 is not $9.99 everywhere. Charging one global USD price means users in
+// Accra, Lagos, Nairobi and Beirut simply cannot convert — not because they
+// won't, but because the card declines. Two mechanisms:
+//
+//   1. LOCAL CURRENCY where Paystack can actually settle it (NGN/GHS/ZAR/KES).
+//   2. PURCHASING-POWER USD tiers everywhere else.
+//
+// ⚠️  REVIEW THE NUMBERS BELOW against live FX before launch. They're set to
+//     sensible round local figures, not live-rate conversions — round prices
+//     convert better, but rates drift. This table is the single place to edit.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Currencies Paystack can actually charge & settle. Anything else → USD.
+const PAYSTACK_CURRENCIES = ["NGN","GHS","ZAR","KES","USD"];
+
+// Local-currency price books (round, human numbers — not raw FX conversions)
+const LOCAL_PRICE_BOOK = {
+  GHS: { symbol:"GH₵", pro:59,    promax:149,    pro_annual:499,    promax_annual:1299   },
+  NGN: { symbol:"₦",   pro:4500,  promax:11000,  pro_annual:38000,  promax_annual:95000  },
+  KES: { symbol:"KSh", pro:590,   promax:1490,   pro_annual:4900,   promax_annual:12900  },
+  ZAR: { symbol:"R",   pro:99,    promax:249,    pro_annual:849,    promax_annual:2099   },
+};
+
+// Purchasing-power tiers for everyone Paystack must bill in USD.
+// t1 = high income, t2 = middle, t3 = lower. Default is t2 (safer than t1).
+const USD_PRICE_TIERS = {
+  t1: { pro:9.99, promax:24.99, pro_annual:79.99, promax_annual:199.99 },
+  t2: { pro:5.99, promax:14.99, pro_annual:49.99, promax_annual:119.99 },
+  t3: { pro:3.49, promax:8.99,  pro_annual:27.99, promax_annual:69.99  },
+};
+
+const TIER1_COUNTRIES = new Set(["united states","canada","united kingdom","ireland","australia","new zealand","germany","france","netherlands","belgium","austria","switzerland","sweden","norway","denmark","finland","iceland","luxembourg","singapore","japan","south korea","israel","united arab emirates","qatar","kuwait","hong kong","italy","spain","portugal"]);
+const TIER3_COUNTRIES = new Set(["nigeria","ghana","kenya","uganda","tanzania","rwanda","ethiopia","zambia","zimbabwe","cameroon","senegal","ivory coast","côte d'ivoire","india","pakistan","bangladesh","sri lanka","nepal","egypt","morocco","tunisia","algeria","lebanon","jordan","syria","iraq","yemen","sudan","philippines","indonesia","vietnam","cambodia","myanmar","laos","bolivia","honduras","nicaragua","el salvador","guatemala","venezuela","ukraine","moldova","georgia","armenia","uzbekistan","kyrgyzstan","tajikistan","mongolia","zambia","malawi","mozambique","angola","congo","democratic republic of the congo","ivory coast","mali","burkina faso","niger","benin","togo","liberia","sierra leone","gambia","guinea","namibia","botswana","lesotho","eswatini","madagascar","haiti","afghanistan","papua new guinea"]);
+
+function getPriceTierForCountry(country){
+  const q=String(country||"").toLowerCase().trim();
+  if(!q) return "t2";
+  if(TIER1_COUNTRIES.has(q)) return "t1";
+  if(TIER3_COUNTRIES.has(q)) return "t3";
+  return "t2";
+}
+
+// The one function the paywall calls. Returns everything needed to render AND charge.
+function getLocalPricing(country){
+  const cc = getCurrencyForCountry(country);          // {currency, symbol}
+  const code = cc?.currency || "USD";
+
+  // Step 1. Paystack can settle this currency locally → charge in it.
+  if(LOCAL_PRICE_BOOK[code] && PAYSTACK_CURRENCIES.includes(code)){
+    const b = LOCAL_PRICE_BOOK[code];
+    const fmt = n => b.symbol + n.toLocaleString();
+    return {
+      currency: code, symbol: b.symbol, isLocal: true, tier: "local",
+      pro:            {amount:b.pro,           label:fmt(b.pro)+"/month"},
+      promax:         {amount:b.promax,        label:fmt(b.promax)+"/month"},
+      pro_annual:     {amount:b.pro_annual,    label:fmt(b.pro_annual)+"/year"},
+      promax_annual:  {amount:b.promax_annual, label:fmt(b.promax_annual)+"/year"},
+    };
+  }
+
+  // Step 2. Otherwise bill in USD, but at a price their country can actually bear.
+  const t = getPriceTierForCountry(country);
+  const p = USD_PRICE_TIERS[t];
+  const fmt = n => "$"+n.toFixed(2);
+  return {
+    currency:"USD", symbol:"$", isLocal:false, tier:t,
+    pro:            {amount:p.pro,           label:fmt(p.pro)+"/month"},
+    promax:         {amount:p.promax,        label:fmt(p.promax)+"/month"},
+    pro_annual:     {amount:p.pro_annual,    label:fmt(p.pro_annual)+"/year"},
+    promax_annual:  {amount:p.promax_annual, label:fmt(p.promax_annual)+"/year"},
+  };
+}
+
+// Paystack wants the smallest unit (kobo/pesewa/cents) for most currencies.
+// All of NGN/GHS/ZAR/KES/USD use x100.
+function toPaystackAmount(amount){ return Math.round(Number(amount)*100); }
 
 // Get income ranges in local currency
 function getIncomeRanges(currencySymbol){
@@ -11800,6 +12167,53 @@ const PRO_REPORT_LIMIT   = 3;   // Pro: 3 reports/month
 // Only Decisions generates for free (alongside the intelligence report) — it's
 // the flagship free taste. Every other tool is browsable but generates on Pro,
 // so free users never trigger AI cost on them.
+// ═══════════════════════════════════════════════════════════════════════════════
+// FREE TASTES — you can't want what you've never felt
+// ───────────────────────────────────────────────────────────────────────────────
+// Before: 41 of 42 tools were a padlock to a free user. They hit a wall before
+// they'd ever felt the product work, and a person who bounces pays $0 forever.
+//
+// Now: every free user gets N full tool generations per month — ANY tools they
+// choose. They taste the real thing. Then the wall arrives, and it means
+// something, because now they know what's behind it.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const FREE_TASTES_PER_MONTH = 3;
+const TASTE_KEY = (uid)=>`diq_tastes_${uid}`;
+
+function _tasteMonth(){ return new Date().toISOString().slice(0,7); } // "2026-07"
+
+// Returns {used, left, month, tools:[]}
+function getTastes(userId){
+  if(!userId) return {used:0,left:FREE_TASTES_PER_MONTH,month:_tasteMonth(),tools:[]};
+  try{
+    const raw = JSON.parse(localStorage.getItem(TASTE_KEY(userId))||"{}");
+    if(raw.month !== _tasteMonth()) return {used:0,left:FREE_TASTES_PER_MONTH,month:_tasteMonth(),tools:[]};
+    const tools = Array.isArray(raw.tools)?raw.tools:[];
+    return {used:tools.length, left:Math.max(0,FREE_TASTES_PER_MONTH-tools.length), month:raw.month, tools};
+  }catch{ return {used:0,left:FREE_TASTES_PER_MONTH,month:_tasteMonth(),tools:[]}; }
+}
+
+// Has this user already unlocked THIS tool with a taste this month?
+// (Re-opening a tool you already tasted shouldn't cost another taste.)
+function hasTasted(userId, toolId){
+  return getTastes(userId).tools.includes(toolId);
+}
+
+// Spend one taste on a tool. Returns true if allowed (or already tasted).
+function spendTaste(userId, toolId){
+  if(!userId || !toolId) return false;
+  const t = getTastes(userId);
+  if(t.tools.includes(toolId)) return true;      // already open — free
+  if(t.left <= 0) return false;                  // out of tastes this month
+  try{
+    const tools=[...t.tools, toolId];
+    localStorage.setItem(TASTE_KEY(userId), JSON.stringify({month:_tasteMonth(), tools}));
+    window.dispatchEvent(new CustomEvent("tastesUpdated",{detail:{used:tools.length,left:FREE_TASTES_PER_MONTH-tools.length}}));
+  }catch{ return false; }
+  return true;
+}
+
 const FREE_TOOLS = ["decisions"];
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -13272,6 +13686,106 @@ function deriveStrengthsRisks(data){
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// STREAK EARNS PRO — the loop that pays for itself
+// ───────────────────────────────────────────────────────────────────────────────
+// Show up 30 days straight → 7 days of Pro, free. Not a discount, not a coupon:
+// the actual product. It rewards exactly the behaviour that produces paying
+// customers, and a user who has FELT Pro converts far better than one who has
+// only ever seen a padlock. Repeats every 30 days, so the streak keeps meaning
+// something at day 60, 90, 120.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const TRIAL_KEY   = (uid)=>`diq_trial_until_${uid}`;
+const TRIAL_SEEN  = (uid)=>`diq_trial_seen_${uid}`;   // last streak milestone rewarded
+const TRIAL_DAYS  = 7;
+const STREAK_REWARD_EVERY = 30;
+
+// Is a streak-earned trial currently running?
+function getActiveTrial(userId){
+  if(!userId) return null;
+  try{
+    const until = localStorage.getItem(TRIAL_KEY(userId));
+    if(!until) return null;
+    const end = new Date(until);
+    if(isNaN(end) || end <= new Date()) return null;
+    const daysLeft = Math.max(1, Math.ceil((end - new Date())/86400000));
+    return {until:end, daysLeft};
+  }catch{ return null; }
+}
+
+// Called when a streak ticks over. Returns the granted trial, or null.
+function maybeGrantStreakTrial(userId, streak){
+  if(!userId || !streak) return null;
+  if(streak % STREAK_REWARD_EVERY !== 0) return null;   // only every 30th day
+  try{
+    // Don't re-grant the same milestone twice
+    const seen = parseInt(localStorage.getItem(TRIAL_SEEN(userId))||"0");
+    if(seen >= streak) return null;
+    localStorage.setItem(TRIAL_SEEN(userId), String(streak));
+
+    // Extend from whichever is later: now, or an existing trial end.
+    const existing = getActiveTrial(userId);
+    const base = existing ? existing.until : new Date();
+    const end  = new Date(base.getTime() + TRIAL_DAYS*86400000);
+    localStorage.setItem(TRIAL_KEY(userId), end.toISOString());
+
+    // Mirror to Supabase so it survives a device change
+    try{
+      supabase.from("user_profiles").upsert({
+        user_id:userId,
+        trial_until:end.toISOString(),
+        updated_at:new Date().toISOString(),
+      },{onConflict:"user_id"}).then(null,()=>{});
+    }catch{}
+
+    window.dispatchEvent(new CustomEvent("trialGranted",{detail:{days:TRIAL_DAYS, streak, until:end}}));
+    return {until:end, daysLeft:TRIAL_DAYS};
+  }catch{ return null; }
+}
+
+// ── The banner they see when they earn it ────────────────────────────────────
+function TrialGrantedModal({days, streak, onClose}){
+  const [inAnim,setInAnim]=useState(false);
+  useEffect(()=>{
+    const t=setTimeout(()=>setInAnim(true),50);
+    return()=>clearTimeout(t);
+  },[]);
+  return(
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:3100,
+      background:"rgba(5,4,8,0.88)",display:"flex",alignItems:"center",
+      justifyContent:"center",padding:20,cursor:"pointer",
+      opacity:inAnim?1:0,transition:"opacity .35s"}}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        maxWidth:400,width:"100%",textAlign:"center",padding:"36px 28px",
+        borderRadius:26,background:"linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02))",
+        backdropFilter:"blur(16px)",
+        border:"1px solid rgba(240,180,41,.35)",
+        boxShadow:"0 26px 80px rgba(0,0,0,.6), 0 0 60px rgba(240,180,41,.18)",
+        transform:inAnim?"scale(1) translateY(0)":"scale(.7) translateY(50px)",
+        transition:"transform .6s cubic-bezier(0.175,0.885,0.32,1.35)"}}>
+        <div style={{fontSize:64,lineHeight:1,marginBottom:10}}>🎁</div>
+        <div style={{fontSize:11,fontFamily:"var(--f-mono)",letterSpacing:".2em",
+          color:"var(--gold)",marginBottom:10}}>YOU EARNED THIS</div>
+        <div style={{fontSize:27,fontWeight:800,color:"#fff",marginBottom:12,lineHeight:1.25}}>
+          {days} days of Pro — free
+        </div>
+        <p style={{fontSize:15,color:"rgba(255,255,255,.68)",lineHeight:1.7,marginBottom:26}}>
+          You showed up {streak} days in a row. That's rarer than you think — so every
+          tool, every module, the whole thing is open for the next {days} days. No card, no catch.
+        </p>
+        <button onClick={onClose} style={{
+          background:"linear-gradient(120deg,#FDE68A,#F0B429,#E8890C)",
+          border:"none",borderRadius:16,padding:"15px 40px",fontSize:15,
+          fontWeight:800,color:"#0a0910",cursor:"pointer",fontFamily:"inherit",
+          boxShadow:"0 10px 30px rgba(240,180,41,.35)"}}>
+          Go use it →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // STREAK CELEBRATION — TikTok-style milestone pop when streak increases
 // Triggers on: 3, 7, 10, 14, 21, 30, 50, 75, 100, 150, 200, 365 days
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -13680,6 +14194,8 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
     {id:"foryou",  icon:"star",label:"For You"},
     {id:"explore", icon:"search",label:"Explore"},
     {id:"progress",icon:"chart",label:"Progress"},
+    {id:"patterns",icon:"brain",label:"Patterns"},
+    {id:"review",  icon:"book",label:"Review"},
     {id:"report",  icon:"report",label:"My Report"},
     {id:"checkin", icon:"check",label:"Check-in"},
     {id:"journal", icon:"pen",label:"Journal"},
@@ -14697,6 +15213,522 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
 // Leads with the tools that match the goals + blockers picked at onboarding,
 // instead of showing every user the same 42-tool grid.
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATTERNS — "what your own history knows about you"
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVIEW — Quarterly Life Review + The Life Book
+// ───────────────────────────────────────────────────────────────────────────────
+// The ceremonial end of the product. Everything else is daily and fast; this is
+// slow and rare on purpose. It's also the strongest reason to stay: leaving
+// doesn't just cancel a subscription, it abandons a book you're still writing.
+//
+// The Life Book prints via window.print() + a print stylesheet — no PDF library,
+// no new dependency. On mobile: Share → Print → Save as PDF.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function _reviewData(userId, days){
+  const cutoff = new Date(Date.now() - days*86400000).toISOString().slice(0,10);
+  const hist = getCheckinHistory(userId).filter(h=>h.date >= cutoff);
+  const wins = (isAdminPreview() ? demoWins()
+    : (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${userId}`)||"[]"); }catch{ return []; } })())
+    .filter(w=>String(w.date||"").slice(0,10) >= cutoff);
+  const jour = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_journal_${userId}`)||"[]"); }catch{ return []; } })()
+    .filter(j=>String(j.date||"").slice(0,10) >= cutoff);
+  const scores = hist.map(h=>h.score).filter(s=>typeof s==="number" && s>0);
+  return {
+    hist, wins, jour,
+    checkins: hist.length,
+    avgScore: scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length) : 0,
+    bestScore: scores.length ? Math.max(...scores) : 0,
+    patterns: detectPatterns(userId),
+  };
+}
+
+function ReviewScreen({userId, formData, streak, isPaid, isProMax, onUnlock, setNav, isPremium}){
+  const G = useThemeColors();
+  const [mode,setMode] = useState(null);          // null | "quarter" | "book"
+  const name = formData?.name?.split(" ")[0] || "you";
+
+  if(mode==="quarter") return <QuarterlyReview userId={userId} formData={formData} streak={streak} isPremium={isPremium} onBack={()=>setMode(null)}/>;
+  if(mode==="book")    return <LifeBook userId={userId} formData={formData} streak={streak} onBack={()=>setMode(null)}/>;
+
+  const q = _reviewData(userId, 90);
+  const y = _reviewData(userId, 365);
+  const admin = isAdminUser();
+  const qReady = admin || q.checkins>=10;
+  const yReady = admin || y.checkins>=20;
+
+  return(
+    <div style={{padding:"28px 32px 60px",maxWidth:720,margin:"0 auto"}}>
+      <AdminPreviewBar/>
+      <div style={{fontFamily:"var(--f-display)",fontSize:30,color:G.cream,marginBottom:8}}>Review</div>
+      <p style={{fontSize:14.5,color:G.dim,lineHeight:1.75,marginBottom:28,maxWidth:520}}>
+        Everything else here is daily. This is the slow part — where you sit down with
+        your own year and actually look at it.
+      </p>
+
+      {/* Quarterly */}
+      <div onClick={()=>qReady ? setMode("quarter") : null}
+        style={{padding:"22px",borderRadius:18,background:"var(--raised)",
+          border:"1px solid var(--line)",marginBottom:14,
+          cursor:qReady?"pointer":"default",opacity:qReady?1:0.65}}>
+        <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:9}}>
+          <span style={{fontSize:24}}>🍂</span>
+          <span style={{fontSize:17,fontWeight:800,color:G.cream}}>Quarterly Life Review</span>
+        </div>
+        <p style={{fontSize:13.5,color:G.dim,lineHeight:1.7,margin:"0 0 12px"}}>
+          Your last 90 days, honestly. What moved, what didn't, and what you keep
+          circling back to. Takes about ten minutes — do it slowly.
+        </p>
+        {qReady ? (
+          <div style={{fontSize:12,fontFamily:"var(--f-mono)",color:"var(--gold)"}}>
+            {q.checkins} check-ins · {q.wins.length} wins · ready →
+          </div>
+        ):(
+          <div style={{fontSize:12,color:G.dimmer}}>
+            Needs 10 check-ins in the last 90 days — you have {q.checkins}.
+          </div>
+        )}
+      </div>
+
+      {/* Life Book */}
+      <div onClick={()=>yReady ? setMode("book") : null}
+        style={{padding:"22px",borderRadius:18,
+          background:"linear-gradient(150deg,rgba(240,180,41,.07),rgba(240,180,41,.02))",
+          border:"1px solid rgba(240,180,41,.28)",
+          cursor:yReady?"pointer":"default",opacity:yReady?1:0.65}}>
+        <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:9}}>
+          <span style={{fontSize:24}}>📖</span>
+          <span style={{fontSize:17,fontWeight:800,color:G.cream}}>Your Life Book</span>
+        </div>
+        <p style={{fontSize:13.5,color:G.dim,lineHeight:1.7,margin:"0 0 12px"}}>
+          Your year — every win, every streak, every pattern, every word you wrote —
+          laid out as a book you can print and hold. Most people have never seen a record
+          of their own growth. This is yours.
+        </p>
+        {yReady ? (
+          <div style={{fontSize:12,fontFamily:"var(--f-mono)",color:"var(--gold)"}}>
+            {y.checkins} check-ins · {y.wins.length} wins · {y.jour.length} entries · open →
+          </div>
+        ):(
+          <div style={{fontSize:12,color:G.dimmer}}>
+            Needs 20 check-ins this year — you have {y.checkins}. Keep going, {name}.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── QUARTERLY REVIEW ─────────────────────────────────────────────────────────
+function QuarterlyReview({userId, formData, streak, isPremium, onBack}){
+  const G = useThemeColors();
+  const d = _reviewData(userId, 90);
+  const SAVE_KEY = `diq_qreview_${userId}`;
+  const [answers,setAnswers] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(SAVE_KEY)||"{}"); }catch{ return {}; }
+  });
+  const [synthesis,setSynthesis] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem(SAVE_KEY)||"{}").synthesis || ""; }catch{ return ""; }
+  });
+  const [loading,setLoading] = useState(false);
+
+  const QUESTIONS = [
+    {id:"proud",  q:"What are you most proud of from the last 90 days?", hint:"It doesn't have to be big. It has to be true."},
+    {id:"cost",   q:"What did you avoid, and what did it cost you?",     hint:"Be honest. Nobody else reads this."},
+    {id:"learn",  q:"What do you know now that you didn't 90 days ago?", hint:"About the work, or about yourself."},
+    {id:"next",   q:"What is the ONE thing the next 90 days is for?",    hint:"One. Not three."},
+  ];
+
+  const set=(id,v)=>{
+    const next={...answers,[id]:v};
+    setAnswers(next);
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(next)); }catch{}
+  };
+
+  const answered = QUESTIONS.filter(x=>(answers[x.id]||"").trim().length>3).length;
+
+  const synthesize=async()=>{
+    setLoading(true);
+    try{
+      const facts = [
+        `Name: ${formData?.name||"they"}`,
+        `Check-ins in 90 days: ${d.checkins}`,
+        `Average daily score: ${d.avgScore.toFixed(1)}/10`,
+        `Current streak: ${streak}`,
+        `Wins logged: ${d.wins.length}${d.wins.length?" — e.g. "+d.wins.slice(-4).map(w=>w.text).join("; "):""}`,
+        d.patterns.length ? `Patterns found in their data: ${d.patterns.map(p=>p.title).join("; ")}` : "",
+      ].filter(Boolean).join("\n");
+      const theirWords = QUESTIONS.map(x=>`${x.q}\n${answers[x.id]||"(left blank)"}`).join("\n\n");
+      const reply = await callAPI({
+        messages:[{role:"user",content:
+`Here is a person's last 90 days, from their own tracked data:
+
+${facts}
+
+And here is what they wrote in their quarterly review, in their own words:
+
+${theirWords}
+
+Write them a short, honest quarterly reflection (200–260 words). Rules:
+- Speak directly to them, warmly, like someone who has actually read all of it.
+- Reference their REAL data and their REAL words. Be specific. No generic praise.
+- Name one thing they're not saying out loud but that the data implies.
+- End with one sentence about the next 90 days that is a challenge, not a platitude.
+- Do not use headers, bullets, or markdown. Plain paragraphs.`}],
+        system:"You are a wise, warm mentor who has known this person for years. You are honest — you don't flatter. You notice what they avoid. You speak plainly and never in corporate language.",
+        userId, isPremium,
+      });
+      setSynthesis(reply);
+      try{ localStorage.setItem(SAVE_KEY, JSON.stringify({...answers, synthesis:reply, date:new Date().toISOString()})); }catch{}
+    }catch(e){ setSynthesis("Couldn't generate your reflection right now. Your answers are saved — try again in a moment."); }
+    setLoading(false);
+  };
+
+  return(
+    <div style={{padding:"24px 32px 60px",maxWidth:680,margin:"0 auto"}}>
+      <button onClick={onBack} style={{background:"none",border:"none",color:G.dim,
+        cursor:"pointer",fontSize:13,marginBottom:18,padding:0,fontFamily:"inherit"}}>← Review</button>
+
+      <div style={{fontFamily:"var(--f-display)",fontSize:28,color:G.cream,marginBottom:8}}>Your last 90 days</div>
+
+      {/* The numbers — no interpretation, just the record */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:10,marginBottom:26}}>
+        {[["Check-ins",d.checkins],["Avg day",d.avgScore?d.avgScore.toFixed(1)+"/10":"—"],
+          ["Wins",d.wins.length],["Streak",streak]].map(([k,v])=>(
+          <div key={k} style={{padding:"14px",borderRadius:14,background:"var(--raised)",
+            border:"1px solid var(--line)",textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:800,color:"var(--gold)",lineHeight:1.2}}>{v}</div>
+            <div style={{fontSize:10.5,color:G.dimmer,fontFamily:"var(--f-mono)",marginTop:3}}>{k}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* What their data already knows */}
+      {d.patterns.length>0&&(
+        <div style={{padding:"16px 18px",borderRadius:14,background:"var(--raised)",
+          border:"1px solid var(--line)",marginBottom:28}}>
+          <div style={{fontSize:11,fontFamily:"var(--f-mono)",color:G.dimmer,letterSpacing:".08em",marginBottom:10}}>
+            WHAT YOUR DATA ALREADY KNOWS
+          </div>
+          {d.patterns.slice(0,3).map(p=>(
+            <div key={p.id} style={{fontSize:13.5,color:G.cream,marginBottom:6,lineHeight:1.6}}>
+              {p.icon} {p.title}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* The questions — the slow part */}
+      {QUESTIONS.map(x=>(
+        <div key={x.id} style={{marginBottom:22}}>
+          <div style={{fontSize:15.5,fontWeight:700,color:G.cream,marginBottom:4,lineHeight:1.5}}>{x.q}</div>
+          <div style={{fontSize:12,color:G.dimmer,marginBottom:9}}>{x.hint}</div>
+          <textarea value={answers[x.id]||""} onChange={e=>set(x.id,e.target.value)} rows={3}
+            placeholder="Take your time…"
+            style={{width:"100%",boxSizing:"border-box",background:"var(--lift,rgba(255,255,255,.03))",
+              border:"1px solid var(--line)",borderRadius:12,padding:"12px 14px",
+              color:G.cream,fontSize:14,lineHeight:1.7,resize:"vertical",fontFamily:"inherit"}}/>
+        </div>
+      ))}
+
+      <button onClick={synthesize} disabled={loading||answered<2}
+        style={{width:"100%",background:answered>=2?"var(--gold)":"var(--raised)",
+          border:answered>=2?"none":"1px solid var(--line)",borderRadius:14,padding:"15px",
+          fontSize:15,fontWeight:800,color:answered>=2?"#000":G.dimmer,
+          cursor:answered>=2&&!loading?"pointer":"default",fontFamily:"inherit",marginTop:6}}>
+        {loading ? "Reading your quarter…" : answered<2 ? "Answer at least two questions" : "Show me my quarter →"}
+      </button>
+
+      {synthesis&&(
+        <div style={{marginTop:26,padding:"24px",borderRadius:18,
+          background:"linear-gradient(150deg,rgba(240,180,41,.06),rgba(240,180,41,.02))",
+          border:"1px solid rgba(240,180,41,.25)"}}>
+          <div style={{fontSize:10.5,fontFamily:"var(--f-mono)",color:"var(--gold)",
+            letterSpacing:".14em",marginBottom:14}}>YOUR QUARTER</div>
+          <div style={{fontSize:15,color:G.cream,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{synthesis}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── THE LIFE BOOK ────────────────────────────────────────────────────────────
+function LifeBook({userId, formData, streak, onBack}){
+  const G = useThemeColors();
+  const d = _reviewData(userId, 365);
+  const year = new Date().getFullYear();
+  const name = formData?.name || "";
+  const scores = d.hist.map(h=>h.score).filter(Boolean);
+
+  return(
+    <div style={{padding:"24px 32px 80px",maxWidth:760,margin:"0 auto"}}>
+      <div className="lb-hide" style={{display:"flex",justifyContent:"space-between",
+        alignItems:"center",marginBottom:22,gap:12,flexWrap:"wrap"}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:G.dim,
+          cursor:"pointer",fontSize:13,padding:0,fontFamily:"inherit"}}>← Review</button>
+        <button onClick={()=>window.print()} style={{background:"var(--gold)",border:"none",
+          borderRadius:12,padding:"11px 22px",fontSize:13.5,fontWeight:800,color:"#000",
+          cursor:"pointer",fontFamily:"inherit"}}>
+          🖨 Print / Save as PDF
+        </button>
+      </div>
+
+      <div className="lifebook">
+        {/* Title page */}
+        <div style={{textAlign:"center",padding:"30px 0 34px",borderBottom:"1px solid var(--line)",marginBottom:30}}>
+          <div style={{fontSize:11,fontFamily:"var(--f-mono)",letterSpacing:".3em",
+            color:"var(--gold)",marginBottom:14}}>THE LIFE BOOK</div>
+          <div style={{fontFamily:"var(--f-display)",fontSize:38,color:G.cream,
+            lineHeight:1.2,marginBottom:10}}>{name||"My"} — {year}</div>
+          <div style={{fontSize:13.5,color:G.dim,lineHeight:1.7,maxWidth:420,margin:"0 auto"}}>
+            A record of a year you actually showed up for. Most people never get to see one of these
+            about themselves.
+          </div>
+        </div>
+
+        {/* The year in numbers */}
+        <div style={{marginBottom:32}}>
+          <div style={{fontSize:11,fontFamily:"var(--f-mono)",letterSpacing:".14em",
+            color:G.dimmer,marginBottom:14}}>THE YEAR IN NUMBERS</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12}}>
+            {[["Days you showed up",d.checkins],["Current streak",streak],
+              ["Wins logged",d.wins.length],["Journal entries",d.jour.length],
+              ["Average day",d.avgScore?d.avgScore.toFixed(1)+"/10":"—"],
+              ["Your best day",d.bestScore?d.bestScore+"/10":"—"]].map(([k,v])=>(
+              <div key={k} style={{padding:"16px 12px",borderRadius:14,
+                border:"1px solid var(--line)",textAlign:"center"}}>
+                <div style={{fontSize:26,fontWeight:800,color:"var(--gold)",lineHeight:1.15}}>{v}</div>
+                <div style={{fontSize:10.5,color:G.dimmer,marginTop:5,lineHeight:1.4}}>{k}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* What your year taught you */}
+        {d.patterns.length>0&&(
+          <div style={{marginBottom:32}}>
+            <div style={{fontSize:11,fontFamily:"var(--f-mono)",letterSpacing:".14em",
+              color:G.dimmer,marginBottom:14}}>WHAT YOUR YEAR TAUGHT YOU</div>
+            {d.patterns.map(p=>(
+              <div key={p.id} style={{padding:"16px 0",borderBottom:"1px solid var(--line)"}}>
+                <div style={{fontSize:15,fontWeight:700,color:G.cream,marginBottom:6}}>
+                  {p.icon} {p.title}
+                </div>
+                <div style={{fontSize:13.5,color:G.dim,lineHeight:1.75}}>{p.body}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Every win */}
+        {d.wins.length>0&&(
+          <div style={{marginBottom:32}}>
+            <div style={{fontSize:11,fontFamily:"var(--f-mono)",letterSpacing:".14em",
+              color:G.dimmer,marginBottom:14}}>EVERY WIN YOU LOGGED ({d.wins.length})</div>
+            {d.wins.slice().reverse().map((w,i)=>(
+              <div key={w.id||i} style={{display:"flex",gap:12,padding:"9px 0",
+                borderBottom:"1px solid var(--line)",fontSize:13.5,lineHeight:1.6}}>
+                <span style={{color:G.dimmer,fontFamily:"var(--f-mono)",fontSize:11,
+                  minWidth:66,paddingTop:2}}>{w.date}</span>
+                <span style={{color:G.cream}}>{w.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Closing */}
+        <div style={{textAlign:"center",padding:"34px 20px 10px",borderTop:"1px solid var(--line)"}}>
+          <p style={{fontSize:15,color:G.cream,lineHeight:1.9,maxWidth:440,margin:"0 auto",fontStyle:"italic"}}>
+            {d.checkins} days. Not perfect days — just days you came back. That's the only thing
+            that was ever required.
+          </p>
+          <div style={{fontSize:11,color:G.dimmer,marginTop:22,fontFamily:"var(--f-mono)"}}>
+            DESTINIQ · {year}
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @media print {
+          .lb-hide, .sidebar, .mobile-nav, .mobile-topbar, nav, header { display:none !important; }
+          body { background:#fff !important; }
+          .lifebook, .lifebook * {
+            color:#111 !important;
+            background:transparent !important;
+            border-color:#ddd !important;
+          }
+          .lifebook { max-width:100% !important; padding:0 !important; }
+          @page { margin: 16mm; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Admin-only strip: flip sample data on/off to preview gated screens.
+function AdminPreviewBar(){
+  const [on,setOn]=useState(isAdminPreview());
+  if(!isAdminUser()) return null;
+  return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+      gap:12,flexWrap:"wrap",padding:"10px 14px",borderRadius:12,marginBottom:18,
+      background:on?"rgba(224,92,110,0.10)":"rgba(255,255,255,0.03)",
+      border:"1px solid "+(on?"rgba(224,92,110,0.35)":"var(--line)")}}>
+      <div style={{fontSize:11.5,color:on?"#e05c6e":"var(--cream-40)",lineHeight:1.5}}>
+        {on ? "⚠ PREVIEW MODE — showing sample data, not your real history."
+            : "Admin: preview these screens with sample data."}
+      </div>
+      <button onClick={()=>{ const n=!on; setAdminPreview(n); setOn(n); }}
+        style={{background:"none",border:"1px solid "+(on?"rgba(224,92,110,0.5)":"var(--cream-15)"),
+          borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,
+          color:on?"#e05c6e":"var(--cream-50)",cursor:"pointer",whiteSpace:"nowrap",
+          fontFamily:"inherit"}}>
+        {on ? "Turn off" : "Preview with sample data"}
+      </button>
+    </div>
+  );
+}
+
+function PatternsScreen({userId, formData, isPaid, onUnlock, setNav}){
+  const G = useThemeColors();
+  const [patterns,setPatterns] = useState([]);
+  const [ready,setReady] = useState({have:0,need:12,ready:false,left:12});
+
+  useEffect(()=>{
+    setReady(patternsReadiness(userId));
+    setPatterns(detectPatterns(userId));
+  },[userId]);
+
+  const first = formData?.name?.split(" ")[0] || "you";
+  const admin = isAdminUser();   // admin skips the data + paywall gates
+
+  // ── Not enough history yet — be honest about it, don't fake insight ───────
+  if(!ready.ready && !admin){
+    const pct = Math.round((ready.have/ready.need)*100);
+    return(
+      <div style={{padding:"28px 32px 60px",maxWidth:720,margin:"0 auto"}}>
+        <AdminPreviewBar/>
+        <div style={{fontFamily:"var(--f-display)",fontSize:30,color:G.cream,marginBottom:8}}>Patterns</div>
+        <p style={{fontSize:14.5,color:G.dim,lineHeight:1.75,marginBottom:26,maxWidth:520}}>
+          This is the one thing no chatbot can give you: what <em>your own history</em> knows about you.
+          Which day you always dip. What you keep avoiding. Where your streak really breaks.
+        </p>
+
+        <div style={{padding:"22px",borderRadius:18,background:"var(--raised)",
+          border:"1px solid var(--line)",marginBottom:22}}>
+          <div style={{fontSize:12,fontFamily:"var(--f-mono)",color:G.dimmer,
+            letterSpacing:".08em",marginBottom:12}}>BUILDING YOUR BASELINE</div>
+          <div style={{height:8,borderRadius:20,background:"var(--cream-05)",overflow:"hidden",marginBottom:12}}>
+            <div style={{height:"100%",width:pct+"%",borderRadius:20,
+              background:"linear-gradient(90deg,#FDE68A,#F0B429)",transition:"width .6s"}}/>
+          </div>
+          <div style={{fontSize:14,color:G.cream,fontWeight:700,marginBottom:6}}>
+            {ready.have} of {ready.need} check-ins
+          </div>
+          <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0}}>
+            {ready.left === 1
+              ? "One more check-in and your patterns unlock."
+              : `${ready.left} more check-ins and your patterns unlock.`} We won't guess —
+            we'd rather show you nothing than tell you something untrue about yourself.
+          </p>
+        </div>
+
+        <button onClick={()=>setNav("checkin")} style={{
+          background:G.gold,border:"none",borderRadius:13,padding:"14px 28px",
+          fontSize:14.5,fontWeight:700,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+          Check in today →
+        </button>
+      </div>
+    );
+  }
+
+  // ── Locked for free users, but show them it's REAL and waiting ────────────
+  if(!isPaid && !admin){
+    return(
+      <div style={{padding:"28px 32px 60px",maxWidth:720,margin:"0 auto"}}>
+        <div style={{fontFamily:"var(--f-display)",fontSize:30,color:G.cream,marginBottom:8}}>Patterns</div>
+        <p style={{fontSize:14.5,color:G.dim,lineHeight:1.75,marginBottom:24,maxWidth:520}}>
+          Your history is long enough now. We found <strong style={{color:G.gold}}>{patterns.length} real
+          patterns</strong> in your {ready.have} check-ins — computed from your own data, not guessed.
+        </p>
+
+        {/* Show the titles, blur the substance — honest teaser, real content */}
+        <div style={{display:"grid",gap:10,marginBottom:24}}>
+          {patterns.slice(0,3).map(p=>(
+            <div key={p.id} style={{padding:"16px 18px",borderRadius:14,
+              background:"var(--raised)",border:"1px solid var(--line)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <span style={{fontSize:18}}>{p.icon}</span>
+                <span style={{fontSize:14.5,fontWeight:700,color:G.cream}}>{p.title}</span>
+              </div>
+              <div style={{fontSize:13,color:G.dim,lineHeight:1.7,
+                filter:"blur(5px)",userSelect:"none",pointerEvents:"none"}}>
+                {p.body.slice(0,120)}…
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={onUnlock} style={{
+          background:G.gold,border:"none",borderRadius:13,padding:"15px 30px",
+          fontSize:15,fontWeight:800,color:"#000",cursor:"pointer",fontFamily:"inherit",
+          marginBottom:10,width:"100%",maxWidth:340}}>
+          ✦ See what your history knows
+        </button>
+        <p style={{fontSize:12,color:G.dimmer,lineHeight:1.6,margin:0}}>
+          Or keep your streak — 30 days in a row earns you 7 days of Pro, free.
+        </p>
+      </div>
+    );
+  }
+
+  // ── The real thing ────────────────────────────────────────────────────────
+  return(
+    <div style={{padding:"28px 32px 60px",maxWidth:720,margin:"0 auto"}}>
+      <AdminPreviewBar/>
+      <div style={{fontFamily:"var(--f-display)",fontSize:30,color:G.cream,marginBottom:8}}>
+        What your history knows
+      </div>
+      <p style={{fontSize:14,color:G.dim,lineHeight:1.7,marginBottom:26}}>
+        Found in {ready.have} check-ins, {first}. Every line below is arithmetic from your own
+        data — nothing here is a guess.
+      </p>
+
+      {patterns.length===0 && (
+        <div style={{padding:"22px",borderRadius:16,background:"var(--raised)",
+          border:"1px solid var(--line)",fontSize:14,color:G.dim,lineHeight:1.7}}>
+          Your check-ins are remarkably steady — no strong pattern stands out yet.
+          That's genuinely a good sign. Keep going and we'll surface anything that emerges.
+        </div>
+      )}
+
+      <div style={{display:"grid",gap:14}}>
+        {patterns.map(p=>(
+          <div key={p.id} style={{padding:"20px 22px",borderRadius:18,
+            background:"var(--raised)",border:"1px solid var(--line)",
+            position:"relative",overflow:"hidden"}}>
+            {/* strength bar — how confident the data is */}
+            <div style={{position:"absolute",top:0,left:0,height:3,
+              width:Math.round(p.strength*100)+"%",
+              background:"linear-gradient(90deg,#FDE68A,#F0B429)"}}/>
+            <div style={{display:"flex",alignItems:"center",gap:11,marginBottom:10}}>
+              <span style={{fontSize:22}}>{p.icon}</span>
+              <span style={{fontSize:16,fontWeight:800,color:G.cream,lineHeight:1.3}}>{p.title}</span>
+            </div>
+            <p style={{fontSize:14,color:G.dim,lineHeight:1.75,margin:0}}>{p.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <p style={{fontSize:11.5,color:G.dimmer,lineHeight:1.6,marginTop:24,fontStyle:"italic"}}>
+        These update as you check in. The longer you stay, the more this knows.
+      </p>
+    </div>
+  );
+}
+
 function ForYouScreen({formData, setNav, streak}){
   const G = useThemeColors();
   const picks = getForYouTools(formData, 6);
@@ -16404,43 +17436,78 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
   const G = useThemeColors();
   const meta=TOOL_META[toolId];
   const cat=meta?CATEGORIES.find(c=>c.id===meta.cat):null;
-  const isToolFree = FREE_TOOLS.includes(toolId)||toolId==="advisor";
-  if(!isPaid && !isToolFree){
+  const isToolFree = FREE_TOOLS.includes(toolId)||toolId==="advisor"||isAdminUser();
+
+  // ── FREE TASTE GATE ───────────────────────────────────────────────────────
+  // A free user gets FREE_TASTES_PER_MONTH full generations of any tools they
+  // pick. Only when those run out does the wall appear — by then they've felt
+  // the product actually work, which is the only reason anyone ever pays.
+  //
+  // NOTE: no useState here on purpose. ToolPage calls hooks AFTER this early
+  // return, so flipping state here would change the hook count between renders
+  // and crash React. Instead we read localStorage, and spendTaste() fires an
+  // event that remounts this component with a fresh key.
+  const _tastes = getTastes(userId);
+  const tasteOpen = hasTasted(userId, toolId);
+  const canTaste = !isPaid && !isToolFree && !tasteOpen && _tastes.left > 0;
+
+  if(!isPaid && !isToolFree && !tasteOpen){
+    // Still has tastes left → offer the real thing, free.
+    if(canTaste){
+      return(
+        <div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",
+          color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+          <div style={{fontSize:"clamp(32px,10vw,52px)",marginBottom:16}}>{meta?.icon||"✦"}</div>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:".12em",color:"#1d9e75",
+            fontFamily:"monospace",marginBottom:8}}>FREE THIS MONTH</div>
+          <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:G.cream}}>{meta?.label||"This Tool"}</h2>
+          <p style={{fontSize:14,color:G.dim,lineHeight:1.7,margin:"0 0 8px"}}>
+            Open {meta?.label||"this tool"} in full — 5 strategies written for your exact situation.
+            No card, no trial signup.
+          </p>
+          <p style={{fontSize:12,color:G.dimmer,margin:"0 0 24px",fontFamily:"var(--f-mono)"}}>
+            {_tastes.left} of {FREE_TASTES_PER_MONTH} free tools left this month
+          </p>
+          <button onClick={()=>{ spendTaste(userId,toolId); }}
+            style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
+              borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+              marginBottom:12}}>
+            Open {meta?.label||"this tool"} — free
+          </button>
+          <button onClick={()=>goBack?goBack():setNav("explore")}
+            style={{background:"none",border:"none",color:G.dim,
+              cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+            ← Browse other tools
+          </button>
+        </div>
+      );
+    }
+
+    // Tastes spent → now the wall means something.
     return(
       <div style={{padding:"40px 24px",textAlign:"center",maxWidth:420,margin:"0 auto",
         color:G.cream,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
         <div style={{fontSize:"clamp(32px,10vw,52px)",marginBottom:16}}>{meta?.icon||"🔒"}</div>
-        <div style={{fontSize:10,fontWeight:700,letterSpacing:".12em",color:G.gold,fontFamily:"monospace",marginBottom:8}}>PRO TOOL · PREVIEW</div>
+        <div style={{fontSize:10,fontWeight:700,letterSpacing:".12em",color:G.gold,fontFamily:"monospace",marginBottom:8}}>PRO TOOL</div>
         <h2 style={{fontSize:20,fontWeight:800,margin:"0 0 10px",color:G.cream}}>{meta?.label||"This Tool"}</h2>
-        <p style={{fontSize:14,color:G.dim,lineHeight:1.7,margin:"0 0 24px"}}>
-          Unlock {meta?.label||"this tool"} to get 5 strategies written for your exact situation — then tap any one to go deeper. One of all 42 tools included in Pro.
+        <p style={{fontSize:14,color:G.dim,lineHeight:1.7,margin:"0 0 10px"}}>
+          You've used your {FREE_TASTES_PER_MONTH} free tools this month. Pro opens all 42 —
+          unlimited, plus an advisor that remembers you.
+        </p>
+        <p style={{fontSize:12,color:G.dimmer,margin:"0 0 24px",lineHeight:1.6}}>
+          Or keep your streak going — 30 days in a row earns you 7 days of Pro, free.
         </p>
         <button onClick={onUnlock}
           style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
             borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
             marginBottom:12}}>
-          ✦ Unlock {meta?.label||"this tool"} — from $9/mo
+          ✦ Unlock all 42 tools
         </button>
         <button onClick={()=>goBack?goBack():setNav("explore")}
           style={{background:"none",border:"none",color:G.dim,
             cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
           ← Browse other tools
         </button>
-        <div style={{marginTop:24,padding:"14px 16px",background:"rgba(240,180,41,0.06)",
-          border:"1px solid rgba(240,180,41,0.15)",borderRadius:12}}>
-          <div style={{fontSize:11,color:G.gold,fontWeight:700,marginBottom:6}}>FREE RIGHT NOW</div>
-          <p style={{fontSize:12,color:G.dim,lineHeight:1.6,margin:"0 0 10px"}}>
-            Your full intelligence report and the Decisions tool are free — no upgrade needed.
-          </p>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
-            <span onClick={()=>setNav("tool:decisions")}
-              style={{padding:"4px 10px",background:"var(--cream-05)",
-                border:"1px solid var(--cream-10)",borderRadius:20,
-                fontSize:11,color:G.dim,cursor:"pointer"}}>
-              {TOOL_META["decisions"]?.icon} Try Decisions free →
-            </span>
-          </div>
-        </div>
       </div>
     );
   }
@@ -18193,6 +19260,20 @@ function Dashboard({data,formData,isPaid,onUnlock,streak,showCheckin,setShowChec
     return localStorage.getItem("diq_active_tab")||"today";
   });
   const [streakCelebration,setStreakCelebration]=useState(null);
+  const [trialGrant,setTrialGrant]=useState(null); // {days,streak} when Pro is earned
+  // Bumped when a free taste is spent — forces ToolPage to remount with a clean
+  // hook order (it calls hooks after an early return, so we can't flip state).
+  const [tasteVersion,setTasteVersion]=useState(0);
+  useEffect(()=>{
+    const h=()=>setTasteVersion(v=>v+1);
+    window.addEventListener("tastesUpdated",h);
+    return()=>window.removeEventListener("tastesUpdated",h);
+  },[]);
+  useEffect(()=>{
+    const h=(e)=>setTrialGrant(e.detail||null);
+    window.addEventListener("trialGranted",h);
+    return()=>window.removeEventListener("trialGranted",h);
+  },[]);
   // Admin test hook: lets the ⚙ Admin panel fire the celebration on demand
   useEffect(()=>{
     const h=(e)=>setStreakCelebration(Number(e?.detail)||30);
@@ -18470,6 +19551,10 @@ Rules:
       {/* Streak celebrations — top level so they show after check-in from ANY view */}
       {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
       {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+      {/* Pro earned by streak — shows after the celebration lands */}
+      {trialGrant&&!streakCelebration&&(
+        <TrialGrantedModal days={trialGrant.days} streak={trialGrant.streak} onClose={()=>setTrialGrant(null)}/>
+      )}
 
       <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
 
@@ -18480,6 +19565,8 @@ Rules:
         title={(()=>{
           if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
           if(navSection==="foryou") return "For You";
+          if(navSection==="patterns") return "Patterns";
+          if(navSection==="review") return "Review";
           if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
           if(isTool) return TOOL_META[toolId]?.label;
           if(isTopic) return TOPIC_CONFIGS[topicCatId]?.topics?.find(t=>t.id===topicId)?.label||"";
@@ -18498,10 +19585,12 @@ Rules:
         {isCat&&<CategoryPage catId={catId} setNav={setNav} goBack={goBack} userId={userId}/>}
         {isTopic&&<TopicPage key={topicCatId+"."+topicId} catId={topicCatId} topicId={topicId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock}/>}
         {isTool&&MODULE_CONFIGS?.[toolId]&&(
-          <ToolPage key={toolId} toolId={toolId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang} reportData={data}/>
+          <ToolPage key={toolId+":"+tasteVersion} toolId={toolId} setNav={setNav} goBack={goBack} formData={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang} reportData={data}/>
         )}
         {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
         {navSection==="foryou"&&<ForYouScreen formData={formData} setNav={setNav} streak={streak}/>}
+        {navSection==="patterns"&&<PatternsScreen userId={userId} formData={formData} isPaid={isPaid} onUnlock={onUnlock} setNav={setNav}/>}
+        {navSection==="review"&&<ReviewScreen userId={userId} formData={formData} streak={streak} isPaid={isPaid} isProMax={isProMax} isPremium={isPremium} onUnlock={onUnlock} setNav={setNav}/>}
         {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav} goBack={goBack}/>}
         {navSection==="journal"&&<JournalScreen profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} setNav={setNav} goBack={goBack} onUnlock={onUnlock}/>}
         {navSection==="wins"&&<div style={{padding:"28px 32px"}}><WinTracker profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} onUnlock={onUnlock}/></div>}
@@ -20302,6 +21391,9 @@ function DestinIQInner(){
     // Eliminates the flash of "Free" or streak=0 on every page refresh.
     try {
       if (localStorage.getItem(`diq_paid_${u.id}`) === "1")   setIsPaid(true);
+      // A streak-earned trial unlocks Pro exactly like a paid plan
+      if (getActiveTrial(u.id)) setIsPaid(true);
+      setCurrentUserEmail(u.email);   // enables admin preview + admin bypasses
       if (localStorage.getItem(`diq_prem_${u.id}`) === "1")   setIsPremium(true);
       const lsStreak = parseInt(localStorage.getItem(`diq_streak_${u.id}`) || "0");
       if (lsStreak > 0) setStreak(lsStreak);
@@ -20892,6 +21984,10 @@ try{
           if(next===7)  addProgressPoints(uid,"streak_7",  PROGRESS_POINTS.streak_7);
           if(next===14) addProgressPoints(uid,"streak_14", PROGRESS_POINTS.streak_14);
           if(next===30) addProgressPoints(uid,"streak_30", PROGRESS_POINTS.streak_30);
+
+          // Every 30 days of showing up earns 7 free days of Pro.
+          const granted = maybeGrantStreakTrial(uid, next);
+          if(granted) setIsPaid(true);
         };
         window.addEventListener("checkinComplete",handleCI);
         return()=>{window.removeEventListener("showPolicy",handler);window.removeEventListener("showAbout",handleAbout);window.removeEventListener("showEditProfile",handleEditProfile);window.removeEventListener("signOut",handleSignOutEv);window.removeEventListener("showNotif",handleShowNotif);window.removeEventListener("photoUpdated",handlePhotoUpdated);window.removeEventListener("checkinComplete",handleCI);};
