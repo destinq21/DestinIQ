@@ -1514,6 +1514,53 @@ const BLOCKER_TOOLS = {
   time:         ["discipline","digitallife","roadmap"],
 };
 
+// Stage-aware overrides. THIS is what stops us handing "Start a Business" to a
+// woman who has run a salon for six years — the single most insulting thing the
+// app could do to a real user.
+const STAGE_TOOLS = {
+  business: {
+    idea:      ["business","sidehustle","roadmap","decisions"],
+    started:   ["business","earnonline","negotiation","roadmap"],
+    customers: ["negotiation","business","money","career"],      // growth, not startup
+    scaling:   ["negotiation","career","money","decisions"],      // systems & leverage
+  },
+  finances: {
+    debt:   ["debtfreedom","money","earnonline"],
+    save:   ["money","debtfreedom","investment101"],
+    earn:   ["earnonline","sidehustle","negotiation","career"],
+    invest: ["investment101","invest","money"],
+  },
+  health: {
+    energy:   ["bodyfuel","sleepcoach","nogym"],
+    weight:   ["nogym","bodyfuel","glowup"],
+    sleep:    ["sleepcoach","digitallife","innerpeace"],
+    strength: ["nogym","bodyfuel","discipline"],
+  },
+  relationships: {
+    partner: ["relationshipiq","hardconvo"],
+    family:  ["hardconvo","relationshipiq","parenting"],
+    dating:  ["relationshipiq","confidencelab","smalltalk"],
+    work:    ["peopledecoder","hardconvo","negotiation","smalltalk"],
+  },
+  habits: {
+    morning:     ["morningritual","discipline"],
+    focus:       ["digitallife","discipline","innerpeace"],
+    exercise:    ["nogym","discipline"],
+    consistency: ["discipline","morningritual","mindsettenx"],
+  },
+  purpose: {
+    lost:    ["visionboard","roadmap","advisor"],
+    change:  ["career","roadmap","decisions"],
+    meaning: ["legacyletter","visionboard","lettertoself"],
+    clarity: ["roadmap","visionboard","decisions"],
+  },
+};
+
+// Read the stage the user picked for a given priority, if any.
+function stageFor(profile, pid){
+  return (profile?.followups?.[pid]?.stage) || "";
+}
+
 // Human-readable "why we picked this" lines
 const PRIORITY_WHY = {
   finances:"you want to improve your finances",
@@ -1593,7 +1640,16 @@ function getForYouTools(profile, limit=6){
       .map(t=>({id:t, ...TOOL_META[t], why:why[t]||""}));
   };
 
-  const goalPicks  = rank(priorities, PRIORITY_TOOLS, PRIORITY_WHY, 10);
+  // If the user told us their STAGE, use the stage-specific tool list instead
+  // of the generic one for that priority.
+  const stagedPriorityTools = {...PRIORITY_TOOLS};
+  priorities.forEach(pid=>{
+    const st = stageFor(profile, pid);
+    const list = STAGE_TOOLS[pid] && STAGE_TOOLS[pid][st];
+    if(list && list.length) stagedPriorityTools[pid] = list;
+  });
+
+  const goalPicks  = rank(priorities, stagedPriorityTools, PRIORITY_WHY, 10);
   const blockPicks = rank(blockers,   BLOCKER_TOOLS,  BLOCKER_WHY,  10);
 
   // Reserve roughly a third of the slots for blocker tools (at least 2 when the
@@ -1808,7 +1864,409 @@ const UK_BUSINESS_CARDS=[
   },
 ];
 
-const DEV_DECKS={ startbusiness: DEV_BUSINESS_CARDS, earnonline: DEV_EARNONLINE_CARDS };
+// ── DEV_INVESTING_CARDS ──────────────────────────────────────────────────────
+// The default Investing deck was Index Funds + Crypto. For a user in Accra,
+// Lagos or Nairobi that's two wrong answers: a Vanguard account is usually out
+// of reach, and crypto is not a first rung — it's a cliff.
+//
+// This is the ladder people in these markets ACTUALLY climb, in the order they
+// actually climb it: T-bills → fixed deposit/money market → unit trusts →
+// local stocks → land. Susu is included because it's real, it works, and
+// pretending it doesn't exist is how finance advice loses people.
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRIORITY FOLLOW-UPS — the difference between a checkbox and an answer
+// ───────────────────────────────────────────────────────────────────────────────
+// "Grow my business" told us nothing. It could be someone with an idea, or a
+// woman who has run a salon for six years — and we were showing BOTH of them
+// cards about starting a portable blender business. Same for "improve my
+// finances": that's either "I'm drowning in debt" or "I want to start
+// investing" — opposite advice, identical checkbox.
+//
+// One tap and one line per selected priority fixes it. These answers feed the
+// card ranking AND the AI prompts, so advice stops being plausibly generic and
+// starts being specific.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const PRIORITY_FOLLOWUPS = {
+  business: {
+    stageQ: "Where are you with it?",
+    stages: [
+      {id:"idea",      label:"Just an idea"},
+      {id:"started",   label:"Just started"},
+      {id:"customers", label:"I have customers"},
+      {id:"scaling",   label:"I'm scaling it"},
+    ],
+    textQ: "What is it?",
+    placeholder: "e.g. I braid hair from home in East Legon",
+  },
+  finances: {
+    stageQ: "What matters most right now?",
+    stages: [
+      {id:"debt",   label:"Get out of debt"},
+      {id:"save",   label:"Save consistently"},
+      {id:"earn",   label:"Earn more"},
+      {id:"invest", label:"Start investing"},
+    ],
+    textQ: "Anything specific?",
+    placeholder: "e.g. I want to clear a loan by December",
+  },
+  health: {
+    stageQ: "What are you actually chasing?",
+    stages: [
+      {id:"energy",   label:"More energy"},
+      {id:"weight",   label:"Weight & body"},
+      {id:"sleep",    label:"Better sleep"},
+      {id:"strength", label:"Get stronger"},
+    ],
+    textQ: "Anything specific?",
+    placeholder: "e.g. I sit at a desk 10 hours a day",
+  },
+  relationships: {
+    stageQ: "Which relationship?",
+    stages: [
+      {id:"partner", label:"My partner"},
+      {id:"family",  label:"Family"},
+      {id:"dating",  label:"Dating"},
+      {id:"work",    label:"Work / people"},
+    ],
+    textQ: "Anything specific?",
+    placeholder: "e.g. My brother and I haven't spoken in a year",
+  },
+  habits: {
+    stageQ: "Which habit is it, mostly?",
+    stages: [
+      {id:"morning",  label:"Mornings"},
+      {id:"focus",    label:"Focus / phone"},
+      {id:"exercise", label:"Exercise"},
+      {id:"consistency", label:"Just consistency"},
+    ],
+    textQ: "Which habit keeps breaking?",
+    placeholder: "e.g. I start waking at 5am then quit after 3 days",
+  },
+  purpose: {
+    stageQ: "Where are you?",
+    stages: [
+      {id:"lost",      label:"Feel lost"},
+      {id:"change",    label:"Want to change direction"},
+      {id:"meaning",   label:"Want more meaning"},
+      {id:"clarity",   label:"Have a sense, need clarity"},
+    ],
+    textQ: "Say it in your own words",
+    placeholder: "e.g. Good job, but it feels like it isn't mine",
+  },
+};
+
+// Turn the follow-ups into a single, specific line for the AI prompts.
+// "grow my business" → "runs a business with customers: braids hair from home in East Legon"
+function describeFollowups(f){
+  const out=[];
+  const ids = Array.isArray(f?.priorities)?f.priorities:[];
+  ids.forEach(pid=>{
+    const cfg=PRIORITY_FOLLOWUPS[pid];
+    if(!cfg) return;
+    const stage=(f.followups?.[pid]?.stage)||"";
+    const text =(f.followups?.[pid]?.text ||"").trim();
+    const stageLabel=(cfg.stages.find(s=>s.id===stage)||{}).label||"";
+    if(!stageLabel && !text) return;
+    out.push(`${pid.toUpperCase()} — ${stageLabel}${text?`: ${text}`:""}`);
+  });
+  return out.join("\n");
+}
+
+const DEV_INVESTING_CARDS = [
+  {
+    id:"tbills", title:"Treasury Bills", badge:"Start Here", badgeColor:"#81c784",
+    tags:["All","Saving","Low Risk"],
+    tagline:"Lend to your government. Get paid. Almost zero risk.",
+    startupCost:"From ~$10 equivalent", returnRange:"10–28%/yr (varies by country)", risk:"Very Low",
+    whyItWorks:"This is the first rung of the ladder in most of Africa and South Asia, and almost nobody in Western finance content will tell you that. You lend the government money for 91, 182 or 364 days and they pay you interest. It's backed by the state, the rates often beat inflation, and you can start small. Boring beats clever when you're building your first capital.",
+    steps:[
+      "Ask your bank about Treasury Bills — most sell them over the counter",
+      "Start with the 91-day bill so your money isn't locked long",
+      "Compare the rate against inflation — if the rate is lower, you're losing money slowly",
+      "Roll it over automatically each time it matures instead of spending it",
+      "Once you have 3 months of expenses saved this way, move to the next rung",
+    ],
+  },
+  {
+    id:"moneymarket", title:"Money Market & Fixed Deposits", badge:"Safe Growth", badgeColor:"#81c784",
+    tags:["All","Saving","Low Risk"],
+    tagline:"Where your emergency fund should actually live",
+    startupCost:"From ~$20 equivalent", returnRange:"8–20%/yr", risk:"Low",
+    whyItWorks:"A savings account quietly loses to inflation every single year. A money market fund or fixed deposit pays you far more for the same safety. This is where your emergency fund belongs — not under the mattress, and not in a current account paying you nothing.",
+    steps:[
+      "Ask your bank or a licensed fund manager about money market funds",
+      "Check the fund is regulated by your country's securities commission — always check",
+      "Move your emergency fund here (aim for 3–6 months of expenses)",
+      "Set a standing order so a fixed amount moves in every payday",
+      "Don't touch it. That's the whole point of it existing.",
+    ],
+  },
+  {
+    id:"unittrusts", title:"Unit Trusts & Mutual Funds", badge:"Hands Off", badgeColor:"#64b5f6",
+    tags:["All","Stocks"],
+    tagline:"Someone else picks the stocks. You just keep adding.",
+    startupCost:"From ~$20/month", returnRange:"12–25%/yr (not guaranteed)", risk:"Medium",
+    whyItWorks:"This is the closest thing to an index fund that's actually available to you locally. A professional manager pools money from many people and invests it. You get diversification without needing a foreign brokerage account or a big balance. Returns aren't guaranteed — that's the trade for higher upside than T-bills.",
+    steps:[
+      "Find fund managers licensed in your country (your bank will have one)",
+      "Compare their 3-year and 5-year returns — not just last year's",
+      "Check the management fee. Anything above ~2.5%/yr is eating your gains",
+      "Start with a small monthly contribution and increase it as you earn more",
+      "Judge it over years, not months. Selling in a dip is how people lose money",
+    ],
+  },
+  {
+    id:"localstocks", title:"Your Local Stock Exchange", badge:"Higher Risk", badgeColor:"#ffb74d",
+    tags:["All","Stocks"],
+    tagline:"Own a piece of the companies you already buy from",
+    startupCost:"From ~$50", returnRange:"Highly variable", risk:"Medium–High",
+    whyItWorks:"You already know which banks, telcos and breweries in your country make money — you use them every day. Local exchanges (GSE, NSE, NGX, JSE) let you own a piece. It's less liquid than the US market and you must do real homework, but you have an information advantage foreigners don't: you live there.",
+    steps:[
+      "Open an account with a licensed local broker",
+      "Start with companies whose business you genuinely understand",
+      "Read the annual report. If you can't explain how it makes money, don't buy it",
+      "Never put money here that you need within 5 years",
+      "Buy a little every month rather than one big lump",
+    ],
+  },
+  {
+    id:"dollarsave", title:"Holding Some Money In Dollars", badge:"Inflation Hedge", badgeColor:"#ffb74d",
+    tags:["All","Saving"],
+    tagline:"If your currency is falling, this is defence — not greed",
+    startupCost:"Any amount", returnRange:"Preserves value", risk:"Low–Medium",
+    whyItWorks:"If your currency loses 20% against the dollar in a year, a 15% savings return is still a loss. Holding a portion of your savings in a stable foreign currency isn't unpatriotic — it's arithmetic. This is defence, not speculation. Keep most of your money in the currency you actually spend.",
+    steps:[
+      "Ask your bank about a domiciliary / foreign-currency account",
+      "Use only licensed, regulated channels — the black market is how people get robbed",
+      "Keep only a portion here (many people use 20–40%), not everything",
+      "Don't day-trade the currency. You are saving, not gambling",
+      "Remember: you still need local currency for daily life. Don't over-convert",
+    ],
+  },
+  {
+    id:"susu", title:"Susu, Chamas & Rotating Savings", badge:"Community", badgeColor:"#64b5f6",
+    tags:["All","Saving"],
+    tagline:"The oldest savings tool you already know — used properly",
+    startupCost:"Whatever you agree", returnRange:"No interest — but it enforces discipline", risk:"Depends entirely on trust",
+    whyItWorks:"Susu (Ghana), esusu/ajo (Nigeria), chama (Kenya), and similar systems work because they solve the real problem: not knowledge, but discipline. Everyone contributes, everyone takes a turn with the pot. You don't earn interest, so it's not an investment — but it's an outstanding way to force yourself to save a lump sum you'd otherwise spend.",
+    steps:[
+      "Only join a group where you personally know and trust the people",
+      "Agree the amount, the schedule and the payout order IN WRITING before starting",
+      "Never join a group promising 'returns' — that's not susu, that's a scheme",
+      "When your turn comes, put the lump sum straight into T-bills or a money market fund",
+      "That last step is what turns saving into investing. Most people skip it",
+    ],
+  },
+  {
+    id:"land", title:"Land & Property", badge:"Long Game", badgeColor:"#ffb74d",
+    tags:["All","Real Estate"],
+    tagline:"Powerful — and the easiest place to get badly cheated",
+    startupCost:"Substantial", returnRange:"Highly variable", risk:"High (mostly legal, not market)",
+    whyItWorks:"Land is the wealth-builder of choice across much of Africa and Asia, and for good reason. But the risk here isn't market risk — it's fraud and title risk. Land sold twice, disputed family land, no proper documents. Done carefully it's excellent. Done in a hurry it's how families lose everything.",
+    steps:[
+      "Never buy land you have not physically stood on",
+      "Pay a licensed lawyer to run a full title search BEFORE any money moves",
+      "Verify the seller actually has the right to sell — meet the family/stool/authority",
+      "Get every document registered properly. An unregistered receipt protects nothing",
+      "If the price seems too good, walk away. It is too good for a reason",
+    ],
+  },
+  {
+    id:"cryptocare", title:"Crypto — Read This First", badge:"Caution", badgeColor:"#e05c6e",
+    tags:["All","Crypto"],
+    tagline:"Not a first investment. Not a way out.",
+    startupCost:"Any amount", returnRange:"Wildly unpredictable", risk:"Very High",
+    whyItWorks:"Crypto is marketed hardest to exactly the people who can least afford to lose money — and there's a reason for that. It is not a first rung. If you have no emergency fund and no T-bills, crypto is not an investment, it's a lottery ticket you were sold. If you do choose to hold some, treat it as money you can afford to lose entirely.",
+    steps:[
+      "Build your emergency fund FIRST. Non-negotiable",
+      "Never invest more than you can lose completely without it changing your life",
+      "Ignore anyone in your DMs promising returns. Every single one is a scam",
+      "If someone needs you to recruit others, it is a ponzi scheme. Leave",
+      "Use only major regulated exchanges, and never share your seed phrase with anyone",
+    ],
+  },
+];
+
+// ── DEV_BUDGETING_CARDS ──────────────────────────────────────────────────────
+// The default Budgeting deck is "Zero-Based Budgeting" — assign every dollar of
+// your monthly salary. That advice assumes a salary. Most people in these
+// markets are traders, drivers, hairdressers, farmers, freelancers: income is
+// different every single day.
+//
+// It also ignores the single strongest force acting on money in West Africa,
+// East Africa and South Asia — family obligation. You cannot budget in Accra
+// without a line for the relatives who WILL ask. Every budgeting guide that
+// pretends otherwise is written for someone else's life.
+const DEV_BUDGETING_CARDS = [
+  {
+    id:"irregular", title:"Budgeting On Income That Changes Daily", badge:"Start Here", badgeColor:"#81c784",
+    tags:["All","Saving"],
+    tagline:"For traders, drivers, stylists — anyone whose week is never the same",
+    startupCost:"Free", returnRange:"Control over money you already earn", risk:"None",
+    whyItWorks:"Standard budgeting says: work out your monthly salary, then divide it up. But you don't have a monthly salary. You have good days and dead days. So you budget on PERCENTAGES, not amounts — the split stays the same whether today brought GH₵40 or GH₵400. This is the single most useful money skill for irregular earners, and almost nobody teaches it.",
+    steps:[
+      "Work out your BARE MINIMUM month — rent, food, transport, school fees. That's your floor",
+      "Every time money comes in, split it the same way: 50% living, 20% savings, 20% family/obligations, 10% you",
+      "Do the split THE DAY the money arrives, not at the end of the week. By then it's gone",
+      "On a good day, don't spend more — save more. Good days are what carry the dead days",
+      "Track for 30 days and you'll see your real average. That's the number to plan on — not your best day",
+    ],
+  },
+  {
+    id:"blacktax", title:"Family Obligations Without Going Broke", badge:"Honest", badgeColor:"#e05c6e",
+    tags:["All","Saving"],
+    tagline:"The money conversation nobody writes about — and everyone lives",
+    startupCost:"Free", returnRange:"Protects everything else you're building", risk:"Emotional, not financial",
+    whyItWorks:"You can't build wealth while every naira, cedi or shilling you save is an open account for anyone who asks. But you also aren't going to abandon your family, and no honest advice would tell you to. So the answer isn't 'say no' — it's 'decide the number in advance'. An amount you chose calmly is completely different from an amount you were guilted into at midnight.",
+    steps:[
+      "Decide the percentage you give BEFORE anyone asks. 10%? 20%? Choose it while you're calm",
+      "Set it aside the day money arrives — a separate account, a separate wallet, separate from savings",
+      "When the ask comes, you're not saying no. You're saying: this is what's there",
+      "When it's gone, it's gone until next month. That's not cruelty — that's the only way you survive to help long-term",
+      "Never touch your emergency fund for this. A person who goes broke helping cannot help anyone next year",
+    ],
+  },
+  {
+    id:"payfirst", title:"Pay Yourself Before Anyone Can Ask", badge:"Non-Negotiable", badgeColor:"#81c784",
+    tags:["All","Saving"],
+    tagline:"Save on arrival. Not on what's left — there is never anything left.",
+    startupCost:"Any amount", returnRange:"This is how people actually build capital", risk:"None",
+    whyItWorks:"Saving what's left over at month-end has never worked for anyone, anywhere. There is never anything left. The only method that survives contact with real life is taking your savings off the top, the moment money lands, before your brain has counted it as spendable. Even 5% works — the habit is worth more than the amount at the start.",
+    steps:[
+      "Pick a number so small it's almost embarrassing. 5%. 10%. It must survive a bad month",
+      "Move it the same DAY money arrives. Not tomorrow. Tomorrow it's spent",
+      "Put it somewhere with friction — a separate account, T-bills, a locked box. Not your daily wallet",
+      "Raise it by 1% every time your income rises. You won't feel it",
+      "Never explain to anyone how much you have saved. The amount is your business alone",
+    ],
+  },
+  {
+    id:"momo", title:"Where Mobile Money Quietly Eats You", badge:"Hidden Leak", badgeColor:"#ffb74d",
+    tags:["All","Saving"],
+    tagline:"Small fees, many times, every month, forever",
+    startupCost:"Free", returnRange:"Often a full day's income each month", risk:"None",
+    whyItWorks:"Mobile money is a genuine gift — but every cash-out, every transfer, every top-up takes a small cut. Thirty small cuts a month is a real number, and because each one is tiny you never feel it. Most people are astonished when they finally add it up. This is money you already earned, leaking out through a hole you can simply close.",
+    steps:[
+      "Open your mobile money statement and add up ONE month of fees. Just look at the number",
+      "Batch your cash-outs — one larger withdrawal costs far less than five small ones",
+      "Keep money in the wallet where you'll spend it, instead of moving it back and forth",
+      "Compare providers. The fee difference between them is real money over a year",
+      "Whatever you save here, move straight into savings. Otherwise it just gets spent invisibly again",
+    ],
+  },
+  {
+    id:"inflation", title:"Your Savings Are Losing A Race You Can't See", badge:"Important", badgeColor:"#ffb74d",
+    tags:["All","Saving"],
+    tagline:"Money under the mattress is not safe. It's shrinking.",
+    startupCost:"Free", returnRange:"Protects what you've already built", risk:"None",
+    whyItWorks:"If prices rise 25% this year and your money sits in a drawer earning nothing, you didn't break even — you lost a quarter of everything you saved. Cash feels safe because the number doesn't drop. But the number isn't what matters; what that number can BUY is what matters. This is the quietest way people lose money, and it happens without a single bad decision.",
+    steps:[
+      "Find your country's current inflation rate. Look it up right now — it takes one minute",
+      "Compare it against what your savings actually earn. A normal savings account is almost certainly losing",
+      "Move anything you're not spending this month into T-bills or a money market fund",
+      "Keep only 1–2 months of expenses as cash. Everything beyond that should be working",
+      "Recheck every few months. Rates move, and so should your money",
+    ],
+  },
+  {
+    id:"realnumber", title:"Find Out What You Actually Spend", badge:"Reality Check", badgeColor:"#64b5f6",
+    tags:["All","Saving"],
+    tagline:"Not what you think. What you actually do.",
+    startupCost:"Free", returnRange:"Usually reveals 20–30% you didn't know about", risk:"None",
+    whyItWorks:"Almost everyone underestimates their spending — and it's not stupidity, it's that cash and small purchases genuinely don't register. The daily transport, the sachet water, the airtime, the food you bought because you were out and hungry. Nobody can budget honestly until they've seen the truth for one full month. Look before you plan.",
+    steps:[
+      "For 30 days, write down every single thing you spend. Everything. Even the small ones",
+      "Use whatever you'll actually keep using — a notebook, your phone's notes. Not a fancy app you'll abandon",
+      "At the end, group it: food, transport, family, airtime, fun, unplanned",
+      "Find the biggest surprise. There's always one, and it's rarely the thing you'd have guessed",
+      "Only NOW make a budget. A budget built on guesses is a wish, not a plan",
+    ],
+  },
+];
+
+// ── DEV_CAREER_CARDS ─────────────────────────────────────────────────────────
+// The default Career deck teaches you to beat Applicant Tracking Systems and
+// negotiate a $5,000–$20,000 raise. Both assume a Western corporate labour
+// market. In Accra, Lagos, Nairobi and much of South Asia the gatekeeper is not
+// an algorithm — it is a person who knows you. And a large share of workers
+// aren't salaried at all.
+//
+// This deck is written for the market people actually work in.
+const DEV_CAREER_CARDS = [
+  {
+    id:"whoknowsyou", title:"Jobs Come Through People, Not Portals", badge:"Start Here", badgeColor:"#81c784",
+    tags:["All","Career"],
+    tagline:"Stop firing CVs into the void. It isn't how hiring works here.",
+    startupCost:"Free", returnRange:"This is how most jobs are actually filled", risk:"None",
+    whyItWorks:"Western career advice tells you to optimise your CV for a scanning system. Here, most roles are filled before they're ever advertised — through a colleague, a church member, a WhatsApp group, a cousin. That isn't corruption, it's how trust works in a market where verifying strangers is hard. So the question isn't 'how do I beat the system'. It's 'who knows I'm good, and would they say so out loud?'",
+    steps:[
+      "List 10 people who know your work — former bosses, clients, colleagues, lecturers",
+      "Tell them plainly what you're looking for. Not vaguely. Specifically: role, sector, when",
+      "Ask each one: 'who else should I be talking to?' That question is the whole engine",
+      "Follow up in two weeks. Most people forget — they didn't refuse, they just forgot",
+      "Do this BEFORE you need a job. A network built in a crisis arrives too late",
+    ],
+  },
+  {
+    id:"provenwork", title:"Proof Beats A CV", badge:"High Impact", badgeColor:"#64b5f6",
+    tags:["All","Career"],
+    tagline:"Show the work. Nobody can argue with the work.",
+    startupCost:"Free — your time", returnRange:"The fastest way to jump levels", risk:"None",
+    whyItWorks:"A CV is a claim. Work is evidence. When credentials are easy to inflate and hard to verify — which is true in most markets — visible proof cuts through everything. The designer with a folder of real work beats the one with a longer CV, every time. And it works whether you're employed, freelance, or trying to move between the two.",
+    steps:[
+      "Pick one thing you can do that someone would pay for. One. Not five",
+      "Do it publicly — a small project, a fix for a local business, a piece of work you can point at",
+      "Document it: before, after, what changed. A photo and three sentences is enough",
+      "Put it where people can see it — WhatsApp status, a simple portfolio link, LinkedIn if your sector uses it",
+      "Do this four times. Now you have a body of work, not a claim",
+    ],
+  },
+  {
+    id:"askhere", title:"Asking For More — When There's Room, And When There Isn't", badge:"Realistic", badgeColor:"#ffb74d",
+    tags:["All","Career"],
+    tagline:"Some salaries can move. Some genuinely can't. Know which you're in.",
+    startupCost:"Free", returnRange:"Varies enormously by sector", risk:"Low if done well",
+    whyItWorks:"Western advice assumes every salary is negotiable. Here that's often untrue — public sector scales, fixed grades, and small firms with genuinely thin margins. Pretending otherwise sets people up to look naive. The skill is knowing which situation you're in, and having a different move for each. When the salary can't move, other things still can.",
+    steps:[
+      "First find out honestly: is this a fixed scale, or is there discretion? Ask someone senior, quietly",
+      "If there IS room: come with evidence — what you delivered, what it earned or saved them. Numbers, not feelings",
+      "If there is NO room: negotiate what else has value — training, a certificate they pay for, flexible days, a title",
+      "A title and a paid certification can be worth more than a raise. They travel with you to the next job",
+      "If nothing can move and nothing will change — that's not a negotiation. That's information. Start planning your exit",
+    ],
+  },
+  {
+    id:"skillstack", title:"The Skill That Pays In YOUR Market", badge:"Practical", badgeColor:"#81c784",
+    tags:["All","Career"],
+    tagline:"Not the skill that's trending abroad. The one people near you will pay for.",
+    startupCost:"Low", returnRange:"Directly raises your floor", risk:"Low",
+    whyItWorks:"Online advice pushes whatever is hot in San Francisco. But you get paid by the market you're standing in. There are skills badly needed near you right now that nobody talks about online — and the pay is better precisely because fewer people are chasing them. Look around before you look at YouTube.",
+    steps:[
+      "Ask three business owners near you: 'what do you struggle to find someone good for?'",
+      "Their answers are your list. Real demand, spoken by people with money to spend",
+      "Pick the one closest to what you can already do — you're stacking, not restarting",
+      "Get good enough to charge, not good enough to be perfect. Perfect never arrives",
+      "Raise your price the moment you have three happy clients. Not before, not much later",
+    ],
+  },
+  {
+    id:"sideincome", title:"Don't Quit — Build Beside It", badge:"Safest Path", badgeColor:"#64b5f6",
+    tags:["All","Career"],
+    tagline:"The bravest move is usually the boring one",
+    startupCost:"Your evenings", returnRange:"Freedom, eventually", risk:"Low — that's the point",
+    whyItWorks:"The internet romanticises quitting your job to chase the dream. In a market with no safety net, no unemployment benefit, and family depending on you, quitting isn't brave — it's reckless. The people who actually get out build the other thing on the side until it can carry them. Slower. Far more likely to work.",
+    steps:[
+      "Keep the job. It's funding your escape, and that's a respectable role for it",
+      "Give the side thing fixed hours — early mornings or two evenings. Not 'whenever'",
+      "Your target isn't 'passion'. It's your first paying customer. Get to that fast",
+      "Only consider leaving when the side income has covered your bare-minimum month, three months running",
+      "Until then, be patient and be quiet about it. Announcing plans is not progress",
+    ],
+  },
+];
+
+const DEV_DECKS={ startbusiness: DEV_BUSINESS_CARDS, earnonline: DEV_EARNONLINE_CARDS, investing: DEV_INVESTING_CARDS, budgeting: DEV_BUDGETING_CARDS, careerpath: DEV_CAREER_CARDS };
 const isUKCountry=(country)=>/united kingdom|great britain|(^|\b)uk(\b|$)|england|scotland|wales|northern ireland/.test(String(country||"").toLowerCase());
 function pickDeck(country, topicId, defaultCards){
   if(isUKCountry(country)&&topicId==="startbusiness") return UK_BUSINESS_CARDS;
@@ -3984,6 +4442,12 @@ PERSON:
 - Main goal: ${goal}
 - Biggest challenge: ${challenge}
 - What they want from DestinIQ: ${f.wantFrom||"clarity and direction"}
+${f.followupSummary?`
+WHAT THEY ACTUALLY TOLD US — BE SPECIFIC TO THIS, NOT TO THE CATEGORY:
+${f.followupSummary}
+(If they already HAVE a business, never give them advice about starting one. If
+they said "get out of debt", do not talk to them about investing. Meet them
+exactly where they said they are.)`:""}
 ${memCtx?`\nCONTEXT FROM PREVIOUS SESSIONS:\n${memCtx}`:""}
 ${localContext?`\nLIVE LOCAL CONTEXT FOR ${country.toUpperCase()}:\n${localContext}`:""}
 
@@ -7521,6 +7985,7 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                   : Array.isArray(draft.blockers)    ? draft.blockers : [],
       mood:       sd.mood       || draft.mood        || "",
       vision:     sd.goals      || sd.bigGoal        || draft.vision || "",
+      followups:  sd.followups  || draft.followups   || {},
     };
   });
 
@@ -7627,6 +8092,10 @@ function Intake({onSubmit, savedFormData, ipLocation}){
         // reverse-mapping from labels. (Older profiles have labels only.)
         priorityIds:     Array.isArray(f.priorities) ? f.priorities : [],
         blockerIds:      Array.isArray(f.blockers)   ? f.blockers   : [],
+        // The follow-ups: WHICH business, WHAT stage, WHICH habit. Without
+        // these, "grow my business" is a checkbox, not an answer.
+        followups:       f.followups || {},
+        followupSummary: describeFollowups(f),
         mindsetId:       f.mindset || "",
         moodId:          f.mood    || "",
         skills:          "",
@@ -7822,24 +8291,68 @@ function Intake({onSubmit, savedFormData, ipLocation}){
               {PRIORITIES.map(p=>{
                 const sel=Array.isArray(f.priorities)&&f.priorities.includes(p.id);
                 const maxed=Array.isArray(f.priorities)&&f.priorities.length>=3&&!sel;
+                const fu = PRIORITY_FOLLOWUPS[p.id];
+                const ans = (f.followups||{})[p.id] || {};
+                const setFu = (k,v)=>set("followups", {...(f.followups||{}), [p.id]:{...ans,[k]:v}});
                 return(
-                  <div key={p.id} onClick={()=>!maxed&&togglePriority(p.id)}
-                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"14px 16px",
-                      background:sel?"rgba(240,180,41,0.07)":G.card,
-                      border:"1.5px solid "+(sel?G.gold:G.border),
-                      borderRadius:13,cursor:maxed?"default":"pointer",
-                      opacity:maxed?0.38:1,transition:"all .15s"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:13}}>
-                      <span style={{fontSize:20}}>{p.icon}</span>
-                      <span style={{fontSize:15,color:sel?G.cream:G.dim,fontWeight:sel?600:400}}>{p.label}</span>
+                  <div key={p.id}>
+                    <div onClick={()=>!maxed&&togglePriority(p.id)}
+                      style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                        padding:"14px 16px",
+                        background:sel?"rgba(240,180,41,0.07)":G.card,
+                        border:"1.5px solid "+(sel?G.gold:G.border),
+                        borderRadius:13,cursor:maxed?"default":"pointer",
+                        opacity:maxed?0.38:1,transition:"all .15s"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:13}}>
+                        <span style={{fontSize:20}}>{p.icon}</span>
+                        <span style={{fontSize:15,color:sel?G.cream:G.dim,fontWeight:sel?600:400}}>{p.label}</span>
+                      </div>
+                      <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
+                        border:"2px solid "+(sel?G.gold:"var(--cream-20)"),
+                        background:sel?G.gold:"transparent",
+                        display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        {sel&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
+                      </div>
                     </div>
-                    <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
-                      border:"2px solid "+(sel?G.gold:"var(--cream-20)"),
-                      background:sel?G.gold:"transparent",
-                      display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {sel&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
-                    </div>
+
+                    {/* ── Follow-up: appears only once this priority is chosen ──
+                        A checkbox is not an answer. "Grow my business" could be
+                        someone with an idea or someone running a salon for six
+                        years — and we were showing both the same startup cards. */}
+                    {sel&&fu&&(
+                      <div style={{margin:"8px 0 2px",padding:"14px 15px",borderRadius:12,
+                        background:"rgba(240,180,41,0.04)",
+                        border:"1px dashed rgba(240,180,41,0.28)"}}>
+                        <div style={{fontSize:12.5,color:G.cream,fontWeight:600,marginBottom:9}}>
+                          {fu.stageQ}
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:12}}>
+                          {fu.stages.map(s=>{
+                            const on = ans.stage===s.id;
+                            return(
+                              <button key={s.id} type="button"
+                                onClick={()=>setFu("stage", on?"":s.id)}
+                                style={{padding:"7px 13px",borderRadius:20,fontSize:12,
+                                  cursor:"pointer",fontFamily:"inherit",
+                                  background:on?G.gold:"transparent",
+                                  color:on?"#000":G.dim,
+                                  fontWeight:on?700:500,
+                                  border:"1px solid "+(on?G.gold:G.border)}}>
+                                {s.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{fontSize:12.5,color:G.cream,fontWeight:600,marginBottom:7}}>
+                          {fu.textQ} <span style={{color:G.dim,fontWeight:400}}>(optional)</span>
+                        </div>
+                        <input value={ans.text||""} onChange={e=>setFu("text",e.target.value)}
+                          placeholder={fu.placeholder} maxLength={140}
+                          style={{width:"100%",boxSizing:"border-box",background:G.inp,
+                            border:"1px solid "+G.inpBorder,borderRadius:10,padding:"10px 12px",
+                            color:G.cream,fontSize:13.5,fontFamily:"inherit"}}/>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -20924,6 +21437,7 @@ function AdminDashboard({user,onBack}){
   const [loadError,setLoadError]=useState("");
   const [actioning,setActioning]=useState(null);   // testimonial id being acted on
   const [topCountries,setTopCountries]=useState([]);
+  const [warnings,setWarnings]=useState([]);
 
   // Admin stats MUST come from the server. Querying user_profiles from the
   // browser hits Supabase Row Level Security, which only exposes the caller's
@@ -20944,6 +21458,7 @@ function AdminDashboard({user,onBack}){
         setTestimonials(j.testimonials||[]);
         setUsers(j.users||[]);
         setTopCountries(j.topCountries||[]);
+        setWarnings(j.warnings||[]);   // e.g. "engagement: column country does not exist"
       }catch(e){ setLoadError(e.message||"Could not reach /api/admin/stats"); }
       setLoading(false);
     })();
@@ -21042,6 +21557,20 @@ function AdminDashboard({user,onBack}){
             <div style={{fontSize:12,color:"var(--cream-50)",lineHeight:1.6}}>
               {loadError}
             </div>
+          </div>
+        )}
+
+        {warnings.length>0&&(
+          <div style={{padding:"12px 15px",borderRadius:12,marginBottom:18,
+            background:"rgba(255,183,77,0.07)",border:"1px solid rgba(255,183,77,0.3)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#ffb74d",marginBottom:6}}>
+              Partial data — {warnings.length} quer{warnings.length===1?"y":"ies"} failed
+            </div>
+            {warnings.map((w,i)=>(
+              <div key={i} style={{fontSize:11.5,color:"var(--cream-50)",lineHeight:1.6,fontFamily:"var(--f-mono)"}}>
+                • {w}
+              </div>
+            ))}
           </div>
         )}
 
