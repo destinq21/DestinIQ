@@ -499,6 +499,30 @@ const PLANS = {
   promax_annual:{ name:"Pro Max Annual",amount:199.99, label:"$199.99/year",  currency:"USD", tier:"promax" },
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRICE DISPLAY — what we SHOW must equal what we CHARGE
+// ───────────────────────────────────────────────────────────────────────────────
+// The paywall advertised "Pro Max $19/mo" while charging $24.99, and "Pro $9/mo"
+// while charging $9.99. It also hardcoded USD, so a user in Accra saw "$9/month"
+// and was billed GH₵59. Advertising one price and taking another is how you earn
+// chargebacks and lose people permanently.
+//
+// These read from the SAME source the Paystack call uses, so display and charge
+// can never drift apart again.
+// ═══════════════════════════════════════════════════════════════════════════════
+let CURRENT_COUNTRY = "";
+function setCurrentCountry(c){ CURRENT_COUNTRY = String(c||""); }
+
+// "GH₵59/month" · "$9.99/month" — the real monthly Pro price for this user.
+function proPriceLabel(country){
+  try{ return getLocalPricing(country ?? CURRENT_COUNTRY).pro.label; }
+  catch{ return "$9.99/month"; }
+}
+function promaxPriceLabel(country){
+  try{ return getLocalPricing(country ?? CURRENT_COUNTRY).promax.label; }
+  catch{ return "$24.99/month"; }
+}
+
 // Approximate USD exchange rates for display purposes only — actual charge
 // is always in USD. Update periodically; doesn't need to be perfectly live.
 const FX_RATES = {
@@ -653,6 +677,152 @@ const NOTIF_MSGS = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GOAL-AWARE NOTIFICATIONS — a best friend remembers what you told them
+// ───────────────────────────────────────────────────────────────────────────────
+// A best friend doesn't send you a form letter. They know you're trying to wake
+// at 5am, that your brother hasn't called, that you're clearing a loan by
+// December. DestinIQ already collected all of that at onboarding (priority +
+// stage + the follow-up text) and threw none of it at the one surface that
+// reaches you when the app is closed: the notification.
+//
+// Every daily notification is now chosen by a PRIORITY LADDER. For each person,
+// each day, the first matching tier wins:
+//
+//   1. REWARD countdown   — last 7 days of a streak → free Pro is close
+//   2. WIN-BACK           — drifting away → catch them before they're gone
+//   3. GOAL voice         — the everyday case, written for THEIR goal
+//   4. WARM default       — no goal set → the original friendly bank
+//
+// The goal voice weaves in their own follow-up words where they exist, so it
+// reads like it was written for them — because it was.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Trim the user's own follow-up text to something quotable in a notification.
+function _fu(profile, pid){
+  const t = (profile?.followups?.[pid]?.text || "").trim();
+  if(!t) return "";
+  return t.length > 64 ? t.slice(0, 61).replace(/\s+\S*$/,"") + "…" : t;
+}
+function _stage(profile, pid){ return profile?.followups?.[pid]?.stage || ""; }
+
+// ── The six goal voices ──────────────────────────────────────────────────────
+// Each returns {morning, evening} lines. `n`=first name, `w`=their own words.
+const GOAL_VOICE = {
+  habits: {
+    morning:(n,w,stage)=>
+      stage==="morning" || /wake|5am|early|morning/i.test(w)
+        ? `${n} — the alarm just went off. This exact second is where discipline is built or skipped. Get up. That's the whole task.`
+        : (w ? `${n}, you told us: "${w}". Today's not about willpower — it's about starting the smallest version before your mind argues.`
+             : `${n}, discipline isn't a feeling you wait for. It's the thing you do before the feeling arrives. Start now.`),
+    evening:(n,w)=>
+      `${n} — did you keep the promise to yourself today? Not perfectly. Just at all. That honesty is the muscle. Check in.`,
+  },
+  finances: {
+    morning:(n,w,stage)=>
+      stage==="debt"
+        ? `Morning ${n}. One question, no pressure: what's the smallest payment you could make toward that debt today?`
+        : stage==="save"
+          ? `${n}, pay yourself first — the day money arrives, before anyone can ask. Even a little. That's the whole game.`
+          : stage==="earn"
+            ? `${n}, one move toward earning more today. A message sent, a skill practised, a price raised. Small counts.`
+            : (w ? `${n}, you said: "${w}". Money answers to attention. Give it five minutes this morning.`
+                 : `Morning ${n}. Your money grows in the minutes you're willing to look at it. Take a look today.`),
+    evening:(n,w)=>
+      `${n} — did you move one cedi in the right direction today? Saved, earned, or a debt made smaller. Log it before you forget.`,
+  },
+  health: {
+    morning:(n,w,stage)=>
+      stage==="energy" ? `${n}, energy isn't found, it's built — water, light, movement, in that order. Start with the glass of water.`
+      : stage==="sleep" ? `Morning ${n}. Tonight's sleep is decided by today's choices. Set the phone-down time now, while it's easy.`
+      : stage==="weight" ? `${n} — not a diet today. Just one honest, decent meal and a short walk. Bodies change on boring days.`
+      : (w ? `${n}, you said: "${w}". Your body's been waiting for you. Ten honest minutes today.`
+           : `Morning ${n}. Move a little today — not to punish the body, to thank it. It carries everything you do.`),
+    evening:(n,w)=>
+      `${n} — how did your body feel today, honestly? Rest is part of the work, not a break from it. Check in.`,
+  },
+  relationships: {
+    morning:(n,w,stage)=>
+      w ? `${n}, you told us about this: "${w}". A two-line message is all today asks. People are worth the small brave thing.`
+        : stage==="family" ? `Morning ${n}. Family is the relationship we assume we'll fix "later". Later is a long time. Reach out today.`
+        : stage==="partner" ? `${n} — one small act of attention toward your partner today. Not grand. Just seen. That's what lasts.`
+        : `${n}, the people who matter rarely get told they matter. Fix that for one person today.`,
+    evening:(n,w)=>
+      `${n} — did you connect with someone real today, or just get through the day near people? Worth noticing. Check in.`,
+  },
+  business: {
+    morning:(n,w,stage)=>
+      stage==="idea" ? `${n}, an idea becomes a business the day you show ONE stranger. Not perfect it — show it. Who could you tell today?`
+      : stage==="customers" || stage==="scaling"
+        ? (w ? `${n}, your "${w}" doesn't need more setup — it needs one more customer served well today. Go find them.`
+             : `${n} — you're past the idea. Today is about serving one customer so well they tell another. That's the engine.`)
+      : (w ? `${n}, you said: "${w}". Businesses move on shipped things, not planned ones. Ship one small thing today.`
+           : `Morning ${n}. The business grows on the days you do the uncomfortable task, not the comfortable one. Pick the hard one.`),
+    evening:(n,w)=>
+      `${n} — did you move the business forward today, or just stay busy near it? There's a difference. Log the real progress.`,
+  },
+  purpose: {
+    morning:(n,w,stage)=>
+      w ? `${n}, you wrote: "${w}". Purpose isn't found in one big moment — it's built in small honest days. Today is one.`
+        : stage==="lost" ? `${n}, feeling lost isn't failure — it's the space before direction. One honest question today: what would matter?`
+        : `Morning ${n}. What would make today feel like it counted? Answer that, then go do the small version of it.`,
+    evening:(n,w)=>
+      `${n} — did today feel like yours, or like something that happened to you? Either answer teaches you something. Reflect.`,
+  },
+};
+
+// ── The priority ladder — picks ONE line for this person, right now ──────────
+function pickDailyNotification(slot, profile, streak, userId){
+  const n = (profile?.name || "").split(" ")[0] || "friend";
+  const isPaid = !!profile?.is_paid;
+
+  // ── TIER 1: reward countdown (only in the last week, only for free users) ──
+  if(!isPaid && (streak||0) > 0){
+    const left = 30 - ((streak||0) % 30);
+    if(left <= 7 && left >= 1){
+      if(slot === "morning" || slot === "evening"){
+        return left === 1
+          ? `${n} — ONE more day. Check in and a free week of Pro is yours. Don't let tonight be the miss.`
+          : `${n}, you're ${left} days from earning a free week of Pro. You've come too far to coast now.`;
+      }
+    }
+  }
+
+  // ── TIER 2: win-back (drifting away — catch them) ──────────────────────────
+  // "Drifting" = last check-in was 2+ days ago. Only fires in the morning slot
+  // so we don't pile on. A saved streak is the strongest hook we have.
+  try{
+    const last = localStorage.getItem(`diq_streak_last_counted_${userId}`) || "";
+    if(last && slot === "morning"){
+      const gapDays = Math.floor((Date.now() - new Date(last+"T12:00:00").getTime())/86400000);
+      if(gapDays >= 2){
+        return (streak||0) >= 3
+          ? `${n}, we kept your ${streak}-day streak safe with your shield — but it won't hold forever. Come back today?`
+          : `${n} — it's been a few days. No guilt. Your plan is exactly where you left it, and today's a clean start.`;
+      }
+    }
+  }catch{}
+
+  // ── TIER 3: goal voice (the everyday case) ─────────────────────────────────
+  try{
+    const {priorities} = resolveProfileTags(profile);
+    const pid = priorities[0];                 // their PRIMARY goal leads
+    const voice = pid && GOAL_VOICE[pid];
+    if(voice){
+      const w = _fu(profile, pid);
+      const stage = _stage(profile, pid);
+      if(slot === "morning" && voice.morning) return voice.morning(n, w, stage);
+      if(slot === "evening" && voice.evening) return voice.evening(n, w, stage);
+    }
+  }catch{}
+
+  // ── TIER 4: warm default (no goal set / afternoon slot) ────────────────────
+  const bank = NOTIF_MSGS[slot] || NOTIF_MSGS.morning;
+  const fn = bank[Math.floor(Math.random()*bank.length)];
+  try{ return fn(n, profile?.followupSummary ? "" : (profile?.vision||""), streak); }
+  catch{ return `${n}, your check-in is ready. Two minutes for the person you're becoming.`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PROGRESS POINTS ENGINE
 // Tracks real user actions and converts them into a dynamic progress score.
 // Points are stored per-user in localStorage and synced to Supabase.
@@ -697,18 +867,85 @@ function addProgressPoints(userId, action, amount){
     const current = getProgressPoints(userId);
     const next = Math.min(9999, current + amount);
     localStorage.setItem(PROGRESS_PTS_KEY(userId), String(next));
+    markActive(userId);   // any earned action counts as "active today" → decay recovers
     // Dispatch so ProgressScreen can react in real-time
     window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,points:next,action}}));
   }catch{}
 }
 
 // Convert raw points into a 0-99 progress score on top of the AI baseline
+// Score = AI baseline + earned momentum − gentle decay from inactivity.
+// ───────────────────────────────────────────────────────────────────────────────
+// This number is meant to be ALIVE — to visibly move when you act and gently
+// slip when you vanish, then recover fast when you return. Three changes from
+// the old frozen version:
+//   1. Each point now moves the score ~3x more, so a check-in is VISIBLE.
+//   2. After 3+ idle days the score decays a little per day (never below
+//      baseline−6), so going quiet finally costs something.
+//   3. Returning restores it fast — a single check-in wipes most of the decay.
 function getProgressScore(userId, aiBaseline){
   const base = Math.max(10, Math.min(85, aiBaseline||60));
   const pts  = getProgressPoints(userId);
-  // Each point = 0.08% above baseline, capped at 99
-  const earned = Math.min(99 - base, pts * 0.08);
-  return Math.round(base + earned);
+  // Each point = 0.25 (was 0.08 — three checks-ins used to round to zero).
+  const earned = Math.min(99 - base, pts * 0.25);
+  let score = base + earned;
+
+  // ── Gentle inactivity decay ────────────────────────────────────────────────
+  // Grace period of 2 days. From day 3 of silence, lose ~0.8/day, floored at
+  // baseline − 6 so a long absence never wipes real progress or feels punishing.
+  try{
+    const last = localStorage.getItem(`diq_last_active_${userId}`) || "";
+    if(last){
+      const idle = Math.floor((Date.now() - new Date(last+"T12:00:00").getTime())/86400000);
+      if(idle >= 3){
+        const decay = Math.min(score - (base - 6), (idle - 2) * 0.8);
+        if(decay > 0) score -= decay;
+      }
+    }
+  }catch{}
+
+  return Math.round(Math.max(base - 6, score));
+}
+
+// Call whenever the user does something real — stamps "today" as last-active,
+// which both powers decay recovery and feeds the streak/notification logic.
+function markActive(userId){
+  if(!userId) return;
+  try{ localStorage.setItem(`diq_last_active_${userId}`, new Date().toISOString().slice(0,10)); }catch{}
+}
+
+// ── PEAK STATE ───────────────────────────────────────────────────────────────
+// At 99 the score can't climb, so a new number takes over: how many days you've
+// HELD the peak. It only rises while you stay at 99, and resets if you slip.
+// This gives power users something that never dies — 99 becomes a status to
+// maintain, not a wall to hit and abandon.
+function updatePeakDays(userId, currentScore){
+  if(!userId) return 0;
+  const today = new Date().toISOString().slice(0,10);
+  try{
+    const raw = JSON.parse(localStorage.getItem(`diq_peak_${userId}`) || "null");
+    if(currentScore >= 99){
+      if(!raw){ // first day at peak
+        localStorage.setItem(`diq_peak_${userId}`, JSON.stringify({since:today, last:today, days:1}));
+        return 1;
+      }
+      if(raw.last === today) return raw.days;           // already counted today
+      // count the new day (only advance by real calendar days held)
+      const days = (raw.days||1) + 1;
+      localStorage.setItem(`diq_peak_${userId}`, JSON.stringify({since:raw.since||today, last:today, days}));
+      return days;
+    } else {
+      // slipped below peak — reset the streak of peak days
+      if(raw) localStorage.removeItem(`diq_peak_${userId}`);
+      return 0;
+    }
+  }catch{ return 0; }
+}
+function getPeakDays(userId){
+  try{
+    const raw=JSON.parse(localStorage.getItem(`diq_peak_${userId}`)||"null");
+    return raw?.days || 0;
+  }catch{ return 0; }
 }
 
 const NOTIF_SCHED_KEY="destiniq_notif_v2";
@@ -731,9 +968,21 @@ function fireNotification(title, body, tag="destiniq"){
   }catch(_){}
 }
 
-async function scheduleNotification(uid, name, goal, streak, times, onFire){
+async function scheduleNotification(uid, name, goal, streak, times, onFire, profile){
   // Persist times so smart quiet-mode can re-arm after a check-in
   try{ if(uid&&times) localStorage.setItem(`diq_notif_times_${uid}`, JSON.stringify(times)); }catch{}
+  // Persist a compact profile snapshot so re-arming after restart keeps goal context
+  try{
+    if(uid && profile){
+      localStorage.setItem(`diq_notif_profile_${uid}`, JSON.stringify({
+        name: profile.name||name||"",
+        is_paid: !!profile.is_paid,
+        priorities: profile.priorities||profile.priorityIds||[],
+        followups: profile.followups||{},
+        vision: profile.vision||"",
+      }));
+    }
+  }catch{}
   if(!uid||!times) return;
   const pick=(arr)=>arr[Math.floor(Math.random()*arr.length)];
 
@@ -787,10 +1036,19 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
       const notifications = [];
 
       if(times.morning){
-        const [h,m]=times.morning.split(":").map(Number);
+        // A wake-early user set their own time — for them, the nudge fires exactly
+        // when the alarm should. Everyone else keeps the standard morning slot.
+        let mTime = times.morning;
+        try{
+          const wt = profile?.followups?.habits?.wakeTime;
+          const wakeStage = profile?.followups?.habits?.stage;
+          const {priorities} = (typeof resolveProfileTags==="function" && profile) ? resolveProfileTags(profile) : {priorities:[]};
+          if(wt && wakeStage==="morning" && priorities?.[0]==="habits") mTime = wt;
+        }catch{}
+        const [h,m]=mTime.split(":").map(Number);
         notifications.push({
           id:1001, title:"DestinIQ", channelId:"destiniq-daily",
-          body:pick(NOTIF_MSGS.morning)(name,goal),
+          body:pickDailyNotification("morning", profile||{name,is_paid:false}, streak, uid),
           schedule:{on:{hour:h, minute:m}, allowWhileIdle:true},
           sound:"default",
         });
@@ -799,7 +1057,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         const [h,m]=times.afternoon.split(":").map(Number);
         notifications.push({
           id:1002, title:"DestinIQ", channelId:"destiniq-daily",
-          body:pick(NOTIF_MSGS.afternoon)(name),
+          body:pickDailyNotification("afternoon", profile||{name,is_paid:false}, streak, uid),
           schedule:{on:{hour:h, minute:m}, allowWhileIdle:true},
           sound:"default",
         });
@@ -808,7 +1066,7 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
         const [h,m]=times.evening.split(":").map(Number);
         notifications.push({
           id:1003, title:"DestinIQ", channelId:"destiniq-daily",
-          body:pick(NOTIF_MSGS.evening)(name,streak),
+          body:pickDailyNotification("evening", profile||{name,is_paid:false}, streak, uid),
           schedule:{on:{hour:h, minute:m}, allowWhileIdle:true},
           sound:"default",
         });
@@ -861,7 +1119,8 @@ async function scheduleNotification(uid, name, goal, streak, times, onFire){
     const tid=setTimeout(()=>{
       fireNotification("DestinIQ", msgFn(), tag);
       onFire&&onFire(tag);
-      scheduleNotification(uid,name,goal,streak,times,onFire);
+      let _p=null; try{ _p=JSON.parse(localStorage.getItem(`diq_notif_profile_${uid}`)||"null"); }catch{}
+      scheduleNotification(uid,name,goal,streak,times,onFire,_p);
     }, delay);
     newTimers.push(tid);
   };
@@ -923,7 +1182,10 @@ if(typeof window!=="undefined"){
     const alreadyToday = ciTodayKey === new Date().toISOString().slice(0,10);
     if(saved&&saved.uid&&(isNativeLoad || (typeof Notification!=="undefined"&&Notification.permission==="granted"))){
       // If they already checked in today, stay quiet — quiet-mode owns tomorrow.
-      if(!alreadyToday) scheduleNotification(saved.uid,saved.name,saved.goal,saved.streak,saved.times,null);
+      if(!alreadyToday){
+        let _p=null; try{ _p=JSON.parse(localStorage.getItem(`diq_notif_profile_${saved.uid}`)||"null"); }catch{}
+        scheduleNotification(saved.uid,saved.name,saved.goal,saved.streak,saved.times,null,_p);
+      }
     }
   }catch(_){}
 }
@@ -4992,7 +5254,7 @@ function LockGate({children,isPaid,onUnlock,teaser=""}){
         {teaser
           ? <p style={{fontSize:13,color:"var(--cream-50)",maxWidth:300,marginBottom:16,lineHeight:1.6,textAlign:"center"}}>{teaser}</p>
           : <p className="body" style={{maxWidth:300,marginBottom:16,textAlign:"center"}}>Unlock your roadmap, decisions, career paths, weekly pulse, and relocation reports.</p>}
-        <button className="btn btn-gold" onClick={onUnlock}>Unlock from $9/month</button>
+        <button className="btn btn-gold" onClick={onUnlock}>Unlock — {proPriceLabel()}</button>
         <p style={{fontSize:11,color:"var(--cream-30)",marginTop:8}}>Cancel anytime · No hidden fees</p>
       </div>
     </div>
@@ -5014,7 +5276,7 @@ function FreeGate({total, freeCount, isPaid, onUnlock, label="sections"}){
         Free users see {freeCount} of {total}. Upgrade to unlock all {total}.
       </p>
       <button className="btn btn-gold" onClick={onUnlock}>
-        Unlock all {total} → from $9/month
+        Unlock all {total} → {proPriceLabel()}
       </button>
     </div>
   );
@@ -5463,7 +5725,7 @@ function NotificationPanel({profile,userId,streak,onClose}){
           return;
         }
       }
-      await scheduleNotification(userId,profile?.name||"",profile?.goals||"",streak||1,times,null);
+      await scheduleNotification(userId,profile?.name||"",profile?.goals||"",streak||1,times,null,profile);
       setStatus("done");
     }catch(e){
       setStatus("error");
@@ -5729,7 +5991,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
 
   const FREE_FEATURES=[
   {text:"1 intelligence report (your profile)",        inc:true},
-  {text:"Decisions tool free — plus a preview of all 42 tools", inc:true},
+  {text:"3 full AI tools every month — your pick",   inc:true},
+  {text:"Earn a free week of Pro with a 30-day streak", inc:true},
   {text:"AI Advisor — short daily chats",           inc:true},
   {text:"Daily check-in — basic reflection",           inc:true},
   {text:"Win tracker — up to 5 wins",                  inc:true},
@@ -5795,8 +6058,11 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
         {/* ── TIER SELECTOR: Pro vs Pro Max ────────────────────────────────── */}
         <div className="fu3" style={{display:"flex",gap:10,marginBottom:20,maxWidth:480,margin:"0 auto 20px"}}>
           {[
-            {id:"pro",    label:"Pro",     price:"$9/mo",  color:"var(--gold)",   desc:"Full access"},
-            {id:"promax", label:"Pro Max", price:"$19/mo", color:"#9b72cf", desc:"Unlimited AI"},
+            // Read straight from PRICING — the same object the Paystack charge uses.
+            // Previously these were hardcoded "$9/mo" and "$19/mo" while the actual
+            // charges were $9.99 and $24.99. We advertised $19 and took $25.
+            {id:"pro",    label:"Pro",     price:PRICING.pro.label.replace("/month","/mo"),    color:"var(--gold)", desc:"Full access"},
+            {id:"promax", label:"Pro Max", price:PRICING.promax.label.replace("/month","/mo"), color:"#9b72cf",     desc:"Unlimited AI"},
           ].map(t=>(
             <button key={t.id} onClick={()=>setTier(t.id)} style={{
               flex:1,padding:"12px 16px",borderRadius:14,
@@ -6295,7 +6561,7 @@ function patternsReadiness(userId){
   return {have:n, need:NEED, ready:n>=NEED, left:Math.max(0,NEED-n)};
 }
 
-function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
+function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid}){
   const G = useThemeColors();
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
@@ -6479,8 +6745,11 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 
           {/* What did you do */}
           <div style={{marginBottom:14}}>
-            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:8}}>
-              What's one thing you did or are doing today?
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
+              <div style={{fontSize:11,color:G.dim,fontWeight:600}}>
+                What's one thing you did or are doing today?
+              </div>
+              <MicButton size={28} onText={t=>setDid(v=>appendSpoken(v,t))}/>
             </div>
             <textarea value={did} onChange={e=>setDid(e.target.value)} rows={3}
               placeholder="Worked on my side project, had a hard conversation, started the task I was avoiding…"
@@ -6491,8 +6760,11 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 
           {/* What did you avoid */}
           <div style={{marginBottom:20}}>
-            <div style={{fontSize:11,color:G.dim,fontWeight:600,marginBottom:8}}>
-              Anything you're avoiding? <span style={{color:G.dimmer,fontWeight:400}}>(optional)</span>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
+              <div style={{fontSize:11,color:G.dim,fontWeight:600}}>
+                Anything you're avoiding? <span style={{color:G.dimmer,fontWeight:400}}>(optional)</span>
+              </div>
+              <MicButton size={28} onText={t=>setAvoided(v=>appendSpoken(v,t))}/>
             </div>
             <textarea value={avoided} onChange={e=>setAvoided(e.target.value)} rows={2}
               placeholder="Procrastinating on something? A hard decision? Leave it blank if not."
@@ -6525,9 +6797,11 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium}){
 
           {streak>0&&(
             <div style={{textAlign:"center",marginTop:14,fontSize:12,color:G.dimmer}}>
-              🔥 {streak} day streak — keep it going
+              🔥 {streak} day streak
             </div>
           )}
+          {/* "keep it going" is not a reason. THIS is a reason. */}
+          <StreakRewardLine streak={streak} isPaid={isPaid}/>
         </>
       )}
     </div>
@@ -6755,6 +7029,9 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
       <div style={{flexShrink:0,paddingTop:12,borderTop:"1px solid "+G.border}}>
         {error&&<p style={{color:"#e05252",fontSize:12,margin:"0 0 8px"}}>{error}</p>}
         <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+          <MicButton size={38} title="Ask out loud"
+            onText={t=>setInput(v=>appendSpoken(v,t))}
+            style={{alignSelf:"flex-end",marginBottom:2}}/>
           <textarea value={input} onChange={e=>setInput(e.target.value)} rows={2}
             placeholder="Ask your coach anything…"
             onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
@@ -6888,7 +7165,7 @@ function SupportWidget(){
     {q:"The payment went through but I'm still on free - what do I do?",a:"Refresh the page. If it still shows free after 5 minutes, send us a message in the chat with your email address."},
     {q:"How do I delete my account?",a:"Send us a message in this support chat with your email and we will delete your account and all data within 24 hours."},
     {q:"Why is my streak not going up?",a:"Your streak increases by 1 each time you complete a daily check-in on a new calendar day. Make sure you tap Submit on your check-in - just opening it does not count."},
-    {q:"How do I use voice to type?",a:"Anywhere you see a mic icon next to a text box, tap it and speak. It will type what you say automatically."},
+    {q:"How do I use voice to type?",a:"Tap the 🎤 icon next to any text box — check-ins, your journal, letters to your future self, the advisor chat, and your quarterly review all support it. Speak naturally; you can pause to think and keep going. Tap it again when you're done. It works in Chrome, Edge and Safari (Firefox doesn't support it yet, so the icon simply won't appear there)."},
   ];
 
   useEffect(()=>{ if(open) setTimeout(()=>msgEndRef.current?.scrollIntoView({behavior:"smooth"}),80); },[msgs,open]);
@@ -7858,14 +8135,16 @@ function Landing({onStart,ipLocation}){
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,maxWidth:900,margin:"0 auto"}}>
           {[
             {name:"Free",price:"$0",period:"forever",color:"rgba(255,255,255,0.06)",border:"rgba(255,255,255,0.1)",badge:null,
-             features:["1 Intelligence Report","Decisions tool free + preview all 42","AI Advisor — short daily chats","Daily Check-in","Win Tracker (up to 5)","Journal — 1 entry"],
+             // Was: "Decisions tool free + preview all 42" — stale. Free users now
+             // get 3 FULL tools a month, and can EARN Pro by keeping a streak.
+             features:["1 Intelligence Report","3 full AI tools every month","Earn a free week of Pro with a 30-day streak","AI Advisor — short daily chats","Daily Check-in","Win Tracker (up to 5)","Journal — 1 entry"],
              cta:"Get Started Free",ctaStyle:{background:"var(--cream-10)",color:G.cream},
              action:()=>onStart()},
-            {name:"Pro",price:"$9.99",period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
+            {name:"Pro",price:proPriceLabel().replace("/month","").replace("/year",""),period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
              features:["3 Intelligence Reports/month","All 42 AI tools unlocked","AI Advisor — full conversations","Unlimited journal + win tracker","Practices & habit tracking","Progress analytics","Audio read-aloud + saved reports"],
              cta:"Start Pro →",ctaStyle:{background:G.gold,color:"#000"},
              action:()=>onStart()},
-            {name:"Pro Max",price:"$24.99",period:"per month",color:"rgba(155,114,207,0.06)",border:"rgba(155,114,207,0.3)",badge:"Everything",
+            {name:"Pro Max",price:promaxPriceLabel().replace("/month","").replace("/year",""),period:"per month",color:"rgba(155,114,207,0.06)",border:"rgba(155,114,207,0.3)",badge:"Everything",
              features:["Unlimited Intelligence Reports","Unlimited AI Advisor — 2.5× deeper responses","Weekly AI Digest every Monday","PDF export of your report","Score comparison history","Priority speed + early access"],
              cta:"Start Pro Max →",ctaStyle:{background:"#9b72cf",color:"#fff"},
              action:()=>onStart()},
@@ -8376,11 +8655,30 @@ function Intake({onSubmit, savedFormData, ipLocation}){
                         <div style={{fontSize:12.5,color:G.cream,fontWeight:600,marginBottom:7}}>
                           {fu.textQ} <span style={{color:G.dim,fontWeight:400}}>(optional)</span>
                         </div>
-                        <input value={ans.text||""} onChange={e=>setFu("text",e.target.value)}
-                          placeholder={fu.placeholder} maxLength={140}
-                          style={{width:"100%",boxSizing:"border-box",background:G.inp,
-                            border:"1px solid "+G.inpBorder,borderRadius:10,padding:"10px 12px",
-                            color:G.cream,fontSize:13.5,fontFamily:"inherit"}}/>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          <input value={ans.text||""} onChange={e=>setFu("text",e.target.value)}
+                            placeholder={fu.placeholder} maxLength={140}
+                            style={{flex:1,minWidth:0,boxSizing:"border-box",background:G.inp,
+                              border:"1px solid "+G.inpBorder,borderRadius:10,padding:"10px 12px",
+                              color:G.cream,fontSize:13.5,fontFamily:"inherit"}}/>
+                          <MicButton size={34} onText={t=>setFu("text", appendSpoken(ans.text||"", t))}/>
+                        </div>
+
+                        {/* Wake-time — only for the wake-early person. For them the
+                            TIMING is the message: a 6am "get up" is worthless at 9am.
+                            So we ask, and fire their morning nudge at exactly this time. */}
+                        {p.id==="habits" && ans.stage==="morning" && (
+                          <div style={{marginTop:12,paddingTop:12,borderTop:"1px dashed "+G.inpBorder}}>
+                            <div style={{fontSize:12.5,color:G.cream,fontWeight:600,marginBottom:7}}>
+                              What time do you want to be up? <span style={{color:G.gold,fontWeight:400}}>we'll nudge you exactly then</span>
+                            </div>
+                            <input type="time" value={ans.wakeTime||"05:30"}
+                              onChange={e=>setFu("wakeTime",e.target.value)}
+                              style={{background:G.inp,border:"1px solid "+G.inpBorder,borderRadius:10,
+                                padding:"10px 12px",color:G.cream,fontSize:14,fontFamily:"inherit",
+                                colorScheme:"dark"}}/>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -9520,6 +9818,9 @@ Return ONLY a JSON array of exactly 5 objects, no markdown, no explanation, no c
       if(!Array.isArray(parsed)||!parsed.length) throw new Error("Empty array");
       setPoints(parsed);
       try{ localStorage.setItem(pointsCacheKey, JSON.stringify(parsed)); }catch{}
+      // Also record that this tool was generated, so Categories Progress counts
+      // it. Without this the bar only ever saw 3 of 42 tools and stayed at 0%.
+      try{ if(userId) localStorage.setItem(`diq_mod_${modId}_${userId}`, "generated"); }catch{}
     }catch(e){
       setError2("Could not generate. Check your connection and tap Refresh to try again.");
     }
@@ -9640,8 +9941,17 @@ Write a focused, personalised, practical breakdown of JUST this one point — no
                         ↺ Refresh
                       </button>
                       <button onClick={()=>{
-                        addProgressPoints(userId,`generic_${modId}_${idx}_${new Date().toISOString().slice(0,10)}`,PROGRESS_POINTS.deepdive_done);
-                        window.dispatchEvent(new CustomEvent("showToast",{detail:"✓ Marked as done — progress updated!"}));
+                        if(userId){
+                          addProgressPoints(userId,`generic_${modId}_${idx}_${new Date().toISOString().slice(0,10)}`,PROGRESS_POINTS.deepdive_done);
+                          // Mark this tool as ACTED-ON so the category % bar counts it.
+                          // (The bar reads diq_mod_${tool}; the points components never
+                          // wrote that key, so every category sat at 0% forever.)
+                          try{ localStorage.setItem(`diq_mod_${modId}_${userId}`, "applied"); }catch{}
+                          try{ localStorage.setItem(`diq_applied_${modId}_${userId}`, new Date().toISOString()); }catch{}
+                          markActive(userId);
+                          window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,action:"deepdive_done"}}));
+                        }
+                        window.dispatchEvent(new CustomEvent("showToast",{detail:userId?"✓ Logged — this counts toward your progress":"Sign in to save your progress"}));
                       }}
                         style={{background:G.gold+"18",border:"1px solid "+G.gold+"40",
                           borderRadius:8,padding:"7px 14px",fontSize:11,color:G.gold,
@@ -11987,6 +12297,107 @@ function AudioPlayer({text,label="Listen",mini=false}){
 // VOICE INPUT — Textarea with microphone dictation (Web Speech API)
 // Falls back to a plain textarea if SpeechRecognition isn't supported.
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// MicButton — speak instead of typing, anywhere
+// ───────────────────────────────────────────────────────────────────────────────
+// The FAQ already promised users: "Anywhere you see a mic icon next to a text
+// box, tap it and speak." That was untrue — there was exactly ONE mic in the
+// whole app.
+//
+// It matters more than it sounds. Picture the actual user: end of a long day, on
+// a phone, being asked to TYPE a reflective answer into a textarea. Typing is
+// the friction. Speaking is not. For check-ins, journals and letters to your
+// future self, the voice is the natural instrument — and people say more, and
+// truer things, when they speak than when they thumb-type.
+//
+// Uses the browser's SpeechRecognition API: free, no server, no per-use cost.
+// Renders nothing at all where it isn't supported, so nothing ever breaks.
+// ═══════════════════════════════════════════════════════════════════════════════
+function MicButton({onText, size=32, title="Speak instead of typing", style={}}){
+  const [listening,setListening]=useState(false);
+  const [supported,setSupported]=useState(false);
+  const recogRef=useRef(null);
+
+  useEffect(()=>{
+    const SR = typeof window!=="undefined" &&
+      (window.SpeechRecognition || window.webkitSpeechRecognition);
+    setSupported(!!SR);
+    return ()=>{ try{ recogRef.current?.stop(); }catch{} };
+  },[]);
+
+  const stop=()=>{
+    try{ recogRef.current?.stop(); }catch{}
+    recogRef.current=null;
+    setListening(false);
+  };
+
+  const start=()=>{
+    if(listening){ stop(); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR) return;
+    const r = new SR();
+    r.lang = (typeof navigator!=="undefined" && navigator.language) || "en-US";
+    r.interimResults = false;
+    r.continuous = true;          // let people pause and think mid-sentence
+    r.maxAlternatives = 1;
+
+    r.onresult = (e)=>{
+      let said = "";
+      for(let i=e.resultIndex; i<e.results.length; i++){
+        if(e.results[i].isFinal) said += e.results[i][0].transcript;
+      }
+      if(said.trim()) onText?.(said.trim());
+    };
+    r.onerror = ()=>{ setListening(false); recogRef.current=null; };
+    r.onend   = ()=>{ setListening(false); recogRef.current=null; };
+
+    try{
+      r.start();
+      recogRef.current=r;
+      setListening(true);
+    }catch{ setListening(false); }
+  };
+
+  // Browsers without support (e.g. Firefox) simply get no button. No error, no
+  // broken affordance, no promise we can't keep.
+  if(!supported) return null;
+
+  return(
+    <>
+      <button type="button" onClick={start}
+        title={listening ? "Stop — tap when you're done" : title}
+        aria-label={listening ? "Stop dictation" : title}
+        style={{
+          width:size, height:size, borderRadius:"50%", flexShrink:0,
+          border:"1px solid "+(listening ? "var(--gold)" : "var(--cream-15)"),
+          background: listening ? "var(--gold)" : "var(--lift, rgba(255,255,255,0.05))",
+          color: listening ? "#000" : "var(--cream-50)",
+          fontSize:Math.round(size*0.45), cursor:"pointer",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          transition:"all .2s",
+          animation: listening ? "diqMicPulse 1.4s ease-in-out infinite" : "none",
+          ...style,
+        }}>
+        🎤
+      </button>
+      <style>{`
+        @keyframes diqMicPulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(240,180,41,.55); }
+          50%     { box-shadow: 0 0 0 7px rgba(240,180,41,0); }
+        }
+      `}</style>
+    </>
+  );
+}
+
+// Convenience: append dictated speech to whatever's already in the field, so
+// people can dictate in several passes without wiping what they said before.
+function appendSpoken(prev, said){
+  const p = String(prev||"").trim();
+  if(!p) return said;
+  return /[.!?]$/.test(p) ? `${p} ${said}` : `${p}. ${said}`;
+}
+
 function VoiceInput({value,onChange,rows=4,maxLength=600,placeholder=""}){
   const [listening,setListening]=useState(false);
   const [supported,setSupported]=useState(false);
@@ -14373,7 +14784,64 @@ const STREAK_THEMES = {
 };
 const DEFAULT_THEME = ["#FDE68A","#F0B429","#E8890C"];
 
-function StreakCelebration({streak, onClose}){
+// ═══════════════════════════════════════════════════════════════════════════════
+// StreakRewardLine — the reward has to PULL, not surprise
+// ───────────────────────────────────────────────────────────────────────────────
+// 30 days of showing up earns 7 free days of Pro. But a reward nobody knows
+// they're earning changes nobody's behaviour — it's just a nice surprise on day
+// 30, by which point it did no work. So it has to be visible at every point
+// where the streak is, and it has to get LOUDER as they close in.
+// ═══════════════════════════════════════════════════════════════════════════════
+function StreakRewardLine({streak, isPaid, compact=false}){
+  if(isPaid) return null;                       // already Pro — nothing to earn
+  const EVERY = 30;
+  const s = streak || 0;
+  const done = s % EVERY;
+  const left = EVERY - done;
+  const pct = Math.round((done / EVERY) * 100);
+
+  // Escalating copy — the last week should feel close enough to touch.
+  const line =
+    s === 0        ? "Check in 30 days in a row and Pro is free for a week." :
+    left === 1     ? "One more day. Then Pro is yours, free, for a week." :
+    left <= 3      ? `${left} days. That's it. Then a free week of Pro.` :
+    left <= 7      ? `${left} days from a free week of Pro. You're close.` :
+    left <= 14     ? `${left} days from earning a free week of Pro.` :
+                     `Keep going — 30 days in a row earns a free week of Pro.`;
+
+  const urgent = left <= 7 && s > 0;
+
+  if(compact){
+    return(
+      <div style={{fontSize:11.5,color:urgent?"var(--gold)":"var(--cream-40)",
+        lineHeight:1.5,marginTop:6}}>
+        {urgent?"✦ ":""}{line}
+      </div>
+    );
+  }
+
+  return(
+    <div style={{marginTop:12,padding:"12px 14px",borderRadius:12,
+      background: urgent ? "rgba(240,180,41,0.09)" : "rgba(255,255,255,0.03)",
+      border: "1px solid " + (urgent ? "rgba(240,180,41,0.35)" : "var(--line)")}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+        gap:10,marginBottom:8}}>
+        <span style={{fontSize:12,color: urgent ? "var(--gold)" : "var(--cream-50)",
+          lineHeight:1.5, fontWeight: urgent ? 700 : 500}}>
+          {urgent ? "✦ " : ""}{line}
+        </span>
+        <span style={{fontSize:10.5,fontFamily:"var(--f-mono)",
+          color:"var(--cream-30)",whiteSpace:"nowrap"}}>{done}/{EVERY}</span>
+      </div>
+      <div style={{height:5,borderRadius:20,background:"rgba(255,255,255,0.07)",overflow:"hidden"}}>
+        <div style={{height:"100%",width:pct+"%",borderRadius:20,
+          background:"linear-gradient(90deg,#FDE68A,#F0B429)",transition:"width .6s"}}/>
+      </div>
+    </div>
+  );
+}
+
+function StreakCelebration({streak, onClose, isPaid}){
   const [animIn, setAnimIn] = useState(false);
   // Hooks FIRST — early returns before hooks break React
   useEffect(()=>{
@@ -14577,6 +15045,19 @@ function StreakCelebration({streak, onClose}){
           Keep going 🔥
         </button>
 
+        {/* They just hit a milestone and feel good. THIS is the moment to tell
+            them day 30 is a free week of Pro — not a surprise on day 30. */}
+        {!isPaid && streak % 30 !== 0 && (
+          <div style={{marginTop:16,padding:"12px 14px",borderRadius:12,
+            background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.14)"}}>
+            <div style={{fontSize:12.5,color:"rgba(255,255,255,0.75)",lineHeight:1.6}}>
+              {30 - (streak % 30) <= 7
+                ? `Only ${30 - (streak % 30)} more days and Pro is yours free for a week.`
+                : `Reach 30 days in a row and Pro is free for a week — ${30 - (streak % 30)} to go.`}
+            </div>
+          </div>
+        )}
+
         <button onClick={()=>shareGrowthCard(
             {emoji:milestone.emoji||"🔥", headline:`${streak}-DAY STREAK`, sub:"Showing up for myself, every single day", name:""},
             `🔥 ${streak}-day streak on DestinIQ! Showing up for myself every single day.\n\nStart yours free 👉 destiniq.app`)}
@@ -14773,7 +15254,14 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
           <span style={{fontSize:20}}>🔥</span>
           <div>
             <div style={{fontSize:13,fontWeight:700,color:"var(--cream)"}}>{streak||1} day streak</div>
-            <div style={{fontSize:10,color:"var(--cream-30)"}}>Keep it going</div>
+            {/* "Keep it going" is a slogan. Tell them what it's FOR. */}
+            <div style={{fontSize:10,color: (!isPaid && (30-((streak||0)%30))<=7) ? "var(--gold)" : "var(--cream-30)"}}>
+              {isPaid
+                ? "Keep it going"
+                : (30-((streak||0)%30))===1
+                  ? "1 day to free Pro"
+                  : `${30-((streak||0)%30)} days to free Pro`}
+            </div>
           </div>
         </div>
         <div style={{display:"flex",gap:5}}>
@@ -16040,7 +16528,11 @@ Write them a short, honest quarterly reflection (200–260 words). Rules:
       {/* The questions — the slow part */}
       {QUESTIONS.map(x=>(
         <div key={x.id} style={{marginBottom:22}}>
-          <div style={{fontSize:15.5,fontWeight:700,color:G.cream,marginBottom:4,lineHeight:1.5}}>{x.q}</div>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:4}}>
+            <div style={{fontSize:15.5,fontWeight:700,color:G.cream,lineHeight:1.5}}>{x.q}</div>
+            <MicButton size={30} title="Answer out loud"
+              onText={t=>set(x.id, appendSpoken(answers[x.id]||"", t))}/>
+          </div>
           <div style={{fontSize:12,color:G.dimmer,marginBottom:9}}>{x.hint}</div>
           <textarea value={answers[x.id]||""} onChange={e=>set(x.id,e.target.value)} rows={3}
             placeholder="Take your time…"
@@ -17413,6 +17905,9 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
       const next = [...prev, sectionKey];
       try{ if(sectionsKey) localStorage.setItem(sectionsKey, JSON.stringify(next)); }catch{}
       addProgressPoints(userId, `section_${card.id}_${sectionKey}`, PROGRESS_POINTS.deepdive_done);
+      // Feed Categories Progress: record engagement against this category's tools.
+      try{ if(userId){ localStorage.setItem(`diq_applied_${card.id}_${userId}`, new Date().toISOString()); markActive(userId); } }catch{}
+      window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,action:"deepdive_done"}}));
       return next;
     });
   };
@@ -17498,11 +17993,24 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
     setAiLoading(false);
   };
 
-  // Business plan sections config — only for Money+ cards.
-  // Other categories (Social, Mindset, Body, Wellness, Purpose, Skills, Plan)
-  // get an action-plan framing with no cost/market/income language.
+  // Money+ contains three very different kinds of card, and they were all being
+  // shown business sections. A BUDGETING card was showing "The Market Right Now",
+  // "Startup Cost Breakdown" and "Expected Income" — nonsense for a money habit.
+  // So branch on what the card actually IS, not just its category.
   const isMoneyCard = catId==="money";
-  const PLAN_SECTIONS = isMoneyCard ? [
+  const moneyKind = (()=>{
+    if(!isMoneyCard) return null;
+    // No topicId in scope here — infer from the card's own id/title/tags.
+    const hay = ((card?.id||"")+" "+(card?.title||"")+" "+((card?.tags||[]).join(" "))).toLowerCase();
+    // investing: has risk/return, not "startup cost" or "income projection"
+    if(/invest|index fund|stock|t-bill|treasury|crypto|unit trust|money market|bond|share|portfolio/.test(hay)) return "invest";
+    // money habits: budgeting, saving, debt — no market, no startup cost, no income
+    if(/budget|saving|save |debt|susu|obligation|inflation|mobile money|momo|spend|mindset|remittance|transfer fee/.test(hay)) return "habit";
+    // everything else under money is a business / earning play
+    return "business";
+  })();
+
+  const BUSINESS_SECTIONS = [
     {key:"market",    icon:"📊", title:`The Market Right Now`,
      prompt:`Analyse the market for "${card.title}" in ${country} right now. Cover: current demand, top competitors, market size, best target customers, and the #1 opportunity nobody is taking. Use specific numbers and local context.`},
     {key:"startup",   icon:"💰", title:`Startup Cost Breakdown`,
@@ -17513,7 +18021,35 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
      prompt:`Project ${name}'s realistic income from "${card.title}" in ${country} at Month 1, Month 2, and Month 3. Show conservative, realistic, and optimistic scenarios with specific numbers. What needs to be true for each scenario. Include weekly revenue targets.`},
     {key:"risks",     icon:"⚠️", title:`Biggest Risks & How to Avoid Them`,
      prompt:`What are the 3 biggest risks for ${name} starting "${card.title}" in ${country}? For each risk: what it is, how likely it is, and the exact steps to prevent or recover from it. Be honest, not discouraging.`},
-  ] : [
+  ];
+
+  const HABIT_MONEY_SECTIONS = [
+    {key:"context",   icon:"🧭", title:`Why This Matters For Your Money`,
+     prompt:`Explain why "${card.title}" specifically matters for ${name} in ${country}, given their situation: ${buildProfileContext(formData)||"general circumstances"}. Be concrete about the money it saves or protects. 2-3 short paragraphs.`},
+    {key:"setup",     icon:"✅", title:`Set It Up Today`,
+     prompt:`Give ${name} in ${country} the exact steps to set up "${card.title}" today — accounts to open, apps to use, amounts to start with, all in local currency and locally available. Practical, not theoretical.`},
+    {key:"first30",   icon:"🚀", title:`Your First 30 Days`,
+     prompt:`Write a simple 30-day plan for ${name} to build the habit of "${card.title}". Week by week, what to do and what it should feel like. Keep the amounts realistic for ${country}.`},
+    {key:"mistakes",  icon:"⚠️", title:`Mistakes That Cost People`,
+     prompt:`What are the 3 most common mistakes people in ${country} make with "${card.title}", and exactly how ${name} can avoid each one? Be specific and honest.`},
+  ];
+
+  const INVEST_SECTIONS = [
+    {key:"context",   icon:"🧭", title:`Is This Right For You Yet?`,
+     prompt:`Honestly assess whether ${name} in ${country} is ready for "${card.title}" given their situation: ${buildProfileContext(formData)||"general circumstances"}. Cover what should be in place FIRST (emergency fund, etc). Don't push them in before they're ready.`},
+    {key:"howto",     icon:"✅", title:`How To Actually Start`,
+     prompt:`Give ${name} in ${country} the real, locally-available steps to start "${card.title}" — which providers accept their country, minimums in local currency, and paperwork needed. Practical and current.`},
+    {key:"returns",   icon:"📈", title:`Realistic Returns & Risk`,
+     prompt:`Give ${name} an honest picture of the returns and risks of "${card.title}" for someone in ${country}. Real percentage ranges, what can go wrong, and the time horizon needed. No hype.`},
+    {key:"risks",     icon:"⚠️", title:`How People Lose Money Here`,
+     prompt:`What are the specific ways people in ${country} lose money with "${card.title}" — scams, fees, bad timing, wrong platforms? For each, how ${name} avoids it. Be direct.`},
+  ];
+
+  const PLAN_SECTIONS =
+      moneyKind==="business" ? BUSINESS_SECTIONS
+    : moneyKind==="habit"    ? HABIT_MONEY_SECTIONS
+    : moneyKind==="invest"   ? INVEST_SECTIONS
+    : [
     {key:"context",   icon:"🧭", title:`Why This Matters For You`,
      prompt:`Explain why "${card.title}" specifically matters for ${name} from ${country}, given their situation: ${buildProfileContext(formData)||"general circumstances"}. Be specific to them, not generic. 2-3 short paragraphs.`},
     {key:"first30",   icon:"🚀", title:`Your First 30 Days`,
@@ -18352,14 +18888,32 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
   const s=data?.scores||{};
   const aiBaseline=Math.min(85,Math.max(10,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
   const [overall, setOverall] = useState(()=>getProgressScore(userId, aiBaseline));
-  // Re-compute when points update
+  const [scoreDelta,setScoreDelta] = useState(0);      // movement since this session opened
+  const [pointPop,setPointPop] = useState(null);       // {n} floating "+3" feedback
+  const sessionStartScore = useRef(overall);
+  // Re-compute when points update, and show WHAT moved and by how much
   useEffect(()=>{
-    const handler=()=>setOverall(getProgressScore(userId,aiBaseline));
+    const handler=(e)=>{
+      const next = getProgressScore(userId,aiBaseline);
+      setOverall(prev=>{
+        if(next>prev){
+          const gained = e?.detail?.action;
+          const amt = ({checkin:3,win_logged:2,one_thing:3,step_completed:1,streak_7:5,streak_14:5,streak_30:10,deepdive_done:2})[gained];
+          if(amt){ setPointPop({n:amt, id:Date.now()}); setTimeout(()=>setPointPop(null), 1800); }
+        }
+        return next;
+      });
+      setScoreDelta(next - sessionStartScore.current);
+    };
     window.addEventListener("progressUpdated",handler);
     return()=>window.removeEventListener("progressUpdated",handler);
   },[userId,aiBaseline]);
   const toolCount=(()=>{try{return JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]").length;}catch{return 0;}})();
   const reportCount=Math.max(1,data?.score_history?.length||1);
+  // Peak state — once you hit 99 the score can't climb, so "days held" takes over
+  const atPeak = overall >= 99;
+  const [peakDays,setPeakDays] = useState(()=>{ try{ return updatePeakDays(userId, overall); }catch{ return 0; } });
+  useEffect(()=>{ try{ setPeakDays(updatePeakDays(userId, overall)); }catch{} }, [userId, overall]);
 
   // Build last-7-days journey from momentum log
   const log=getMomentumLog(userId);
@@ -18461,7 +19015,14 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
         {/* Categories Progress */}
         <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>Categories Progress</div>
         {CATEGORIES.map(cat=>{
-          const done=(Array.isArray(cat?.tools)?cat.tools:[]).filter(t=>{try{return!!localStorage.getItem(`diq_mod_${t}_${userId}`);}catch{return false;}}).length;
+          // Count tools the user has actually ENGAGED with — either generated a
+          // report (diq_mod_) or tapped "I'm applying this" (diq_applied_).
+          const done=(Array.isArray(cat?.tools)?cat.tools:[]).filter(t=>{
+            try{
+              return !!localStorage.getItem(`diq_mod_${t}_${userId}`)
+                  || !!localStorage.getItem(`diq_applied_${t}_${userId}`);
+            }catch{return false;}
+          }).length;
           const pct=cat.tools.length?Math.round((done/cat.tools.length)*100):0;
           return(
             <div key={cat.id} style={{marginBottom:16,cursor:"pointer"}} onClick={()=>setNav("category:"+cat.id)}>
@@ -18700,7 +19261,8 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
     (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
   )));
 
-  const scoreMsg = overall>=80?"You are ahead of most. Stay consistent and keep executing."
+  const scoreMsg = atPeak?(peakDays>=2?`Peak momentum — held for ${peakDays} days. This is rare air. Don't coast.`:"You've reached peak momentum. Now the game is holding it.")
+    :overall>=80?"You are ahead of most. Stay consistent and keep executing."
     :overall>=70?"You're on the right path. Keep building momentum!"
     :overall>=60?"Great foundations. A few key shifts will unlock your potential."
     :"This is your starting point. Every expert was once a beginner.";
@@ -18855,24 +19417,91 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
           <div style={{fontSize:9,color:G.dimmer,letterSpacing:".14em",
             fontFamily:"monospace",marginBottom:18}}>OVERALL INTELLIGENCE SCORE ℹ</div>
 
-          <div style={{position:"relative",width:144,height:144,margin:"0 auto 18px"}}>
+          <div style={{position:"relative",width:144,height:144,margin:"0 auto 18px",
+            filter: atPeak ? "drop-shadow(0 0 18px rgba(240,180,41,0.55))" : "none",
+            transition:"filter .6s"}}>
             <svg width={144} height={144}
               style={{transform:"rotate(-90deg)",position:"absolute",inset:0}}>
               <circle cx={72} cy={72} r={R} fill="none"
                 stroke="rgba(255,255,255,0.06)" strokeWidth={SW}/>
-              <circle cx={72} cy={72} r={R} fill="none" stroke={G.gold} strokeWidth={SW}
-                strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"/>
+              <circle cx={72} cy={72} r={R} fill="none"
+                stroke={atPeak ? "url(#peakGrad)" : G.gold} strokeWidth={SW}
+                strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"
+                style={{transition:"stroke-dashoffset .8s cubic-bezier(.34,1.2,.4,1)"}}/>
+              {atPeak&&(
+                <defs>
+                  <linearGradient id="peakGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#FDE68A"/>
+                    <stop offset="50%" stopColor="#F0B429"/>
+                    <stop offset="100%" stopColor="#FF8A65"/>
+                  </linearGradient>
+                </defs>
+              )}
             </svg>
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
               alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontSize:"clamp(32px,9vw,48px)",fontWeight:800,color:G.cream,lineHeight:1}}>{overall}</span>
-              <span style={{fontSize:13,color:G.dimmer,marginTop:2}}>/100</span>
+              {atPeak ? (
+                <>
+                  <span style={{fontSize:22,lineHeight:1,marginBottom:2}}>👑</span>
+                  <span style={{fontSize:"clamp(28px,8vw,42px)",fontWeight:800,lineHeight:1,
+                    backgroundImage:"linear-gradient(120deg,#FDE68A,#F0B429,#FF8A65)",
+                    WebkitBackgroundClip:"text",backgroundClip:"text",
+                    WebkitTextFillColor:"transparent",color:"transparent"}}>99</span>
+                  <span style={{fontSize:10,color:G.gold,marginTop:3,fontFamily:"var(--f-mono)",
+                    letterSpacing:".05em"}}>PEAK</span>
+                </>
+              ):(
+                <>
+                  <span style={{fontSize:"clamp(32px,9vw,48px)",fontWeight:800,color:G.cream,lineHeight:1,
+                    transition:"color .3s"}}>{overall}</span>
+                  <span style={{fontSize:13,color:G.dimmer,marginTop:2}}>/100</span>
+                </>
+              )}
             </div>
+
+            {/* Floating "+3" when an action lands — makes the reward FELT */}
+            {pointPop&&(
+              <div key={pointPop.id} style={{position:"absolute",top:6,right:2,
+                fontSize:18,fontWeight:800,color:G.gold,pointerEvents:"none",
+                animation:"diqPointFloat 1.8s ease-out forwards"}}>
+                +{pointPop.n}
+              </div>
+            )}
           </div>
+
+          {/* At peak, "days held" becomes the number that keeps rising */}
+          {atPeak && peakDays>=1 && (
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:10,
+              padding:"5px 14px",borderRadius:20,
+              background:"rgba(240,180,41,0.12)",border:"1px solid rgba(240,180,41,0.4)"}}>
+              <span style={{fontSize:13,fontWeight:700,color:G.gold}}>
+                🔥 {peakDays} {peakDays===1?"day":"days"} at peak
+              </span>
+            </div>
+          )}
+
+          {/* Live movement badge — hidden at peak (days-held tells the story there) */}
+          {!atPeak && scoreDelta!==0&&(
+            <div style={{display:"inline-flex",alignItems:"center",gap:5,marginBottom:10,
+              padding:"4px 12px",borderRadius:20,
+              background: scoreDelta>0 ? "rgba(29,158,117,0.12)" : "rgba(224,92,110,0.1)",
+              border:"1px solid "+(scoreDelta>0?"rgba(29,158,117,0.35)":"rgba(224,92,110,0.3)")}}>
+              <span style={{fontSize:13,fontWeight:700,color:scoreDelta>0?"#1d9e75":"#e05c6e"}}>
+                {scoreDelta>0?"▲":"▼"} {Math.abs(scoreDelta)} this session
+              </span>
+            </div>
+          )}
 
           <p style={{fontSize:13,color:G.dim,lineHeight:1.65,margin:0}}>{scoreMsg}</p>
         </div>
       </div>
+      <style>{`
+        @keyframes diqPointFloat {
+          0%   { transform: translateY(0) scale(.6); opacity: 0; }
+          25%  { transform: translateY(-6px) scale(1.15); opacity: 1; }
+          100% { transform: translateY(-34px) scale(1); opacity: 0; }
+        }
+      `}</style>
 
       {/* ══════════════════════════════════════════
           2. STATS ROW — 4 cards
@@ -19479,8 +20108,12 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
                 <div style={{fontSize:13,color:G.cream,lineHeight:1.6}}>{todaysPrompt}</div>
               </div>
 
-              <div style={{fontSize:12,color:G.dimmer,marginBottom:12,fontStyle:"italic"}}>
-                Dear future {firstName},
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:12}}>
+                <div style={{fontSize:12,color:G.dimmer,fontStyle:"italic"}}>
+                  Dear future {firstName},
+                </div>
+                <MicButton size={30} title="Say it out loud instead"
+                  onText={t=>setLetter(v=>appendSpoken(v,t))}/>
               </div>
               <textarea value={letter} onChange={e=>setLetter(e.target.value)} rows={9}
                 placeholder={"Right now I feel…\n\nThe thing I'm most afraid of is…\n\nWhat I really want is…"}
@@ -20212,7 +20845,7 @@ Rules:
       )}
       {showCheckin&&(
         <div className="cx-md" style={{paddingTop:24,paddingBottom:24}}>
-          <CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
+          <CheckIn profile={formData} reportData={data} streak={streak} userId={userId} isPaid={isPaid} onComplete={()=>{setShowCheckin(false);setNav("home");}}/>
         </div>
       )}
       {!showCheckin&&(
@@ -20248,7 +20881,7 @@ Rules:
   if(navSection==="explore"){
     return(
       <>
-        {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+        {streakCelebration&&<StreakCelebration streak={streakCelebration} isPaid={isPaid} onClose={()=>setStreakCelebration(null)}/>}
         {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
         <ExploreScreen
           setNav={setNav} formData={formData} userId={userId}
@@ -20263,7 +20896,7 @@ Rules:
     <div className="app-shell">
 
       {/* Streak celebrations — top level so they show after check-in from ANY view */}
-      {streakCelebration&&<StreakCelebration streak={streakCelebration} onClose={()=>setStreakCelebration(null)}/>}
+      {streakCelebration&&<StreakCelebration streak={streakCelebration} isPaid={isPaid} onClose={()=>setStreakCelebration(null)}/>}
       {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
       {/* Pro earned by streak — shows after the celebration lands */}
       {trialGrant&&!streakCelebration&&(
@@ -22706,6 +23339,7 @@ try{
   useEffect(()=>{
     getIPLocation().then(loc=>{
       setIpLocation(loc);
+      setCurrentCountry(loc?.country||"");   // so displayed prices match the charge
       setIpLoaded(true);
     });
   },[]);
