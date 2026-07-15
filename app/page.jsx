@@ -10604,12 +10604,23 @@ function GenericAIModulePoints({modId, profile, userId, isPaid, isPremium, isPro
     setLoadingPoints(true); setError2(""); setExpanded({});
     try{
       const {currencySymbol, currencyName, note} = buildCurrencyNote(profile);
-      const prompt = `For "${cfg.title}", give ${profile?.name||"this person"} 5 distinct, specific, personalised points/principles — not generic advice. Each point should be a single focused idea they can act on (e.g. for wealth-building content: "Build Multiple Income Streams", "Master Delayed Gratification", "Invest In Your Own Skills First"). Base these on their profile: ${buildProfileContext(profile)||"general best practices for their situation"}.
+      // Each tool defines its OWN brief in MODULE_CONFIGS (cfg.prompt) — a letter,
+      // a eulogy, a 1/3/5-year vision, etc. Feed that brief in, so the points
+      // actually deliver THIS tool's purpose. (Previously the brief was ignored
+      // and a wealth-building example was hardcoded here, which made every tool —
+      // letters, vision boards, legacy letters — output money-hustle tips.)
+      let brief = "";
+      try{ if(typeof cfg.prompt === "function") brief = cfg.prompt(profile) || ""; }catch(_e){}
+      const prompt = `${brief
+        ? `THIS TOOL'S BRIEF — follow it exactly:\n"""\n${brief}\n"""\n\nDeliver that brief as 5 distinct points for ${profile?.name||"this person"}. Each point must serve the brief above: if the brief asks for a letter, the points are the letter's movements; if it asks for a vision, they are the vision's stages; if it asks for habits, they are the habits. Do NOT drift into generic money or hustle advice unless the brief itself is about money.`
+        : `For "${cfg.title}", give ${profile?.name||"this person"} 5 distinct, specific, personalised points — each a single focused idea true to what "${cfg.title}" means. Not generic advice.`}
+
+Their profile: ${buildProfileContext(profile)||"general best practices for their situation"}.
 
 Return ONLY a JSON array of exactly 5 objects, no markdown, no explanation, no code fences. Each object: {"title":"<3-6 word punchy title>","teaser":"<one sentence, max 18 words, specific to them, not generic>"}`;
       const result = await callAPI({
         messages:[{role:"user", content: prompt}],
-        system: `You are DestinIQ writing "${cfg.title}" content. Return ONLY a valid JSON array of 5 objects. Start with [ and end with ]. No markdown, no code fences, no preamble. Make each point genuinely distinct from the others — no overlap.`,
+        system: `You are DestinIQ writing "${cfg.title}" content. Every point must be unmistakably about "${cfg.title}" — never substitute generic money or side-hustle advice for this tool's actual purpose. Return ONLY a valid JSON array of 5 objects. Start with [ and end with ]. No markdown, no code fences, no preamble. Make each point genuinely distinct from the others — no overlap.`,
         userId, isPremium, isProMax,
       });
       const txt = Array.isArray(result?.content)
@@ -23028,7 +23039,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v15-DAILY-ACTIONS-LIVE"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v15-toolbrief"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
