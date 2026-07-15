@@ -787,6 +787,33 @@ function pickDailyNotification(slot, profile, streak, userId){
     }
   }
 
+  // ── TIER 1.5: daily-action reminder — the "did you save today?" you asked for.
+  // If they have a real daily action going with a streak, protect it BY NAME.
+  // This is the most personal reminder in the app: it's about a real thing they
+  // chose to do in their actual life.
+  try{
+    const acts = getDailyActions(userId) || [];
+    if(acts.length){
+      // find the action with the best live streak that ISN'T done today
+      let best=null, bestStreak=-1;
+      acts.forEach(a=>{
+        if(isActionDoneToday(userId, a.id)) return;
+        const st = actionStreak(userId, a.id);
+        if(st > bestStreak){ bestStreak = st; best = a; }
+      });
+      if(best){
+        if(slot === "morning"){
+          return bestStreak >= 1
+            ? `${n} — ${bestStreak} day${bestStreak>1?"s":""} of "${best.label.toLowerCase()}". Keep it alive today. ${best.icon}`
+            : `${n}, today's the day to start "${best.label.toLowerCase()}". ${best.icon} One small step counts.`;
+        }
+        if(slot === "evening"){
+          return `${n} — did you ${best.label.toLowerCase()} today? Tap it in DestinIQ if you did. ${best.icon}`;
+        }
+      }
+    }
+  }catch{}
+
   // ── TIER 2: win-back (drifting away — catch them) ──────────────────────────
   // "Drifting" = last check-in was 2+ days ago. Only fires in the morning slot
   // so we don't pile on. A saved streak is the strongest hook we have.
@@ -837,6 +864,8 @@ const PROGRESS_POINTS = {
   streak_14:        5,   // reached 14-day streak
   streak_30:        10,  // reached 30-day streak
   one_thing:        3,   // completed "your one thing today"
+  commit_done:      4,   // confirmed they ACTUALLY did a real-life commitment
+  daily_action:     5,   // checked off a REAL daily action (saved money, woke early) — heaviest, it's the whole point
 };
 
 const PROGRESS_PTS_KEY = (uid) => `diq_prog_pts_${uid}`;
@@ -874,6 +903,759 @@ function addProgressPoints(userId, action, amount){
 }
 
 // Convert raw points into a 0-99 progress score on top of the AI baseline
+// ═══════════════════════════════════════════════════════════════════════════════
+// FIVE ADDITIONS — the things that make an app feel like it's FOR you
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── 1. YOUR WHY — one line, in their own words, shown when it matters most ────
+function getMyWhy(userId){
+  try{ return localStorage.getItem(`diq_my_why_${userId}`) || ""; }catch{ return ""; }
+}
+function setMyWhy(userId, text){
+  try{ localStorage.setItem(`diq_my_why_${userId}`, String(text||"").slice(0,200)); }catch{}
+  try{
+    supabase.from("user_profiles").upsert({
+      user_id:userId, my_why:String(text||"").slice(0,200), updated_at:new Date().toISOString(),
+    },{onConflict:"user_id"}).then(null,()=>{});
+  }catch{}
+}
+
+// Small editable card — set your reason, and it shows back to you.
+function MyWhyCard({userId}){
+  const G = useThemeColors();
+  const [why,setWhy] = useState(()=>getMyWhy(userId));
+  const [editing,setEditing] = useState(false);
+  const [draft,setDraft] = useState(why);
+
+  const save=()=>{ setMyWhy(userId, draft); setWhy(draft); setEditing(false); };
+
+  if(!why && !editing) return(
+    <div onClick={()=>setEditing(true)} style={{margin:"0 0 16px",padding:"16px 18px",
+      borderRadius:16,background:"var(--cream-05)",border:"1.5px dashed var(--line)",
+      cursor:"pointer",textAlign:"center"}}>
+      <div style={{fontSize:13.5,color:G.dim,lineHeight:1.6}}>
+        ✍️ Why are you really doing this? <span style={{color:G.gold}}>Write your reason →</span>
+      </div>
+    </div>
+  );
+
+  if(editing) return(
+    <div style={{margin:"0 0 16px",padding:"18px 20px",borderRadius:16,
+      background:"linear-gradient(150deg,rgba(240,180,41,0.07),rgba(240,180,41,0.02))",
+      border:"1px solid rgba(240,180,41,0.3)"}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:G.cream,marginBottom:10}}>
+        Your reason — the real one. You'll see this on the hard days.
+      </div>
+      <div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+        <textarea autoFocus value={draft} onChange={e=>setDraft(e.target.value)} rows={2} maxLength={200}
+          placeholder="e.g. So my daughter never worries about school fees"
+          style={{flex:1,minWidth:0,boxSizing:"border-box",background:G.inp,
+            border:"1px solid "+G.inpBorder,borderRadius:10,padding:"11px 13px",
+            color:G.cream,fontSize:14,lineHeight:1.6,resize:"vertical",fontFamily:"inherit"}}/>
+        <MicButton size={34} onText={t=>setDraft(v=>appendSpoken(v,t))}/>
+      </div>
+      <button onClick={save} disabled={!draft.trim()} style={{marginTop:10,
+        background:draft.trim()?G.gold:"var(--cream-10)",border:"none",borderRadius:11,
+        padding:"11px 22px",fontSize:14,fontWeight:800,color:draft.trim()?"#000":G.dimmer,
+        cursor:draft.trim()?"pointer":"default",fontFamily:"inherit"}}>Save my why</button>
+    </div>
+  );
+
+  return(
+    <div onClick={()=>{ setDraft(why); setEditing(true); }} style={{margin:"0 0 16px",
+      padding:"16px 20px",borderRadius:16,cursor:"pointer",
+      background:"linear-gradient(150deg,rgba(240,180,41,0.07),rgba(240,180,41,0.02))",
+      border:"1px solid rgba(240,180,41,0.25)"}}>
+      <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".12em",
+        color:G.gold,marginBottom:7}}>WHY YOU'RE DOING THIS</div>
+      <div style={{fontSize:15,color:G.cream,lineHeight:1.6,fontStyle:"italic"}}>"{why}"</div>
+    </div>
+  );
+}
+
+// ── 2. WEEKLY SUMMARY — the Sunday "here's your week" moment ──────────────────
+function buildWeeklySummary(userId){
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7*86400000).toISOString().slice(0,10);
+
+  // check-ins this week
+  const hist = (typeof getCheckinHistory==="function" ? getCheckinHistory(userId) : [])
+    .filter(h=>h.date >= weekAgo);
+  // wins this week
+  const wins = (()=>{ try{ return JSON.parse(localStorage.getItem(`diq_wins_${userId}`)||"[]"); }catch{ return []; } })()
+    .filter(w=>String(w.date||"").slice(0,10) >= weekAgo);
+  // daily actions this week
+  const actions = (typeof getDailyActions==="function" ? getDailyActions(userId) : []) || [];
+  const log = (typeof getDailyLog==="function" ? getDailyLog(userId) : {});
+  const actionSummary = actions.map(a=>{
+    let days=0, sum=0;
+    const l = log[a.id]||{};
+    Object.entries(l).forEach(([date,e])=>{
+      if(date>=weekAgo && e?.done){ days++; const n=parseFloat(String(e.amount||"").replace(/[^0-9.]/g,"")); if(!isNaN(n)) sum+=n; }
+    });
+    return {label:a.label, icon:a.icon, days, sum, unit:a.unit};
+  }).filter(a=>a.days>0);
+
+  return { checkins: hist.length, wins: wins.length, actions: actionSummary,
+           hasData: hist.length>0 || wins.length>0 || actionSummary.length>0 };
+}
+
+function WeeklySummaryCard({userId, formData}){
+  const G = useThemeColors();
+  // Only show on Sunday/Monday, and only once dismissed-per-week
+  const [dismissed,setDismissed] = useState(()=>{
+    try{
+      const wk = _isoWeek();
+      return localStorage.getItem(`diq_weekly_seen_${userId}`) === wk;
+    }catch{ return false; }
+  });
+  const day = new Date().getDay();
+  const showDay = (day===0 || day===1);   // Sun or Mon
+  const sum = buildWeeklySummary(userId);
+  if(dismissed || !showDay || !sum.hasData) return null;
+
+  const first = formData?.name?.split(" ")[0] || "";
+  const dismiss=()=>{
+    try{ localStorage.setItem(`diq_weekly_seen_${userId}`, _isoWeek()); }catch{}
+    setDismissed(true);
+  };
+
+  return(
+    <div style={{margin:"0 0 16px",padding:"20px",borderRadius:18,
+      background:"linear-gradient(150deg,rgba(155,114,207,0.1),rgba(155,114,207,0.02))",
+      border:"1px solid rgba(155,114,207,0.3)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:10.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",color:"#b794e0"}}>
+          YOUR WEEK{first?`, ${first.toUpperCase()}`:""}
+        </div>
+        <button onClick={dismiss} style={{background:"none",border:"none",color:G.dimmer,
+          fontSize:16,cursor:"pointer",padding:0,lineHeight:1}}>✕</button>
+      </div>
+
+      <div style={{display:"grid",gap:8,marginBottom:14}}>
+        {sum.checkins>0&&(
+          <div style={{fontSize:14,color:G.cream,lineHeight:1.5}}>
+            ✓ Checked in <strong style={{color:"#b794e0"}}>{sum.checkins}</strong> {sum.checkins===1?"day":"days"}
+          </div>
+        )}
+        {sum.wins>0&&(
+          <div style={{fontSize:14,color:G.cream,lineHeight:1.5}}>
+            🏆 Logged <strong style={{color:"#b794e0"}}>{sum.wins}</strong> {sum.wins===1?"win":"wins"}
+          </div>
+        )}
+        {sum.actions.map(a=>(
+          <div key={a.label} style={{fontSize:14,color:G.cream,lineHeight:1.5}}>
+            {a.icon} {a.label}: <strong style={{color:"#b794e0"}}>{a.days}/7 days</strong>
+            {a.sum>0&&a.unit==="amount"?` · ${Math.round(a.sum).toLocaleString()} total`:""}
+            {a.sum>0&&a.unit==="minutes"?` · ${Math.round(a.sum)} mins`:""}
+          </div>
+        ))}
+      </div>
+
+      <div style={{fontSize:13,color:G.dim,lineHeight:1.7,paddingTop:12,
+        borderTop:"1px solid rgba(155,114,207,0.2)"}}>
+        {sum.checkins>=5 ? "A strong week. This is what consistency looks like — keep the engine running."
+          : sum.checkins>=2 ? "You showed up more than you didn't. That's the whole game. Aim for one more day next week."
+          : "A quiet week — and that's okay. Next week is a clean page. One small thing, tomorrow."}
+      </div>
+    </div>
+  );
+}
+
+// ── 3. REFERRALS — invite a friend, you both earn free Pro ───────────────────
+function getReferralCode(userId){
+  if(!userId) return "";
+  // short, shareable code derived from the user id
+  return "DIQ" + String(userId).replace(/[^a-zA-Z0-9]/g,"").slice(0,6).toUpperCase();
+}
+
+function ReferralCard({userId, formData}){
+  const G = useThemeColors();
+  const [copied,setCopied] = useState(false);
+  const code = getReferralCode(userId);
+  const link = `https://destiniq.app/?ref=${code}`;
+  const msg = `I've been using DestinIQ to actually build better habits — check-ins, real daily actions, the works. Join with my link and we BOTH get a free week of Pro:\n\n${link}`;
+
+  const share=async()=>{
+    try{
+      if(navigator.share){ await navigator.share({title:"DestinIQ", text:msg, url:link}); return; }
+    }catch{}
+    try{ await navigator.clipboard.writeText(msg); setCopied(true); setTimeout(()=>setCopied(false),2000); }catch{}
+  };
+
+  return(
+    <div style={{padding:"20px",borderRadius:18,
+      background:"linear-gradient(150deg,rgba(240,180,41,0.09),rgba(240,180,41,0.02))",
+      border:"1px solid rgba(240,180,41,0.3)"}}>
+      <div style={{fontSize:22,marginBottom:8}}>🎁</div>
+      <div style={{fontSize:17,fontWeight:800,color:G.cream,marginBottom:6}}>
+        Give a week, get a week
+      </div>
+      <p style={{fontSize:13.5,color:G.dim,lineHeight:1.7,marginBottom:16}}>
+        Invite a friend. When they check in for 3 days, you <strong>both</strong> get 7 days of Pro,
+        free. Share the people you care about into better habits.
+      </p>
+
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"11px 14px",
+        borderRadius:12,background:"var(--cream-05)",border:"1px solid var(--line)",marginBottom:12}}>
+        <span style={{flex:1,fontSize:13,fontFamily:"var(--f-mono)",color:G.gold,letterSpacing:".05em"}}>{code}</span>
+        <span style={{fontSize:11,color:G.dimmer}}>your code</span>
+      </div>
+
+      <button onClick={share} style={{width:"100%",background:G.gold,border:"none",borderRadius:13,
+        padding:"14px",fontSize:15,fontWeight:800,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+        {copied ? "✓ Copied — paste it anywhere" : "Share my invite"}
+      </button>
+      <p style={{fontSize:11,color:G.dimmer,textAlign:"center",marginTop:10,lineHeight:1.5}}>
+        Works great on WhatsApp — where your people already are.
+      </p>
+    </div>
+  );
+}
+
+// ISO week string for once-per-week gating
+function _isoWeek(){
+  const d = new Date();
+  const onejan = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${week}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DAILY ACTIONS — the real-life spine the whole app was missing
+// ───────────────────────────────────────────────────────────────────────────────
+// "I saved 200 cedis today — where do I put that?" There was no clean answer.
+// You could type it into a check-in box and it vanished. The score rewarded
+// opening the app, not living the change.
+//
+// This is the fix. You set 2-3 REAL daily actions (save something, wake early,
+// read before work). Each day you check off what you actually DID in life —
+// optionally with an amount ("saved GH₵200"). You build a real streak per
+// action, the app remembers, and tomorrow's notification asks about it by name.
+//
+// Actions are auto-suggested from your goals, then fully editable. Points land
+// only on the check-off (real doing), and they're the heaviest in the system.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const DAILY_ACTIONS_KEY = (uid)=>`diq_daily_actions_${uid}`;
+const DAILY_LOG_KEY = (uid)=>`diq_daily_log_${uid}`;   // { "action_id": { "2026-07-15": {done:true, amount:"200"} } }
+
+// Ready-made suggestions keyed by the user's goals.
+const ACTION_SUGGESTIONS = {
+  finances: [
+    {label:"Save something today", icon:"💰", unit:"amount"},
+    {label:"No unplanned spending", icon:"🚫", unit:null},
+  ],
+  habits: [
+    {label:"Wake up early", icon:"🌅", unit:null},
+    {label:"Stick to my routine", icon:"⏰", unit:null},
+  ],
+  health: [
+    {label:"Move my body", icon:"🏃", unit:"minutes"},
+    {label:"Drink enough water", icon:"💧", unit:null},
+  ],
+  relationships: [
+    {label:"Reach out to someone", icon:"💬", unit:null},
+  ],
+  business: [
+    {label:"One task for my business", icon:"🚀", unit:null},
+    {label:"Talk to a customer", icon:"🤝", unit:null},
+  ],
+  purpose: [
+    {label:"One thing that matters", icon:"🧭", unit:null},
+  ],
+  // universal
+  _default: [
+    {label:"Read before work", icon:"📖", unit:"minutes"},
+  ],
+};
+
+function getDailyActions(userId){
+  if(!userId) return [];
+  try{ const a=JSON.parse(localStorage.getItem(DAILY_ACTIONS_KEY(userId))||"null"); return Array.isArray(a)?a:null; }
+  catch{ return null; }
+}
+function saveDailyActions(userId, list){
+  if(!userId) return;
+  try{ localStorage.setItem(DAILY_ACTIONS_KEY(userId), JSON.stringify(list)); }catch{}
+  try{
+    supabase.from("user_profiles").upsert({
+      user_id:userId, daily_actions:list, updated_at:new Date().toISOString(),
+    },{onConflict:"user_id"}).then(null,()=>{});
+  }catch{}
+}
+
+// First time: seed 2-3 actions from the user's goals so they don't start empty.
+function seedDailyActions(userId, profile){
+  const existing = getDailyActions(userId);
+  if(existing) return existing;    // already set up (even if they deleted all)
+  let picks = [];
+  try{
+    const {priorities} = resolveProfileTags(profile);
+    (priorities||[]).forEach(pid=>{
+      const s = ACTION_SUGGESTIONS[pid];
+      if(s && picks.length<3) picks.push({...s[0], id:`a_${pid}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`});
+    });
+  }catch{}
+  if(!picks.length) picks = ACTION_SUGGESTIONS._default.map((s,i)=>({...s, id:`a_def_${Date.now()}_${i}`}));
+  saveDailyActions(userId, picks);
+  return picks;
+}
+
+function getDailyLog(userId){
+  try{ return JSON.parse(localStorage.getItem(DAILY_LOG_KEY(userId))||"{}") || {}; }catch{ return {}; }
+}
+function saveDailyLog(userId, log){
+  try{ localStorage.setItem(DAILY_LOG_KEY(userId), JSON.stringify(log)); }catch{}
+}
+
+const _todayKey = ()=> new Date().toISOString().slice(0,10);
+
+function isActionDoneToday(userId, actionId){
+  const log = getDailyLog(userId);
+  return !!(log[actionId] && log[actionId][_todayKey()] && log[actionId][_todayKey()].done);
+}
+
+// Check off (or un-check) an action for today, with an optional amount/note.
+function toggleActionToday(userId, actionId, amount=""){
+  const log = getDailyLog(userId);
+  const today = _todayKey();
+  if(!log[actionId]) log[actionId] = {};
+  const already = log[actionId][today]?.done;
+  if(already){
+    delete log[actionId][today];        // un-check
+  } else {
+    log[actionId][today] = {done:true, amount:String(amount||"")};
+    // THE reward — only for actually doing it in life. Heaviest in the system.
+    try{ addProgressPoints(userId, `daily_${actionId}_${today}`, PROGRESS_POINTS.daily_action); markActive(userId); }catch{}
+  }
+  saveDailyLog(userId, log);
+  try{ window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,action:"daily_action"}})); }catch{}
+  return !already;
+}
+
+// Current streak for one action: consecutive days ending today (or yesterday).
+function actionStreak(userId, actionId){
+  const log = getDailyLog(userId)[actionId] || {};
+  let streak = 0;
+  let d = new Date();
+  // allow "today not yet done" without breaking the streak
+  if(!log[_todayKey()]?.done) d = new Date(Date.now() - 86400000);
+  for(let i=0;i<400;i++){
+    const k = d.toISOString().slice(0,10);
+    if(log[k]?.done){ streak++; d = new Date(d.getTime() - 86400000); }
+    else break;
+  }
+  return streak;
+}
+
+// Running total for amount-type actions (e.g. total saved).
+function actionTotal(userId, actionId){
+  const log = getDailyLog(userId)[actionId] || {};
+  let sum = 0, count = 0;
+  Object.values(log).forEach(e=>{
+    const n = parseFloat(String(e?.amount||"").replace(/[^0-9.]/g,""));
+    if(!isNaN(n) && n>0){ sum += n; count++; }
+  });
+  return {sum, count};
+}
+
+// ── HOME widget: today's quick check-off ─────────────────────────────────────
+function DailyActionsCard({userId, formData, setNav}){
+  const G = useThemeColors();
+  const [actions,setActions] = useState(()=>seedDailyActions(userId, formData)||[]);
+  const [tick,setTick] = useState(0);                 // force re-render on toggle
+  const [amountFor,setAmountFor] = useState(null);    // action id currently entering an amount
+  const [amountVal,setAmountVal] = useState("");
+
+  useEffect(()=>{ setActions(seedDailyActions(userId, formData)||[]); },[userId]);
+  if(!actions.length) return null;
+
+  const doneCount = actions.filter(a=>isActionDoneToday(userId,a.id)).length;
+
+  const confirm=(a, amount)=>{
+    toggleActionToday(userId, a.id, amount);
+    setAmountFor(null); setAmountVal("");
+    setTick(t=>t+1);
+  };
+  const onTap=(a)=>{
+    if(isActionDoneToday(userId,a.id)){ toggleActionToday(userId,a.id); setTick(t=>t+1); return; }
+    if(a.unit){ setAmountFor(a.id); setAmountVal(""); }   // ask for amount/minutes
+    else confirm(a,"");
+  };
+
+  return(
+    <div style={{margin:"0 0 16px",padding:"18px 20px",borderRadius:18,
+      background:"linear-gradient(150deg,rgba(29,158,117,0.08),rgba(29,158,117,0.02))",
+      border:"1px solid rgba(29,158,117,0.28)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:10.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",color:"#1d9e75"}}>
+          TODAY — DID YOU DO IT?
+        </div>
+        <button onClick={()=>setNav("actions")} style={{background:"none",border:"none",
+          color:G.dimmer,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Edit →</button>
+      </div>
+
+      <div style={{display:"grid",gap:9}}>
+        {actions.map(a=>{
+          const done = isActionDoneToday(userId,a.id);
+          const streak = actionStreak(userId,a.id);
+          const asking = amountFor===a.id;
+          return(
+            <div key={a.id}>
+              <div onClick={()=>!asking&&onTap(a)}
+                style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
+                  borderRadius:12,cursor:"pointer",
+                  background: done ? "rgba(29,158,117,0.12)" : "var(--cream-05)",
+                  border:"1px solid "+(done?"rgba(29,158,117,0.4)":"var(--line)"),
+                  transition:"all .2s"}}>
+                <div style={{width:26,height:26,borderRadius:8,flexShrink:0,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  background: done ? "#1d9e75" : "transparent",
+                  border:"2px solid "+(done?"#1d9e75":"var(--cream-20)"),
+                  color:"#fff",fontSize:15,fontWeight:900}}>
+                  {done?"✓":""}
+                </div>
+                <span style={{fontSize:18}}>{a.icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:600,
+                    color: done ? G.dim : G.cream,
+                    textDecoration: done ? "line-through" : "none"}}>{a.label}</div>
+                  {streak>0&&(
+                    <div style={{fontSize:11,color:"#1d9e75",fontWeight:600,marginTop:1}}>
+                      🔥 {streak} day{streak>1?"s":""} in a row
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* optional amount entry */}
+              {asking&&(
+                <div style={{display:"flex",gap:8,marginTop:8,marginBottom:2}}>
+                  <input autoFocus value={amountVal} onChange={e=>setAmountVal(e.target.value)}
+                    placeholder={a.unit==="amount"?"How much? e.g. 200":"How many minutes?"}
+                    inputMode="numeric"
+                    onKeyDown={e=>e.key==="Enter"&&confirm(a,amountVal)}
+                    style={{flex:1,minWidth:0,boxSizing:"border-box",background:G.inp,
+                      border:"1px solid "+G.inpBorder,borderRadius:10,padding:"10px 12px",
+                      color:G.cream,fontSize:13.5,fontFamily:"inherit"}}/>
+                  <button onClick={()=>confirm(a,amountVal)} style={{background:"#1d9e75",
+                    border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:800,
+                    color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Done</button>
+                  <button onClick={()=>confirm(a,"")} style={{background:"transparent",
+                    border:"1px solid "+G.border,borderRadius:10,padding:"10px 12px",fontSize:12,
+                    color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>Skip</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {doneCount===actions.length&&actions.length>0&&(
+        <div style={{marginTop:12,fontSize:12.5,color:"#1d9e75",fontWeight:700,textAlign:"center"}}>
+          ✓ All done today. This is who you're becoming.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FULL TAB: manage actions + see history & totals ──────────────────────────
+function DailyActionsScreen({userId, formData, setNav}){
+  const G = useThemeColors();
+  const [actions,setActions] = useState(()=>seedDailyActions(userId, formData)||[]);
+  const [adding,setAdding] = useState(false);
+  const [newLabel,setNewLabel] = useState("");
+  const [tick,setTick] = useState(0);
+
+  const persist=(list)=>{ setActions(list); saveDailyActions(userId,list); setTick(t=>t+1); };
+  const addAction=()=>{
+    if(!newLabel.trim()) return;
+    persist([...actions, {id:`a_c_${Date.now()}`, label:newLabel.trim().slice(0,50), icon:"✨", unit:null}]);
+    setNewLabel(""); setAdding(false);
+  };
+  const removeAction=(id)=> persist(actions.filter(a=>a.id!==id));
+  const toggleUnit=(id)=> persist(actions.map(a=>a.id===id?{...a, unit:a.unit?null:"amount"}:a));
+
+  return(
+    <div style={{padding:"28px 32px 60px",maxWidth:680,margin:"0 auto"}}>
+      <div style={{fontFamily:"var(--f-display)",fontSize:30,color:G.cream,marginBottom:8}}>Daily Actions</div>
+      <p style={{fontSize:14,color:G.dim,lineHeight:1.7,marginBottom:26,maxWidth:520}}>
+        The real ones — what you actually do in life, not in the app. Check them off each day.
+        This is what your momentum is really made of.
+      </p>
+
+      <div style={{display:"grid",gap:12,marginBottom:24}}>
+        {actions.map(a=>{
+          const streak = actionStreak(userId,a.id);
+          const {sum,count} = actionTotal(userId,a.id);
+          return(
+            <div key={a.id} style={{padding:"16px 18px",borderRadius:16,
+              background:"var(--raised)",border:"1px solid var(--line)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:22}}>{a.icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:700,color:G.cream}}>{a.label}</div>
+                  <div style={{fontSize:12,color:G.dimmer,marginTop:2}}>
+                    {streak>0?`🔥 ${streak} day streak`:"Not started yet"}
+                    {count>0&&a.unit==="amount"?` · total logged: ${Math.round(sum).toLocaleString()}`:""}
+                    {count>0&&a.unit==="minutes"?` · ${Math.round(sum)} mins total`:""}
+                  </div>
+                </div>
+                <button onClick={()=>removeAction(a.id)} style={{background:"none",border:"none",
+                  color:G.dimmer,cursor:"pointer",fontSize:16,padding:4}} title="Remove">✕</button>
+              </div>
+              <div style={{marginTop:10,display:"flex",gap:8}}>
+                <button onClick={()=>toggleUnit(a.id)} style={{background:a.unit?"rgba(29,158,117,0.12)":"transparent",
+                  border:"1px solid "+(a.unit?"rgba(29,158,117,0.4)":"var(--line)"),borderRadius:8,
+                  padding:"5px 11px",fontSize:11,color:a.unit?"#1d9e75":G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+                  {a.unit?"✓ tracks an amount":"+ track an amount"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {adding?(
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          <input autoFocus value={newLabel} onChange={e=>setNewLabel(e.target.value)}
+            placeholder="e.g. Pray, Study, Walk 10k steps" maxLength={50}
+            onKeyDown={e=>e.key==="Enter"&&addAction()}
+            style={{flex:1,minWidth:0,boxSizing:"border-box",background:G.inp,
+              border:"1px solid "+G.inpBorder,borderRadius:12,padding:"12px 14px",
+              color:G.cream,fontSize:14,fontFamily:"inherit"}}/>
+          <button onClick={addAction} style={{background:G.gold,border:"none",borderRadius:12,
+            padding:"12px 20px",fontSize:14,fontWeight:800,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>Add</button>
+        </div>
+      ):(
+        <button onClick={()=>setAdding(true)} style={{width:"100%",background:"transparent",
+          border:"1.5px dashed var(--line)",borderRadius:14,padding:"14px",fontSize:14,
+          fontWeight:600,color:G.dim,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>
+          + Add a daily action
+        </button>
+      )}
+
+      <button onClick={()=>setNav("home")} style={{background:G.gold,border:"none",borderRadius:13,
+        padding:"14px 28px",fontSize:14.5,fontWeight:700,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+        Done — back to today →
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMMITMENTS — close the loop between "I'll apply this" and "I actually did"
+// ───────────────────────────────────────────────────────────────────────────────
+// "I'm applying this" used to be a lie the app told itself: you tapped it, got a
+// point, and it never checked whether you did the thing. That rewarded the TAP,
+// not the doing — the same disease as the score.
+//
+// Now it's a real loop, the way a friend follows up:
+//   1. You tap → commit ("doing now" or "doing later"). A little % moves.
+//   2. Three days later the app comes back: "You said you'd start saving. Did you?"
+//   3. YES  → "What happened?" → you tell it → the REAL reward lands, remembered.
+//      NOT YET → "Still going to?" → kept alive, no guilt.
+//      GAVE UP → "What got in the way?" → it learns, stops nagging.
+//
+// The result text you give becomes real data — it feeds patterns and the Life
+// Book, and it's the honest signal the score should have used all along.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const COMMITMENTS_KEY = (uid)=>`diq_commitments_${uid}`;
+const FOLLOWUP_AFTER_DAYS = 3;
+
+function getCommitments(userId){
+  if(!userId) return [];
+  try{ const c=JSON.parse(localStorage.getItem(COMMITMENTS_KEY(userId))||"[]"); return Array.isArray(c)?c:[]; }
+  catch{ return []; }
+}
+function saveCommitments(userId, list){
+  if(!userId) return;
+  try{ localStorage.setItem(COMMITMENTS_KEY(userId), JSON.stringify(list.slice(-100))); }catch{}
+  try{
+    supabase.from("user_profiles").upsert({
+      user_id:userId, commitments:list.slice(-50), updated_at:new Date().toISOString(),
+    },{onConflict:"user_id"}).then(null,()=>{});
+  }catch{}
+}
+
+// Called when someone taps "I'm applying this" / "I'll do this later".
+function addCommitment(userId, {title, source, when}){
+  if(!userId || !title) return;
+  const list = getCommitments(userId);
+  // Don't double-log the same thing if it's still open
+  if(list.some(c=>c.title===title && c.status==="open")) return;
+  list.push({
+    id: Date.now(),
+    title: String(title).slice(0,160),
+    source: source||"",
+    when: when||"now",                    // "now" | "later"
+    status: "open",                       // open → done | abandoned
+    committedAt: new Date().toISOString(),
+    dueCheck: new Date(Date.now() + FOLLOWUP_AFTER_DAYS*86400000).toISOString().slice(0,10),
+    result: "",
+  });
+  saveCommitments(userId, list);
+  // A small acknowledgement now — the REAL points land on confirmed "done".
+  try{ addProgressPoints(userId, `commit_${Date.now()}`, 0.5); }catch{}
+}
+
+// The one commitment that's due to be checked (past its dueCheck, still open).
+function dueCommitment(userId){
+  const today = new Date().toISOString().slice(0,10);
+  return getCommitments(userId).find(c=>c.status==="open" && c.dueCheck <= today) || null;
+}
+
+function resolveCommitment(userId, id, outcome, resultText=""){
+  const list = getCommitments(userId);
+  const c = list.find(x=>x.id===id);
+  if(!c) return;
+  if(outcome === "done"){
+    c.status = "done";
+    c.result = String(resultText||"").slice(0,300);
+    c.resolvedAt = new Date().toISOString();
+    // THE REAL REWARD — only now, for actually doing it.
+    try{ addProgressPoints(userId, `commit_done_${id}`, PROGRESS_POINTS.commit_done); markActive(userId); }catch{}
+  } else if(outcome === "later"){
+    // push the check out a few more days, no penalty
+    c.dueCheck = new Date(Date.now() + FOLLOWUP_AFTER_DAYS*86400000).toISOString().slice(0,10);
+  } else if(outcome === "abandoned"){
+    c.status = "abandoned";
+    c.result = String(resultText||"").slice(0,300);
+    c.resolvedAt = new Date().toISOString();
+  }
+  saveCommitments(userId, list);
+  try{ window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,action:"commit"}})); }catch{}
+}
+
+// ── The follow-up card — shows on Home when a commitment is due ──────────────
+function CommitmentFollowUp({userId}){
+  const G = useThemeColors();
+  const [due,setDue] = useState(()=>dueCommitment(userId));
+  const [phase,setPhase] = useState("ask");       // ask → result | done
+  const [note,setNote] = useState("");
+  const [pending,setPending] = useState(null);    // "done" | "abandoned"
+
+  useEffect(()=>{ setDue(dueCommitment(userId)); },[userId]);
+  if(!due) return null;
+
+  const firstLine = due.when === "later"
+    ? `A few days ago you planned to: "${due.title}". Still going to?`
+    : `You said you'd start: "${due.title}". Did you?`;
+
+  const finish = (outcome)=>{
+    resolveCommitment(userId, due.id, outcome, note);
+    setPhase("done");
+    setTimeout(()=>{ setDue(dueCommitment(userId)); setPhase("ask"); setNote(""); setPending(null); }, 1600);
+  };
+
+  return(
+    <div style={{margin:"0 0 16px",padding:"18px 20px",borderRadius:18,
+      background:"linear-gradient(150deg,rgba(240,180,41,0.08),rgba(240,180,41,0.02))",
+      border:"1px solid rgba(240,180,41,0.3)"}}>
+      <div style={{fontSize:10.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",
+        color:G.gold,marginBottom:10}}>DESTINIQ REMEMBERED</div>
+
+      {phase==="done" ? (
+        <div style={{fontSize:14.5,color:G.cream,lineHeight:1.6,padding:"6px 0"}}>
+          {pending==="done" ? "That's what this is all about. Logged. 🔥"
+            : pending==="abandoned" ? "Honesty counts too. We'll leave that one."
+            : "Kept alive — we'll check back."}
+        </div>
+      ) : phase==="result" ? (
+        <>
+          <div style={{fontSize:14.5,color:G.cream,lineHeight:1.6,marginBottom:12}}>
+            {pending==="done" ? "Love it. What happened — what changed?"
+              : "No judgement. What got in the way?"}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <input value={note} onChange={e=>setNote(e.target.value)} maxLength={200}
+              placeholder={pending==="done" ? "e.g. saved GH₵50, felt in control" : "e.g. forgot, got busy, too hard"}
+              style={{flex:1,minWidth:0,boxSizing:"border-box",background:G.inp,
+                border:"1px solid "+G.inpBorder,borderRadius:10,padding:"11px 13px",
+                color:G.cream,fontSize:13.5,fontFamily:"inherit"}}/>
+            <MicButton size={34} onText={t=>setNote(v=>appendSpoken(v,t))}/>
+          </div>
+          <button onClick={()=>finish(pending)} style={{marginTop:12,width:"100%",
+            background:G.gold,border:"none",borderRadius:12,padding:"13px",
+            fontSize:14,fontWeight:800,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+            {pending==="done" ? "Log it →" : "Note it →"}
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{fontSize:15,color:G.cream,lineHeight:1.65,marginBottom:16}}>{firstLine}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            <button onClick={()=>{ setPending("done"); setPhase("result"); }}
+              style={{flex:"1 1 auto",background:G.gold,border:"none",borderRadius:11,
+                padding:"12px 16px",fontSize:13.5,fontWeight:800,color:"#000",
+                cursor:"pointer",fontFamily:"inherit"}}>
+              ✓ Yes, I did
+            </button>
+            <button onClick={()=>finish("later")}
+              style={{flex:"1 1 auto",background:"transparent",border:"1px solid "+G.border,
+                borderRadius:11,padding:"12px 16px",fontSize:13.5,fontWeight:600,
+                color:G.dim,cursor:"pointer",fontFamily:"inherit"}}>
+              Not yet — still will
+            </button>
+            <button onClick={()=>{ setPending("abandoned"); setPhase("result"); }}
+              style={{flex:"1 1 auto",background:"transparent",border:"1px solid "+G.border,
+                borderRadius:11,padding:"12px 16px",fontSize:13.5,fontWeight:600,
+                color:G.dimmer,cursor:"pointer",fontFamily:"inherit"}}>
+              Gave up on it
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// The two-choice commit bar shown on a tool card. Its own component so the
+// hook is legal (was briefly an IIFE with useState inside — a Rules-of-Hooks
+// violation that would crash).
+function CardCommitBar({card, userId, G}){
+  const [committed,setCommitted]=useState(()=>{
+    try{ return getCommitments(userId).some(c=>c.title===card.title && c.status==="open"); }catch{ return false; }
+  });
+  if(committed) return(
+    <div style={{marginBottom:20,padding:"14px 16px",borderRadius:14,
+      background:G.accent+"12",border:"1px solid "+G.accent+"38",
+      fontSize:13,color:G.cream,lineHeight:1.6}}>
+      ✓ You committed to this. DestinIQ will check back in a few days — the reward lands when you've actually done it.
+    </div>
+  );
+  const commit=(when)=>{
+    addCommitment(userId,{title:card.title, source:"card:"+card.id, when});
+    setCommitted(true);
+    window.dispatchEvent(new CustomEvent("showToast",{detail: when==="now"
+      ? "Committed. We'll ask how it went in a few days."
+      : "Saved. We'll gently check back on this."}));
+  };
+  return(
+    <div style={{marginBottom:20,padding:"16px 18px",borderRadius:14,
+      background:"linear-gradient(150deg,"+G.accent+"12,"+G.accent+"04)",
+      border:"1px solid "+G.accent+"33"}}>
+      <div style={{fontSize:13.5,fontWeight:700,color:G.cream,marginBottom:12}}>Going to do this?</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button onClick={()=>commit("now")} style={{flex:"1 1 auto",
+          background:G.accent,border:"none",borderRadius:11,padding:"12px 16px",
+          fontSize:13.5,fontWeight:800,color:"#000",cursor:"pointer",fontFamily:"inherit"}}>
+          ✓ I'm doing this now
+        </button>
+        <button onClick={()=>commit("later")} style={{flex:"1 1 auto",
+          background:"transparent",border:"1px solid "+G.border,borderRadius:11,
+          padding:"12px 16px",fontSize:13.5,fontWeight:600,color:G.dim,
+          cursor:"pointer",fontFamily:"inherit"}}>
+          I'll do this later
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Score = AI baseline + earned momentum − gentle decay from inactivity.
 // ───────────────────────────────────────────────────────────────────────────────
 // This number is meant to be ALIVE — to visibly move when you act and gently
@@ -4472,14 +5254,14 @@ function buildOriginFacts(f){
 
 // ── COMMITMENT FOLLOW-UP — the coach remembers what you said you'd do ────────
 const commitKey = (uid)=>`diq_commits_${uid}`;
-function getCommitments(uid){
+function getChatCommitments(uid){
   if(typeof window==="undefined"||!uid) return [];
   try{ return JSON.parse(localStorage.getItem(commitKey(uid))||"[]"); }catch(_e){ return []; }
 }
 function saveCommitment(uid, text){
   if(typeof window==="undefined"||!uid||!text) return;
   try{
-    const list=getCommitments(uid);
+    const list=getChatCommitments(uid);
     // avoid near-duplicates
     if(list.some(cm=>cm.text.toLowerCase()===text.toLowerCase())) return;
     list.unshift({text:text.slice(0,140), madeAt:Date.now(), status:"open"});
@@ -4488,13 +5270,13 @@ function saveCommitment(uid, text){
 }
 function buildCommitmentContext(uid){
   const now=Date.now();
-  const open=getCommitments(uid).filter(cm=>
+  const open=getChatCommitments(uid).filter(cm=>
     cm.status==="open" && (now-cm.madeAt)>20*60*60*1000 && (now-cm.madeAt)<7*24*60*60*1000
   );
   if(!open.length) return "";
   // mark as asked so we only follow up once per commitment
   try{
-    const list=getCommitments(uid).map(cm=>
+    const list=getChatCommitments(uid).map(cm=>
       open.some(o=>o.madeAt===cm.madeAt)?{...cm,status:"asked",askedAt:now}:cm);
     localStorage.setItem(commitKey(uid), JSON.stringify(list));
   }catch(_e){}
@@ -6822,6 +7604,9 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
   });
   const [showNewChatPrompt,setShowNewChatPrompt]=useState(false);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
+  const [coachName,setCoachName]=useState(()=>{
+    try{ return localStorage.getItem(`diq_coach_name_${userId}`) || "AI Coach"; }catch{ return "AI Coach"; }
+  });
   const scrollRef=useRef(null);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},[msgs,loading]);
 
@@ -6872,7 +7657,8 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
       try{ localStorage.setItem(limitKey,String(next)); }catch{}
     }
     const updated=[...msgs,{role:"user",content:msg}];setMsgs(updated);
-    detectCommitment(userId, msg, isPremium); // fire-and-forget: remember what they say they'll dosetLoading(true);
+    detectCommitment(userId, msg, isPremium); // fire-and-forget: remember what they say they'll do
+    setLoading(true);   // ← was swallowed into the comment above, so the typing dots never showed
     // Award small points for engaging with coach
     addProgressPoints(userId, "coach_msg_"+Date.now(), PROGRESS_POINTS.coach_message);
     pushToMemory(userId,"user",msg);
@@ -6883,7 +7669,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         .filter((_,i)=>!(i===0&&updated[0].role==="assistant"))
         .map(m=>({role:m.role,content:m.content}));
       if(!apiMsgs.length||apiMsgs[0].role!=="user") throw new Error("No user message");
-      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId))+buildCommitmentContext(userId)+langPrompt(),userId,isPremium,isProMax});
+      const reply=await callAPI({messages:apiMsgs,system:buildAdvisorSystem(profile,reportData,isPremium,buildMemoryContext(userId))+buildCommitmentContext(userId)+langPrompt()+(coachName&&coachName!=="AI Coach"?`\n\nThe user has named you "${coachName}". That is your name — respond to it naturally, as a trusted friend would.`:""),userId,isPremium,isProMax});
       pushToMemory(userId,"assistant",reply);setMsgs(p=>[...p,{role:"assistant",content:reply}]);
     }catch(e){
       console.error("Advisor error:",e.message,e);
@@ -6925,7 +7711,19 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
             border:"1px solid rgba(155,114,207,0.3)",display:"flex",alignItems:"center",
             justifyContent:"center",fontSize:18}}>🤖</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:700,color:G.cream,lineHeight:1.2}}>AI Coach</div>
+            <div style={{display:"flex",alignItems:"center",gap:7}}>
+              <div style={{fontSize:15,fontWeight:700,color:G.cream,lineHeight:1.2}}>{coachName}</div>
+              <button onClick={()=>{
+                const nm = window.prompt("Name your coach", coachName);
+                if(nm && nm.trim()){
+                  const clean = nm.trim().slice(0,24);
+                  setCoachName(clean);
+                  try{ localStorage.setItem(`diq_coach_name_${userId}`, clean); }catch{}
+                }
+              }} title="Rename your coach"
+                style={{background:"none",border:"none",cursor:"pointer",fontSize:11,
+                  color:G.dimmer,padding:0,fontFamily:"inherit"}}>✏️</button>
+            </div>
             <div style={{fontSize:11,color:"rgba(100,181,246,0.8)"}}>● Online · Powered by DestinIQ</div>
           </div>
           {/* New Chat button — only show if there's an existing conversation */}
@@ -9793,6 +10591,12 @@ function GenericAIModulePoints({modId, profile, userId, isPaid, isPremium, isPro
   });
   const [loadingPoints, setLoadingPoints] = useState(false);
   const [error2, setError2] = useState("");
+  // Which steps the user tapped "I'm applying this" on — persisted so the ✓
+  // survives leaving and reopening the tool, and gives instant local feedback.
+  const [appliedSteps, setAppliedSteps] = useState(()=>{
+    try{ const r=[]; for(let i=0;i<12;i++){ if(localStorage.getItem(`diq_applied_step_${modId}_${i}_${userId}`)) r.push(i); } return r; }
+    catch{ return []; }
+  });
   // expanded[i] = {loading, content} for each point's deep-dive
   const [expanded, setExpanded] = useState({});
 
@@ -9943,20 +10747,27 @@ Write a focused, personalised, practical breakdown of JUST this one point — no
                       <button onClick={()=>{
                         if(userId){
                           addProgressPoints(userId,`generic_${modId}_${idx}_${new Date().toISOString().slice(0,10)}`,PROGRESS_POINTS.deepdive_done);
-                          // Mark this tool as ACTED-ON so the category % bar counts it.
-                          // (The bar reads diq_mod_${tool}; the points components never
-                          // wrote that key, so every category sat at 0% forever.)
                           try{ localStorage.setItem(`diq_mod_${modId}_${userId}`, "applied"); }catch{}
                           try{ localStorage.setItem(`diq_applied_${modId}_${userId}`, new Date().toISOString()); }catch{}
+                          try{ localStorage.setItem(`diq_applied_step_${modId}_${idx}_${userId}`, "1"); }catch{}
                           markActive(userId);
                           window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,action:"deepdive_done"}}));
                         }
+                        // Local state change is the RELIABLE feedback — a toast at the
+                        // bottom of a phone is easy to miss, and without the button
+                        // itself changing, tapping felt like nothing happened.
+                        setAppliedSteps(prev=> prev.includes(idx)?prev:[...prev,idx]);
                         window.dispatchEvent(new CustomEvent("showToast",{detail:userId?"✓ Logged — this counts toward your progress":"Sign in to save your progress"}));
                       }}
-                        style={{background:G.gold+"18",border:"1px solid "+G.gold+"40",
-                          borderRadius:8,padding:"7px 14px",fontSize:11,color:G.gold,
-                          fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                        ✓ I'm applying this
+                        disabled={appliedSteps.includes(idx)}
+                        style={{
+                          background: appliedSteps.includes(idx) ? "#1d9e75" : G.gold+"18",
+                          border:"1px solid "+(appliedSteps.includes(idx)?"#1d9e75":G.gold+"40"),
+                          borderRadius:8,padding:"7px 14px",fontSize:11,
+                          color: appliedSteps.includes(idx) ? "#fff" : G.gold,
+                          fontWeight:700,cursor:appliedSteps.includes(idx)?"default":"pointer",
+                          fontFamily:"inherit",transition:"all .2s"}}>
+                        {appliedSteps.includes(idx) ? "✓ Applied" : "✓ I'm applying this"}
                       </button>
                     </div>
                   </div>
@@ -13277,7 +14088,7 @@ function WinTracker({profile,userId,isPremium,isPaid,onUnlock}){
     setLoading(false);
   };
 
-  const MOODS=[{e:"🔥",l:"Crushed it"},{e:"✅",l:"Good day"},{e:"😐",l:"Meh day"},{e:"💪",l:"Pushed through"},{e:"🌱",l:"Small step"}];
+  const MOODS=[{e:"🔥",l:"Crushed it"},{e:"✅",l:"Good day"},{e:"😐",l:"Meh day"},{e:"💪",l:"Pushed through"},{e:"🌱",l:"Small step"},{e:"🌧️",l:"Rough day"}];
 
   // Calendar — last 30 days
   const last30=Array.from({length:30},(_, i)=>{const d=new Date();d.setDate(d.getDate()-29+i);const k=d.toISOString().slice(0,10);const dayWins=wins.filter(w=>w.date===k);return{key:k,count:dayWins.length,day:d.getDate(),isToday:k===todayKey};});
@@ -15221,6 +16032,8 @@ function SidebarNav({nav,setNav,isPaid,isPremium,isProMax,streak,onUnlock,formDa
     {id:"foryou",  icon:"star",label:"For You"},
     {id:"explore", icon:"search",label:"Explore"},
     {id:"progress",icon:"chart",label:"Progress"},
+    {id:"actions", icon:"check",label:"Daily Actions"},
+    {id:"invite",  icon:"sparkles",label:"Invite Friends"},
     {id:"patterns",icon:"brain",label:"Patterns"},
     {id:"review",  icon:"book",label:"Review"},
     {id:"report",  icon:"report",label:"My Report"},
@@ -16000,7 +16813,16 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
 
       <div style={{padding:"0 20px"}}>
         {/* The single most important thing on this screen — one action, no menu */}
+        {/* Sunday "here's your week" — only shows Sun/Mon, once per week. */}
+        <WeeklySummaryCard userId={userId} formData={formData}/>
+        {/* Your reason, in your own words — shown back to you. */}
+        <MyWhyCard userId={userId}/>
+        {/* The real spine: your daily real-life actions, checked off as done. */}
+        <DailyActionsCard userId={userId} formData={formData} setNav={setNav}/>
         <OneThingToday formData={formData} userId={userId} setNav={setNav}/>
+        {/* "Did you actually do the thing you committed to?" — the loop that
+            makes the app reward doing, not just tapping. */}
+        <CommitmentFollowUp userId={userId}/>
         <WeeklyDigestCard profile={formData} userId={userId} streak={streak} isPremium={isPremium} isProMax={isProMax}/>
         {/* ══ PICK UP WHERE YOU LEFT OFF ══
             Replaces the old "Continue Your Journey" card, which said "new cards
@@ -16203,6 +17025,8 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
     {id:"home",      icon:"home", label:"Home"},
     {id:"foryou",    icon:"star", label:"For You"},
     {id:"explore",   icon:"search", label:"Explore"},
+    {id:"actions",   icon:"check", label:"Daily Actions"},
+    {id:"invite",    icon:"sparkles", label:"Invite Friends"},
     {id:"patterns",  icon:"brain", label:"Patterns"},
     {id:"review",    icon:"book", label:"Review"},
     {id:"journal",   icon:"pen", label:"Journal"},
@@ -18149,6 +18973,10 @@ Be warm but direct. No emojis. No bullet points. Sound like a real coach who kno
           </div>
         )}
 
+        {/* ── COMMIT TO IT — the real loop. Tapping doesn't earn the reward;
+            DOING it does. DestinIQ checks back in 3 days: "did you?" ── */}
+        <CardCommitBar card={card} userId={userId} G={G}/>
+
         {/* ── SUPPLIER LINKS ── */}
         {card.suppliers?.length>0&&(
           <div style={{marginBottom:20}}>
@@ -19015,11 +19843,16 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
         {/* Categories Progress */}
         <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>Categories Progress</div>
         {CATEGORIES.map(cat=>{
-          // Count tools the user has actually ENGAGED with — either generated a
-          // report (diq_mod_) or tapped "I'm applying this" (diq_applied_).
+          // The bar now reads diq_tlist_ — the list of every tool the user has
+          // OPENED — which ToolPage already writes on mount for every tool,
+          // regardless of which render path it uses. Previously it only checked
+          // diq_mod_, which just two of the tool code-paths ever wrote, so most
+          // categories stayed at 0% no matter how many tools you opened.
+          const opened = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem(`diq_tlist_${userId}`)||"[]")); }catch{ return new Set(); } })();
           const done=(Array.isArray(cat?.tools)?cat.tools:[]).filter(t=>{
             try{
-              return !!localStorage.getItem(`diq_mod_${t}_${userId}`)
+              return opened.has(t)
+                  || !!localStorage.getItem(`diq_mod_${t}_${userId}`)
                   || !!localStorage.getItem(`diq_applied_${t}_${userId}`);
             }catch{return false;}
           }).length;
@@ -19260,6 +20093,16 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
   const overall = Math.min(99,Math.max(1,Math.round(
     (scores.life||60)*.25+(scores.wealth||60)*.3+(scores.mindset||60)*.25+(scores.relations||60)*.2
   )));
+
+  // These were used below but never defined here — the ReferenceError that
+  // crashed the entire report ("Can't find variable: atPeak"). They live in
+  // ProgressScreen; MyReport needs its own copies.
+  const atPeak = overall >= 99;
+  const [peakDays,setPeakDays] = useState(()=>{ try{ return updatePeakDays(userId, overall); }catch{ return 0; } });
+  useEffect(()=>{ try{ setPeakDays(updatePeakDays(userId, overall)); }catch{} }, [userId, overall]);
+  // The live floating "+3" and session delta belong on the Progress screen, not
+  // this static report — but the JSX below references them, so give inert values.
+  const pointPop = null, scoreDelta = 0;
 
   const scoreMsg = atPeak?(peakDays>=2?`Peak momentum — held for ${peakDays} days. This is rare air. Don't coast.`:"You've reached peak momentum. Now the game is holding it.")
     :overall>=80?"You are ahead of most. Stay consistent and keep executing."
@@ -20912,6 +21755,8 @@ Rules:
         title={(()=>{
           if(navSection==="home"){const h=new Date().getHours();return(h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", "+(formData?.name?.split(" ")[0]||"there");}
           if(navSection==="foryou") return "For You";
+          if(navSection==="actions") return "Daily Actions";
+          if(navSection==="invite") return "Invite Friends";
           if(navSection==="patterns") return "Patterns";
           if(navSection==="review") return "Review";
           if(isCat) return CATEGORIES.find(c=>c.id===catId)?.label;
@@ -20936,6 +21781,8 @@ Rules:
         )}
         {isTool&&!MODULE_CONFIGS?.[toolId]&&showModView()}
         {navSection==="foryou"&&<ForYouScreen formData={formData} setNav={setNav} streak={streak}/>}
+        {navSection==="actions"&&<DailyActionsScreen userId={userId} formData={formData} setNav={setNav}/>}
+        {navSection==="invite"&&<div style={{padding:"28px 32px 60px",maxWidth:600,margin:"0 auto"}}><ReferralCard userId={userId} formData={formData}/></div>}
         {navSection==="patterns"&&<PatternsScreen userId={userId} formData={formData} isPaid={isPaid} onUnlock={onUnlock} setNav={setNav}/>}
         {navSection==="review"&&<ReviewScreen userId={userId} formData={formData} streak={streak} isPaid={isPaid} isProMax={isProMax} isPremium={isPremium} onUnlock={onUnlock} setNav={setNav}/>}
         {navSection==="progress"&&<ProgressScreen data={data} streak={streak} userId={userId} setNav={setNav} goBack={goBack}/>}
@@ -22181,7 +23028,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v13.07-admin"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v14-commitfix"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -24072,9 +24919,14 @@ All other rules: personalized, use their name, no markdown asterisks, ONLY valid
 
 
 export default function DestinIQ(){
+  // Outermost boundary: if ThemeProvider or anything at the very top throws, we
+  // still show the error card instead of a black screen. (Android webviews give
+  // no console — a silent throw here looked like a dead app.)
   return(
-    <ThemeProvider>
-      <DestinIQInner/>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <DestinIQInner/>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

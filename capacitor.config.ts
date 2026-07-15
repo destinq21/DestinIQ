@@ -46,7 +46,8 @@ const config: CapacitorConfig = {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
     LocalNotifications: {
-      // Uses the app icon (DQ logo) by default — no custom smallIcon needed
+      smallIcon: 'ic_stat_destiniq',
+      iconColor: '#F0B429',
     },
     Camera: {
       // No special config needed
