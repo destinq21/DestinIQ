@@ -12399,6 +12399,15 @@ function useHabitTracker(userId){
   const persist=(next)=>{
     setData(next);
     try{ localStorage.setItem(HAB_KEY(userId), JSON.stringify(next)); }catch{}
+    // Mirror to Supabase — Practices is a paid feature; committed habits must
+    // survive a cleared browser, a new device or an APK reinstall.
+    try{
+      if(userId){
+        supabase.from("user_profiles").upsert({
+          user_id:userId, habits:next, updated_at:new Date().toISOString(),
+        },{onConflict:"user_id"}).then(null,()=>{});
+      }
+    }catch{}
   };
   const commit=(key)=>{
     const next={...data,[key]:{...(data[key]||{}),committed:true,status:data[key]?.status||"active",startedAt:data[key]?.startedAt||new Date().toISOString()}};
@@ -19616,6 +19625,12 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
         if(next){m[toolId]={label:meta?.label||toolId,icon:meta?.icon||"✦",color:meta?.color||"var(--gold)",savedAt:Date.now()};}
         else{delete m[toolId];}
         localStorage.setItem(metaKey,JSON.stringify(m));
+        // Mirror to Supabase so saved tools follow the user across devices
+        if(userId){
+          supabase.from("user_profiles").upsert({
+            user_id:userId, saved_tools:{ids:[...s], meta:m}, updated_at:new Date().toISOString(),
+          },{onConflict:"user_id"}).then(null,()=>{});
+        }
       }catch{}
       return next;
     });
@@ -20232,9 +20247,6 @@ function MyReport({data, formData, isPaid, isPremium, isProMax, onUnlock, userId
             <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:G.dimmer}}>
               <span>📅</span><span>{genDate}</span>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:G.dimmer}}>
-              <span>⏱</span><span>Generated in 23 seconds</span>
-            </div>
           </div>
         </div>
 
@@ -20678,6 +20690,15 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
     const updated=[entry,...entries].slice(0,100);
     setEntries(updated);
     try{localStorage.setItem(STORE_KEY,JSON.stringify(updated));}catch{}
+    // Mirror to Supabase — the journal is the most personal thing in the app.
+    // Local-only meant a cleared browser or new phone erased it forever.
+    try{
+      if(userId){
+        supabase.from("user_profiles").upsert({
+          user_id:userId, journal:updated, updated_at:new Date().toISOString(),
+        },{onConflict:"user_id"}).then(null,()=>{});
+      }
+    }catch{}
   };
 
   // ── MEMORY CONTEXT: recent past entries for AI ──
@@ -23039,7 +23060,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v15-toolbrief"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v18-nodataloss"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -23796,6 +23817,74 @@ function DestinIQInner(){
         if (IS_ADMIN) {
           setIsPaid(true); setIsPremium(true); setIsProMax(true);
         }
+        // ── CHECK-IN HISTORY HYDRATION ──────────────────────────────────────
+        // logCheckin() mirrors history to Supabase (checkin_history), but the
+        // reader only looked at localStorage — so a cleared browser, a new
+        // device or an APK reinstall made Patterns report zero check-ins even
+        // though the data was safe in the DB. Pull the server copy back and
+        // merge it with whatever is local (newest wins per date).
+        try{
+          const serverHist = Array.isArray(profile.checkin_history) ? profile.checkin_history : [];
+          if(serverHist.length){
+            let localHist=[];
+            try{ localHist = JSON.parse(localStorage.getItem(`diq_ci_hist_${u.id}`)||"[]"); }catch{}
+            if(!Array.isArray(localHist)) localHist=[];
+            const byDate = new Map();
+            serverHist.forEach(h=>{ if(h&&h.date) byDate.set(h.date,h); });
+            localHist.forEach(h=>{ if(h&&h.date) byDate.set(h.date,h); }); // local is newer
+            const merged = Array.from(byDate.values()).sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(-400);
+            if(merged.length > localHist.length){
+              try{ localStorage.setItem(`diq_ci_hist_${u.id}`, JSON.stringify(merged)); }catch{}
+            }
+          }
+        }catch(_e){}
+
+        // ── JOURNAL + SAVED TOOLS HYDRATION ─────────────────────────────────
+        // Both were localStorage-only. Pull the server copy back when local is
+        // empty/thinner — a new device or cleared browser must not erase the
+        // user's own writing.
+        try{
+          const serverJournal = Array.isArray(profile.journal) ? profile.journal : [];
+          if(serverJournal.length){
+            let localJournal=[];
+            try{ localJournal = JSON.parse(localStorage.getItem(`diq_journal_${u.id}`)||"[]"); }catch{}
+            if(!Array.isArray(localJournal)) localJournal=[];
+            if(serverJournal.length > localJournal.length){
+              try{ localStorage.setItem(`diq_journal_${u.id}`, JSON.stringify(serverJournal)); }catch{}
+            }
+          }
+        }catch(_e){}
+        try{
+          const st = profile.saved_tools;
+          if(st && Array.isArray(st.ids) && st.ids.length){
+            let localIds=[];
+            try{ localIds = JSON.parse(localStorage.getItem(`diq_saved_tools_${u.id}`)||"[]"); }catch{}
+            if(!Array.isArray(localIds)) localIds=[];
+            if(st.ids.length > localIds.length){
+              try{
+                localStorage.setItem(`diq_saved_tools_${u.id}`, JSON.stringify(st.ids));
+                if(st.meta) localStorage.setItem(`diq_saved_tools_meta_${u.id}`, JSON.stringify(st.meta));
+              }catch{}
+            }
+          }
+        }catch(_e){}
+
+        // ── PRACTICES (HABITS) HYDRATION ────────────────────────────────────
+        // Habits were localStorage-only — a paid feature that vanished on a
+        // cleared browser or new device. Pull the server copy back if local
+        // is empty or thinner than the server's.
+        try{
+          const serverHabits = profile.habits && typeof profile.habits==="object" ? profile.habits : null;
+          if(serverHabits && Object.keys(serverHabits).length){
+            let localHabits={};
+            try{ localHabits = JSON.parse(localStorage.getItem(`diq_hab_${u.id}`)||"{}"); }catch{}
+            if(!localHabits || typeof localHabits!=="object") localHabits={};
+            if(Object.keys(localHabits).length < Object.keys(serverHabits).length){
+              try{ localStorage.setItem(`diq_hab_${u.id}`, JSON.stringify({...serverHabits,...localHabits})); }catch{}
+            }
+          }
+        }catch(_e){}
+
         // ── STREAK RESTORATION ──────────────────────────────────────────────
         // Single source of truth: Supabase last_checkin_date + localStorage backup
         // A streak is valid if the user checked in today OR yesterday.
