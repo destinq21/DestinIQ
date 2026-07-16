@@ -6809,12 +6809,13 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
 
   const FREE_FEATURES=[
   {text:"1 intelligence report (your profile)",        inc:true},
-  {text:"3 full AI tools every month — your pick",   inc:true},
+  {text:"Decisions tool — free, unlimited",           inc:true},
+  {text:"Preview all 42 tools",                       inc:true},
   {text:"Earn a free week of Pro with a 30-day streak", inc:true},
   {text:"AI Advisor — short daily chats",           inc:true},
   {text:"Daily check-in — basic reflection",           inc:true},
   {text:"Win tracker — up to 5 wins",                  inc:true},
-  {text:"Journal — 1 entry",                           inc:true},
+  {text:"Journal — 3 entries a month",                 inc:true},
   {text:"Streak tracking",                             inc:true},
   {text:"All 42 tools",                                inc:false},
   {text:"Audio on reports 🔊",                         inc:false},
@@ -8696,14 +8697,32 @@ function Landing({onStart,ipLocation}){
      desc:"Find your why. Build your path. Turn your values into daily decisions that actually move you forward."},
   ];
 
-  const testimonials=[
-    {init:"S",name:"Sarah M.",meta:"28 · United Kingdom",
-     quote:"DestinIQ showed me exactly what was blocking my financial growth. Within 60 days I had a plan I could actually follow."},
-    {init:"K",name:"Kwame A.",meta:"34 · Ghana",
-     quote:"I doubled my freelance income in 3 months using the career roadmap. The currency-specific advice was a game changer."},
-    {init:"P",name:"Priya S.",meta:"26 · India",
-     quote:"The relationship section alone changed how I communicate at work. I've never had a tool understand my situation this well."},
-  ];
+  // REAL testimonials only — loaded from Supabase (approved=true).
+  // These used to be three invented people with invented results, which is
+  // both dishonest and against app-store/advertising rules. If there are no
+  // approved testimonials yet, the section simply doesn't render.
+  const [testimonials,setTestimonials]=useState([]);
+  useEffect(()=>{
+    let alive=true;
+    (async()=>{
+      try{
+        const {data}=await supabase.from("testimonials")
+          .select("name,country,age,quote")
+          .eq("approved",true)
+          .order("created_at",{ascending:false})
+          .limit(12);
+        if(alive&&Array.isArray(data)&&data.length){
+          setTestimonials(data.map(t=>({
+            init:(t.name||"?").trim().charAt(0).toUpperCase(),
+            name:t.name||"DestinIQ user",
+            meta:[t.age,t.country].filter(Boolean).join(" · "),
+            quote:t.quote||"",
+          })).filter(t=>t.quote));
+        }
+      }catch(_e){}
+    })();
+    return()=>{alive=false;};
+  },[]);
 
   const sec={padding:"56px 24px",maxWidth:860,margin:"0 auto"};
 
@@ -8814,9 +8833,9 @@ function Landing({onStart,ipLocation}){
           background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.14)",
           borderRadius:18,overflow:"hidden"}}>
           {[
-            {num:"50+",   label:"Countries Served"},
-            {num:"40+",   label:"AI Intelligence Tools"},
-            {num:"10K+",  label:"Reports Generated"},
+            {num:"198",   label:"Countries Supported"},
+            {num:"42",    label:"AI Intelligence Tools"},
+            {num:"5 min", label:"To Your First Report"},
           ].map(({num,label},i)=>(
             <div key={label} style={{padding:"28px 20px",textAlign:"center",
               borderRight:i<2?"1px solid rgba(240,180,41,0.1)":"none"}}>
@@ -8932,9 +8951,57 @@ function Landing({onStart,ipLocation}){
       </section>
 
       {/* ══════════════════════════════════════════
-          TESTIMONIALS
+          WHAT MAKES IT DIFFERENT
       ══════════════════════════════════════════ */}
       <section style={{...sec}}>
+        <div style={{marginBottom:32}}>
+          <Badge icon="✦" text="NOT ANOTHER CHAT BOT"/>
+          <h2 style={{fontSize:"clamp(24px,6vw,34px)",fontWeight:800,lineHeight:1.25,margin:0,color:G.cream}}>
+            Three things<br/><span style={{color:G.gold}}>nothing else does.</span>
+          </h2>
+        </div>
+
+        <div style={{display:"grid",gap:14}}>
+          {[
+            {
+              icon:"💌", tag:"FUTURE ME",
+              title:"A letter from your past self — delivered",
+              body:"Write to yourself and seal it. It disappears. Months later your phone lights up: “You have a message from your past self.” Your own words, arriving on the day you chose — in the app and in your inbox.",
+              color:"#c8a84b",
+            },
+            {
+              icon:"🌍", tag:"BUILT FOR YOUR COUNTRY",
+              title:"Advice that actually works where you live",
+              body:"A hustle that prints money in Lagos is useless in Manchester. DestinIQ knows your country — your currency, your job market, the platforms and payment methods that exist for you. Never generic Western advice.",
+              color:"#64b5f6",
+            },
+            {
+              icon:"🎯", tag:"DO THIS TODAY",
+              title:"One move a day. Not a library to dig through.",
+              body:"Open the app and there's one concrete action, chosen from your profile and your goals. Do it, tap done, get on with your life. The depth is there when you want it — but you never have to go hunting.",
+              color:"#81c784",
+            },
+          ].map(f=>(
+            <div key={f.tag} style={{background:G.card,border:"1px solid "+G.border,
+              borderRadius:18,padding:"22px 22px",display:"flex",gap:16,alignItems:"flex-start"}}>
+              <div style={{width:44,height:44,borderRadius:13,flexShrink:0,fontSize:21,
+                background:f.color+"18",border:"1px solid "+f.color+"38",
+                display:"flex",alignItems:"center",justifyContent:"center"}}>{f.icon}</div>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".12em",
+                  color:f.color,marginBottom:6}}>{f.tag}</div>
+                <div style={{fontSize:16.5,fontWeight:800,color:G.cream,marginBottom:7,lineHeight:1.35}}>{f.title}</div>
+                <div style={{fontSize:14,color:G.dim,lineHeight:1.7}}>{f.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          TESTIMONIALS
+      ══════════════════════════════════════════ */}
+      <section style={{...sec, display: testimonials.length ? undefined : "none"}}>
         <div style={{marginBottom:32}}>
           <Badge icon="💬" text="WHAT PEOPLE SAY"/>
           <h2 style={{fontSize:"clamp(24px,6vw,34px)",fontWeight:800,lineHeight:1.25,margin:0,color:G.cream}}>
@@ -16887,6 +16954,7 @@ function HomeScreen({data,formData,streak,isPaid,isPremium,isProMax,userId,onUnl
         {/* Sunday "here's your week" — only shows Sun/Mon, once per week. */}
         <WeeklySummaryCard userId={userId} formData={formData}/>
         {/* Your reason, in your own words — shown back to you. */}
+        <StoryPrompt userId={userId} formData={formData} streak={streak}/>
         <MyWhyCard userId={userId}/>
         {/* The real spine: your daily real-life actions, checked off as done. */}
         <DailyActionsCard userId={userId} formData={formData} setNav={setNav}/>
@@ -20013,7 +20081,152 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
 
 // ─── DASHBOARD PROFILE VIEW ──────────────────────────────────────────────────
 // Clean profile page matching the Image 2 design spec
+// ── STORY PROMPT — asks once, at the moment they're actually proud ───────────
+// A "share your story" button buried in settings gets ignored. This appears on
+// Home only after a real 7-day streak, can be dismissed forever, and never
+// nags again once they've submitted.
+function StoryPrompt({userId, formData, streak}){
+  const KEY = `diq_testi_asked_${userId}`;
+  const [open,setOpen] = useState(false);
+  const [hidden,setHidden] = useState(()=>{ try{ return !!localStorage.getItem(KEY); }catch{ return false; } });
+  if(hidden || !userId || (streak||0) < 7) return null;
+  const dismiss=()=>{ try{ localStorage.setItem(KEY,"1"); }catch{}; setHidden(true); };
+  return (
+    <>
+      <div style={{margin:"0 0 14px",padding:"16px 18px",borderRadius:16,
+        background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.22)"}}>
+        <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".12em",
+          color:"var(--gold)",marginBottom:7}}>{streak} DAYS IN</div>
+        <div style={{fontSize:14.5,fontWeight:700,color:"var(--cream)",marginBottom:5,lineHeight:1.4}}>
+          You've shown up {streak} days straight. What's changed?
+        </div>
+        <div style={{fontSize:12.5,color:"var(--cream-40)",lineHeight:1.6,marginBottom:13}}>
+          Every quote on our site is from a real person. No invented reviews. If you've
+          got something honest to say — good or bad — we'd like to hear it.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setOpen(true)} style={{flex:1,padding:"10px",background:"var(--gold)",
+            color:"#000",border:"none",borderRadius:10,fontSize:12.5,fontWeight:800,cursor:"pointer",
+            fontFamily:"inherit"}}>Share my story</button>
+          <button onClick={dismiss} style={{padding:"10px 16px",background:"none",
+            color:"var(--cream-40)",border:"1px solid var(--cream-15)",borderRadius:10,fontSize:12.5,
+            cursor:"pointer",fontFamily:"inherit"}}>No thanks</button>
+        </div>
+      </div>
+      {open&&<TestimonialForm userId={userId} formData={formData}
+        onClose={()=>{ dismiss(); setOpen(false); }}/>}
+    </>
+  );
+}
+
+// ── TESTIMONIAL SUBMISSION ───────────────────────────────────────────────────
+// The testimonials table and the admin approval flow both existed, but nothing
+// ever fed them — so the landing page had fabricated quotes instead. This is
+// the missing piece: real users submitting their own words. Nothing appears
+// publicly until the founder approves it in the Admin Dashboard.
+function TestimonialForm({userId, formData, onClose}){
+  const [quote,setQuote]   = useState("");
+  const [name,setName]     = useState(formData?.name||"");
+  const [useCountry,setUseCountry] = useState(true);
+  const [sending,setSending] = useState(false);
+  const [done,setDone]     = useState(false);
+  const [err,setErr]       = useState("");
+
+  const submit=async()=>{
+    const q=quote.trim();
+    if(q.length<20){ setErr("A little more — what actually changed for you?"); return; }
+    setSending(true); setErr("");
+    try{
+      const {error}=await supabase.from("testimonials").insert({
+        user_id: userId||null,
+        name: (name.trim()||"DestinIQ user").slice(0,60),
+        quote: q.slice(0,400),
+        country: useCountry ? (formData?.country||null) : null,
+        age: formData?.age ? String(formData.age) : null,
+        approved: false,          // never public until the founder approves
+      });
+      if(error){ setErr("Couldn't send that — try again in a moment."); setSending(false); return; }
+      setDone(true);
+    }catch(_e){ setErr("Couldn't send that — try again in a moment."); }
+    setSending(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1400,background:"rgba(0,0,0,0.72)",
+      backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"var(--card)",border:"1px solid var(--line)",
+        borderRadius:20,padding:"26px 24px",maxWidth:440,width:"100%",boxSizing:"border-box",
+        maxHeight:"88vh",overflowY:"auto"}}>
+        {done ? (
+          <div style={{textAlign:"center",padding:"18px 4px"}}>
+            <div style={{fontSize:40,marginBottom:12}}>🙏</div>
+            <div style={{fontSize:18,fontWeight:800,color:"var(--cream)",marginBottom:8}}>Thank you</div>
+            <div style={{fontSize:13.5,color:"var(--cream-50)",lineHeight:1.7,marginBottom:22}}>
+              Your story goes to us first — nothing appears publicly until it's reviewed.
+              If it goes up, it'll be your words, exactly as you wrote them.
+            </div>
+            <button onClick={onClose} style={{width:"100%",padding:"13px",background:"var(--gold)",
+              color:"#000",border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",
+              fontFamily:"inherit"}}>Close</button>
+          </div>
+        ) : (
+          <>
+            <div style={{fontSize:10,fontFamily:"var(--f-mono)",letterSpacing:".12em",
+              color:"var(--gold)",marginBottom:8}}>SHARE YOUR STORY</div>
+            <div style={{fontSize:19,fontWeight:800,color:"var(--cream)",marginBottom:8,lineHeight:1.3}}>
+              What has DestinIQ actually changed?
+            </div>
+            <div style={{fontSize:13,color:"var(--cream-40)",lineHeight:1.65,marginBottom:18}}>
+              Be honest — including the unflattering parts. Real beats polished, and we'd
+              rather publish something true than something glowing.
+            </div>
+
+            <textarea value={quote} onChange={e=>setQuote(e.target.value)} rows={5}
+              maxLength={400}
+              placeholder="e.g. I kept planning and never starting. The daily action thing is stupidly simple but it's the first week I've actually done something every day."
+              style={{width:"100%",boxSizing:"border-box",background:"var(--inp,rgba(255,255,255,0.04))",
+                border:"1px solid var(--line)",borderRadius:12,padding:"12px 14px",color:"var(--cream)",
+                fontSize:14,lineHeight:1.6,fontFamily:"inherit",resize:"vertical",marginBottom:6}}/>
+            <div style={{fontSize:11,color:"var(--cream-30)",textAlign:"right",marginBottom:14}}>
+              {quote.length}/400
+            </div>
+
+            <input value={name} onChange={e=>setName(e.target.value)} maxLength={60}
+              placeholder="Name shown (first name is fine)"
+              style={{width:"100%",boxSizing:"border-box",background:"var(--inp,rgba(255,255,255,0.04))",
+                border:"1px solid var(--line)",borderRadius:12,padding:"11px 14px",color:"var(--cream)",
+                fontSize:13.5,fontFamily:"inherit",marginBottom:12}}/>
+
+            {formData?.country&&(
+              <label style={{display:"flex",alignItems:"center",gap:9,marginBottom:18,cursor:"pointer"}}>
+                <input type="checkbox" checked={useCountry} onChange={e=>setUseCountry(e.target.checked)}
+                  style={{width:16,height:16,accentColor:"#f0b429",cursor:"pointer"}}/>
+                <span style={{fontSize:12.5,color:"var(--cream-50)"}}>
+                  Show my country ({formData.country})
+                </span>
+              </label>
+            )}
+
+            {err&&<div style={{fontSize:12.5,color:"#e05c6e",marginBottom:12}}>{err}</div>}
+
+            <button onClick={submit} disabled={sending}
+              style={{width:"100%",padding:"14px",background:"var(--gold)",color:"#000",border:"none",
+                borderRadius:12,fontSize:14.5,fontWeight:800,cursor:sending?"default":"pointer",
+                fontFamily:"inherit",opacity:sending?0.6:1,marginBottom:9}}>
+              {sending?"Sending…":"Send my story"}
+            </button>
+            <button onClick={onClose} style={{width:"100%",padding:"11px",background:"none",
+              color:"var(--cream-40)",border:"1px solid var(--cream-15)",borderRadius:12,fontSize:12.5,
+              cursor:"pointer",fontFamily:"inherit"}}>Not now</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,onSignOut,onManageSubscription,setNav,navPhotoURL,onEditProfile}){
+  const [showTesti,setShowTesti]=useState(false);
   const name    = formData?.name||user?.name||(user?.email?.split("@")[0])||"User";
   const email   = user?.email||"";
   const initial = (name[0]||"U").toUpperCase();
@@ -20188,6 +20401,14 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
             ⚙ Admin Dashboard
           </button>
         )}
+        <button onClick={()=>setShowTesti(true)}
+          style={{width:"100%",padding:"15px",background:"transparent",color:"var(--cream-50)",
+            border:"1px solid var(--cream-15)",borderRadius:12,fontSize:13.5,
+            fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
+            display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+          💬 Share your story
+        </button>
+        {showTesti&&<TestimonialForm userId={user?.id} formData={formData} onClose={()=>setShowTesti(false)}/>}
         <button onClick={onSignOut}
           style={{width:"100%",padding:"15px",background:"transparent",color:"#e05252",
             border:"1px solid rgba(224,82,82,0.2)",borderRadius:12,fontSize:14,
@@ -23164,7 +23385,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v21-overflow"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v24-stories"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -23939,6 +24160,24 @@ function DestinIQInner(){
             const merged = Array.from(byDate.values()).sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(-400);
             if(merged.length > localHist.length){
               try{ localStorage.setItem(`diq_ci_hist_${u.id}`, JSON.stringify(merged)); }catch{}
+            }
+          }
+        }catch(_e){}
+
+        // ── EARNED TRIAL HYDRATION ──────────────────────────────────────────
+        // A 30-day streak grants a free week of Pro. It was written to
+        // Supabase but only ever read from localStorage — so clearing the
+        // browser silently took back a reward the user genuinely earned.
+        try{
+          if(profile.trial_until){
+            const serverEnd = new Date(profile.trial_until).getTime();
+            if(serverEnd > Date.now()){
+              let localEnd = 0;
+              try{ localEnd = new Date(localStorage.getItem(`diq_trial_until_${u.id}`)||0).getTime()||0; }catch{}
+              if(serverEnd > localEnd){
+                try{ localStorage.setItem(`diq_trial_until_${u.id}`, new Date(serverEnd).toISOString()); }catch{}
+              }
+              setIsPaid(true);   // an active earned trial IS paid access
             }
           }
         }catch(_e){}
