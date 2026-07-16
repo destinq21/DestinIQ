@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -1321,6 +1321,7 @@ function DailyActionsCard({userId, formData, setNav}){
 
   return(
     <div style={{margin:"0 0 16px",padding:"18px 20px",borderRadius:18,
+      boxSizing:"border-box",maxWidth:"100%",overflow:"hidden",
       background:"linear-gradient(150deg,rgba(29,158,117,0.08),rgba(29,158,117,0.02))",
       border:"1px solid rgba(29,158,117,0.28)"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
@@ -1331,13 +1332,13 @@ function DailyActionsCard({userId, formData, setNav}){
           color:G.dimmer,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Edit →</button>
       </div>
 
-      <div style={{display:"grid",gap:9}}>
+      <div style={{display:"grid",gap:9,minWidth:0}}>
         {actions.map(a=>{
           const done = isActionDoneToday(userId,a.id);
           const streak = actionStreak(userId,a.id);
           const asking = amountFor===a.id;
           return(
-            <div key={a.id}>
+            <div key={a.id} style={{minWidth:0}}>
               <div onClick={()=>!asking&&onTap(a)}
                 style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",
                   borderRadius:12,cursor:"pointer",
@@ -1366,12 +1367,12 @@ function DailyActionsCard({userId, formData, setNav}){
 
               {/* optional amount entry */}
               {asking&&(
-                <div style={{display:"flex",gap:8,marginTop:8,marginBottom:2}}>
+                <div style={{display:"flex",gap:8,marginTop:8,marginBottom:2,flexWrap:"wrap",minWidth:0}}>
                   <input autoFocus value={amountVal} onChange={e=>setAmountVal(e.target.value)}
                     placeholder={a.unit==="amount"?"How much? e.g. 200":"How many minutes?"}
                     inputMode="numeric"
                     onKeyDown={e=>e.key==="Enter"&&confirm(a,amountVal)}
-                    style={{flex:1,minWidth:0,boxSizing:"border-box",background:G.inp,
+                    style={{flex:"1 1 110px",minWidth:0,width:0,boxSizing:"border-box",background:G.inp,
                       border:"1px solid "+G.inpBorder,borderRadius:10,padding:"10px 12px",
                       color:G.cream,fontSize:13.5,fontFamily:"inherit"}}/>
                   <button onClick={()=>confirm(a,amountVal)} style={{background:"#1d9e75",
@@ -7378,7 +7379,7 @@ function patternsReadiness(userId){
   return {have:n, need:NEED, ready:n>=NEED, left:Math.max(0,NEED-n)};
 }
 
-function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid}){
+function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid,isProMax}){
   const G = useThemeColors();
   const [feeling,setFeeling]=useState("");const [score,setScore]=useState(5);
   const [did,setDid]=useState("");const [avoided,setAvoided]=useState("");
@@ -7409,7 +7410,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid})
     const memCtx=buildMemoryContext(userId);
     pushToMemory(userId,"user",`Check-in: ${score}/10, ${feeling}, did="${did}"`);
     try{
-      const reply=await callAPI({messages:[{role:"user",content:buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx)}],system:"You are a warm, emotionally intelligent coach who genuinely knows this person. Respond like a caring mentor who has read their full story — not a tool. Be honest, be human, acknowledge what they're feeling before you advise.",userId,isPremium});
+      const reply=await callAPI({messages:[{role:"user",content:buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx)}],system:"You are a warm, emotionally intelligent coach who genuinely knows this person. Respond like a caring mentor who has read their full story — not a tool. Be honest, be human, acknowledge what they're feeling before you advise.",userId,isPremium,isProMax});
       pushToMemory(userId,"assistant",reply);
       try{localStorage.setItem(ciResultKey,reply);}catch{}
       setResult(reply);
@@ -21933,7 +21934,7 @@ Rules:
               <button onClick={onUnlock} style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>✦ Upgrade to Pro</button>
             </div>
         )}
-        {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} userId={userId} onComplete={()=>setNav("home")}/></div>}
+        {navSection==="checkin"&&<div style={{padding:"28px 32px"}}><CheckIn profile={formData} reportData={data} streak={streak} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onComplete={()=>setNav("home")}/></div>}
         {navSection==="savedreports"&&(()=>{
           const _bmKey=userId?`diq_saved_tools_${userId}`:"diq_saved_tools_guest";
           const _metaKey=userId?`diq_saved_tools_meta_${userId}`:"diq_saved_tools_meta_guest";
@@ -23163,7 +23164,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v19-visible"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v21-overflow"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
