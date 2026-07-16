@@ -870,6 +870,27 @@ const PROGRESS_POINTS = {
 
 const PROGRESS_PTS_KEY = (uid) => `diq_prog_pts_${uid}`;
 const PROGRESS_ACT_KEY = (uid) => `diq_prog_act_${uid}`;
+const PROGRESS_LOG_KEY = (uid) => `diq_prog_log_${uid}`;
+
+// Human labels — points were earned invisibly; users deserve to see WHY their
+// score moved. Anything not listed falls back to a readable version of the key.
+const PROGRESS_LABELS = {
+  checkin:"Daily check-in", one_thing:"Did today's one thing",
+  streak_7:"7-day streak", streak_14:"14-day streak", streak_30:"30-day streak",
+  commit:"Committed to a practice", commit_done:"Followed through on a commitment",
+  habit_commit:"Started a practice", habit_master:"Mastered a practice",
+  win:"Logged a win", journal:"Journal entry", report:"Generated a report",
+  tool:"Worked through a tool", step:"Applied a step",
+};
+function progressLabel(action){
+  if(PROGRESS_LABELS[action]) return PROGRESS_LABELS[action];
+  return String(action||"Progress").replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
+}
+function getProgressLog(userId){
+  if(!userId) return [];
+  try{ const v=JSON.parse(localStorage.getItem(PROGRESS_LOG_KEY(userId))||"[]"); return Array.isArray(v)?v:[]; }
+  catch{ return []; }
+}
 
 function getProgressPoints(userId){
   if(!userId) return 0;
@@ -896,6 +917,20 @@ function addProgressPoints(userId, action, amount){
     const current = getProgressPoints(userId);
     const next = Math.min(9999, current + amount);
     localStorage.setItem(PROGRESS_PTS_KEY(userId), String(next));
+    // Record WHAT earned it, so the score is explainable instead of mysterious
+    let log=[];
+    try{ log = getProgressLog(userId); }catch{}
+    log.unshift({action, amount, at:Date.now()});
+    log = log.slice(0,40);
+    try{ localStorage.setItem(PROGRESS_LOG_KEY(userId), JSON.stringify(log)); }catch{}
+    // Mirror to Supabase — this drives their score; a cleared browser must not
+    // silently reset everything they earned.
+    try{
+      supabase.from("user_profiles").upsert({
+        user_id:userId, progress_points:next, progress_log:log,
+        updated_at:new Date().toISOString(),
+      },{onConflict:"user_id"}).then(null,()=>{});
+    }catch{}
     markActive(userId);   // any earned action counts as "active today" → decay recovers
     // Dispatch so ProgressScreen can react in real-time
     window.dispatchEvent(new CustomEvent("progressUpdated",{detail:{userId,points:next,action}}));
@@ -7591,16 +7626,16 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid})
 }
 function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlock}){
   const chatKey = userId ? `diq_advisor_chat_${userId}` : null;
-  const openingMessage = `Hey ${profile?.name?.split(" ")[0]||"there"} 👋 Good to see you.\n\nI'm your AI companion — I've gone through everything you shared and I know your situation well. I'm here whether you want to think something through, talk something out, or just need someone to check in with.\n\nWhat's on your mind?`;
+  // Opening greeting removed — the chat starts empty so the user speaks first.
 
   // ── PERSISTENT CHAT — load saved history on mount ─────────────────────────
   const [msgs,setMsgs]=useState(()=>{
-    if(typeof window==="undefined"||!chatKey) return [{role:"assistant",content:openingMessage}];
+    if(typeof window==="undefined"||!chatKey) return [];
     try{
       const saved=JSON.parse(localStorage.getItem(chatKey)||"null");
       if(Array.isArray(saved)&&saved.length>0) return saved;
     }catch{}
-    return [{role:"assistant",content:openingMessage}];
+    return [];
   });
   const [showNewChatPrompt,setShowNewChatPrompt]=useState(false);
   const [input,setInput]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");
@@ -7612,7 +7647,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
 
   // Save chat to localStorage whenever msgs changes
   useEffect(()=>{
-    if(!chatKey||msgs.length<=1) return;
+    if(!chatKey||msgs.length===0) return;
     try{localStorage.setItem(chatKey,JSON.stringify(msgs.slice(-80)));}catch{} // keep last 80 msgs
   },[msgs]);
 
@@ -7626,7 +7661,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
   },[chatKey]);
 
   const startNewChat=()=>{
-    const fresh=[{role:"assistant",content:openingMessage}];
+    const fresh=[];
     setMsgs(fresh);
     setShowNewChatPrompt(false);
     if(chatKey) try{localStorage.removeItem(chatKey);}catch{}
@@ -7783,6 +7818,21 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
                   {q}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {msgs.length===0&&!loading&&(
+          <div style={{textAlign:"center",padding:"48px 24px",opacity:0.75}}>
+            <div style={{width:44,height:44,borderRadius:"50%",margin:"0 auto 14px",
+              background:"linear-gradient(135deg,rgba(155,114,207,0.3),rgba(240,180,41,0.12))",
+              border:"1px solid rgba(240,180,41,0.25)",display:"flex",alignItems:"center",
+              justifyContent:"center",fontSize:18}}>◇</div>
+            <div style={{fontSize:14.5,fontWeight:600,color:"var(--cream)",marginBottom:5}}>
+              {coachName} is listening
+            </div>
+            <div style={{fontSize:12.5,color:"var(--cream-40)",lineHeight:1.6,maxWidth:260,margin:"0 auto"}}>
+              Knows your profile, your goals, and where you're stuck. Say what's on your mind.
             </div>
           </div>
         )}
@@ -19738,6 +19788,54 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
 }
 
 // ── ProgressScreen ────────────────────────────────────────────────────────
+// ── EARNED BREAKDOWN — makes the invisible visible ───────────────────────────
+// Progress points quietly raise the user's score with no explanation. This
+// shows what they earned and why, so effort feels like it counted.
+function EarnedBreakdown({userId}){
+  const [log,setLog] = useState(()=>getProgressLog(userId));
+  const [open,setOpen] = useState(false);
+  useEffect(()=>{
+    const h=()=>setLog(getProgressLog(userId));
+    window.addEventListener("progressUpdated",h);
+    return()=>window.removeEventListener("progressUpdated",h);
+  },[userId]);
+  if(!log.length) return null;
+  const pts = getProgressPoints(userId);
+  const lift = Math.round(pts*0.25*10)/10;   // matches getProgressScore's weighting
+  const when=(t)=>{
+    const d=Math.floor((Date.now()-t)/86400000);
+    return d<=0?"today":d===1?"yesterday":`${d}d ago`;
+  };
+  const shown = open ? log.slice(0,20) : log.slice(0,3);
+  return (
+    <div style={{background:"rgba(240,180,41,0.05)",border:"1px solid rgba(240,180,41,0.2)",
+      borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:800,color:"var(--gold)",letterSpacing:".08em",fontFamily:"var(--f-mono)"}}>
+          YOUR EFFORT · +{lift} TO YOUR SCORE
+        </div>
+        {log.length>3&&(
+          <button onClick={()=>setOpen(o=>!o)} style={{background:"none",border:"none",
+            color:"var(--cream-40)",fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>
+            {open?"Show less":`All ${log.length}`}
+          </button>
+        )}
+      </div>
+      {shown.map((e,i)=>(
+        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",
+          fontSize:12.5,color:"var(--cream-60)"}}>
+          <span style={{color:"var(--gold)",fontWeight:800,fontSize:11,minWidth:26}}>+{e.amount}</span>
+          <span style={{flex:1}}>{progressLabel(e.action)}</span>
+          <span style={{color:"var(--cream-30)",fontSize:11}}>{when(e.at)}</span>
+        </div>
+      ))}
+      <div style={{fontSize:11,color:"var(--cream-30)",marginTop:9,lineHeight:1.5}}>
+        Your score isn't a guess — it moves when you actually do things.
+      </div>
+    </div>
+  );
+}
+
 function ProgressScreen({data,streak,userId,setNav,goBack}){
   const s=data?.scores||{};
   const aiBaseline=Math.min(85,Math.max(10,Math.round((s.life||60)*.25+(s.wealth||60)*.3+(s.mindset||60)*.25+(s.relations||60)*.2)));
@@ -19799,6 +19897,11 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
       </div>
 
       <div style={{padding:"0 16px"}}>
+
+        {/* ── WHY YOUR SCORE MOVED ─────────────────────────────────────────
+            Points were earned invisibly and silently lifted the score. This
+            shows the user exactly what their effort bought. */}
+        <EarnedBreakdown userId={userId}/>
 
         {/* Overview label */}
         <div style={{fontSize:12,fontWeight:700,color:"var(--cream-50)",letterSpacing:".06em",marginBottom:14}}>Overview</div>
@@ -23060,7 +23163,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v18-nodataloss"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v19-visible"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -23835,6 +23938,23 @@ function DestinIQInner(){
             const merged = Array.from(byDate.values()).sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(-400);
             if(merged.length > localHist.length){
               try{ localStorage.setItem(`diq_ci_hist_${u.id}`, JSON.stringify(merged)); }catch{}
+            }
+          }
+        }catch(_e){}
+
+        // ── PROGRESS POINTS HYDRATION ───────────────────────────────────────
+        // Points drive the score. Local-only meant a cleared browser silently
+        // reset everything the user earned back to the AI baseline.
+        try{
+          const sp = Number(profile.progress_points||0);
+          if(sp>0){
+            let localPts=0;
+            try{ localPts = parseFloat(localStorage.getItem(`diq_prog_pts_${u.id}`)||"0"); }catch{}
+            if(sp > localPts){
+              try{ localStorage.setItem(`diq_prog_pts_${u.id}`, String(sp)); }catch{}
+              if(Array.isArray(profile.progress_log)&&profile.progress_log.length){
+                try{ localStorage.setItem(`diq_prog_log_${u.id}`, JSON.stringify(profile.progress_log.slice(0,40))); }catch{}
+              }
             }
           }
         }catch(_e){}
