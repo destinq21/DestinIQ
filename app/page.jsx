@@ -880,6 +880,7 @@ const PROGRESS_LABELS = {
   commit:"Committed to a practice", commit_done:"Followed through on a commitment",
   habit_commit:"Started a practice", habit_master:"Mastered a practice",
   win:"Logged a win", journal:"Journal entry", report:"Generated a report",
+  challenge_done:"Completed the weekly challenge",
   tool:"Worked through a tool", step:"Applied a step",
 };
 function progressLabel(action){
@@ -2480,16 +2481,23 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 .fu-row{display:flex;gap:8px;}
 .fu-input{flex:1;background:var(--midnight);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:13px;outline:none;}
 .fu-input:focus{border-color:var(--gold);}
-@media(min-width:1025px){
-  .sidebar{display:flex!important;}.main-area{margin-left:220px!important;}}
+/* ── FULL-SCREEN SHELL AT EVERY WIDTH ────────────────────────────────────────
+   The persistent 220px desktop sidebar is retired. Navigation is the hamburger
+   + slide-over drawer at all sizes (the pattern Explore already used), so the
+   content always gets the whole viewport.
+   This also closes an old dead zone: between 901–1024px the sidebar was hidden
+   AND `.mob-top` was killed by an !important AND `.bot-nav` was hidden, which
+   left that window with no navigation at all. */
+.sidebar{display:none!important;width:0!important;}
+.main-area{margin-left:0!important;width:100%!important;max-width:100vw!important;}
+.mob-top{display:flex;}
 @media(max-width:1024px){
-  .sidebar{display:none!important;width:0!important;}
-  .main-area{margin-left:0!important;width:100%!important;max-width:100vw!important;}
-  .bot-nav{display:none!important;}.mob-top{display:flex;}.nav{display:none!important;}.home-greet{display:none!important;}
+  .nav{display:none!important;}.home-greet{display:none!important;}
   .home{padding:14px 14px 84px;}.hero-row{grid-template-columns:1fr;}.qa-row{grid-template-columns:repeat(3,1fr);}
   .cat-scroll{grid-template-columns:repeat(2,1fr);}.pg{padding:14px 14px 84px;}.greet-name{font-size:20px;}
 }
-@media(min-width:901px){.mob-top{display:none!important;}.bot-nav{display:none!important;}}
+/* .bot-nav is already display:none!important in its base rule — the bottom nav
+   was retired earlier; the drawer is the navigation at every width. */
 @media(max-width:480px){.qa-row{grid-template-columns:repeat(3,1fr);gap:7px;}.qa-card{padding:12px 7px;}}
 
 `;
@@ -8001,6 +8009,14 @@ function SupportWidget(){
   const G = useThemeColors();
   const [open,setOpen]=useState(false);
   const [tab,setTab]=useState("chat");
+  // Profile → "Help & Support" opens this widget instead of firing a mailto:
+  // link, which silently did nothing inside the Android WebView and on any
+  // desktop without a mail client configured.
+  useEffect(()=>{
+    const h=(e)=>{ setOpen(true); if(e?.detail==="faq") setTab("faq"); };
+    window.addEventListener("diqOpenSupport",h);
+    return()=>window.removeEventListener("diqOpenSupport",h);
+  },[]);
   const [msgs,setMsgs]=useState([{role:"assistant",text:"Hi! I'm the DestinIQ support assistant. Ask me anything about the app, your account, payments, or how features work."}]);
   const [input,setInput]=useState("");
   const [loading,setLoading]=useState(false);
@@ -10751,6 +10767,7 @@ Return ONLY a JSON array of exactly 5 objects, no markdown, no explanation, no c
       if(!Array.isArray(parsed)||!parsed.length) throw new Error("Empty array");
       setPoints(parsed);
       try{ localStorage.setItem(pointsCacheKey, JSON.stringify(parsed)); }catch{}
+
       // Also record that this tool was generated, so Categories Progress counts
       // it. Without this the bar only ever saw 3 of 42 tools and stayed at 0%.
       try{ if(userId) localStorage.setItem(`diq_mod_${modId}_${userId}`, "generated"); }catch{}
@@ -16314,22 +16331,28 @@ function MobileTopBar({title,onBack,streak,isPaid,isProMax,onNotif,setNav,navPho
       borderBottom:"1px solid "+(G.isDark?"rgba(255,255,255,0.07)":"rgba(35,28,12,0.08)"),
       position:"sticky",top:0,zIndex:300,gap:12}}>
 
-      {/* Left: hamburger OR back button */}
-      {onBack
-        ? <button onClick={onBack} style={{background:"none",border:"none",
-            cursor:"pointer",color:G.dim,fontSize:20,padding:"4px 8px 4px 0",
-            display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+      {/* Left: hamburger ALWAYS + back when there's somewhere to go back to.
+          These used to be either/or, so the moment a user navigated anywhere
+          the back arrow replaced the hamburger and the drawer became
+          unreachable — every screen except Explore had no way into the menu. */}
+      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+        <button onClick={onHamburger} aria-label="Menu"
+          style={{background:"none",border:"none",cursor:"pointer",
+            padding:"6px 4px",display:"flex",flexDirection:"column",gap:5}}>
+          {[0,1,2].map(i=>(
+            <span key={i} style={{display:"block",width:22,height:2,
+              background:G.cream,borderRadius:2}}/>
+          ))}
+        </button>
+        {onBack&&(
+          <button onClick={onBack} aria-label="Back"
+            style={{background:"none",border:"none",cursor:"pointer",color:G.dim,
+              fontSize:20,padding:"4px 6px",display:"flex",alignItems:"center",
+              fontFamily:"inherit"}}>
             <span>←</span>
           </button>
-        : <button onClick={onHamburger}
-            style={{background:"none",border:"none",cursor:"pointer",
-              padding:"6px 4px",display:"flex",flexDirection:"column",gap:5}}>
-            {[0,1,2].map(i=>(
-              <span key={i} style={{display:"block",width:22,height:2,
-                background:G.cream,borderRadius:2}}/>
-            ))}
-          </button>
-      }
+        )}
+      </div>
 
       {/* Center: logo or title */}
       <div style={{flex:1,textAlign:"center"}}>
@@ -17173,6 +17196,8 @@ function SideDrawer({open, onClose, nav, setNav, formData, isPaid, isProMax, str
     {id:"progress",  icon:"trending", label:"Progress"},
     {id:"checkin",   icon:"check", label:"Check-in"},
     {id:"tool:advisor",icon:"bot",label:"AI Coach"},
+    {id:"tool:weeklychallenge",icon:"target",label:"Weekly Challenge"},
+    {id:"practices", icon:"activity", label:"My Practices"},
     {id:"savedreports",icon:"bookmark",label:"Saved"},
     {id:"wins",      icon:"trophy", label:"My Wins"},
     {id:"profile",   icon:"settings", label:"Settings"},
@@ -18013,8 +18038,10 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
       fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
       paddingBottom:40,overflowX:"hidden"}}>
 
-      {/* ── STICKY TOP NAV ── */}
-      <div style={{position:"sticky",top:0,zIndex:200,
+      {/* ── STICKY TOP NAV ── mobile only. The `mob-top` class carries a
+          display:none!important above 901px, so on desktop the sidebar is the
+          only navigation and this redundant hamburger bar disappears. */}
+      <div className="mob-top" style={{position:"sticky",top:0,zIndex:200,
         background:G.isDark?"rgba(10,8,0,0.92)":"rgba(245,242,234,0.95)",backdropFilter:"blur(14px)",
         borderBottom:"1px solid "+G.border,padding:"12px 20px",
         display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -18349,10 +18376,16 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
 }
 
 function CategoryPage({catId,setNav,goBack,userId}){
+  const [tab,setTab] = useState("topics");
   const G = useThemeColors();
   const cat=CATEGORIES.find(c=>c.id===catId);
   if(!cat) return null;
   const topicData = TOPIC_CONFIGS[catId];
+  // Drop any tool that duplicates a topic on this page. Money+ was listing
+  // "Earn Online" and "Jim Rohn" twice — once as a topic with real curated
+  // cards, once as an AI tool with the same name. Same subject, two rows.
+  const topicIds = new Set((topicData?.topics||[]).map(t=>t.id));
+  const extraTools = (cat?.tools||[]).filter(tid=>!topicIds.has(tid)&&TOOL_META[tid]);
 
   return(
     <div style={{minHeight:"100vh",background:G.bg,color:G.cream,
@@ -18380,9 +18413,31 @@ function CategoryPage({catId,setNav,goBack,userId}){
         </div>
       </div>
 
-      {/* ── TOPIC CARDS (new card-based system) ── */}
+      {/* ── TOPICS / TOOLS ────────────────────────────────────────────────────
+          These are two different things and both matter: topics are curated
+          cards (real steps, suppliers, prices); tools are AI generators built
+          around your profile. They used to be stacked in one long column, so
+          reaching a tool meant scrolling past every topic. Tabs put them one
+          tap apart instead. */}
       {topicData?.topics?.length>0?(
         <div style={{padding:"0 20px 100px",maxWidth:860,margin:"0 auto"}}>
+          {extraTools.length>0&&(
+            <div style={{display:"flex",gap:7,marginBottom:16}}>
+              {[{k:"topics",t:`Topics (${topicData.topics.length})`},
+                {k:"tools", t:`AI Tools (${extraTools.length})`}].map(o=>(
+                <button key={o.k} onClick={()=>setTab(o.k)}
+                  style={{flex:1,padding:"10px 12px",borderRadius:11,cursor:"pointer",
+                    fontFamily:"inherit",fontSize:12.5,fontWeight:700,
+                    background: tab===o.k ? "rgba(240,180,41,0.12)" : "transparent",
+                    border:"1px solid "+(tab===o.k ? "rgba(240,180,41,0.45)" : G.border),
+                    color: tab===o.k ? G.gold : G.dim}}>
+                  {o.t}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {tab==="topics"&&(<>
           <div style={{fontSize:9,fontWeight:700,letterSpacing:".12em",color:G.dimmer,
             fontFamily:"monospace",marginBottom:14}}>CHOOSE A TOPIC TO START</div>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -18413,13 +18468,24 @@ function CategoryPage({catId,setNav,goBack,userId}){
             ))}
           </div>
 
-          {/* ── Also show legacy tools if they exist ── */}
-          {cat.tools?.length>0&&(
-            <div style={{marginTop:28}}>
+          {/* ── AI TOOLS ──────────────────────────────────────────────────────
+              The topics above are the product: curated cards with real steps,
+              suppliers and prices. These AI tools are the older parallel system
+              that the topics replaced — but several are still the only home for
+              things like Letter to Self or Debt Freedom, so they stay.
+              Two fixes for the overwhelm:
+                1. Any tool whose id matches a topic above is dropped — it was
+                   the same subject listed twice (Earn Online, Jim Rohn…).
+                2. The rest collapse behind one line instead of 8 rows, so a
+                   category page opens as ONE list, not two. */}
+          </>)}
+
+          {tab==="tools"&&extraTools.length>0&&(
+            <div>
               <div style={{fontSize:9,fontWeight:700,letterSpacing:".12em",color:G.dimmer,
-                fontFamily:"monospace",marginBottom:14}}>TOOLS & DEEP DIVES</div>
+                fontFamily:"monospace",marginBottom:14}}>BUILT AROUND YOUR PROFILE</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {cat.tools.map(tid=>{
+                {extraTools.map(tid=>{
                   const m=TOOL_META[tid]; if(!m) return null;
                   return(
                     <div key={tid} onClick={()=>setNav("tool:"+tid)}
@@ -19826,6 +19892,8 @@ function ToolPage({toolId,setNav,goBack,formData,userId,isPaid,isPremium,isProMa
         ? <RelocationExplorer formData={formData} userId={userId} isPremium={isPremium} isPaid={isPaid} onUnlock={onUnlock}/>
         : toolId==="advisor"
         ? <AdvisorChat profile={formData} reportData={reportData} userId={userId} isPremium={isPremium} isProMax={isProMax} isPaid={isPaid} onUnlock={onUnlock}/>
+        : toolId==="weeklychallenge"
+        ? <WeeklyChallenge profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}/>
         : <GenericAIModule key={toolId} modId={toolId} profile={formData} userId={userId} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} onUnlock={onUnlock} lang={lang||"en"}/>
       }
       </div>
@@ -20081,6 +20149,283 @@ function ProgressScreen({data,streak,userId,setNav,goBack}){
 
 // ─── DASHBOARD PROFILE VIEW ──────────────────────────────────────────────────
 // Clean profile page matching the Image 2 design spec
+// ── WEEKLY CHALLENGE ─────────────────────────────────────────────────────────
+// This used to be an ordinary tool with a special name: rendered as 5 tappable
+// points like everything else, cached forever so it never actually changed
+// week to week. It's the one feature in the app with a natural rhythm — it
+// arrives Monday, it expires Sunday — so it gets its own screen: ONE challenge,
+// shown whole, with a clock, and a Done that counts toward progress.
+function isoWeekStamp(d=new Date()){
+  const t=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  t.setDate(t.getDate()+4-(t.getDay()||7));            // ISO: nearest Thursday
+  const yearStart=new Date(t.getFullYear(),0,1);
+  const wk=Math.ceil((((t-yearStart)/86400000)+1)/7);
+  return `${t.getFullYear()}w${wk}`;
+}
+function daysLeftThisWeek(){
+  const day=new Date().getDay()||7;                    // Mon=1 … Sun=7
+  return 8-day;                                        // Mon→7 … Sun→1
+}
+
+function WeeklyChallenge({profile, userId, isPaid, isPremium, isProMax}){
+  const G = useThemeColors();
+  const week = isoWeekStamp();
+  const KEY  = `diq_wc_${userId||"guest"}_${week}`;
+  const [data,setData]       = useState(()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||"null"); }catch{ return null; } });
+  const [loading,setLoading] = useState(false);
+  const [err,setErr]         = useState("");
+  const left = daysLeftThisWeek();
+
+  const persist=(next)=>{
+    setData(next);
+    try{ localStorage.setItem(KEY, JSON.stringify(next)); }catch{}
+    try{
+      if(userId) supabase.from("user_profiles").upsert({
+        user_id:userId, weekly_challenge:{week, ...next}, updated_at:new Date().toISOString(),
+      },{onConflict:"user_id"}).then(null,()=>{});
+    }catch{}
+  };
+
+  // Old weeks' challenges shouldn't linger in storage
+  useEffect(()=>{
+    try{
+      const prefix=`diq_wc_${userId||"guest"}_`;
+      for(let i=localStorage.length-1;i>=0;i--){
+        const k=localStorage.key(i);
+        if(k&&k.startsWith(prefix)&&k!==KEY) localStorage.removeItem(k);
+      }
+    }catch{}
+  },[KEY,userId]);
+
+  const generate=async()=>{
+    setLoading(true); setErr("");
+    try{
+      const brief = MODULE_CONFIGS.weeklychallenge.prompt(profile);
+      const raw = await callAPI({
+        messages:[{role:"user", content:`${brief}
+
+Return ONLY a JSON object, no markdown, no code fences:
+{"challenge":"<the ONE action, one sentence, specific and slightly uncomfortable>","why":"<why exactly this, for them, 1-2 sentences>","rules":["<step>","<step>","<step>"],"success":"<how they'll know it's done — measurable>","builds":"<the capability this develops>","bonus":"<a harder version>"}`}],
+        system:"You design ONE weekly growth challenge for this specific person. Return ONLY valid JSON starting with { and ending with }. No preamble, no markdown.",
+        userId, isPremium, isProMax,
+      });
+      const txt = typeof raw==="string" ? raw : (raw?.content||"");
+      const clean = String(txt).replace(/```json|```/g,"").trim();
+      const start = clean.indexOf("{"), end = clean.lastIndexOf("}");
+      const parsed = JSON.parse(clean.slice(start, end+1));
+      if(!parsed?.challenge) throw new Error("bad shape");
+      persist({challenge:parsed, status:"new", at:Date.now()});
+    }catch(_e){ setErr("Couldn't design this week's challenge. Try again."); }
+    setLoading(false);
+  };
+
+  const accept =()=>persist({...data, status:"accepted", acceptedAt:Date.now()});
+  const markDone=()=>{
+    persist({...data, status:"done", doneAt:Date.now()});
+    try{ addProgressPoints(userId,"challenge_done",3); }catch{}
+    try{ window.dispatchEvent(new CustomEvent("showToast",{detail:"🏆 Challenge complete — that's the whole point."})); }catch{}
+  };
+
+  const clock = (
+    <span style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",
+      padding:"4px 9px",borderRadius:20,flexShrink:0,
+      background: left<=2 ? "rgba(224,92,110,0.12)" : "rgba(240,180,41,0.1)",
+      border:"1px solid "+(left<=2 ? "rgba(224,92,110,0.35)" : "rgba(240,180,41,0.3)"),
+      color: left<=2 ? "#e05c6e" : G.gold}}>
+      {left===1 ? "LAST DAY" : `${left} DAYS LEFT`}
+    </span>
+  );
+
+  // ── Nothing generated for this week yet ──
+  if(!data) return (
+    <div style={{textAlign:"center",padding:"46px 22px"}}>
+      <div style={{fontSize:44,marginBottom:14}}>🎲</div>
+      <div style={{fontSize:20,fontWeight:800,color:G.cream,marginBottom:8}}>This week's challenge</div>
+      <div style={{fontSize:13.5,color:G.dim,lineHeight:1.7,maxWidth:340,margin:"0 auto 22px"}}>
+        One specific action, built around where you actually are. Slightly
+        uncomfortable — that's the point. It resets every Monday.
+      </div>
+      {err&&<div style={{fontSize:12.5,color:"#e05c6e",marginBottom:12}}>{err}</div>}
+      <button onClick={generate} disabled={loading}
+        style={{padding:"14px 30px",background:G.gold,color:"#000",border:"none",borderRadius:12,
+          fontSize:14,fontWeight:800,cursor:loading?"default":"pointer",fontFamily:"inherit",
+          opacity:loading?0.6:1}}>
+        {loading?"Designing your challenge…":"Get this week's challenge"}
+      </button>
+    </div>
+  );
+
+  const c = data.challenge||{};
+  const done = data.status==="done";
+
+  return (
+    <div style={{padding:"4px 0 20px"}}>
+      {/* Header + clock */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14}}>
+        <span style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".12em",color:G.dimmer}}>
+          THIS WEEK'S CHALLENGE
+        </span>
+        {done ? (
+          <span style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",padding:"4px 9px",
+            borderRadius:20,background:"rgba(76,175,125,0.12)",border:"1px solid rgba(76,175,125,0.4)",
+            color:"#4caf7d"}}>COMPLETE</span>
+        ) : clock}
+      </div>
+
+      {/* The challenge itself — one thing, stated plainly */}
+      <div style={{background:done?"rgba(76,175,125,0.06)":"linear-gradient(135deg,rgba(240,180,41,0.07),transparent 65%)",
+        border:"1px solid "+(done?"rgba(76,175,125,0.3)":"rgba(240,180,41,0.3)"),
+        borderRadius:18,padding:"22px 20px",marginBottom:16}}>
+        <div style={{fontSize:19,fontWeight:800,color:G.cream,lineHeight:1.4,marginBottom:c.why?10:0}}>
+          {done&&"✅ "}{c.challenge}
+        </div>
+        {c.why&&<div style={{fontSize:13,color:G.dim,lineHeight:1.7}}>{c.why}</div>}
+      </div>
+
+      {/* Rules */}
+      {Array.isArray(c.rules)&&c.rules.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".12em",color:G.dimmer,marginBottom:9}}>
+            HOW TO DO IT
+          </div>
+          {c.rules.map((r,i)=>(
+            <div key={i} style={{display:"flex",gap:11,padding:"7px 0",fontSize:13.5,
+              color:G.cream,lineHeight:1.6,alignItems:"flex-start"}}>
+              <span style={{color:G.gold,fontWeight:800,fontSize:12,flexShrink:0,marginTop:2}}>{i+1}</span>
+              <span>{r}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Success + builds */}
+      <div style={{display:"grid",gap:10,marginBottom:18}}>
+        {c.success&&(
+          <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:12,padding:"13px 15px"}}>
+            <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",color:"#4caf7d",marginBottom:5}}>SUCCESS LOOKS LIKE</div>
+            <div style={{fontSize:13,color:G.cream,lineHeight:1.6}}>{c.success}</div>
+          </div>
+        )}
+        {c.builds&&(
+          <div style={{background:G.card,border:"1px solid "+G.border,borderRadius:12,padding:"13px 15px"}}>
+            <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",color:G.dimmer,marginBottom:5}}>WHAT THIS BUILDS</div>
+            <div style={{fontSize:13,color:G.dim,lineHeight:1.6}}>{c.builds}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      {done ? (
+        <div style={{textAlign:"center",padding:"16px 12px",background:"rgba(76,175,125,0.06)",
+          border:"1px solid rgba(76,175,125,0.25)",borderRadius:14}}>
+          <div style={{fontSize:14,fontWeight:700,color:G.cream,marginBottom:5}}>You did it.</div>
+          <div style={{fontSize:12.5,color:G.dim,lineHeight:1.6}}>
+            A new challenge lands Monday. {c.bonus?"Still got appetite? Try the bonus below.":""}
+          </div>
+        </div>
+      ) : data.status==="accepted" ? (
+        <button onClick={markDone} style={{width:"100%",padding:"15px",background:G.gold,color:"#000",
+          border:"none",borderRadius:12,fontSize:14.5,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+          ✓ I did it
+        </button>
+      ) : (
+        <div style={{display:"flex",gap:9}}>
+          <button onClick={accept} style={{flex:1,padding:"15px",background:G.gold,color:"#000",
+            border:"none",borderRadius:12,fontSize:14.5,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+            I'm in
+          </button>
+          <button onClick={generate} disabled={loading} title="Different challenge"
+            style={{padding:"15px 18px",background:"none",color:G.dim,border:"1px solid "+G.border,
+              borderRadius:12,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+            ↺
+          </button>
+        </div>
+      )}
+
+      {/* Bonus — only once they're committed */}
+      {c.bonus&&data.status!=="new"&&(
+        <div style={{marginTop:16,padding:"13px 15px",background:"rgba(155,114,207,0.06)",
+          border:"1px solid rgba(155,114,207,0.25)",borderRadius:12}}>
+          <div style={{fontSize:9.5,fontFamily:"var(--f-mono)",letterSpacing:".1em",color:"#9b72cf",marginBottom:5}}>BONUS LEVEL</div>
+          <div style={{fontSize:13,color:G.dim,lineHeight:1.6}}>{c.bonus}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
+// "Settings" used to fire the same event as "Edit Profile" — two rows, one
+// modal. Meanwhile the things that ARE settings had nowhere to live:
+//   • Language — its only pickers sat inside the retired v1 nav, so users
+//     could not change language at all.
+//   • Theme — the light/dark system existed but toggleTheme() was never called
+//     from any UI.
+//   • Coach name — hidden behind a window.prompt in the chat screen.
+// They live here now.
+function SettingsModal({onClose, lang, onLangChange, userId}){
+  const {theme, setTheme} = useContext(ThemeContext);
+  const CK = `diq_coach_name_${userId||"anon"}`;
+  const [coach,setCoach] = useState(()=>{ try{ return localStorage.getItem(CK)||""; }catch{ return ""; } });
+  const saveCoach=(v)=>{
+    setCoach(v);
+    try{ v.trim() ? localStorage.setItem(CK, v.trim().slice(0,24)) : localStorage.removeItem(CK); }catch{}
+  };
+  const row={padding:"16px 0",borderBottom:"1px solid var(--cream-10)"};
+  const lbl={fontSize:13.5,fontWeight:700,color:"var(--cream)",marginBottom:4};
+  const hint={fontSize:11.5,color:"var(--cream-40)",lineHeight:1.5,marginBottom:11};
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1400,background:"rgba(0,0,0,0.72)",
+      backdropFilter:"blur(6px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"var(--card)",border:"1px solid var(--line)",
+        borderRadius:20,padding:"24px",maxWidth:420,width:"100%",boxSizing:"border-box",
+        maxHeight:"86vh",overflowY:"auto"}}>
+        <div style={{fontSize:19,fontWeight:800,color:"var(--cream)",marginBottom:18}}>Settings</div>
+
+        {/* Language */}
+        <div style={row}>
+          <div style={lbl}>Language</div>
+          <div style={hint}>Your reports, coach and tools respond in this language.</div>
+          <LanguageSelector lang={lang||"en"} onChange={(code)=>onLangChange?.(code)}/>
+        </div>
+
+        {/* Theme */}
+        <div style={row}>
+          <div style={lbl}>Appearance</div>
+          <div style={hint}>Dark is the default. Light is easier in bright daylight.</div>
+          <div style={{display:"flex",gap:8}}>
+            {[{k:"dark",t:"🌙 Dark"},{k:"light",t:"☀️ Light"}].map(o=>(
+              <button key={o.k} onClick={()=>setTheme(o.k)}
+                style={{flex:1,padding:"10px",borderRadius:10,cursor:"pointer",fontFamily:"inherit",
+                  fontSize:12.5,fontWeight:700,
+                  background: theme===o.k ? "rgba(240,180,41,0.14)" : "transparent",
+                  border: "1px solid "+(theme===o.k ? "rgba(240,180,41,0.5)" : "var(--cream-15)"),
+                  color: theme===o.k ? "var(--gold)" : "var(--cream-50)"}}>
+                {o.t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Coach name */}
+        <div style={{...row,borderBottom:"none"}}>
+          <div style={lbl}>Your coach's name</div>
+          <div style={hint}>Give them a name and they'll answer to it. Leave blank for "AI Coach".</div>
+          <input value={coach} onChange={e=>saveCoach(e.target.value)} maxLength={24}
+            placeholder="AI Coach"
+            style={{width:"100%",boxSizing:"border-box",background:"var(--inp,rgba(255,255,255,0.04))",
+              border:"1px solid var(--line)",borderRadius:10,padding:"11px 13px",color:"var(--cream)",
+              fontSize:13.5,fontFamily:"inherit"}}/>
+        </div>
+
+        <button onClick={onClose} style={{width:"100%",padding:"13px",background:"var(--gold)",
+          color:"#000",border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",
+          fontFamily:"inherit",marginTop:18}}>Done</button>
+      </div>
+    </div>
+  );
+}
+
 // ── STORY PROMPT — asks once, at the moment they're actually proud ───────────
 // A "share your story" button buried in settings gets ignored. This appears on
 // Home only after a real 7-day streak, can be dismissed forever, and never
@@ -20225,8 +20570,9 @@ function TestimonialForm({userId, formData, onClose}){
   );
 }
 
-function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,onSignOut,onManageSubscription,setNav,navPhotoURL,onEditProfile}){
+function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,onSignOut,onManageSubscription,setNav,navPhotoURL,onEditProfile,lang,onLangChange}){
   const [showTesti,setShowTesti]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
   const name    = formData?.name||user?.name||(user?.email?.split("@")[0])||"User";
   const email   = user?.email||"";
   const initial = (name[0]||"U").toUpperCase();
@@ -20275,12 +20621,14 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
   const G={...useThemeColors()};
 
   const menuItems=[
+    // "Edit Profile" = your answers (name, country, goals). "Settings" = how the
+    // app behaves (language, theme, coach name). They used to fire the SAME
+    // event, and "Report History" pointed at the same screen as "Saved Reports".
     {icon:"✏️",label:"Edit Profile",    action:()=>onEditProfile?.()},
     {icon:"⚡",label:"My Practices",    action:()=>setNav("practices")},
     {icon:"📋",label:"Saved Reports",   action:()=>setNav("savedreports")},
-    {icon:"📈",label:"Report History",  action:()=>setNav("savedreports")},
-    {icon:"⚙️",label:"Settings",        action:()=>window.dispatchEvent(new CustomEvent("showEditProfile"))},
-    {icon:"❓",label:"Help & Support",  action:()=>window.open("mailto:support@destiniq.app")},
+    {icon:"⚙️",label:"Settings",        action:()=>setShowSettings(true)},
+    {icon:"❓",label:"Help & Support",  action:()=>{ try{ window.dispatchEvent(new CustomEvent("diqOpenSupport")); }catch{} }},
   ];
 
   return(
@@ -20409,6 +20757,7 @@ function DashboardProfileView({user,formData,isPaid,isPremium,isProMax,streak,on
           💬 Share your story
         </button>
         {showTesti&&<TestimonialForm userId={user?.id} formData={formData} onClose={()=>setShowTesti(false)}/>}
+        {showSettings&&<SettingsModal userId={user?.id} lang={lang} onLangChange={onLangChange} onClose={()=>setShowSettings(false)}/>}
         <button onClick={onSignOut}
           style={{width:"100%",padding:"15px",background:"transparent",color:"#e05252",
             border:"1px solid rgba(224,82,82,0.2)",borderRadius:12,fontSize:14,
@@ -22077,18 +22426,26 @@ Rules:
   );
 
 
-  // ── EXPLORE: full-page standalone ──────────────────────────────────────────
+  // ── EXPLORE ─────────────────────────────────────────────────────────────────
+  // Explore used to early-return WITHOUT the app shell, so on desktop it threw
+  // away the sidebar and showed a mobile-style hamburger bar instead — one page
+  // that looked like a different app. Now it lives in the same shell as every
+  // other section. Mobile is unaffected: .sidebar is display:none below 901px
+  // and .main-area has no margin there.
   if(navSection==="explore"){
     return(
-      <>
-        {streakCelebration&&<StreakCelebration streak={streakCelebration} isPaid={isPaid} onClose={()=>setStreakCelebration(null)}/>}
-        {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
-        <ExploreScreen
-          setNav={setNav} formData={formData} userId={userId}
-          isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
-          onUnlock={onUnlock} streak={streak} navPhotoURL={navPhotoURL}
-        />
-      </>
+      <div className="app-shell">
+        <SidebarNav nav={navSection} setNav={setNav} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak} onUnlock={onUnlock} formData={formData} navPhotoURL={navPhotoURL} onNotif={()=>window.dispatchEvent(new CustomEvent("showNotif"))}/>
+        <div className="main-area">
+          {streakCelebration&&<StreakCelebration streak={streakCelebration} isPaid={isPaid} onClose={()=>setStreakCelebration(null)}/>}
+          {miniStreak&&<MiniStreakCelebration streak={miniStreak} onClose={()=>setMiniStreak(null)}/>}
+          <ExploreScreen
+            setNav={setNav} formData={formData} userId={userId}
+            isPaid={isPaid} isPremium={isPremium} isProMax={isProMax}
+            onUnlock={onUnlock} streak={streak} navPhotoURL={navPhotoURL}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -22213,6 +22570,7 @@ Rules:
         })()}
         {navSection==="profile"&&(
           <DashboardProfileView
+            lang={lang} onLangChange={(code)=>window.dispatchEvent(new CustomEvent("diqSetLang",{detail:code}))}
             user={{id:userId,email:formData?.email||""}}
             formData={formData} isPaid={isPaid} isPremium={isPremium} isProMax={isProMax} streak={streak}
             navPhotoURL={navPhotoURL}
@@ -23385,7 +23743,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v24-stories"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v33-tabs"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -24003,7 +24361,24 @@ function DestinIQInner(){
   const [isPaid,    setIsPaid   ]=useState(false);
   const [isPremium, setIsPremium]=useState(false);
   const [isProMax,  setIsProMax ]=useState(false);
-  const [lang, setLang] = useState(()=>{ try{return localStorage.getItem("diq_lang")||"en";}catch{return "en";} });
+  const [lang, setLang] = useState(()=>{ try{return localStorage.getItem("diq_lang")||"en";} catch{return "en";} });
+  // The Settings modal (deep in the Dashboard tree) changes language through
+  // this bridge. Mirrors exactly what the old nav's selector did, including
+  // RTL handling — that selector now only exists inside the retired v1 nav,
+  // so without this the app had no reachable way to change language at all.
+  useEffect(()=>{
+    const h=(e)=>{
+      const code=e?.detail; if(!code) return;
+      setLang(code);
+      try{ localStorage.setItem("diq_lang",code); }catch{}
+      try{
+        document.documentElement.dir = ["ar","ur","fa","he"].includes(code)?"rtl":"ltr";
+        document.documentElement.lang = code;
+      }catch{}
+    };
+    window.addEventListener("diqSetLang",h);
+    return()=>window.removeEventListener("diqSetLang",h);
+  },[]);
   const tl = (key) => t(lang, key);
   useEffect(()=>{
     document.documentElement.dir  = lang==="ar"?"rtl":"ltr";
