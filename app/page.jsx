@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -10522,76 +10522,11 @@ WHAT THIS BUILDS: The specific capability or confidence this challenge develops
 BONUS LEVEL: A harder version for if they complete the main challenge
 Make it feel like a personal trainer designed this specifically for them. Not a generic "talk to a stranger" challenge.`,
   },
-  money:{
-    title:"Money Intelligence",icon:"💰",subtitle:"Build wealth with clarity",
-    prompt:(p)=>`You are DestinIQ, a financial intelligence coach. Generate a personalized money intelligence report for ${p.name||"this user"} (${p.age}, ${p.country}).
-Their situation: ${p.goals||p.bigGoal}. Income level: ${p.income||"not specified"}.
-Create a structured report with:
-1. Their Current Financial Reality (honest assessment)
-2. The #1 Money Mindset Shift They Need
-3. Three specific income or saving strategies tailored to ${p.country}
-4. A 30-day money action plan
-Use ${p.currencySymbol||"$"} for all amounts. Be specific, actionable, and encouraging.`,
-  },
-  earnonline:{
-    title:"Online Income Builder",icon:"🌐",subtitle:"Create income from the internet",
-    prompt:(p)=>`You are DestinIQ. Create a personalized online income plan for ${p.name||"this user"} in ${p.country}.
-Their skills: ${p.skills||"general skills"}. Goal: ${p.goals||p.bigGoal}.
-Provide: Top 3 online income opportunities for their profile, step-by-step starter plan for the best option, realistic income timeline, and first action to take today.`,
-  },
-  business:{
-    title:"Business Builder",icon:"🏢",subtitle:"Launch and grow your business",
-    prompt:(p)=>`You are DestinIQ. Create a personalized business strategy for ${p.name||"this user"} in ${p.country}.
-Their background: ${p.career||p.occupation||"not specified"}. Goal: ${p.goals||p.bigGoal}.
-Cover: Best business model for their profile, ${p.country}-specific startup considerations, a lean launch plan with budget in ${p.currencySymbol||"$"}, and first 3 action steps.`,
-  },
   lifehacks:{
     title:"Life Hacks",icon:"⚡",subtitle:"Shortcuts to a better life",
     prompt:(p)=>`You are DestinIQ. Generate 10 powerful, personalized life hacks for ${p.name||"this user"} based on their profile.
 Their biggest blockers: ${p.challenge||"not specified"}. Goal: ${p.goals||p.bigGoal}.
 Each hack should be: practical, immediately actionable, and specific to their situation. Focus on time, energy, money, and relationships.`,
-  },
-  jimrohn:{
-    title:"Jim Rohn Wisdom",icon:"📚",subtitle:"Classic success principles",
-    prompt:(p)=>`You are DestinIQ applying Jim Rohn's philosophy. Give ${p.name||"this user"} a personalized wisdom session.
-Their situation: ${p.goals||p.bigGoal}. Challenges: ${p.challenge||"not specified"}.
-Draw from Jim Rohn's principles: personal development, discipline, philosophy of failure, seasons of life, and financial independence. Apply each principle directly to their current situation.`,
-  },
-  mindsettenx:{
-    title:"10X Mindset",icon:"🚀",subtitle:"Think and grow 10 times bigger",
-    prompt:(p)=>`You are DestinIQ applying 10X thinking. Help ${p.name||"this user"} break their mental ceiling.
-Current thinking: ${p.goals||p.bigGoal}. Blockers: ${p.challenge||"not specified"}.
-Create: A 10X vision of their life in 5 years, the mindset shifts required, the ONE biggest fear holding them back, and a 10X action plan for the next 90 days.`,
-  },
-  success:{
-    title:"Success Psychology",icon:"🏆",subtitle:"The psychology of high achievers",
-    prompt:(p)=>`You are DestinIQ, a success psychology coach. Analyse ${p.name||"this user"}'s success potential.
-Their ambition: ${p.goals||p.bigGoal}. Current challenges: ${p.challenge||"not specified"}.
-Provide: Their success personality type, the psychological patterns blocking them, success habits of people with their profile, and a 21-day success psychology practice.`,
-  },
-  invest:{
-    title:"Invest in Yourself",icon:"💎",subtitle:"Your best ROI is you",
-    prompt:(p)=>`You are DestinIQ. Create a personal investment roadmap for ${p.name||"this user"}.
-Current situation: ${p.goals||p.bigGoal}. Skills: ${p.skills||"not specified"}.
-Design: Top 5 self-investments with highest ROI for their profile, a skills development plan, recommended books and resources, and a 6-month self-improvement budget in ${p.currencySymbol||"$"}.`,
-  },
-  discipline:{
-    title:"Daily Discipline",icon:"🔥",subtitle:"Build unbreakable habits",
-    prompt:(p)=>`You are DestinIQ. Build a personalised discipline system for ${p.name||"this user"}.
-Their struggle: ${p.challenge||"not specified"}. Goal: ${p.goals||p.bigGoal}.
-Create: A personalised morning routine, their 3 non-negotiable daily disciplines, strategies for their specific blockers, and a habit stacking system for their lifestyle.`,
-  },
-  career:{
-    title:"Career Intelligence",icon:"💼",subtitle:"Accelerate your career",
-    prompt:(p)=>`You are DestinIQ, a career strategy coach. Analyse the career path for ${p.name||"this user"} (${p.age}, ${p.country}).
-Current work: ${p.career||p.occupation||"not specified"}. Goal: ${p.goals||p.bigGoal}.
-Provide: Career strengths assessment, top 3 career moves to make in the next 12 months, salary negotiation strategy for ${p.country}, and skills to develop immediately.`,
-  },
-  roadmap:{
-    title:"Life Roadmap",icon:"🗺️",subtitle:"Your personalised life plan",
-    prompt:(p)=>`You are DestinIQ. Build a comprehensive life roadmap for ${p.name||"this user"} (${p.age}, ${p.country}).
-Vision: ${p.goals||p.bigGoal}. Blockers: ${p.challenge||"not specified"}.
-Create a 12-month roadmap with: Quarterly milestones, monthly focus areas, weekly action themes, and the single most important thing to do each month. Make it specific and achievable.`,
   },
   decisions:{
     title:"Decision Clarity",icon:"🎯",subtitle:"Make better decisions faster",
@@ -10674,11 +10609,6 @@ Write in flowing paragraphs. Cover: the three principles most relevant to their 
 Write in flowing paragraphs. Apply these Rohn ideas to their exact situation: work harder on yourself than on your job; you're the average of the people around you; profits are better than wages; the seasons of life. For each, one concrete application to their life this month. End with the question Rohn would ask them.`
   },
 
-  lifehacks: {
-    title:"Daily Life Hacks",icon:"✨",subtitle:"Small daily upgrades that compound",
-    prompt:(p)=>`You are DestinIQ. Write a personal daily-life optimisation report for ${p.name||"this person"} (${p.age||"adult"}, ${p.country||"their country"}, focus: ${p.focus||p.goals||"daily improvement"}).
-Write in flowing paragraphs. Cover: their ideal morning first-hour given their goals, three friction-removers for the daily annoyances that drain most people, one grooming or self-presentation upgrade with outsized impact, and an evening shutdown ritual that improves tomorrow. All practical for their country and budget.`
-  },
 
   mindsettenx: {
     title:"10X Mindset",icon:"🧠",subtitle:"Think bigger — rewire your defaults",
@@ -23746,7 +23676,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v34-buildfix"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v35-dedupe"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
