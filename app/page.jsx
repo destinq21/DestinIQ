@@ -2485,9 +2485,12 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
    The persistent 220px desktop sidebar is retired. Navigation is the hamburger
    + slide-over drawer at all sizes (the pattern Explore already used), so the
    content always gets the whole viewport.
-   This also closes an old dead zone: between 901–1024px the sidebar was hidden
-   AND `.mob-top` was killed by an !important AND `.bot-nav` was hidden, which
-   left that window with no navigation at all. */
+   This also closes an old dead zone: between 901-1024px the sidebar was hidden
+   AND .mob-top was killed by an !important AND .bot-nav was hidden, which
+   left that window with no navigation at all.
+   NOTE: never use backticks in here - this whole CSS block lives inside a JS
+   template literal, so a backtick ends the string and the rest gets parsed as
+   code (that is exactly how this file once broke with "top is not defined"). */
 .sidebar{display:none!important;width:0!important;}
 .main-area{margin-left:0!important;width:100%!important;max-width:100vw!important;}
 .mob-top{display:flex;}
@@ -23743,7 +23746,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v33-tabs"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v34-buildfix"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
