@@ -1760,12 +1760,6 @@ function updatePeakDays(userId, currentScore){
     }
   }catch{ return 0; }
 }
-function getPeakDays(userId){
-  try{
-    const raw=JSON.parse(localStorage.getItem(`diq_peak_${userId}`)||"null");
-    return raw?.days || 0;
-  }catch{ return 0; }
-}
 
 const NOTIF_SCHED_KEY="destiniq_notif_v2";
 
@@ -2510,12 +2504,6 @@ body{background:var(--void);color:var(--cream);font-family:var(--f-body);font-si
 // ═══════════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════════
 const FEELINGS=["Motivated","Anxious","Stuck","Focused","Overwhelmed","Hopeful","Drained","Confident","Uncertain","Restless"];
-const PILLARS=[
-  {id:"life",      label:"Life", color:"#d2af5a"},
-  {id:"wealth",    label:"Wealth", color:"#1fa89a"},
-  {id:"mindset",   label:"Mindset",        color:"#9b72cf"},
-  {id:"relations", label:"Relationships",  color:"#c4645a"},
-];
 // Tabs grouped by category — rendered as a single scrollable row
 // but with a thin category label above each group for orientation
 
@@ -4121,8 +4109,8 @@ const TOPIC_CONFIGS = {
     topics: [
       {
         id:"lifehacks", label:"Daily Life Hacks", icon:"✨",
-        desc:"The small daily habits for hair, teeth, skin, wake-up and grooming that make a visible difference fast.",
-        tags:["All","Morning","Hair","Teeth","Skin","Grooming"],
+        desc:"Small, specific hacks that actually work — money, focus, mornings, and grooming. The kind you'll actually use.",
+        tags:["All","Money","Focus","Morning","Hair","Teeth","Skin","Grooming"],
         cards:[
           {
             id:"wakeupright", title:"How To Wake Up Right", badge:"Do This Daily", badgeColor:"#f0b429",
@@ -4133,11 +4121,43 @@ const TOPIC_CONFIGS = {
             actions:["Build My Morning Routine","Generate My First 30 Days","Calculate How Much Time I'd Gain","Create My Evening Prep Routine"],
           },
           {
+            id:"tenpercentrule", title:"The 10% Rule That Builds Wealth", badge:"Money", badgeColor:"#c8a84b",
+            tags:["Money"],
+            tagline:"The single habit that separates people who build wealth from people who don't — and it has nothing to do with how much you earn",
+            whyItWorks:"Money you don't see, you don't spend. People who save consistently don't have more discipline — they've removed the decision entirely by moving money before it's in reach. The amount matters far less than the automatic habit.",
+            steps:["The DAY money hits your account — salary, sale, anything — move 10% out immediately, before you spend a single cedi","Move it somewhere you don't carry a card for: a separate account, a fixed deposit, a susu collector, mobile money you've mentally 'locked'","Can't do 10%? Start at 5%, or even 2%. The habit matters more than the amount at first","Automate it if your bank allows — a standing order the day after payday removes willpower from the equation","Never touch it for wants. This is your foundation, not your emergency fund and not your fun money"],
+            actions:["Build My Savings System","Calculate My 10% Over 12 Months","Find Where To Keep It Safe In My Country","Generate My Money Plan"],
+          },
+          {
+            id:"momoleak", title:"Find The Leak Quietly Draining You", badge:"Money", badgeColor:"#c8a84b",
+            tags:["Money"],
+            tagline:"Most people lose more to small invisible costs than to any big expense — and never notice because each one feels too tiny to matter",
+            whyItWorks:"A GH₵2 fee here, a subscription you forgot there, daily small buys — individually invisible, together they're often a chunk of your income every month. You can't fix a leak you can't see, so the fix starts with looking.",
+            steps:["Write down every single thing you spent for the last 3 days — every fee, snack, top-up, transfer charge. All of it","Look for the repeat small ones: mobile money transfer fees, daily snacks, unused subscriptions, 'just this once' buys that happen daily","Add up one repeating cost across a full month — a GH₵5 daily habit is GH₵150/month, GH₵1,800/year","Kill or shrink the top 2 leaks: batch mobile money transfers to cut fees, cancel what you forgot you pay for","Redirect that exact amount into your 10% savings — a plugged leak that becomes savings is a double win"],
+            actions:["Audit My Spending","Calculate My Monthly Leaks","Build My Budget Around This","Find My Biggest Money Leak"],
+          },
+          {
+            id:"twominuterule", title:"The 2-Minute Rule Beats Procrastination", badge:"Focus", badgeColor:"#9b72cf",
+            tags:["Focus"],
+            tagline:"The reason you procrastinate isn't laziness — it's that the task feels too big to start. So you shrink the start, not the task",
+            whyItWorks:"Starting is the hardest part; motion creates motivation, not the other way around. Once you're two minutes in, continuing is far easier than starting was. You trick the resistance by making the entry point almost too small to refuse.",
+            steps:["Take the thing you're avoiding and define a 2-minute version of just STARTING it. Not finishing — starting","'Write the report' becomes 'open the doc and write one ugly sentence.' 'Go to the gym' becomes 'put on my shoes'","Commit to only the 2 minutes. Genuinely give yourself permission to stop after","You'll almost always keep going — because the wall was starting, and you're now past it","On days you do stop after 2 minutes, that's still a win. You showed up, and showing up is the habit"],
+            actions:["Build My Anti-Procrastination System","Pick My One Task Today","Generate My Focus Routine","Break Down What I'm Avoiding"],
+          },
+          {
+            id:"phonefirsthour", title:"Protect The First Hour From Your Phone", badge:"Focus", badgeColor:"#9b72cf",
+            tags:["Focus","Morning"],
+            tagline:"How you spend the first hour awake sets the tone for the whole day — and most people hand it straight to everyone else",
+            whyItWorks:"The moment you open your phone, you've traded your own priorities for everyone else's — notifications, other people's demands, algorithm-picked anxiety. Guarding that first hour means the day starts on YOUR agenda, not a stranger's.",
+            steps:["Charge your phone across the room or in another room overnight — so reaching it takes real effort","When you wake, do not open messages, social media, or email for the first hour","Use that hour for something that's yours: your plan for the day, a walk, prayer, water, one real task","If you use your phone as an alarm, turn it off and put it face-down immediately — don't 'just check'","Notice how different the day feels when it starts with your intentions instead of other people's noise"],
+            actions:["Build My Morning Routine","Generate My First 30 Days","Create My Phone Boundaries","Design My Ideal Morning"],
+          },
+          {
             id:"teethhacks", title:"Teeth Hacks That Actually Work", badge:"Quick Wins", badgeColor:"#e8dcc8",
             tags:["Teeth"],
             tagline:"Small daily habits that visibly change your teeth in under 30 days",
             whyItWorks:"Most tooth problems (staining, sensitivity, decay) are preventable with the right sequence. Most people brush incorrectly, at the wrong time, with the wrong technique. These require zero extra products.",
-            steps:["Wait 30 minutes after eating before brushing — brushing immediately after acidic food strips enamel","Brush in small circles, not back-and-forth — back-and-forth damages gum line over time","Brush your tongue every time — 90% of bad breath comes from the tongue, not the teeth","Floss before brushing — loosens debris so brushing removes it","Oil pulling: 1 tsp coconut oil for 5-10 minutes before brushing 3x/week — whitens naturally","Drink water immediately after coffee/tea — reduces staining significantly","Use a straw for coffee, juice, acidic drinks — bypasses front teeth"],
+            steps:["After acidic food or drink (citrus, soda, coffee), wait 30 min before brushing — brushing right away can wear softened enamel. After normal meals it's fine","Brush in small circles, not back-and-forth — back-and-forth damages gum line over time","Brush your tongue every time — 90% of bad breath comes from the tongue, not the teeth","Floss before brushing — loosens debris so brushing removes it","Oil pulling: swish 1 tsp coconut oil 5-10 min before brushing — may reduce bacteria and freshen breath (it won't whiten, despite the hype)","Drink water immediately after coffee/tea — reduces staining significantly","Use a straw for coffee, juice, acidic drinks — bypasses front teeth"],
             actions:["Build My Daily Teeth Routine","Generate My 30-Day Whitening Plan","Find Affordable Dental Care In My Country","Calculate My Oral Health Score"],
           },
           {
@@ -4153,7 +4173,7 @@ const TOPIC_CONFIGS = {
             tags:["Skin"],
             tagline:"The 5-step daily routine that visibly changes skin in 3 weeks",
             whyItWorks:"Clear skin is mostly diet and consistency, not expensive products. People with consistently good skin follow a simple, consistent sequence — not 12-step routines.",
-            steps:["Morning: gentle cleanser → moisturizer with SPF (non-negotiable, even indoors) → done","Evening: double cleanse (oil cleanser first, then water-based) → moisturizer","Drink 2-3 litres of water daily — dehydration shows on the face first","Cut sugar for 2 weeks — sugar causes glycation which ages skin visibly","Change pillowcase every 3-4 days — your face rests there 8 hours, buildup transfers directly","Never sleep with makeup on — even once breaks down collagen over time","Touch your face less — hands transfer bacteria every single time"],
+            steps:["Morning: gentle cleanser → moisturizer with SPF (non-negotiable, even indoors) → done","Evening: double cleanse (oil cleanser first, then water-based) → moisturizer","Drink 2-3 litres of water daily — dehydration shows on the face first","Cut back on sugar — over time high sugar drives glycation, which stiffens skin's collagen. Not overnight, but it adds up","Change pillowcase every 3-4 days — your face rests there 8 hours, buildup transfers directly","Never sleep with makeup on — even once breaks down collagen over time","Touch your face less — hands transfer bacteria every single time"],
             actions:["Build My Morning + Evening Skin Routine","Find Affordable Products In My Country","Generate My 30-Day Clear Skin Plan","Identify My Skin Type"],
           },
           {
@@ -4815,7 +4835,6 @@ const TOPIC_CONFIGS = {
     ],
   },
 };
-function getGreeting(){const h=new Date().getHours();return h<12?"Good morning":h<17?"Good afternoon":"Good evening";}
 const MODULE_GROUPS=[
   {
     group:"Your Dashboard",
@@ -4928,7 +4947,6 @@ const MODULE_GROUPS=[
   },
 ];
 // Flat list kept for backward compatibility (tab persistence, etc.)
-const MODULES = MODULE_GROUPS.flatMap(g=>g.items);
 const LOADING_PHRASES=["Reading what you shared…","Thinking about your situation…","Writing your roadmap…","Looking at what's really possible for you…","Almost there…","One moment more…"];
 
 function urlBase64ToUint8Array(base64String){
@@ -5550,8 +5568,15 @@ function buildAnalysisPrompt(f,isPremium,memCtx,ipLocation,localContext){
 COSTS/SAVINGS/STARTUP = LOCAL CURRENCY ONLY: ${country} uses ${currCode} (${currSym}). Write ALL prices, rents, costs in ${currSym}. NEVER use $ for costs in ${country}.
 EARNINGS FROM ONLINE WORK = USD. Earnings on Upwork/Fiverr/remote = USD, add local equivalent in brackets e.g. "$500 (${currSym}3,500/month)".`;
 
-  return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
+  // ── Goal & origin intelligence — richer context for the AI. These were built
+  // but never connected: detectGoalContext ran only for scoring, and the deep
+  // goal/origin blocks never reached the prompt. Now they do. ──
+  const goalCtx = detectGoalContext(f);
+  const goalBlock = buildGoalContext(f, goalCtx) || "";
+  const originBlock = buildOriginFacts(f) || "";
 
+  return `Today is ${today}. You are writing a deeply personal, brutally honest, genuinely useful life report for ONE specific person. Not a template. Not generic. Everything below must feel like it was written by someone who spent 2 hours studying this person's situation.
+${goalBlock ? "\n"+goalBlock+"\n" : ""}${originBlock ? "\n"+originBlock+"\n" : ""}
 PERSON:
 - Name: ${name}, Age: ${ageNum}, Location: ${loc}
 - Current situation: ${situation}${f.career?`, specifically: ${f.career}`:""}
@@ -10524,9 +10549,18 @@ Make it feel like a personal trainer designed this specifically for them. Not a 
   },
   lifehacks:{
     title:"Life Hacks",icon:"⚡",subtitle:"Shortcuts to a better life",
-    prompt:(p)=>`You are DestinIQ. Generate 10 powerful, personalized life hacks for ${p.name||"this user"} based on their profile.
-Their biggest blockers: ${p.challenge||"not specified"}. Goal: ${p.goals||p.bigGoal}.
-Each hack should be: practical, immediately actionable, and specific to their situation. Focus on time, energy, money, and relationships.`,
+    prompt:(p)=>`You are DestinIQ. Give ${p.name||"this user"} 10 genuinely useful life hacks — the kind that make someone stop and think "I'm actually going to do that."
+
+THEIR CONTEXT: from ${p.country||"their country"}, income level ${p.income||"not specified"}, goal: ${p.goals||p.bigGoal||"a better life"}, biggest challenge: ${p.challenge||"not specified"}.
+
+WHAT MAKES A GREAT HACK (follow strictly):
+- SPECIFIC and CONCRETE — a real action with a real number or trigger, not vague advice. Bad: "save money." Good: "The day money hits your account, move 10% to a separate account you don't carry a card for — before you spend a cedi."
+- TRUE. Only real, verifiable hacks. NEVER repeat viral health myths (e.g. "don't drink water after meals", "walking after eating causes colitis", "skipping breakfast ages you") — these are false. If a hack touches health or money, it must be actually correct.
+- SURPRISING or UNDERUSED — something most people don't already do. If it's obvious ("exercise more"), cut it.
+- RELEVANT to THEIR life — weight toward their goal and country. For a money goal, lean money/discipline hacks with local context (mobile money, susu, local banks). For discipline, lean habit/focus hacks.
+- LOW-EFFORT, HIGH-RETURN — small thing, big payoff.
+
+FORMAT: 10 hacks. Each: a punchy bold title (4-7 words), then 1-2 sentences on exactly how to do it and why it works. Group loosely by Money, Time & Focus, Health (accurate only), and Relationships. No filler, no padding, no obvious advice.`,
   },
   decisions:{
     title:"Decision Clarity",icon:"🎯",subtitle:"Make better decisions faster",
@@ -12510,112 +12544,6 @@ function useHabitTracker(userId){
   return { data, commit, uncommit, updateStatus, addNote, committed, mastered, active, paused, total, pct };
 }
 
-function HabitButton({itemKey, userId, compact=false}){
-  const ht = useHabitTracker(userId);
-  const item = ALL_TRACKABLE.find(t=>t.key===itemKey);
-  const entry = ht.data[itemKey];
-  const isCommitted = entry?.committed;
-  const status = entry?.status || "active";
-  const [showNote, setShowNote] = useState(false);
-  const [noteVal, setNoteVal] = useState(entry?.notes||"");
-  const [noteSaved, setNoteSaved] = useState(false);
-
-  if(!item) return null;
-
-  const STATUS_META = {
-    active:   {label:"Active",   color:"var(--teal)",  bg:"rgba(31,168,154,0.12)",  border:"rgba(31,168,154,0.3)"},
-    mastered: {label:"Mastered", color:"var(--gold)",  bg:"rgba(210,175,90,0.12)",  border:"rgba(210,175,90,0.3)"},
-    paused:   {label:"Paused",   color:"var(--cream-40)", bg:"rgba(255,255,255,0.04)", border:"rgba(255,255,255,0.1)"},
-  };
-  const sm = STATUS_META[status];
-
-  if(compact){
-    // Compact chip used in tracker overview
-    return(
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",
-        background:isCommitted?sm.bg:"rgba(255,255,255,0.03)",
-        border:`1px solid ${isCommitted?sm.border:"rgba(255,255,255,0.08)"}`,
-        borderRadius:20,cursor:"pointer",transition:"all .2s"}}
-        onClick={()=>isCommitted?ht.uncommit(itemKey):ht.commit(itemKey)}>
-        <span style={{fontSize:12}}>{isCommitted?"✓":"○"}</span>
-        <span style={{fontSize:11,color:isCommitted?sm.color:"var(--cream-30)",fontWeight:isCommitted?600:400}}>{item.icon} {item.label}</span>
-      </div>
-    );
-  }
-
-  return(
-    <div style={{marginTop:14}}>
-      {!isCommitted?(
-        <button
-          onClick={()=>{ ht.commit(itemKey); setShowNote(true); }}
-          style={{
-            width:"100%",padding:"12px 16px",
-            background:"rgba(31,168,154,0.06)",
-            border:"1px dashed rgba(31,168,154,0.35)",
-            borderRadius:12,cursor:"pointer",
-            display:"flex",alignItems:"center",gap:10,
-            transition:"all .2s",
-          }}
-          onMouseEnter={e=>{e.currentTarget.style.background="rgba(31,168,154,0.12)";e.currentTarget.style.borderStyle="solid";}}
-          onMouseLeave={e=>{e.currentTarget.style.background="rgba(31,168,154,0.06)";e.currentTarget.style.borderStyle="dashed";}}
-        >
-          <div style={{width:28,height:28,borderRadius:"50%",border:"2px dashed rgba(31,168,154,0.5)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <span style={{fontSize:14}}>+</span>
-          </div>
-          <div style={{textAlign:"left"}}>
-            <div style={{fontSize:13,fontWeight:600,color:"var(--teal)"}}>I'm doing this</div>
-            <div style={{fontSize:11,color:"var(--cream-30)",marginTop:1}}>Add to your practice tracker</div>
-          </div>
-        </button>
-      ):(
-        <div style={{background:sm.bg,border:`1px solid ${sm.border}`,borderRadius:12,padding:"12px 14px"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:showNote?10:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:24,height:24,borderRadius:"50%",background:sm.border,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <span style={{fontSize:12,color:sm.color}}>✓</span>
-              </div>
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:sm.color}}>In your practice</div>
-                {entry?.startedAt&&<div style={{fontSize:10,color:"var(--cream-30)",marginTop:1}}>
-                  Started {new Date(entry.startedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
-                </div>}
-              </div>
-            </div>
-            <div style={{display:"flex",gap:6,flexShrink:0}}>
-              {/* Status picker */}
-              <select value={status} onChange={e=>ht.updateStatus(itemKey,e.target.value)}
-                style={{background:"var(--midnight)",border:`1px solid ${sm.border}`,borderRadius:8,padding:"4px 8px",color:sm.color,fontSize:10,fontFamily:"var(--f-mono)",cursor:"pointer",outline:"none"}}>
-                <option value="active">Active</option>
-                <option value="mastered">Mastered ✦</option>
-                <option value="paused">Paused</option>
-              </select>
-              <button onClick={()=>setShowNote(n=>!n)}
-                style={{background:"var(--cream-05)",border:"1px solid var(--cream-10)",borderRadius:8,padding:"4px 8px",color:"var(--cream-40)",fontSize:10,cursor:"pointer"}}>
-                {showNote?"▲":"📝"}
-              </button>
-              <button onClick={()=>ht.uncommit(itemKey)}
-                style={{background:"none",border:"1px solid var(--cream-10)",borderRadius:8,padding:"4px 8px",color:"var(--cream-30)",fontSize:10,cursor:"pointer"}}
-                title="Remove from tracker">✕</button>
-            </div>
-          </div>
-          {showNote&&(
-            <div style={{marginTop:8}}>
-              <textarea
-                value={noteVal}
-                onChange={e=>setNoteVal(e.target.value)}
-                onBlur={()=>{ht.addNote(itemKey,noteVal);setNoteSaved(true);setTimeout(()=>setNoteSaved(false),1500);}}
-                placeholder="Add a note — how is this going? What have you noticed?"
-                rows={2}
-                style={{width:"100%",background:"rgba(0,0,0,0.2)",border:"1px solid var(--cream-10)",borderRadius:8,padding:"8px 10px",color:"var(--cream-60)",fontSize:12,resize:"none",outline:"none",lineHeight:1.6,boxSizing:"border-box",fontFamily:"inherit"}}
-              />
-              {noteSaved&&<div style={{fontSize:10,color:sm.color,marginTop:4,fontFamily:"var(--f-mono)"}}>✓ Saved</div>}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Master Progress Tracker Panel — shows all 33 items, filter by module ──────
 function HabitTrackerPanel({userId, onClose, onNavigate}){
@@ -12844,15 +12772,6 @@ function cancelSpeech(){
   }catch(e){ /* no-op: Speech API missing or unavailable */ }
 }
 
-function resolveLiveVoice(voiceRef){
-  if(typeof window==="undefined"||!window.speechSynthesis||!voiceRef) return null;
-  const live=window.speechSynthesis.getVoices();
-  // Match by name (most reliable cross-browser identifier)
-  return live.find(v=>v.name===voiceRef.name)
-      || live.find(v=>v.lang===voiceRef.lang&&!v.localService===!voiceRef.localService)
-      || live.find(v=>v.lang===voiceRef.lang)
-      || null;
-}
 
 // ── VOICE PREFERENCE — saved voice name in localStorage, used by all audio ────
 const VOICE_PREF_KEY = "diq_voice_pref";
@@ -13584,127 +13503,13 @@ function RecommendedResources({toolId, country, G}){
   );
 }
 
-function ModuleShell({title,color="var(--gold)",audioText,children,onRegen,loading,err,isPaid,onUnlock}){
-  const handleRegen=()=>{
-    if(!isPaid){ onUnlock&&onUnlock(); return; }
-    onRegen&&onRegen();
-  };
-  return(
-    <div className="card" style={{marginBottom:20}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div className="mono" style={{fontSize:"9px",color}}>{title}</div>
-          {audioText&&isPaid&&<AudioPlayer text={audioText} label="" mini={true}/>}
-        </div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          {audioText&&isPaid&&<AudioPlayer text={audioText} label="Listen"/>}
-          <button onClick={handleRegen} disabled={loading}
-            title={isPaid?"Get a new set":"Upgrade to refresh with new ideas"}
-            style={{fontSize:10,padding:"4px 10px",borderRadius:20,border:"1px solid var(--cream-15)",background:"none",color:"var(--cream-30)",cursor:"pointer",fontFamily:"var(--f-mono)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:4}}>
-            {loading?"…":isPaid?"↺ Refresh":<>🔒 Refresh</>}
-          </button>
-        </div>
-      </div>
-      {err&&<div className="err-box" style={{marginBottom:10}}>⚠ {err} <button onClick={handleRegen} style={{marginLeft:8,background:"none",border:"none",color:"var(--gold)",cursor:"pointer",fontSize:11}}>Retry</button></div>}
-      {loading&&<div style={{textAlign:"center",padding:"24px 0"}}><div style={{width:28,height:28,border:"2.5px solid rgba(255,255,255,0.08)",borderTop:"2.5px solid var(--gold)",borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 10px"}}/><p style={{fontSize:12,color:"var(--cream-30)"}}>Building your {title.toLowerCase()}…</p></div>}
-      {!loading&&children}
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // JIM ROHN FINANCIAL WISDOM
 // "Profits are better than wages. Wages make you a living. Profits make you a fortune."
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const JIM_ROHN_PRINCIPLES = [
-  {
-    id:"7030",
-    icon:"💰",
-    color:"var(--gold)",
-    title:"The 70/30 Rule — Jim Rohn's Master Money Formula",
-    quote:"Learn to live on 70% of what you make and do something important with the other 30%.",
-    body:"This is the foundation of everything Jim Rohn taught about money. It is deceptively simple and almost universally ignored. Of every dollar or cedi or naira that comes into your hands: 70% covers your life — rent, food, transport, clothing, and your cost of living. The remaining 30% is split three ways. Ten percent goes to charity or giving — not because it makes you feel good, but because generosity is a discipline that keeps you from becoming someone who hoards and fears. Ten percent goes to active capital — money you put to work through a business, a skill investment, or a learning fund. Ten percent goes to passive savings — a wealth account you never touch, that grows silently while you sleep. The key word is 'learn.' You may not be able to do this today. Start at 1%. Then 3%. Then 5%. The discipline matters more than the percentage.",
-    steps:[
-      "70% — your cost of living: rent, food, transport, utilities, phone. Track this for 30 days first.",
-      "10% — giving: church, family in need, someone who needs a meal. This is non-negotiable for Rohn.",
-      "10% — active capital: money that WORKS. A skill course. Starting your side hustle. Buying stock in a company you understand.",
-      "10% — passive savings: open a separate account. Name it 'Wealth Account'. Never withdraw from it. Ever.",
-    ],
-    application:"Whatever you earn each month, split it 70/10/10/10: 70% is your life budget. 10% goes to giving. 10% goes to a skill or micro-business. 10% gets invested — no matter how small the amounts feel at first.",
-  },
-  {
-    id:"profits",
-    icon:"📈",
-    color:"var(--teal)",
-    title:"Profits Are Better Than Wages",
-    quote:"Wages make you a living. Profits make you a fortune.",
-    body:"This was the idea that changed Jim Rohn's life at age 25, when his mentor Earl Shoaff first said it to him. A wage is what someone gives you for your time. A profit is what you earn because you created value beyond your own labor. The difference is not just financial — it is psychological. A wage-earner asks 'how much am I worth per hour?' A profit-earner asks 'how much value can I create?' Wages have a ceiling set by someone else. Profits have a ceiling set by your creativity, your market, and your execution. This does not mean quit your job tomorrow. It means start building something alongside your job — anything — that generates profit rather than just a paycheck. A small business. A skill you sell. A product. A course. Something that pays you whether you show up or not.",
-    steps:[
-      "Keep your job (wages) — it funds your life while you build your profits.",
-      "Start a micro-business alongside it — even the smallest monthly profit is the beginning of a different identity.",
-      "Reinvest every profit back into the business for the first 12 months. Do not spend what the business makes.",
-      "When profits equal 50% of your wages, you have options. That is the target.",
-    ],
-    application:"Rohn said: 'Work full-time on your job and part-time on your fortune.' Most people do it the other way around — they give their employer their best hours and their business their worst.",
-  },
-  {
-    id:"philosophy",
-    icon:"🧠",
-    color:"#9b72cf",
-    title:"Your Money Philosophy Determines Your Financial Future",
-    quote:"The philosophy of the rich versus the poor is this: the rich invest their money and spend what is left. The poor spend their money and invest what is left.",
-    body:"Jim Rohn believed that financial results were a direct consequence of financial philosophy — not income, not opportunity, not luck. Two people can earn the same salary and in 10 years be in completely different positions, because one paid themselves first and one spent first. This is not a budgeting tip. It is a statement about identity and belief. If you believe money is meant to be spent when you have it, you will always spend it. If you believe money is a tool to build with, you will always build with it. The first step is not opening a savings account — it is changing what you believe money is for.",
-    steps:[
-      "Write down your current money philosophy in one sentence — what do you actually believe money is for?",
-      "Read it back and ask: does this philosophy make people rich or keep people poor?",
-      "Decide on a new philosophy. Rohn's: 'I invest first, then live on what remains.'",
-      "Build one habit that matches the new philosophy — automate a transfer of any amount on payday. Even 2%.",
-    ],
-    application:"Rohn used to say: 'If you keep doing what you've always done, you'll keep getting what you've always got.' The philosophy changes first. The results follow.",
-  },
-  {
-    id:"amount",
-    icon:"⚡",
-    color:"var(--rose)",
-    title:"It Is Not the Amount — It Is the Habit",
-    quote:"It's not the amount that counts, it's the plan that counts. It's not what you save but that you save.",
-    body:"One of the most damaging financial beliefs is: 'I don't earn enough to save.' Jim Rohn destroyed this belief with one argument: if you cannot save out of a small income, you will not save out of ten times that income. The problem is not the amount — it is the absence of a saving habit. A person who saves even a tiny amount every month is building something more important than money: they are building the identity of someone who saves. And that identity, once real, will apply at every income level. The amount will grow as the income grows, because the habit is already there. The person who saves nothing at a small income will save nothing at a large one. The habit must be built now, at whatever level you are at.",
-    steps:[
-      "Start with any amount — even the smallest note in your wallet. The number does not matter yet.",
-      "Save it on the day you receive income — not after expenses. Before anything else.",
-      "Keep a visible record of what you've saved. Watch the number. Celebrate it.",
-      "Increase the amount by any small percentage every 3 months. 5% more than last time.",
-    ],
-    application:"'A little bit saved regularly beats a large amount saved irregularly.' Set up an automatic transfer for the day after payday — any amount. You will not miss it. You will build it.",
-  },
-  {
-    id:"seasons",
-    icon:"🌱",
-    color:"var(--teal)",
-    title:"The Seasons of Financial Life",
-    quote:"Winter always follows summer. The person who didn't prepare in summer is in serious trouble in winter.",
-    body:"Jim Rohn applied the four seasons to money. Spring is when opportunity is fresh — you are young, energy is high, income potential is growing. This is the time to plant: build skills, build businesses, build savings, build the habits that will define your financial life. Summer is when you maintain what you built in spring — not the time to relax, but to tend and guard. Fall is when you harvest — the compounding of earlier decisions begins to pay off. And then winter comes. Financial winter: a job loss, a recession, a health crisis, an unexpected expense. The question Rohn asked is: 'What did you do in the summer?' The person who saved and invested in the spring and summer survives financial winter. The person who spent everything does not.",
-    steps:[
-      "Identify your current season honestly — which one are you in?",
-      "If you are in Spring: plant aggressively. Every month without a habit is a month wasted.",
-      "If you are in Summer: guard your progress. Do not increase lifestyle faster than income.",
-      "If you are in Fall: harvest AND reinvest. Do not spend the entire harvest.",
-      "If you are in Winter: hold steady. Do not panic. Cut expenses. Survive. Spring comes.",
-    ],
-    application:"Most people never prepare for winter because they feel invincible in summer. Every financial mistake Rohn described was made by people who thought summer would last forever.",
-  },
-];
 
-const JIM_ROHN_BOOKS = [
-  {label:"The Art of Exceptional Living — Jim Rohn (audiobook)",url:"https://www.amazon.com/Art-Exceptional-Living-Jim-Rohn/dp/B00005A5ZB",emoji:"📖"},
-  {label:"7 Strategies for Wealth & Happiness — Jim Rohn",url:"https://www.amazon.com/Strategies-Wealth-Happiness-Jim-Rohn/dp/0761511148",emoji:"📖"},
-  {label:"Leading an Inspired Life — Jim Rohn",url:"https://www.amazon.com/Leading-Inspired-Life-Jim-Rohn/dp/0940685221",emoji:"📖"},
-  {label:"Jim Rohn — The Day That Turns Your Life Around (YouTube, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+the+day+that+turns+your+life+around",emoji:"🎧"},
-  {label:"Jim Rohn — How to Have Your Best Year Ever (YouTube, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+best+year+ever+full+seminar",emoji:"🎧"},
-  {label:"Jim Rohn — Building Your Network Marketing Business (full, free)",url:"https://www.youtube.com/results?search_query=jim+rohn+building+your+network+marketing+business+full",emoji:"🎧"},
-  {label:"The Seasons of Life (PDF summary) — Jim Rohn",url:"https://www.jimrohn.com",emoji:"🌐"},
-];
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // JIM ROHN TAB — Dedicated full-page financial wisdom section
@@ -14851,164 +14656,6 @@ function PracticesView({userId}){
   );
 }
 
-const DISCIPLINE_SECTIONS=[
-  {
-    id:"wakeup",
-    icon:"⏰",
-    color:"var(--gold)",
-    title:"When to Wake Up — And Why It Actually Matters",
-    wakeTime:"5:30 AM – 6:00 AM",
-    subtitle:"The first hour of your day is the most uncontested hour you will ever have. Don't waste it.",
-    body:"The most productive people in the world — builders, athletes, writers, founders — protect their mornings aggressively. Not because waking up early is a personality trait, but because the first 60–90 minutes before the world needs you are the only time your mind is fully yours. No notifications. No one asking things of you. No decisions that belong to other people. That window is where real progress is built.",
-    breakdown:[
-      {time:"5:30 AM", label:"Wake up", detail:"No snooze. Get up immediately. The first decision of the day sets the tone for every decision that follows. Snoozing is practice for giving up."},
-      {time:"5:30 – 5:45 AM", label:"Hydrate + no phone", detail:"Drink water before anything else. Your brain is dehydrated after sleep. Do not touch your phone — looking at notifications first thing hands control of your morning to everyone else."},
-      {time:"5:45 – 6:15 AM", label:"Move your body", detail:"30 minutes of movement — a walk, a run, a workout, stretching. This is not about fitness. It raises your cortisol (the focus hormone) to its natural peak and sets your cognitive baseline for the day."},
-      {time:"6:15 – 6:30 AM", label:"Review your day's one goal", detail:"Not your to-do list. One goal. What is the single most important thing you need to move forward today? Write it down. Say it out loud if you need to. This is your anchor."},
-      {time:"6:30 – 8:00 AM", label:"Deep work — no interruptions", detail:"This is your most cognitively powerful window. No calls, no social media, no WhatsApp. Work on the thing that matters most. This block alone, done consistently, changes your life within 90 days."},
-    ],
-    truth:"Most people start their day reactively — checking their phone, responding to others, watching content. You are giving the first and best hours of your brain to other people's agendas. The person who owns their morning owns their life.",
-    links:[
-      {label:"The Miracle Morning by Hal Elrod",url:"https://www.amazon.com/Miracle-Morning-Not-So-Obvious-Guaranteed-Transform/dp/0979019710",type:"book"},
-      {label:"My Morning Routine — routines from top performers",url:"https://mymorningroutine.com",type:"resource"},
-      {label:"5 AM Club by Robin Sharma",url:"https://www.amazon.com/AM-Club-Morning-Elevate-Life/dp/1443456624",type:"book"},
-      {label:"Huberman Lab — morning routine science",url:"https://www.hubermanlab.com/episode/master-your-sleep-and-be-more-alert-when-awake",type:"resource"},
-    ],
-  },
-  {
-    id:"routine",
-    icon:"🔁",
-    color:"var(--teal)",
-    title:"Build a Routine That Actually Sticks",
-    subtitle:"Your routine is the architecture of your discipline. Design it once, execute it forever.",
-    body:"A routine is not a rigid schedule. It is a sequence of defaults — a series of decisions you made once so you don't have to make them again every day. The more decisions you automate with routine, the more cognitive energy you have for the work that actually matters. Most people fail at routines not because they lack willpower, but because they designed a routine that requires willpower to execute. The goal is a routine that feels like friction NOT to do.",
-    blocks:[
-      {label:"Morning Block (5:30–8:30 AM)", items:["Wake, hydrate, no phone","30 min movement","1 goal review","90 min deep work on your most important task"]},
-      {label:"Work Block (9 AM–1 PM)", items:["Focused execution on your main goal","No social media — use Freedom or Cold Turkey to block","Check messages only at 9 AM, 12 PM, 5 PM","1 short break at 11 AM (10 mins, walk outside)"]},
-      {label:"Recovery Block (1–3 PM)", items:["Lunch — real food, not junk, it affects your 3 PM energy","10–20 min nap or rest if needed (optional but powerful)","Light tasks, admin, messages in this window"]},
-      {label:"Evening Block (6–9 PM)", items:["Exercise if you didn't in the morning","Learning — read, watch something that builds a skill, not entertainment","Review: what did I do today? What moves tomorrow?","Wind down: no screens after 9:30 PM"]},
-      {label:"Sleep (10–10:30 PM)", items:["Same time every night — this is not optional","Dark, cool room","No phone in the bedroom","You are programming your body's clock. Inconsistency breaks it."]},
-    ],
-    truth:"The routine is not the destination. It is the container that holds your discipline when motivation is gone. And motivation will always go.",
-    links:[
-      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
-      {label:"Freedom — block sites during work blocks",url:"https://freedom.to",type:"tool"},
-      {label:"Notion daily planner template (free)",url:"https://www.notion.so/templates/daily-planner",type:"tool"},
-      {label:"Structured — visual daily planner app",url:"https://structured.app",type:"tool"},
-    ],
-  },
-  {
-    id:"consistency",
-    icon:"📅",
-    color:"#9b72cf",
-    title:"Stay Consistent When Motivation Disappears",
-    subtitle:"Motivation is a feeling. Discipline is a decision. Feelings come and go. Decisions hold.",
-    body:"Here is what nobody tells you about consistency: you will not feel motivated most of the time. The people you follow online who look disciplined are not motivated every day — they built systems that run even when they feel nothing. The difference between the person who makes it and the person who almost made it is almost never talent. It is the ability to show up on the days when showing up feels pointless.",
-    rules:[
-      {rule:"Never miss twice", detail:"Miss one day — fine, life happens. Miss two days in a row and you are no longer breaking a streak, you are building a new habit of not showing up. One miss is an exception. Two misses is a pattern. Never let the pattern start."},
-      {rule:"Lower the bar on hard days", detail:"Your routine on a hard day does not have to be your routine on a great day. On the days when you can't do everything, do the smallest version. 10 minutes of exercise instead of 45. One paragraph instead of a chapter. Something always beats nothing."},
-      {rule:"Track it visibly", detail:"The moment you can see your streak — physically, on a wall, in an app, in a journal — breaking it becomes painful in a way that keeps you honest. What gets measured gets protected. That's why DestinIQ shows your streak every single day."},
-      {rule:"Remove the decision", detail:"Every day you have to decide whether to start your routine, you will sometimes decide no. Automate the start: set an alarm, lay out your workout clothes, open your notes app before bed. Make starting require zero decisions."},
-      {rule:"Find your why in 10 seconds", detail:"When you don't want to start, give yourself 10 seconds to remember one specific, personal reason you started. Not an abstract goal — a real image. The life you want. The person you're building. Hold it for 10 seconds, then begin."},
-    ],
-    truth:"Every day you show up when you don't feel like it, you are building the mental proof that you are someone who doesn't quit. That proof is more valuable than any single session.",
-    links:[
-      {label:"Can't Hurt Me by David Goggins",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287",type:"book"},
-      {label:"The Compound Effect by Darren Hardy",url:"https://www.amazon.com/Compound-Effect-Darren-Hardy/dp/159315724X",type:"book"},
-      {label:"Streaks — habit tracking app",url:"https://streaksapp.com",type:"tool"},
-      {label:"Habitica — gamify your habits",url:"https://habitica.com",type:"tool"},
-    ],
-  },
-  {
-    id:"focus",
-    icon:"🎯",
-    color:"var(--rose)",
-    title:"How to Stay Focused When Everything Distracts You",
-    subtitle:"Focus is not a personality trait. It is an environment design problem.",
-    body:"If you have to rely on willpower to stay focused, you will lose. Your phone was designed by some of the smartest engineers in the world to be more compelling than your goals. You cannot out-discipline a device built to prevent you from doing exactly that. The solution is not more discipline — it is fewer choices. Remove the distraction from reach before the work session starts. What you cannot see, you will not reach for.",
-    tactics:[
-      {tactic:"The 90-minute block", detail:"Work on one thing for 90 minutes with zero interruptions. Phone in another room (not face down — in another room). Notifications off. This one practice, done 5 days a week, puts you in the top 5% of productive people on Earth. Most people never achieve 90 uninterrupted minutes in a full working day."},
-      {tactic:"Grayscale your phone", detail:"Go to Settings → Accessibility → Display → Color Filters → Grayscale. A grey screen is significantly less addictive than a colorful one. Instagram and TikTok without color lose 40% of their pull. Try it for one week and you will not turn it back."},
-      {tactic:"No phone in the first 60 minutes", detail:"The most common version of this instruction is ignored because people don't understand why. Here is why: the moment you check your phone, your brain switches from creative/strategic mode into reactive mode. It takes 20 minutes on average to get back. You lose that every morning if you check first thing."},
-      {tactic:"Batch your communication", detail:"Check messages, email, and social media at 3 fixed times per day: 9 AM, 1 PM, 5 PM. Outside of those times, they are closed. This alone will recover 2–3 hours of focused work daily that is currently being fragmented by random interruptions."},
-      {tactic:"One tab, one task", detail:"Every open browser tab is a pending decision asking for your attention. Work with one tab open at a time. Use a tool like OneTab to collapse everything else. Your screen should show only what you are currently working on."},
-    ],
-    truth:"The person who can focus for 3 hours a day while everyone else is distracted for 8 hours will produce more in a week than most people produce in a month. Focus is the new superpower.",
-    links:[
-      {label:"Deep Work by Cal Newport",url:"https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692",type:"book"},
-      {label:"Freedom — block distracting websites",url:"https://freedom.to",type:"tool"},
-      {label:"One Sec — pause before opening apps",url:"https://one-sec.app",type:"tool"},
-      {label:"Forest — stay off your phone while working",url:"https://www.forestapp.cc",type:"tool"},
-      {label:"Cold Turkey Blocker",url:"https://getcoldturkey.com",type:"tool"},
-    ],
-  },
-  {
-    id:"study",
-    icon:"📚",
-    color:"var(--gold)",
-    title:"How to Study Hard and Actually Retain It",
-    subtitle:"Studying hard is not about hours. It is about how you use the hours.",
-    body:"Most people study by re-reading and highlighting. Research consistently shows this is one of the least effective methods for actually retaining information. You are not learning — you are recognizing, which feels the same but produces no lasting change. Real learning happens through active recall, spaced repetition, and application. If you can't explain it without looking at it, you don't know it yet.",
-    methods:[
-      {method:"Active recall", detail:"After reading a section, close the book and write down everything you can remember without looking. This feels harder than re-reading — that's the point. Difficulty during learning is a signal of actual encoding. Use flashcards, Anki, or just a blank page."},
-      {method:"The Feynman Technique", detail:"Take any concept you are studying and explain it as if you were teaching it to a 12-year-old. The moment you hit a point where your explanation gets vague, that is the exact gap in your understanding. Go back to that specific gap, learn it, and try again."},
-      {method:"Spaced repetition", detail:"Review material 1 day after learning it. Then 3 days later. Then 7 days. Then 21 days. This mirrors how long-term memory is actually built. Cramming fills short-term memory, not long-term. Anki automates this schedule for you."},
-      {method:"Study in 45-minute blocks", detail:"45 minutes of focused study, 10–15 minute break. During the break, do nothing related to the material — walk, stretch, do nothing. Your brain consolidates learning during rest, not during more studying. Cramming 4 hours straight is worse than 4 × 45-minute focused blocks."},
-      {method:"Teach it immediately", detail:"Within 24 hours of learning something important, teach it to someone — a friend, a family member, even an imaginary student. Teaching exposes exactly what you don't actually understand and forces you to structure what you do. It accelerates retention by a factor of 4x over passive review."},
-    ],
-    truth:"The student who studies 3 focused hours using the right methods will outperform the student who studies 8 distracted hours every single time. Time is not the variable. Method is.",
-    links:[
-      {label:"Anki — free spaced repetition flashcards",url:"https://apps.ankiweb.net",type:"tool"},
-      {label:"Make It Stick — the science of learning",url:"https://www.amazon.com/Make-Stick-Science-Successful-Learning/dp/0674729013",type:"book"},
-      {label:"A Mind for Numbers by Barbara Oakley",url:"https://www.amazon.com/Mind-Numbers-Science-Flunked-Algebra/dp/039916524X",type:"book"},
-      {label:"Coursera learning science courses",url:"https://www.coursera.org/learn/learning-how-to-learn",type:"tool"},
-    ],
-  },
-  {
-    id:"workout",
-    icon:"💪",
-    color:"var(--teal)",
-    title:"Working Out — The Discipline That Builds All Other Discipline",
-    subtitle:"You are not working out for your body. You are working out for your mind.",
-    body:"Exercise is the highest-leverage discipline habit that exists. Every time you finish a workout when you didn't want to start one, you have proved to yourself that you can do hard things. That proof transfers. The person who is consistent in their fitness is statistically more likely to be consistent in their work, their relationships, and their finances. Exercise is not a health strategy — it is a character-building practice.",
-    plan:[
-      {day:"Monday", workout:"Strength (upper body) — 45 mins", notes:"Push-ups, rows, shoulder press. Use bodyweight if you have no gym. Resistance is the stimulus — not the equipment."},
-      {day:"Tuesday", workout:"Run or walk — 30 mins", notes:"Moderate pace. This is active recovery and cardiovascular baseline. Not a race."},
-      {day:"Wednesday", workout:"Strength (lower body + core) — 45 mins", notes:"Squats, lunges, planks. Core strength is posture, energy, and injury prevention combined."},
-      {day:"Thursday", workout:"Rest or light stretch — 20 mins", notes:"Rest is part of the programme. Your muscles grow during rest, not during the workout. Honour this."},
-      {day:"Friday", workout:"Full body circuit — 40 mins", notes:"Compound movements: squat, push, pull, hinge. High intensity. Short rest periods."},
-      {day:"Saturday", workout:"Long walk or sport — 45–60 mins", notes:"Something you enjoy. A sport, a long walk, a hike. This is movement as living, not movement as obligation."},
-      {day:"Sunday", workout:"Complete rest", notes:"Recovery is not weakness. It is the completion of the cycle that makes you stronger."},
-    ],
-    truth:"You don't need a gym. You don't need equipment. You need your bodyweight and 30–45 minutes. The excuse that you need more than that to start is the reason most people never start.",
-    links:[
-      {label:"Nike Training Club — free guided workouts",url:"https://www.nike.com/ntc-app",type:"tool"},
-      {label:"Bodyweight fitness subreddit (free programme)",url:"https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/",type:"resource"},
-      {label:"Can't Hurt Me by David Goggins",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287",type:"book"},
-      {label:"Freeletics — bodyweight training app",url:"https://www.freeletics.com",type:"tool"},
-    ],
-  },
-  {
-    id:"mindset_d",
-    icon:"🧠",
-    color:"#9b72cf",
-    title:"Staying Focused When Motivation Fades",
-    subtitle:"Motivation is the spark. Discipline is the engine. You need both — but only one is reliable.",
-    body:"Motivation is an emotion. Emotions are temporary, inconsistent, and influenced by things completely outside your control — your sleep, the weather, a conversation, a notification. If you are waiting to feel motivated to start, you will wait for a long time, and the days will pass. Discipline is the decision to begin before the feeling arrives. And here is what most people don't know: the feeling usually arrives after you begin, not before.",
-    mental_tools:[
-      {tool:"The 2-minute rule", detail:"If you don't want to start, commit to just 2 minutes. Just open the book. Just put on your shoes. Just sit at your desk. 90% of the time, starting for 2 minutes turns into a full session. The resistance is in the beginning, not the middle."},
-      {tool:"Identity-based motivation", detail:"Instead of saying 'I want to work out,' say 'I am someone who works out.' Instead of 'I want to study,' say 'I am someone who studies every day.' Identity follows behaviour — but behaviour also follows identity. Claim the identity before you've fully earned it, then earn it."},
-      {tool:"The 10-year test", detail:"When you don't want to do the work: ask yourself how you will feel about today's choice in 10 years. Not 10 days. 10 years. Almost always, the answer immediately makes the right decision obvious. Future you is always watching."},
-      {tool:"Visualise the next 5 minutes, not the goal", detail:"Don't think about the whole run when you're tired. Think about the next 5 minutes. Don't think about finishing the book. Think about the next 2 pages. Breaking the action down to the smallest next step removes the overwhelm that kills momentum."},
-    ],
-    truth:"The people you most admire for their discipline did not become that way through motivation. They became that way through hundreds of small, invisible choices to begin when they didn't want to — until beginning became automatic.",
-    links:[
-      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
-      {label:"Discipline Equals Freedom by Jocko Willink",url:"https://www.amazon.com/Discipline-Equals-Freedom-Field-Manual/dp/1250156089",type:"book"},
-      {label:"David Goggins on discipline (YouTube)",url:"https://www.youtube.com/results?search_query=david+goggins+discipline",type:"resource"},
-    ],
-  },
-];
 
 const INVEST_SECTIONS=[
   {
@@ -15224,258 +14871,14 @@ function ResourceLinks({links, accentColor}){
 // DISGUSTINGLY SUCCESSFUL MODULE
 // Not lucky. Not gifted. Just following the right rules.
 // ═══════════════════════════════════════════════════════════════════════════════
-const SUCCESS_RULES=[
-  {
-    number:"01",
-    color:"var(--gold)",
-    title:"Study Obsession",
-    hook:"Read biographies of the greats. Not to worship them. To steal their patterns.",
-    detail:"Steve Jobs. Elon Musk. Rockefeller. Oprah. Howard Schultz. Katherine Johnson. These people were not just talented — they were patterned. They made specific choices, at specific moments, that changed everything. When you read their actual stories, not the highlight reels, you see the patterns: they worked when others rested, they obsessed when others kept things balanced, they were willing to look stupid before they looked brilliant. Success leaves clues. You can steal from people who already figured it out.",
-    actions:[
-      "Read 1 real biography per month — not summaries, the full book.",
-      "After each one, write 3 patterns you noticed. What did they all do that most people don't?",
-      "Pick 1 mistake they made and figure out if you are currently making the same one.",
-    ],
-    links:[
-      {label:"Steve Jobs by Walter Isaacson",url:"https://www.amazon.com/Steve-Jobs-Walter-Isaacson/dp/1451648537",type:"book"},
-      {label:"Elon Musk by Walter Isaacson",url:"https://www.amazon.com/Elon-Musk-Walter-Isaacson/dp/1982181281",type:"book"},
-      {label:"The Art of Exceptional Living — Jim Rohn",url:"https://www.amazon.com/Art-Exceptional-Living-Jim-Rohn/dp/B00005A5ZB",type:"book"},
-      {label:"Jim Rohn — The Day That Turns Your Life Around (YouTube)",url:"https://www.youtube.com/results?search_query=jim+rohn+turn+your+life+around",type:"resource"},
-      {label:"Titan: Life of John D. Rockefeller Sr.",url:"https://www.amazon.com/Titan-Life-John-Rockefeller-Sr/dp/1400077303",type:"book"},
-      {label:"Goodreads — browse top biographies",url:"https://www.goodreads.com/shelf/show/biography",type:"resource"},
-    ],
-  },
-  {
-    number:"02",
-    color:"var(--teal)",
-    title:"Ruthless Routine",
-    hook:"Motivation is a visitor. Discipline is a resident. Build the system that runs when you don't feel like it.",
-    detail:"Every high performer you study has a morning routine, an output quota, a non-negotiable block of deep work. They are not more motivated than you. They designed environments and systems that make their best work the default behavior. Your feelings are unreliable. Your calendar is not. Structure your day so that your most important work happens first, before the world gets its hands on your attention.",
-    actions:[
-      "Design your ideal morning and run it for 21 days straight — no modification, just execute.",
-      "Block 2–3 hours of uninterrupted deep work daily — guard it like a meeting with your largest client.",
-      "End each day with a 5-minute review: did today move you forward or just keep you busy?",
-    ],
-    links:[
-      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
-      {label:"Deep Work by Cal Newport",url:"https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692",type:"book"},
-      {label:"My Morning Routine — real routines from top performers",url:"https://mymorningroutine.com",type:"resource"},
-      {label:"Notion daily planner template (free)",url:"https://www.notion.so/templates/daily-planner",type:"tool"},
-    ],
-  },
-  {
-    number:"03",
-    color:"#9b72cf",
-    title:"Network Mathematics",
-    hook:"One right introduction beats 10 years of solo effort. The math is real.",
-    detail:"Your network is not who you know. It is what you believe is possible. The people around you define your ceiling, whether you notice it or not. The ambitious person who surrounds themselves with builders starts to believe bigger without trying. The talented person who stays in a circle of complainers slowly loses the ambition they started with. Upgrade your environment, and your results follow automatically — even before you do any more work.",
-    actions:[
-      "Reach out to one person you admire every month — no ask, just genuine connection.",
-      "Attend one event or gathering in your field every quarter. Your next opportunity will come from a room.",
-      "Give before you take — show up with value, ideas, connections. Transactions come much later.",
-    ],
-    links:[
-      {label:"LinkedIn — connect with your industry",url:"https://www.linkedin.com",type:"tool"},
-      {label:"Never Eat Alone by Keith Ferrazzi",url:"https://www.amazon.com/Never-Eat-Alone-Secrets-Relationship/dp/0385346654",type:"book"},
-      {label:"Lunchclub — AI-matched 1:1 networking",url:"https://lunchclub.com",type:"tool"},
-      {label:"Eventbrite — find events in your field",url:"https://www.eventbrite.com",type:"tool"},
-      {label:"Meetup — local professional groups",url:"https://www.meetup.com",type:"tool"},
-    ],
-  },
-  {
-    number:"04",
-    color:"var(--rose)",
-    title:"Create, Don't Consume",
-    hook:"Consumers pay. Creators get paid. Stop feeding algorithms and start building things.",
-    detail:"Every hour you spend consuming, someone else is building the thing you wish you had created. Writing, building, designing, teaching, making — this is how you convert what you know into leverage. Creation is also the fastest path to clarity. You don't know what you think until you write it. You don't know if an idea works until you build it. The creator who ships imperfect work consistently beats the perfectionist who never finishes.",
-    actions:[
-      "Create something every day — a post, a paragraph, a prototype, a line of code. Even if nobody sees it.",
-      "Ship before you are ready. Done is the engine of more. Perfect is the enemy of real.",
-      "Pick one medium to master this year: writing, video, audio, or code. One. Go very deep.",
-    ],
-    links:[
-      {label:"Substack — write and earn from your audience",url:"https://substack.com",type:"tool"},
-      {label:"Ghost — professional blog & newsletter",url:"https://ghost.org",type:"tool"},
-      {label:"GitHub — share your code projects",url:"https://github.com",type:"tool"},
-      {label:"Show Your Work by Austin Kleon",url:"https://www.amazon.com/Show-Your-Work-Austin-Kleon/dp/076117897X",type:"book"},
-      {label:"The War of Art by Steven Pressfield",url:"https://www.amazon.com/War-Art-Through-Creative-Battles/dp/1936891026",type:"book"},
-    ],
-  },
-  {
-    number:"05",
-    color:"var(--gold)",
-    title:"Obsess Over Energy",
-    hook:"You cannot build an empire running on empty. Your body is not a cost — it is your infrastructure.",
-    detail:"Sleep, movement, nutrition, and mental recovery are not indulgences — they are performance inputs. A well-rested, physically active person with average talent will outperform a brilliant, depleted person almost every time. You cannot think clearly, make good decisions, or sustain long-term effort on 5 hours of sleep and zero movement. This is not wellness advice. It is performance strategy.",
-    actions:[
-      "Protect 7–8 hours of sleep — especially during your most important work phases.",
-      "Move your body for at least 30 minutes daily. The cognitive benefits alone are worth it.",
-      "Audit your energy for 7 days: rate yourself every 3 hours. Find the patterns that are costing you output.",
-    ],
-    links:[
-      {label:"Why We Sleep by Matthew Walker",url:"https://www.amazon.com/Why-We-Sleep-Unlocking-Dreams/dp/1501144316",type:"book"},
-      {label:"Huberman Lab Podcast — free science-based health show",url:"https://www.hubermanlab.com/podcast",type:"resource"},
-      {label:"Nike Training Club — free workouts",url:"https://www.nike.com/ntc-app",type:"tool"},
-      {label:"Eight Sleep — sleep tracking (resource)",url:"https://www.eightsleep.com/blog/sleep-performance/",type:"resource"},
-    ],
-  },
-];
 
-const SUCCESS_TRUTH={
-  title:"The Final Truth",
-  lines:[
-    "Disgusting success is built daily. Not emotionally. Not randomly. Systematically.",
-    "The person who shows up without motivation and executes their system beats the inspired person who acts only when they feel like it.",
-    "You don't need luck. You need a repeatable process, applied with obsessive consistency, for longer than most people are willing to go.",
-    "The rules are not a secret. Everyone has access to them. The difference is who actually follows them.",
-  ],
-};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 10X MINDSET MODULE
 // Strong mindset principles + 10x performance principles
 // ═══════════════════════════════════════════════════════════════════════════════
-const MINDSET_PRINCIPLES=[
-  {icon:"⏳",color:"var(--gold)",title:"Be Patient",
-   body:"Most worthwhile things take longer than you expect. Impatience is what causes people to quit at the exact moment they are about to break through. Build a 3-year frame for your goals and a daily frame for your actions. The daily actions are yours to control. The 3-year result is the compound of those actions. Patience is not passive waiting — it is aggressive consistency without demanding an immediate reward.",
-   links:[
-     {label:"The Almanack of Naval Ravikant (free PDF)",url:"https://www.navalmanack.com",type:"book"},
-     {label:"Grit by Angela Duckworth",url:"https://www.amazon.com/Grit-Passion-Perseverance-Angela-Duckworth/dp/1501111108",type:"book"},
-   ]},
-  {icon:"⚡",color:"var(--teal)",title:"Be Proactive",
-   body:"Reactive people manage problems. Proactive people prevent them. Every week, ask yourself: what is the one thing that, if I handle it now, removes 10 problems in the future? Proactivity is a thinking habit first — you have to train yourself to look ahead before looking around. Start each morning asking: what do I want to happen today, and what can I do in the next hour to make it more likely?",
-   links:[
-     {label:"The 7 Habits of Highly Effective People",url:"https://www.amazon.com/Habits-Highly-Effective-People-Powerful/dp/1982137274",type:"book"},
-     {label:"Getting Things Done by David Allen",url:"https://www.amazon.com/Getting-Things-Done-Stress-Free-Productivity/dp/0143126563",type:"book"},
-   ]},
-  {icon:"🔄",color:"#9b72cf",title:"Be Open to Change",
-   body:"The person who updates their beliefs when they get new evidence moves faster than the person who defends what they already decided. Change is not weakness — refusing to change when the evidence demands it is. Every 6 months, audit your top 3 beliefs about yourself, your work, and your goals. Ask honestly: is this still true, or am I holding this belief because I've held it for a long time?",
-   links:[
-     {label:"Mindset by Carol Dweck",url:"https://www.amazon.com/Mindset-Psychology-Carol-S-Dweck/dp/0345472322",type:"book"},
-     {label:"The Art of Thinking Clearly by Rolf Dobelli",url:"https://www.amazon.com/Art-Thinking-Clearly-Rolf-Dobelli/dp/0062219693",type:"book"},
-   ]},
-  {icon:"🍃",color:"var(--rose)",title:"Learn to Let Go",
-   body:"Some people are carrying losses from 3 years ago like they happened this morning. Every unit of energy spent resisting something that has already happened is energy that cannot go into what comes next. Letting go is not forgetting — it is refusing to let the past allocate your present resources. Process it, extract the lesson, then physically move your focus to the next thing.",
-   links:[
-     {label:"The Power of Now by Eckhart Tolle",url:"https://www.amazon.com/Power-Now-Guide-Spiritual-Enlightenment/dp/1577314808",type:"book"},
-     {label:"Letting Go by David R. Hawkins",url:"https://www.amazon.com/Letting-Go-Pathway-Surrender-Hawkins/dp/1401945015",type:"book"},
-   ]},
-  {icon:"☀️",color:"var(--gold)",title:"Stay Hopeful",
-   body:"Hope is not naive optimism — it is the rational belief that your actions can influence your outcomes. People without hope stop trying. People with realistic hope keep adjusting and moving. Protect your hope aggressively: limit time with people who drain it, regularly review evidence of your own progress, and zoom out when the present moment feels impossible.",
-   links:[
-     {label:"Man's Search for Meaning by Viktor Frankl",url:"https://www.amazon.com/Mans-Search-Meaning-Viktor-Frankl/dp/0807014273",type:"book"},
-     {label:"Learned Optimism by Martin Seligman",url:"https://www.amazon.com/Learned-Optimism-Change-Your-Mind/dp/1400078393",type:"book"},
-   ]},
-  {icon:"🧠",color:"var(--teal)",title:"Check Your Thoughts",
-   body:"Your internal monologue is either your best coach or your worst saboteur. Most people never audit it. When you catch a thought like 'I can't do this' or 'this always happens to me,' pause and ask: is this actually true, or is this a habit my brain has? You do not have to believe every thought you have. You have to notice it, question it, and replace it with one that is both true and useful.",
-   links:[
-     {label:"Feeling Good by David D. Burns (CBT classic)",url:"https://www.amazon.com/Feeling-Good-New-Mood-Therapy/dp/0380810336",type:"book"},
-     {label:"The Happiness Trap by Russ Harris (ACT)",url:"https://www.amazon.com/Happiness-Trap-Stop-Struggling-Living/dp/1590305841",type:"book"},
-     {label:"Woebot — free AI mental wellness app",url:"https://woebothealth.com",type:"tool"},
-   ]},
-  {icon:"💙",color:"#9b72cf",title:"It's Okay Not to Be Okay",
-   body:"Pretending to be fine when you're not costs enormous energy and cuts you off from the help available to you. Acknowledging difficulty is not weakness — it is the first accurate assessment of your situation. You cannot navigate from a position you're lying about. Name what's hard, allow it to be hard, then ask: what is the smallest thing I can do from here that moves me slightly forward?",
-   links:[
-     {label:"Maybe You Should Talk to Someone by Lori Gottlieb",url:"https://www.amazon.com/Maybe-You-Should-Talk-Someone/dp/1328662055",type:"book"},
-     {label:"7 Cups — free online emotional support",url:"https://www.7cups.com",type:"tool"},
-     {label:"Headspace — guided meditation & mindfulness",url:"https://www.headspace.com",type:"tool"},
-   ]},
-  {icon:"🏁",color:"var(--rose)",title:"Don't Give Up",
-   body:"Giving up too early is the single most common reason for failure — not incompetence, not bad luck, not the wrong idea. Most people quit right before the compounding would have kicked in. Before you quit anything, ask: am I quitting because this genuinely isn't working, or am I quitting because it's hard right now and harder than I expected? Those are two very different situations requiring two very different responses.",
-   links:[
-     {label:"Grit by Angela Duckworth",url:"https://www.amazon.com/Grit-Passion-Perseverance-Angela-Duckworth/dp/1501111108",type:"book"},
-     {label:"Can't Hurt Me by David Goggins",url:"https://www.amazon.com/Cant-Hurt-Me-Master-Your/dp/1544512287",type:"book"},
-     {label:"The Dip by Seth Godin",url:"https://www.amazon.com/Dip-Little-Book-Teaches-Stick/dp/1591841666",type:"book"},
-   ]},
-];
 
-const TENX_PRINCIPLES=[
-  {
-    title:"Consistency Beats Intensity",
-    icon:"📅",
-    color:"var(--gold)",
-    body:"The person who shows up every day at 70% outperforms the person who shows up at 100% three times a week. Consistency is not glamorous. It does not make good Instagram content. But it is what separates the person who makes it from the person who almost made it. Design your work so that your worst day is still enough to move forward.",
-    links:[
-      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
-      {label:"The Compound Effect by Darren Hardy",url:"https://www.amazon.com/Compound-Effect-Darren-Hardy/dp/159315724X",type:"book"},
-      {label:"Streaks app — habit tracking",url:"https://streaksapp.com",type:"tool"},
-    ],
-  },
-  {
-    title:"Focus on Process, Not Outcome",
-    icon:"🔬",
-    color:"var(--teal)",
-    body:"Outcomes are the result of a thousand process decisions you made when no one was watching. Obsessing over results without controlling inputs is anxiety, not strategy. Define the exact behaviors that produce your goal, then measure those behaviors daily. The outcome becomes the inevitable consequence of a well-executed process, not something you achieve by wanting it harder.",
-    links:[
-      {label:"The Score Takes Care of Itself by Bill Walsh",url:"https://www.amazon.com/Score-Takes-Care-Itself-Philosophy/dp/1591843472",type:"book"},
-      {label:"Measure What Matters by John Doerr (OKRs)",url:"https://www.amazon.com/Measure-What-Matters-Google-Foundation/dp/0525536221",type:"book"},
-    ],
-  },
-  {
-    title:"Remove Friction from Good Habits",
-    icon:"✂️",
-    color:"#9b72cf",
-    body:"You do not rise to the level of your motivation — you fall to the level of your environment. If good habits require willpower every time, they will fail eventually. Make them the default: gym clothes by the bed, healthy food at the front of the fridge, phone in another room during deep work, book on your pillow. Every point of friction you remove is 5 years of sustained behavior you gain.",
-    links:[
-      {label:"Atomic Habits by James Clear",url:"https://www.amazon.com/Atomic-Habits-Proven-Build-Break/dp/0735211299",type:"book"},
-      {label:"Tiny Habits by BJ Fogg",url:"https://www.amazon.com/Tiny-Habits-Changes-Change-Everything/dp/0358003326",type:"book"},
-      {label:"Habitica — gamify your habits (free)",url:"https://habitica.com",type:"tool"},
-    ],
-  },
-  {
-    title:"Get Feedback Fast",
-    icon:"⚡",
-    color:"var(--rose)",
-    body:"Slow feedback loops are expensive. The faster you can test an idea and learn from reality, the faster you improve. Ship small, learn fast, adjust early. Every week of building without feedback is a week of potentially going in the wrong direction. Build a feedback mechanism into everything you do: test your ideas with real people, show your work before it's ready, and value honest criticism over comfortable silence.",
-    links:[
-      {label:"The Lean Startup by Eric Ries",url:"https://www.amazon.com/Lean-Startup-Entrepreneurs-Continuous-Innovation/dp/0307887898",type:"book"},
-      {label:"Typeform — create quick user feedback surveys",url:"https://www.typeform.com",type:"tool"},
-      {label:"UserTesting — get real feedback on your ideas",url:"https://www.usertesting.com",type:"tool"},
-    ],
-  },
-  {
-    title:"Learn from People Ahead of You",
-    icon:"🔭",
-    color:"var(--gold)",
-    body:"You can compress 10 years of someone's experience into 3 hours of honest conversation. Stop learning exclusively from peers who are at the same level as you — you will all discover the same things at the same time. Find people who are 5–10 years ahead on the specific path you're on, and learn what they know about the phase you're currently in. This is not networking for status — it is intelligence gathering for your own journey.",
-    links:[
-      {label:"MentorCruise — find a paid mentor",url:"https://mentorcruise.com",type:"tool"},
-      {label:"ADPList — free mentorship from industry pros",url:"https://adplist.org",type:"tool"},
-      {label:"Lunchclub — AI-matched 1:1 conversations",url:"https://lunchclub.com",type:"tool"},
-      {label:"Indie Hackers — community of founders sharing real numbers",url:"https://www.indiehackers.com",type:"resource"},
-    ],
-  },
-  {
-    title:"Eliminate Distractions — Shape Your Environment",
-    icon:"🎯",
-    color:"var(--teal)",
-    body:"Focus is less about willpower and more about environment. You cannot out-discipline a phone that is designed by a team of engineers to be more addictive than your goals. Stop trying to resist your phone and start designing a life where it has less access to you. Remove apps that steal time. Turn off all non-essential notifications. Put the phone in another room during your most important 2 hours of the day. What you don't see, you don't reach for.",
-    callout:{
-      label:"Try This Starting Today",
-      items:[
-        "Delete any app that you open out of boredom rather than intention — not forever, just for 30 days.",
-        "Turn off all notifications except calls and messages from specific people. Every other notification is someone else's agenda interrupting yours.",
-        "Set your phone to grayscale. Color is an attention tool. Grayscale removes 40% of the addictive pull.",
-        "Create a physical 'phone-free zone' in your home — your desk during work hours, your dinner table, your bed.",
-      ],
-    },
-    links:[
-      {label:"Deep Work by Cal Newport",url:"https://www.amazon.com/Deep-Work-Focused-Success-Distracted/dp/1455586692",type:"book"},
-      {label:"Digital Minimalism by Cal Newport",url:"https://www.amazon.com/Digital-Minimalism-Choosing-Focused-Noisy/dp/0525536515",type:"book"},
-      {label:"Freedom — block distracting sites & apps",url:"https://freedom.to",type:"tool"},
-      {label:"Cold Turkey — hardcore website blocker",url:"https://getcoldturkey.com",type:"tool"},
-      {label:"One Sec — adds a pause before opening apps",url:"https://one-sec.app",type:"tool"},
-    ],
-  },
-];
 
-function asReportText(val){
-  if(val==null) return "";
-  if(typeof val==="string") return val;
-  if(Array.isArray(val)) return val.filter(v=>typeof v==="string").join(". ");
-  if(typeof val==="object") return Object.values(val).filter(v=>typeof v==="string").join(". ");
-  return String(val);
-}
 
 // For reports generated before strengths/risks fields existed,
 // derive them from the existing report text.
@@ -23676,7 +23079,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v35-dedupe"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v37-lifehacks"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
