@@ -526,7 +526,7 @@ function promaxPriceLabel(country){
 // Approximate USD exchange rates for display purposes only — actual charge
 // is always in USD. Update periodically; doesn't need to be perfectly live.
 const FX_RATES = {
-  USD:1, GHS:14.8, NGN:1550, KES:129, ZAR:18.4, GBP:0.79, EUR:0.92,
+  USD:1, GHS:15.3, NGN:1570, KES:129, ZAR:18.3, GBP:0.79, EUR:0.92,
   INR:85, PHP:58.5, BRL:5.7, CAD:1.37, AUD:1.52, MXN:18.2, EGP:49,
   PKR:279, BDT:122, VND:25400, IDR:16200, NGS:1550, XOF:605, KWD:0.31,
   AED:3.67, SAR:3.75, CNY:7.25, JPY:155, ZMW:27, UGX:3700, TZS:2650,
@@ -6785,11 +6785,35 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
     }
     setLoading(true); setError("");
     const ref="diq_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+
+    // The #1 cause of "Something went wrong opening the payment window" was
+    // calling PaystackPop.setup() before js.paystack.co had finished loading
+    // (slow mobile data, WebView cache). If it isn't ready yet, load it now and
+    // retry once instead of throwing.
+    if(!window.PaystackPop){
+      const existing=document.querySelector('script[src*="js.paystack.co"]');
+      const kick=()=>{ if(window.PaystackPop){ setLoading(false); handlePaystack(); } };
+      if(existing){
+        existing.addEventListener("load", kick, {once:true});
+      }else{
+        const sc=document.createElement("script");
+        sc.src="https://js.paystack.co/v1/inline.js";
+        sc.onload=kick;
+        sc.onerror=()=>{ setLoading(false); setError("Could not load the payment system. Check your connection and try again."); };
+        document.body.appendChild(sc);
+      }
+      // Safety timeout so the button never spins forever on a dead connection.
+      setTimeout(()=>{
+        if(!window.PaystackPop){ setLoading(false); setError("The payment system is taking too long to load. Check your connection and try again."); }
+      }, 8000);
+      return;
+    }
+
     try{
       const handler=window.PaystackPop.setup({
         key:      PAYSTACK_PUBLIC_KEY,
         email:    email.trim(),
-        amount:   toPaystackAmount(localPlan.amount),
+        amount:   toPaystackAmount(localPlan.amount, PRICING.currency),
         currency: PRICING.currency,
         ref,
         label:    "DestinIQ "+plan.name,
@@ -6850,7 +6874,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
       }
     }catch(e){
       setLoading(false);
-      setError("Something went wrong opening the payment window. Try again.");
+      setError("Couldn't open the payment window. Please refresh the page and try again — if it keeps happening, check your connection or try a different browser.");
     }
   };
 
@@ -8476,11 +8500,17 @@ function getCurrencyForCountry(countryName){
 const PAYSTACK_CURRENCIES = ["NGN","GHS","ZAR","KES","USD"];
 
 // Local-currency price books (round, human numbers — not raw FX conversions)
+// Local prices, aligned to the same purchasing-power philosophy as the t3 USD
+// tier (~$3.49 Pro / ~$8.99 Pro Max) and rounded to clean local numbers.
+// Previously these drifted: Kenya and South Africa were ~2x the USD-tier
+// equivalent, Ghana's annuals overshot. Now every market pays roughly the same
+// real value. Rechecked against approx mid-2026 FX; refresh if a currency moves
+// a lot, but small drift is fine — these are deliberate round numbers.
 const LOCAL_PRICE_BOOK = {
-  GHS: { symbol:"GH₵", pro:59,    promax:149,    pro_annual:499,    promax_annual:1299   },
-  NGN: { symbol:"₦",   pro:4500,  promax:11000,  pro_annual:38000,  promax_annual:95000  },
-  KES: { symbol:"KSh", pro:590,   promax:1490,   pro_annual:4900,   promax_annual:12900  },
-  ZAR: { symbol:"R",   pro:99,    promax:249,    pro_annual:849,    promax_annual:2099   },
+  GHS: { symbol:"GH₵", pro:55,    promax:139,    pro_annual:449,    promax_annual:1099  },
+  NGN: { symbol:"₦",   pro:5500,  promax:13900,  pro_annual:44000,  promax_annual:109000 },
+  KES: { symbol:"KSh", pro:449,   promax:1150,   pro_annual:3600,   promax_annual:8900  },
+  ZAR: { symbol:"R",   pro:65,    promax:165,    pro_annual:519,    promax_annual:1290  },
 };
 
 // Purchasing-power tiers for everyone Paystack must bill in USD.
@@ -8533,9 +8563,17 @@ function getLocalPricing(country){
   };
 }
 
-// Paystack wants the smallest unit (kobo/pesewa/cents) for most currencies.
-// All of NGN/GHS/ZAR/KES/USD use x100.
-function toPaystackAmount(amount){ return Math.round(Number(amount)*100); }
+// Paystack wants the smallest currency unit. NGN/GHS/ZAR/KES/USD are all
+// x100 (kobo/pesewa/cent). A few world currencies have ZERO decimal places
+// (their smallest unit IS the whole unit) — multiplying those by 100 would
+// overcharge 100x. We only settle the x100 currencies today, but this guard
+// makes adding one later safe by construction.
+const ZERO_DECIMAL_CURRENCIES = new Set(["JPY","KRW","VND","XOF","XAF","CLP","ISK","UGX","RWF","GNF","BIF","KMF","XPF","PYG","VUV"]);
+function toPaystackAmount(amount, currency){
+  const n = Number(amount) || 0;
+  if(currency && ZERO_DECIMAL_CURRENCIES.has(currency)) return Math.round(n);
+  return Math.round(n*100);
+}
 
 // Get income ranges in local currency
 function getIncomeRanges(currencySymbol){
@@ -23090,7 +23128,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v38-payverify"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v40-paywindow"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
