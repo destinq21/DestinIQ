@@ -6857,6 +6857,10 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
         email:    email.trim(),
         amount:   toPaystackAmount(localPlan.chargeAmount ?? localPlan.amount, PRICING.chargeCurrency || PRICING.currency),
         currency: PRICING.chargeCurrency || PRICING.currency,
+        // Mobile Money and Bank Transfer are Ghana rails — only Ghanaians can
+        // use them. Foreign customers pay the GHS charge with a card, so
+        // showing them Ghana-only channels was pure confusion.
+        ...(!PRICING.isLocal ? {channels:["card"]} : {}),
         ref,
         label:    "DestinIQ "+plan.name,
         channels: ["card","bank","ussd","qr","mobile_money","bank_transfer"],
@@ -7154,7 +7158,9 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
 
           {/* Payment methods accepted */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:20,flexWrap:"wrap"}}>
-            {["Visa","Mastercard","Mobile Money","Bank Transfer","Apple Pay"].map(m=>(
+            {(PRICING.isLocal
+              ? ["Visa","Mastercard","Mobile Money","Bank Transfer"]
+              : ["Visa","Mastercard"]).map(m=>(
               <div key={m} style={{padding:"4px 10px",background:"var(--lift)",border:"1px solid var(--line)",borderRadius:6,fontSize:11,color:"var(--cream-30)"}}>
                 {m}
               </div>
@@ -11419,18 +11425,6 @@ function AuthScreen({onAuth, onBack}){
   }
 
 
-  // Apple OAuth (Supabase)
-  const handleApple=async()=>{
-    setLoading(true);setError("");
-    try{
-      const{error:err}=await supabase.auth.signInWithOAuth({
-        provider:"apple",
-        options:{redirectTo:typeof window!=="undefined"?window.location.origin:"/"}
-      });
-      if(err) setError(err.message);
-    }catch(e){setError("Apple sign-in unavailable. Please try email.");}
-    setLoading(false);
-  };
   // Aliases — handleEmail already handles both modes
   const handleLogin=handleEmail;
   const handleSignup=handleEmail;
@@ -11562,19 +11556,10 @@ function AuthScreen({onAuth, onBack}){
               Continue with Google
             </button>
 
-            {/* Apple */}
-            <button onClick={handleApple} disabled={loading}
-              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,
-                padding:"14px",background:"var(--cream-05)",border:"1px solid var(--cream-10)",
-                borderRadius:12,cursor:"pointer",fontFamily:"inherit",marginBottom:10,
-                color:G.cream,fontSize:14,fontWeight:500,transition:"background .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
-              onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.04)"}>
-              <svg width="16" height="18" viewBox="0 0 814 1000" fill={G.cream}>
-                <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105-37.5-150.9-99.2C-33.2 753.2 0 571.5 0 570c0-0.4 0-0.8 0-1.2 0.3-140.1 89.4-214.2 177.3-214.2 61.2 0 112.2 38.7 151.7 38.7 37.7 0 98.4-40.8 165.2-40.8 27.4 0 108.2 2.3 162.9 86.4zm-137.4-195.7c5.8-27.4 15.4-52.5 30.4-76.5 33-48.7 93.1-85.5 148.5-85.5 2.9 0 5.8 0 8.7 0.3-3.2 30.4-14.8 58.2-30.4 82.5-32.4 49.4-90.9 84.5-157.2 79.2z"/>
-              </svg>
-              Continue with Apple
-            </button>
+            {/* Apple sign-in removed — the OAuth provider was never
+                configured (needs an Apple Developer account), so the button
+                errored for anyone who tapped it. Re-add alongside a real Apple
+                setup if iOS ever ships. Google + email cover everyone today. */}
 
             {/* Email toggle button */}
             {!showEmailForm&&(
@@ -23174,7 +23159,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v46-ghscharge"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v48-noapple"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
