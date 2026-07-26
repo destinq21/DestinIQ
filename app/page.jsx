@@ -9,7 +9,7 @@
  *
  * 2. Create .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
- *    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1b2NuZ3N3YW1pb3l5dnpvemFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NDM3OTUsImV4cCI6MjA5NjQxOTc5NX0.0itooEhEwG1sD-1yKQZTwxjLpubpyjGFWSRtF-MmXYA
+ *    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
  *
  * 3. Enable Auth providers in Supabase Dashboard:
  *    - Email / Password (enable "Confirm email" or turn it off for dev)
@@ -6802,28 +6802,39 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
           custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}],
         },
         callback: async(response)=>{
-          if(userId){
-            try{
-              localStorage.setItem("diq_paid_"+userId,"1");
-              if(tier==="promax"||tier==="promax_annual") localStorage.setItem("diq_prem_"+userId,"1");
-              else localStorage.removeItem("diq_prem_"+userId);
-              localStorage.setItem("diq_paystack_ref_"+userId,response.reference);
-            }catch{}
-          }
+          // The browser NO LONGER decides who is paid. We hand the reference to
+          // our server, which asks Paystack directly (secret key) whether it
+          // really succeeded and only then writes is_paid. Unlock the UI only if
+          // the server confirms. (Was: trust the popup callback and set is_paid
+          // from the browser — forgeable, so a technical user could unlock for
+          // free.)
           try{
-            let uid=userId;
-            if(!uid){ try{const{data}=await supabase.auth.getSession(); uid=data?.session?.user?.id;}catch{} }
-            if(uid){
-              await supabase.from("user_profiles").upsert({
-                user_id:uid, is_paid:true,
-                is_premium: tier==="promax"||tier==="promax_annual",
-                paystack_ref:response.reference,
-                paid_plan:planKey,
-                paid_at:new Date().toISOString(),
-                updated_at:new Date().toISOString(),
-              },{onConflict:"user_id"});
+            const vr = await fetch("/api/verify-payment",{
+              method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({ reference: response.reference, userId: userId||"", plan: planKey }),
+            });
+            const vd = await vr.json().catch(()=>({}));
+            if(!vd?.ok || !vd?.paid){
+              setLoading(false);
+              setError("We couldn't confirm that payment yet. If you were charged, contact support with your reference: "+response.reference);
+              return;   // do NOT unlock on an unverified payment
             }
-          }catch(e){ console.warn("Supabase save failed — localStorage backup active"); }
+            // Server confirmed. Mirror to localStorage for instant UI; the DB is
+            // already updated server-side as the source of truth.
+            if(userId){
+              try{
+                localStorage.setItem("diq_paid_"+userId,"1");
+                if(vd.premium) localStorage.setItem("diq_prem_"+userId,"1");
+                else localStorage.removeItem("diq_prem_"+userId);
+                localStorage.setItem("diq_paystack_ref_"+userId,response.reference);
+              }catch{}
+            }
+          }catch(_e){
+            setLoading(false);
+            setError("Couldn't reach the server to confirm payment. If you were charged, contact support with reference: "+response.reference);
+            return;
+          }
           setLoading(false);
           onUnlock(response.reference, planKey);
         },
@@ -23079,7 +23090,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v37-lifehacks"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v38-payverify"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
@@ -24172,30 +24183,32 @@ function DestinIQInner(){
     const ref=params.get("ref");
     const planKey=params.get("plan");
     if(payment==="success"&&ref&&userId){
-      // Retrieve pending payment info from localStorage
+      // Return from an external (mobile-money / deep-link) checkout. A URL that
+      // merely SAYS payment=success can be typed by anyone, so we confirm the
+      // reference on the server before granting anything.
+      (async()=>{
       try{
         const pending=JSON.parse(localStorage.getItem("diq_pending_payment_"+userId)||"null");
         if(pending&&pending.ref===ref){
-          // Mark as paid immediately
-          localStorage.setItem("diq_paid_"+userId,"1");
-          if(pending.tier==="promax") localStorage.setItem("diq_prem_"+userId,"1");
-          localStorage.removeItem("diq_pending_payment_"+userId);
-          // Save to Supabase
-          supabase.from("user_profiles").upsert({
-            user_id:userId, is_paid:true,
-            is_premium:pending.tier==="promax",
-            paid_plan:pending.plan,
-            hubtel_ref:ref,
-            paid_at:new Date().toISOString(),
-          },{onConflict:"user_id"}).then(null,()=>{});
-          // Update UI
-          setIsPaid(true);
-          if(pending.tier==="promax") setIsPremium(true);
-          // Clean URL
+          const vr = await fetch("/api/verify-payment",{
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({ reference: ref, userId, plan: pending.plan||"pro" }),
+          });
+          const vd = await vr.json().catch(()=>({}));
           window.history.replaceState({},"",window.location.pathname);
-          alert("✅ Payment successful! Your "+pending.plan+" plan is now active.");
+          if(!vd?.ok || !vd?.paid){
+            alert("We couldn't confirm that payment yet. If you were charged, contact support with reference: "+ref);
+            return;
+          }
+          localStorage.setItem("diq_paid_"+userId,"1");
+          if(vd.premium) localStorage.setItem("diq_prem_"+userId,"1");
+          localStorage.removeItem("diq_pending_payment_"+userId);
+          setIsPaid(true);
+          if(vd.premium) setIsPremium(true);
+          alert("Payment confirmed! Your "+(pending.plan||"Pro")+" plan is now active.");
         }
       }catch(e){}
+      })();
     }
   },[userId]);
 
