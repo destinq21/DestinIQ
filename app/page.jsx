@@ -6985,7 +6985,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
               color:billing==="annual"?"#000":"var(--cream-50)",transition:"all .2s"}}>
             Annual
             <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:billing==="annual"?"rgba(0,0,0,0.15)":"var(--gold-dim)",color:billing==="annual"?"#000":"var(--gold)",fontWeight:700}}>
-              {tier==="promax"?"Save 35%":"Save 27%"}
+              {`Save ${Math.max(0,Math.round((1-(baseAnnual/(baseMonthly*12)))*100))}%`}
             </span>
           </button>
         </div>
@@ -7013,18 +7013,18 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
             <div className="mono" style={{color:"var(--gold)",marginBottom:10}}>PREMIUM</div>
             <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:2}}>
               <div style={{fontFamily:"var(--f-display)",fontSize:34,color:"var(--cream)"}}>
-                ${billing==="annual"?monthlyEquivalent.toFixed(2):baseMonthly}
+                {PRICING.symbol}{billing==="annual"?(PRICING.isLocal?Math.round(monthlyEquivalent).toLocaleString():monthlyEquivalent.toFixed(2)):baseMonthly.toLocaleString()}
               </div>
               <div style={{fontSize:13,color:"var(--cream-40)"}}>/month</div>
             </div>
-            {localPrice(billing==="annual"?monthlyEquivalent:baseMonthly)&&(
+            {!PRICING.isLocal&&localPrice(billing==="annual"?monthlyEquivalent:baseMonthly)&&(
               <div style={{fontSize:12,color:"var(--cream-40)",marginBottom:8}}>
                 ≈ {localPrice(billing==="annual"?monthlyEquivalent:baseMonthly)}/month in {userCurrency}
               </div>
             )}
             <div style={{fontSize:12,color:"var(--cream-30)",marginBottom:20}}>
               {billing==="annual"
-                ?`Billed ${localPrice(baseAnnual)?`$${baseAnnual} (${localPrice(PLANS.pro_annual.amount)})`:`$${PLANS.pro_annual.amount}`} once per year`
+                ?`Billed ${PRICING.symbol}${baseAnnual.toLocaleString()}${!PRICING.isLocal&&localPrice(baseAnnual)?` (≈${localPrice(baseAnnual)})`:""} once per year`
                 :"Billed monthly — cancel anytime"}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:10,flex:1}}>
@@ -7069,8 +7069,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
             <span style={{fontSize:15,fontWeight:700}}>
               {loading?"Opening checkout…":!scriptReady?"Loading…":
                 billing==="annual"
-                  ?`Subscribe — $${baseAnnual}/year →`
-                  :`Subscribe — $${baseMonthly}/month →`}
+                  ?`Subscribe — ${PRICING.symbol}${baseAnnual.toLocaleString()}/year →`
+                  :`Subscribe — ${PRICING.symbol}${baseMonthly.toLocaleString()}/month →`}
             </span>
             <span style={{fontSize:11,opacity:.75,fontWeight:400}}>
               Visa · Mastercard · all major cards · Ghana MoMo · worldwide
@@ -7123,7 +7123,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:24,flexWrap:"wrap"}}>
             <span style={{fontSize:11,color:"var(--cream-30)"}}>🔒</span>
             <span style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
-              SECURED BY PAYSTACK · CANCEL ANYTIME · CHARGED IN USD
+              SECURED BY PAYSTACK · CANCEL ANYTIME · CHARGED IN {PRICING.currency}
             </span>
           </div>
 
@@ -8500,8 +8500,11 @@ function getCurrencyForCountry(countryName){
 const PAYSTACK_CURRENCIES = ["NGN","GHS","ZAR","KES","USD"];
 
 // Local-currency price books (round, human numbers — not raw FX conversions)
-// Local prices, aligned to the same purchasing-power philosophy as the t3 USD
-// tier (~$3.49 Pro / ~$8.99 Pro Max) and rounded to clean local numbers.
+// Local prices for the 4 Paystack-settleable African markets — a deliberate
+// affordability discount (~$3.50 Pro / ~$9 Pro Max equivalent) versus the flat
+// $9.99/$24.99 the USD-billed world pays. These are the beachhead markets:
+// MoMo works here, marketing happens here, and rich-world pricing would price
+// out the home crowd. Founder decision, Jul 2026.
 // Previously these drifted: Kenya and South Africa were ~2x the USD-tier
 // equivalent, Ghana's annuals overshot. Now every market pays roughly the same
 // real value. Rechecked against approx mid-2026 FX; refresh if a currency moves
@@ -8515,10 +8518,18 @@ const LOCAL_PRICE_BOOK = {
 
 // Purchasing-power tiers for everyone Paystack must bill in USD.
 // t1 = high income, t2 = middle, t3 = lower. Default is t2 (safer than t1).
+// ── ONE USD PRICE WORLDWIDE (founder decision, Jul 2026) ─────────────────────
+// Every country billed in USD pays the same: Pro $9.99, Pro Max $24.99.
+// The old t2 ($5.99) / t3 ($3.49) purchasing-power discounts are retired for
+// launch — price with confidence; lowering later is easy, raising on existing
+// subscribers is brutal. The tier STRUCTURE is kept so discounts can return
+// with one edit if conversion data in lower-income markets demands it.
+// NOTE: the 4 Paystack-settleable African markets (GHS/NGN/KES/ZAR) never
+// touch this table — they keep their affordable LOCAL_PRICE_BOOK prices.
 const USD_PRICE_TIERS = {
   t1: { pro:9.99, promax:24.99, pro_annual:79.99, promax_annual:199.99 },
-  t2: { pro:5.99, promax:14.99, pro_annual:49.99, promax_annual:119.99 },
-  t3: { pro:3.49, promax:8.99,  pro_annual:27.99, promax_annual:69.99  },
+  t2: { pro:9.99, promax:24.99, pro_annual:79.99, promax_annual:199.99 },
+  t3: { pro:9.99, promax:24.99, pro_annual:79.99, promax_annual:199.99 },
 };
 
 const TIER1_COUNTRIES = new Set(["united states","canada","united kingdom","ireland","australia","new zealand","germany","france","netherlands","belgium","austria","switzerland","sweden","norway","denmark","finland","iceland","luxembourg","singapore","japan","south korea","israel","united arab emirates","qatar","kuwait","hong kong","italy","spain","portugal"]);
@@ -9146,7 +9157,7 @@ function Landing({onStart,ipLocation}){
             {name:"Free",price:"$0",period:"forever",color:"rgba(255,255,255,0.06)",border:"rgba(255,255,255,0.1)",badge:null,
              // Was: "Decisions tool free + preview all 42" — stale. Free users now
              // get 3 FULL tools a month, and can EARN Pro by keeping a streak.
-             features:["1 Intelligence Report","3 full AI tools every month","Earn a free week of Pro with a 30-day streak","AI Advisor — short daily chats","Daily Check-in","Win Tracker (up to 5)","Journal — 1 entry"],
+             features:["1 Intelligence Report","Decisions tool — free, unlimited","Preview all 42 tools","Earn a free week of Pro with a 30-day streak","AI Advisor — short daily chats","Daily Check-in","Win Tracker (up to 5)","Journal — 3 entries a month"],
              cta:"Get Started Free",ctaStyle:{background:"var(--cream-10)",color:G.cream},
              action:()=>onStart()},
             {name:"Pro",price:proPriceLabel().replace("/month","").replace("/year",""),period:"per month",color:"rgba(240,180,41,0.06)",border:"rgba(240,180,41,0.3)",badge:"Most Popular",
@@ -23128,7 +23139,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v40-paywindow"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v42-flatusd"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
