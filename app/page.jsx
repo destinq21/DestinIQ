@@ -6874,7 +6874,17 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
       }
     }catch(e){
       setLoading(false);
-      setError("Couldn't open the payment window. Please refresh the page and try again — if it keeps happening, check your connection or try a different browser.");
+      // Surface the REAL cause instead of swallowing it — we were flying blind.
+      // The exception text goes to the console for us and (trimmed) on screen
+      // for the user, so a screenshot diagnoses the failure.
+      try{ console.error("[DIQ] Payment window failed:", e); }catch{}
+      const detail = e&&e.message ? ` [${String(e.message).slice(0,90)}]` : "";
+      const isBrave = !!(navigator&&navigator.brave);
+      setError(
+        isBrave
+          ? "Your browser (Brave) may be blocking the payment window — click the lion icon in the address bar, turn Shields OFF for this site, and try again. Or use Chrome/Edge."+detail
+          : "Couldn't open the payment window."+detail+" Try again — if it keeps happening, an ad-blocker or privacy extension may be blocking it; try Chrome/Edge or disable blockers for this site."
+      );
     }
   };
 
@@ -7073,7 +7083,9 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
                   :`Subscribe — ${PRICING.symbol}${baseMonthly.toLocaleString()}/month →`}
             </span>
             <span style={{fontSize:11,opacity:.75,fontWeight:400}}>
-              Visa · Mastercard · all major cards · Ghana MoMo · worldwide
+              {PRICING.isLocal
+                ? "Visa · Mastercard · all major cards · Mobile Money"
+                : "Visa · Mastercard · all major cards · worldwide"}
             </span>
           </button>
 
@@ -23139,7 +23151,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v42-flatusd"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v44-momotext"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
