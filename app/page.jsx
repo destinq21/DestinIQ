@@ -6855,8 +6855,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
       const handler=window.PaystackPop.setup({
         key:      PAYSTACK_PUBLIC_KEY,
         email:    email.trim(),
-        amount:   toPaystackAmount(localPlan.amount, PRICING.currency),
-        currency: PRICING.currency,
+        amount:   toPaystackAmount(localPlan.chargeAmount ?? localPlan.amount, PRICING.chargeCurrency || PRICING.currency),
+        currency: PRICING.chargeCurrency || PRICING.currency,
         ref,
         label:    "DestinIQ "+plan.name,
         channels: ["card","bank","ussd","qr","mobile_money","bank_transfer"],
@@ -6864,7 +6864,8 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
           userId:  userId||"",
           plan:    planKey,
           price_tier: PRICING.tier,
-          local_currency: PRICING.currency,
+          local_currency: PRICING.chargeCurrency || PRICING.currency,
+          display_currency: PRICING.currency,
           custom_fields:[{display_name:"Plan",variable_name:"plan",value:plan.name}],
         },
         callback: function(response){ verifyAndUnlock(response); },
@@ -7094,6 +7095,12 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
                 : "Visa · Mastercard · all major cards · worldwide"}
             </span>
           </button>
+          {!PRICING.isLocal&&localPlan?.chargeAmount&&(
+            <p style={{fontSize:11,color:"var(--cream-30)",textAlign:"center",margin:"8px 0 0",
+              fontFamily:"var(--f-mono)",lineHeight:1.6}}>
+              Processed as GH₵{Number(localPlan.chargeAmount).toLocaleString()} ({localPlan.label}) — your bank converts automatically.
+            </p>
+          )}
 
           {/* Access code redemption */}
           <div style={{textAlign:"center",marginBottom:18}}>
@@ -7141,7 +7148,7 @@ function Paywall({onUnlock,teaser,userEmail,userId,ipLocation,onBack}){
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:24,flexWrap:"wrap"}}>
             <span style={{fontSize:11,color:"var(--cream-30)"}}>🔒</span>
             <span style={{fontSize:11,color:"var(--cream-30)",fontFamily:"var(--f-mono)",letterSpacing:".08em"}}>
-              SECURED BY PAYSTACK · CANCEL ANYTIME · CHARGED IN {PRICING.currency}
+              SECURED BY PAYSTACK · CANCEL ANYTIME · CHARGED IN {PRICING.chargeCurrency || PRICING.currency}{!PRICING.isLocal ? " — YOUR BANK CONVERTS" : ""}
             </span>
           </div>
 
@@ -8566,29 +8573,39 @@ function getLocalPricing(country){
   const cc = getCurrencyForCountry(country);          // {currency, symbol}
   const code = cc?.currency || "USD";
 
-  // Step 1. Paystack can settle this currency locally → charge in it.
+  // Step 1. Home market: display AND charge in the local currency (GHS today).
   if(LOCAL_PRICE_BOOK[code] && PAYSTACK_CURRENCIES.includes(code)){
     const b = LOCAL_PRICE_BOOK[code];
     const fmt = n => b.symbol + n.toLocaleString();
     return {
       currency: code, symbol: b.symbol, isLocal: true, tier: "local",
-      pro:            {amount:b.pro,           label:fmt(b.pro)+"/month"},
-      promax:         {amount:b.promax,        label:fmt(b.promax)+"/month"},
-      pro_annual:     {amount:b.pro_annual,    label:fmt(b.pro_annual)+"/year"},
-      promax_annual:  {amount:b.promax_annual, label:fmt(b.promax_annual)+"/year"},
+      chargeCurrency: code,
+      pro:            {amount:b.pro,           chargeAmount:b.pro,           label:fmt(b.pro)+"/month"},
+      promax:         {amount:b.promax,        chargeAmount:b.promax,        label:fmt(b.promax)+"/month"},
+      pro_annual:     {amount:b.pro_annual,    chargeAmount:b.pro_annual,    label:fmt(b.pro_annual)+"/year"},
+      promax_annual:  {amount:b.promax_annual, chargeAmount:b.promax_annual, label:fmt(b.promax_annual)+"/year"},
     };
   }
 
-  // Step 2. Otherwise bill in USD, but at a price their country can actually bear.
+  // Step 2. Everyone else: DISPLAY in USD (familiar worldwide), but CHARGE the
+  // GHS equivalent — the only currency this merchant can process. Confirmed in
+  // production: a USD charge returns "Currency not supported by merchant".
+  // The customer's bank converts the GHS charge automatically; the UI shows
+  // both numbers so nothing surprises anyone. Rate mirrors FX_RATES.GHS —
+  // refresh it if the cedi moves a lot, or international customers drift off
+  // the advertised USD price.
   const t = getPriceTierForCountry(country);
   const p = USD_PRICE_TIERS[t];
+  const rate = (typeof FX_RATES!=="undefined" && FX_RATES.GHS) || 15.3;
   const fmt = n => "$"+n.toFixed(2);
+  const ghs = n => Math.round(n*rate);
   return {
     currency:"USD", symbol:"$", isLocal:false, tier:t,
-    pro:            {amount:p.pro,           label:fmt(p.pro)+"/month"},
-    promax:         {amount:p.promax,        label:fmt(p.promax)+"/month"},
-    pro_annual:     {amount:p.pro_annual,    label:fmt(p.pro_annual)+"/year"},
-    promax_annual:  {amount:p.promax_annual, label:fmt(p.promax_annual)+"/year"},
+    chargeCurrency:"GHS",
+    pro:            {amount:p.pro,           chargeAmount:ghs(p.pro),           label:fmt(p.pro)+"/month"},
+    promax:         {amount:p.promax,        chargeAmount:ghs(p.promax),        label:fmt(p.promax)+"/month"},
+    pro_annual:     {amount:p.pro_annual,    chargeAmount:ghs(p.pro_annual),    label:fmt(p.pro_annual)+"/year"},
+    promax_annual:  {amount:p.promax_annual, chargeAmount:ghs(p.promax_annual), label:fmt(p.promax_annual)+"/year"},
   };
 }
 
@@ -23157,7 +23174,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v45-callback"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v46-ghscharge"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
