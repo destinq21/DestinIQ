@@ -8528,7 +8528,14 @@ function getCurrencyForCountry(countryName){
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Currencies Paystack can actually charge & settle. Anything else → USD.
-const PAYSTACK_CURRENCIES = ["NGN","GHS","ZAR","KES","USD"];
+// Currencies THIS merchant account can actually charge. Confirmed in
+// production (Jul 2026): a USD charge returned Paystack's "Currency not
+// supported by merchant" — a Ghana-registered account charges GHS only, and
+// NGN/KES/ZAR would fail the same way. International cards pay the GHS amount
+// and the customer's bank converts. If Paystack NG/KE/ZA accounts or a second
+// processor are added later, re-add those codes and the local price books
+// below wake up automatically.
+const PAYSTACK_CURRENCIES = ["GHS"];
 
 // Local-currency price books (round, human numbers — not raw FX conversions)
 // Local prices for the 4 Paystack-settleable African markets — a deliberate
@@ -20706,11 +20713,29 @@ function JournalScreen({profile,userId,isPaid,isPremium,isProMax,setNav,goBack,o
       let email=profile?.email||null;
       if(!email){ try{ const{data}=await supabase.auth.getUser(); email=data?.user?.email||null; }catch{} }
       if(userId){
-        await supabase.from("future_letters").insert({
-          user_id:userId, email, name:firstName,
-          letter:entry.letter, mood:entry.mood||null,
-          written_at:todayKey, open_at:openAt, sent:false,
-        });
+        // DUPLICATE GUARD — the seal handler could fire more than once
+        // (double-tap / re-render), and every run inserted a fresh row.
+        // Supabase showed the same letter stored 4x, so the cron emailed it
+        // 4x. One letter = one row: skip the insert if this exact letter
+        // already exists for the same write/open dates.
+        let exists=false;
+        try{
+          const {data:dup}=await supabase.from("future_letters")
+            .select("id")
+            .eq("user_id",userId)
+            .eq("written_at",todayKey)
+            .eq("open_at",openAt)
+            .eq("letter",entry.letter)
+            .limit(1);
+          exists = Array.isArray(dup)&&dup.length>0;
+        }catch(_e){}
+        if(!exists){
+          await supabase.from("future_letters").insert({
+            user_id:userId, email, name:firstName,
+            letter:entry.letter, mood:entry.mood||null,
+            written_at:todayKey, open_at:openAt, sent:false,
+          });
+        }
       }
     }catch(_e){ /* table may not exist yet — in-app sealing still works */ }
     setLetter("");setMood(null);setSealing(false);setCustomDate("");
@@ -23159,7 +23184,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v48-noapple"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v50-futureme"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
