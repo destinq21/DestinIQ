@@ -13534,7 +13534,7 @@ const AFFILIATE_RESOURCES = [
   {id:"hostinger",name:"Hostinger",    tagline:"Cheap hosting + domain to launch your website or store",
    url:"", countries:[], tools:["business","earnonline","sidehustle","digitallife"]},
   {id:"systeme",  name:"Systeme.io",   tagline:"Free all-in-one funnel/email tool to sell digital products",
-   url:"", countries:[], tools:["business","earnonline","money"]},
+   url:"https://systeme.io/?sa=sa0277559835ddd7fec42c546d7293925c0f3e38b7", countries:[], tools:["business","earnonline","money"]},
   {id:"coursera", name:"Coursera",     tagline:"Certificates that actually move your CV — many courses free to audit",
    url:"", countries:[], tools:["career","invest","discipline"]},
   {id:"canva",    name:"Canva Pro",    tagline:"Design anything — thumbnails, flyers, products — no designer needed",
@@ -17612,37 +17612,33 @@ function ExploreScreen({setNav, formData, userId, isPaid, isPremium, isProMax, o
             color:G.dimmer,fontFamily:"monospace",marginBottom:14}}>
             LIFE CATEGORIES
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {filteredCats.map(cat=>(
               <div key={cat.id} onClick={()=>setNav("category:"+cat.id)}
                 style={{background:G.card,border:"1px solid "+G.border,
-                  borderRadius:16,padding:"14px 16px",
-                  display:"flex",alignItems:"center",gap:14,cursor:"pointer",
+                  borderRadius:14,padding:"14px 12px",cursor:"pointer",
+                  display:"flex",flexDirection:"column",gap:8,
                   transition:"all .15s"}}
-                onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.07)";
-                  e.currentTarget.style.borderColor="rgba(255,255,255,0.14)";}}
-                onMouseLeave={e=>{e.currentTarget.style.background=G.card;
-                  e.currentTarget.style.borderColor=G.border;}}>
+                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(240,180,41,0.2)"}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=G.border}>
                 {/* Icon */}
-                <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
-                  background:`linear-gradient(135deg,${cat.color}33,${cat.color}18)`,
-                  border:`1px solid ${cat.color}44`,
-                  display:"flex",alignItems:"center",justifyContent:"center",color:cat.color}}>
-                  <DQIcon name={cat.icon} size={24}/>
+                <div style={{display:"inline-flex",lineHeight:1,color:cat.color||"var(--gold)"}}>
+                  <DQIcon name={cat.icon} size={26}/>
                 </div>
-                {/* Text */}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:G.cream,
-                    marginBottom:2}}>{cat.label}</div>
-                  <div style={{fontSize:12,color:G.dim,
-                    overflow:"hidden",textOverflow:"ellipsis",
-                    whiteSpace:"nowrap",marginBottom:4}}>{cat.desc}</div>
-                  <div style={{fontSize:11,color:cat.color,fontWeight:600}}>
-                    {cat.tools.length} tools
-                  </div>
-                </div>
-                {/* Arrow */}
-                <span style={{color:G.dimmer,fontSize:18,flexShrink:0}}>›</span>
+                {/* Title */}
+                <div style={{fontSize:13,fontWeight:700,color:G.cream,
+                  lineHeight:1.3}}>{cat.label}</div>
+                {/* Description */}
+                <div style={{fontSize:11,color:G.dimmer,lineHeight:1.5,flex:1,
+                  overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",
+                  WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{cat.desc}</div>
+                {/* Open button */}
+                <button style={{padding:"7px 12px",background:"rgba(240,180,41,0.1)",
+                  border:"1px solid rgba(240,180,41,0.2)",borderRadius:8,
+                  fontSize:11,fontWeight:700,color:G.gold,cursor:"pointer",
+                  fontFamily:"inherit",textAlign:"center"}}>
+                  Open →
+                </button>
               </div>
             ))}
           </div>
@@ -23184,7 +23180,7 @@ function ProfilePage({user,formData,isPaid,isPremium,isProMax,streak,onBack,onSi
 // ═══════════════════════════════════════════════════════════════════════════════
 const ADMIN_EMAILS=["destiniq21@gmail.com","support@destiniq.app"]; // founder logins with admin access
 let IS_ADMIN=false; // set at login from the real auth email; readable by any component
-const DIQ_BUILD="v50-futureme"; // visible build tag — bump when deploying to verify what is live
+const DIQ_BUILD="v51-affiliates"; // visible build tag — bump when deploying to verify what is live
 
 function AdminDashboard({user,onBack}){
   const [stats,setStats]=useState(null);
