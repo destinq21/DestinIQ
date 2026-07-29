@@ -266,7 +266,7 @@ if(typeof window!=="undefined" && !window.__diqQuietHook){
         const d=new Date(); d.setDate(d.getDate()+1); d.setHours(h,m,0,0);
         return d;
       };
-      const name=(()=>{try{return JSON.parse(localStorage.getItem("destiniq_form_data")||"{}")?.name||"";}catch{return "";}})();
+      const name=(()=>{try{return JSON.parse(localStorage.getItem("diq_ob_draft")||"{}")?.name||"";}catch{return "";}})();
       // Commitment injection: if they promised something for tomorrow,
       // the morning notification carries their own words back to them.
       // ── GENTLE MODE: if today's check-in scored low, tomorrow holds them ──
@@ -5481,6 +5481,7 @@ function buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx){
   const momentum= entry?.momentum  ||5;
   const feeling = entry?.feeling   ||"neutral";
   const note    = entry?.note      ||"";
+  const avoided = entry?.avoided   ||"";
   const overall = reportData?.overall||50;
   const {code:currCode,symbol:currSym} = getLocalCurrency(country);
 
@@ -5498,6 +5499,7 @@ TODAY'S CHECK-IN:
 - Momentum: ${momentum}/10
 - How they're feeling: ${feeling}
 ${note?`- Their note: "${note}"`:""}
+${avoided?`- What they're avoiding: "${avoided}"`:""}
 
 Write a SHORT personal response (3-5 sentences max):
 1. Acknowledge how they're actually feeling today — validate it without being sycophantic
@@ -7496,7 +7498,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid,i
   });
 
   const submit=async()=>{
-    if(!feeling||!did.trim()) return;
+    if(!feeling) return;
     setLoading(true);setError("");
     const entry={feeling,score,did,avoided};
     // Record this check-in permanently — it's the raw material for pattern
@@ -7513,7 +7515,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid,i
     const memCtx=buildMemoryContext(userId);
     pushToMemory(userId,"user",`Check-in: ${score}/10, ${feeling}, did="${did}"`);
     try{
-      const reply=await callAPI({messages:[{role:"user",content:buildCheckinPrompt(profile,entry,reportData,isPremium,memCtx)}],system:"You are a warm, emotionally intelligent coach who genuinely knows this person. Respond like a caring mentor who has read their full story — not a tool. Be honest, be human, acknowledge what they're feeling before you advise.",userId,isPremium,isProMax});
+      const reply=await callAPI({messages:[{role:"user",content:buildCheckinPrompt(profile,{energy:score,focus:score,momentum:score,feeling,note:did,avoided},reportData,isPremium,memCtx)}],system:"You are a warm, emotionally intelligent coach who genuinely knows this person. Respond like a caring mentor who has read their full story — not a tool. Be honest, be human, acknowledge what they're feeling before you advise.",userId,isPremium,isProMax});
       pushToMemory(userId,"assistant",reply);
       try{localStorage.setItem(ciResultKey,reply);}catch{}
       setResult(reply);
@@ -7632,7 +7634,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid,i
             <h2 style={{fontSize:"clamp(15px,4vw,22px)",fontWeight:800,color:G.cream,margin:"0 0 4px"}}>
               How are you today{profile?.name?`, ${profile.name.split(" ")[0]}`:""}?
             </h2>
-            <p style={{fontSize:13,color:G.dimmer,margin:0}}>Takes 60 seconds. Your coach is listening.</p>
+            <p style={{fontSize:13,color:G.dimmer,margin:0}}>Tap how you feel and you're done — add more only if you want to.</p>
           </div>
 
           {/* How are you feeling */}
@@ -7668,7 +7670,7 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid,i
           <div style={{marginBottom:14}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
               <div style={{fontSize:11,color:G.dim,fontWeight:600}}>
-                What's one thing you did or are doing today?
+                What's one thing you did today? <span style={{color:G.dimmer,fontWeight:400}}>(optional)</span>
               </div>
               <MicButton size={28} onText={t=>setDid(v=>appendSpoken(v,t))}/>
             </div>
@@ -7708,10 +7710,10 @@ function CheckIn({profile,reportData,onComplete,streak,userId,isPremium,isPaid,i
 
           {error&&<p style={{color:"#e05252",fontSize:13,marginBottom:12}}>{error}</p>}
 
-          <button onClick={submit} disabled={loading||!feeling||!did.trim()}
+          <button onClick={submit} disabled={loading||!feeling}
             style={{width:"100%",padding:"15px",background:G.gold,color:"#000",border:"none",
               borderRadius:13,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
-              opacity:loading||!feeling||!did.trim()?0.6:1,
+              opacity:loading||!feeling?0.6:1,
               boxShadow:"0 0 30px rgba(240,180,41,0.15)"}}>
             {loading?"Your coach is thinking…":"Get My Reflection →"}
           </button>
@@ -24265,42 +24267,10 @@ function DestinIQInner(){
     }
   },[]);
 
-  // ── HUBTEL RETURN URL HANDLER ─────────────────────────────────────────────
-  useEffect(()=>{
-    if(typeof window==="undefined") return;
-    const params=new URLSearchParams(window.location.search);
-    const payment=params.get("payment");
-    const ref=params.get("ref");
-    const planKey=params.get("plan");
-    if(payment==="success"&&ref&&userId){
-      // Return from an external (mobile-money / deep-link) checkout. A URL that
-      // merely SAYS payment=success can be typed by anyone, so we confirm the
-      // reference on the server before granting anything.
-      (async()=>{
-      try{
-        const pending=JSON.parse(localStorage.getItem("diq_pending_payment_"+userId)||"null");
-        if(pending&&pending.ref===ref){
-          const vr = await fetch("/api/verify-payment",{
-            method:"POST", headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({ reference: ref, userId, plan: pending.plan||"pro" }),
-          });
-          const vd = await vr.json().catch(()=>({}));
-          window.history.replaceState({},"",window.location.pathname);
-          if(!vd?.ok || !vd?.paid){
-            alert("We couldn't confirm that payment yet. If you were charged, contact support with reference: "+ref);
-            return;
-          }
-          localStorage.setItem("diq_paid_"+userId,"1");
-          if(vd.premium) localStorage.setItem("diq_prem_"+userId,"1");
-          localStorage.removeItem("diq_pending_payment_"+userId);
-          setIsPaid(true);
-          if(vd.premium) setIsPremium(true);
-          alert("Payment confirmed! Your "+(pending.plan||"Pro")+" plan is now active.");
-        }
-      }catch(e){}
-      })();
-    }
-  },[userId]);
+  // (Removed: dead legacy Hubtel return-URL handler. It read
+  //  diq_pending_payment_<userId>, a key nothing ever writes, so its condition
+  //  was never true and the block never ran. Paystack unlock is handled by
+  //  verifyAndUnlock (inline callback) and the is_paid check on app load.)
 
 
   // ── DEEP LINK HANDLER — catches OAuth callback on mobile ──────────────
