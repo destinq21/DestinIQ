@@ -551,14 +551,46 @@ function formatLocalPrice(usdAmount, currencyCode){
   const rounded = converted>=100 ? Math.round(converted) : Math.round(converted*100)/100;
   return `${symbol}${rounded.toLocaleString()}`;
 }
-function getHistory(uid) { return _memoryStore.get(uid)||[]; }
+function getHistory(uid) {
+  if(_memoryStore.has(uid)) return _memoryStore.get(uid);
+  // Hydrate from localStorage so the coach remembers across app restarts
+  try{
+    const raw = (typeof localStorage!=="undefined") ? localStorage.getItem("diq_coachmem_"+uid) : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    _memoryStore.set(uid, Array.isArray(arr)?arr:[]);
+    return _memoryStore.get(uid);
+  }catch{ return _memoryStore.get(uid)||[]; }
+}
+// Turn a saved timestamp into natural phrasing the coach can reference,
+// e.g. "last night (~11:14 pm)", "yesterday afternoon", "3 days ago".
+function relTime(ts){
+  if(!ts) return "";
+  const now=new Date(), then=new Date(ts);
+  const startOf=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
+  const dayDiff=Math.round((startOf(now)-startOf(then))/86400000);
+  const h=then.getHours();
+  const part = h<5?"night" : h<12?"morning" : h<17?"afternoon" : h<21?"evening" : "night";
+  const clock = then.toLocaleTimeString("en-GB",{hour:"numeric",minute:"2-digit",hour12:true});
+  if(dayDiff<=0) return (h>=20||h<5) ? `earlier tonight (~${clock})` : `earlier today, this ${part} (~${clock})`;
+  if(dayDiff===1) return (h>=20||h<5) ? `last night (~${clock})` : `yesterday ${part} (~${clock})`;
+  if(dayDiff<7) return `${dayDiff} days ago (${part}, ~${clock})`;
+  const weeks=Math.round(dayDiff/7);
+  return weeks<=1 ? "about a week ago" : `about ${weeks} weeks ago`;
+}
 function pushToMemory(uid,role,content) {
-  const h=getHistory(uid); h.push({role,content:content.slice(0,800)});
+  const h=getHistory(uid); h.push({role,content:content.slice(0,800),at:Date.now()});
   if(h.length>10) h.splice(0,h.length-10); _memoryStore.set(uid,h);
+  // Persist so "last night" survives an app restart
+  try{ if(typeof localStorage!=="undefined") localStorage.setItem("diq_coachmem_"+uid, JSON.stringify(h)); }catch{}
 }
 function buildMemoryContext(uid) {
   const h=getHistory(uid); if(!h.length) return "";
-  return "\n\nPrevious context:\n"+h.slice(-6).map(m=>`${m.role==="user"?"User":"Advisor"}: ${m.content}`).join("\n");
+  return "\n\nPrevious context — each line notes WHEN it was said; reference the timing naturally when it's relevant (e.g. \"you mentioned last night that…\"), but don't force it:\n"+
+    h.slice(-6).map(m=>{
+      const who=m.role==="user"?"User":"Advisor";
+      const when=m.at?` [${relTime(m.at)}]`:"";
+      return `${who}${when}: ${m.content}`;
+    }).join("\n");
 }
 function getMomentumLog(uid) { return _momentumLog.get(uid)||[]; }
 function addMomentumEntry(uid,entry) {
@@ -1763,12 +1795,6 @@ function updatePeakDays(userId, currentScore){
 
 const NOTIF_SCHED_KEY="destiniq_notif_v2";
 
-async function requestNotifPermission() {
-  if(typeof window==="undefined"||!("Notification" in window)) return "unsupported";
-  if(Notification.permission==="granted") return "granted";
-  if(Notification.permission==="denied") return "denied";
-  return await Notification.requestPermission();
-}
 
 function fireNotification(title, body, tag="destiniq"){
   if(typeof window==="undefined"||Notification.permission!=="granted") return;
@@ -5375,7 +5401,14 @@ function buildAdvisorSystem(profile,reportData,isPremium,memCtx){
     ?`Life: ${scores.life||"?"}/100, Wealth: ${scores.wealth||"?"}/100, Mindset: ${scores.mindset||"?"}/100, Relationships: ${scores.relations||"?"}/100`
     :"not yet generated";
   const {code:currCode,symbol:currSym} = getLocalCurrency(country);
+  const nowDt   = new Date();
+  const dateStr = nowDt.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const timeStr = nowDt.toLocaleTimeString("en-GB",{hour:"numeric",minute:"2-digit",hour12:true});
+  const tz      = (()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"";}catch{return "";}})();
+  const tzStr   = tz ? `, ${tz}` : "";
   return `You are ${name}'s personal AI companion at DestinIQ — part close friend, part life coach. You know their full story from their profile.
+
+CURRENT DATE & TIME (${name}'s local time${tzStr}): ${dateStr}, ${timeStr}. Use this whenever timing matters — reference today, the day of the week, the time of day, or how long until a date naturally. Never guess or invent a different date.
 
 THEIR PROFILE:
 ${buildProfileContext(profile)}
@@ -13433,89 +13466,6 @@ function getLocalCurrency(country){
   return {code: found.currency || "USD", symbol: found.symbol || "$"};
 }
 
-async function regenerateModule(key, profile, userId, isPremium, setData, setLoading, setErr){
-  setLoading(true); setErr("");
-  // Build full profile context from ALL onboarding fields
-  const country  = profile?.country  || "their country";
-  const skills   = profile?.skills   || "general";
-  const goals    = profile?.goals || profile?.bigGoal || "success";
-  const name     = profile?.name     || "the user";
-  const income   = profile?.income   || "Under $500";
-  const profileCtx = buildProfileContext(profile);
-  const challenge= profile?.challenge|| "getting started";
-  // Resolve local currency — MUST happen before currencyNote is built
-  const {code:currCode, symbol:currSym} = getLocalCurrency(country);
-  const currencyNote = `MANDATORY CURRENCY RULES:
-COSTS/STARTUP/SAVINGS = LOCAL CURRENCY: ${country} uses ${currCode} (${currSym}). All prices, startup costs, rents, savings must be in ${currSym}. NEVER use $ for costs in ${country}.
-EARNINGS FROM ONLINE WORK = USD only — add local equivalent in brackets e.g. "$800/month (${currSym}12,000)".`;
-  const dayIndex=Math.floor(Date.now()/(1000*60*60*24))%5;
-  const platformSets=["Upwork and Fiverr","Appen and Remotasks","Preply and Cambly","Rev.com and TranscribeMe","UserTesting and Prolific"];
-  const todayPlatforms=platformSets[dayIndex];
-
-  const prompts={
-    life_hacks:`${currencyNote}
-
-Generate 7 REAL life hacks for ${name} living in ${country} earning ${income} with goal "${goals}".
-
-WHAT A REAL LIFE HACK IS:
-- A specific shortcut that saves real time or real money
-- Something that uses local knowledge — real markets, real apps, real USSD codes, real WhatsApp groups
-- Something the person hasn't thought of — not "save money" but exactly HOW
-- Must include a real local detail: name of market, app, bank, platform, service, or code
-
-WHAT A LIFE HACK IS NOT:
-- Generic advice like "wake up early" or "be disciplined"
-- Motivational statements
-- Things they already know
-
-CATEGORIES TO COVER (one hack per category):
-1. MONEY: A specific way to save or earn extra money in ${country}. Include a real amount in ${currSym}.
-2. FOOD/FUEL: How to spend less on daily essentials in ${country}. Name real markets or methods.
-3. TIME: A system or tool that saves 1+ hours per week. Name the exact app or method.
-4. PHONE/DATA: A USSD code, app, or phone trick that works in ${country} and most people don't know.
-5. HEALTH: One free or almost free health habit that fits a busy life in ${country}.
-6. SKILL: The fastest way to learn something valuable using free resources — name the specific platform.
-7. NETWORK: A specific place or method to meet better people in ${country}. Name real venues, groups, or events.
-
-Return ONLY a valid JSON array of 7 strings. Each string = 2-3 sentences. Start with the category in caps. No markdown. No code fences.`,
-    emotional_strength:`${currencyNote}
-
-Write 4 emotional strength practices for ${name} facing: "${challenge}". Each must be specific not generic. Include WHEN, HOW, and WHY for their specific situation. Return ONLY a JSON array of 4 strings (each 2-3 sentences).`,
-    money_protection:`${currencyNote}
-
-Create money protection plan for ${name} in ${country} earning ${income}. ${currencyNote} Return ONLY JSON: {"rule":"The ONE most important money rule specific to ${country} at this income","savings_target":"Exact monthly savings in local currency with specific bank or method in ${country}","avoid":"Top 3 money drains people at this income in ${country} fall into — name them","first_investment":"First real investment in ${country} — name the specific product bank or platform"}`,
-    online_income:`${currencyNote}
-
-Give ${name} in ${country} with skills "${skills}" exactly 3 ways to make money online. TODAY focus on: ${todayPlatforms}. Check payment accessibility from ${country}. Return ONLY JSON array: [{"method":"Platform or method name","why_it_works":"Why this works for someone in ${country} with these skills — 2 sentences","url":"https://exact-real-url.com","first_step":"Specific action doable in 48 hours","earnings":"$X-Y per month for beginners","local_equivalent":"Same in ${country} local currency"}]`,
-    zero_income_business:`${currencyNote}
-
-Generate business ideas for ${name} in ${country} that need zero capital. Think about daily needs in ${country}: food, drinks, transport, mobile data, cleaning, laundry, hair, barbering, phone repair, clothing, event services. Also bars and food joints. ${currencyNote} Return ONLY JSON: {"idea":"Best zero-capital idea for ${country}","why_zero":"Why zero capital needed","day_one":"Exact Day 1 action in ${country}","first_revenue":"When and how much in local currency","scale":"How to grow to employ others","alternatives":["5 more zero-capital ideas for ${country} covering food/drinks, services, trading, digital, creative"]}`,
-    product_business:`${currencyNote}
-
-Give 4 physical product business ideas for ${name} in ${country}. Focus on what people in ${country} buy daily or weekly. Include fashion, food/drinks, electronics accessories, and household items. ${currencyNote} Return ONLY JSON array: [{"product":"Product name","why":"Why this sells in ${country} — specific demand","startup_cost":"Cost in local currency","profit_margin":"Realistic margin percent","supplier_links":["https://www.alibaba.com","https://www.dhgate.com"]}]`,
-    real_estate_hack:`${currencyNote}
-
-How can ${name} in ${country} earn from real estate with little money? Cover: property listing agent earning commission, short-let management, property finding service, rental arbitrage. Name real platforms in ${country}. ${currencyNote} Return ONLY JSON: {"method":"Best method for ${country}","how_it_works":"Step by step","platform":"Real platform or channel in ${country}","first_deal":"How to get first deal with specific steps and local currency amounts"}`,
-  };
-
-  const sys="Return ONLY valid JSON. No markdown. No code fences. No explanation. Start with { or [.";
-  try{
-    const raw=await callAPI({messages:[{role:"user",content:prompts[key]}],system:sys,userId,isPremium:true});
-    const clean=raw.replace(/```json|```/g,"").trim();
-    const s=clean[0]==="["?clean.indexOf("["):clean.indexOf("{");
-    const e=clean[0]==="["?clean.lastIndexOf("]"):clean.lastIndexOf("}");
-    const parsed=JSON.parse(s>=0?clean.slice(s,e+1):clean);
-    setData(parsed);setErr("");
-  }catch(e){
-    const msg = e?.message||"";
-    if(msg.toLowerCase().includes("credit")||msg.toLowerCase().includes("billing")){
-      setErr("⚠️ AI credits needed. Go to console.anthropic.com → Billing to add credits.");
-    } else {
-      setErr("Couldn't generate right now. Tap retry.");
-    }
-  }
-  setLoading(false);
-}
 
 
 // ═════════════════════════════════════════════════════════════════════════════
