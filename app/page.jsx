@@ -5013,6 +5013,12 @@ async function callAPI({messages,system,userId,isPremium,isProMax,maxTokens}){
         }
         return s + `
 
+SAFETY & CARE — THIS OVERRIDES EVERY STYLE RULE BELOW:
+- If the person describes abuse, violence, or a controlling/coercive partner (being hit, threatened, isolated from friends/family, monitored, frightened, or made to feel their partner's anger is their fault): believe them, tell them plainly that it is not their fault and they do not deserve it, and never excuse, minimise, or "see both sides" of the abuser. Do NOT tell them to just communicate better or stay to fix it. Warmly encourage them to reach out to someone they trust and to a local domestic-support or emergency service, and to put their own safety first.
+- If the person sounds hopeless, mentions self-harm, or that they don't want to be alive: take it seriously and lead with warmth — never brush past it or rush to advice. Acknowledge their pain, remind them they matter, and gently encourage them to reach out right now to someone they trust or a crisis line / emergency service in their country. Never describe methods, and don't make promises about confidentiality.
+- In these situations, drop the usual style rules: their safety and warmth come first, being gentle beats being "direct", and you do NOT need to end with a single action or avoid "reach out" language. Never leave someone in danger with just a tip.
+- This care mode is ONLY for genuine risk. For everyday relationship ups and downs — arguments, dating nerves, jealousy, sad-but-not-dangerous heartbreak — coach normally and warmly.
+
 CRITICAL WRITING RULES — FOLLOW EXACTLY:
 1. Write like a brilliant, warm friend who has studied this person deeply — not a consultant, coach or therapist
 2. Use their name naturally once or twice where it feels right — not every sentence
@@ -5419,10 +5425,12 @@ ${memCtx?`\nEARLIER IN THIS CONVERSATION:\n${memCtx}`:""}
 CURRENCY: Local costs = ${currSym} (${currCode}). International income = USD + ${currSym} equivalent.
 
 HOW TO SHOW UP IN THIS CONVERSATION:
+- Be warm and genuinely glad they showed up. NEVER reply with a bare one-word or dismissive line like "Yeah?", "Ok", or "Sure" — even a tiny, vague, or one-word message from them deserves a warm, engaged reply that shows you care and invites them to say more. If you're not sure what they mean, ask kindly rather than brushing them off.
+- Address ${name} warmly and personally — use their name naturally, or speak the way a close, caring friend would. If they address you casually or by a nickname, you can mirror that warmth back to them.
 - If they say hello, how are you, what's up, or just want to chat → respond warmly and casually like a real friend would. Ask how they're doing. Do NOT immediately jump into coaching or goals. Just be present.
 - If they share something difficult or emotional → listen first. Reflect back what you're hearing. Ask one good question before offering any advice.
 - If they ask for coaching, feedback, or what to do → give your most honest, specific, deeply personalised guidance. Reference their actual situation. Use their name naturally.
-- Match their energy. Short message → short reply. Deep question → go deep.
+- Match their energy in LENGTH, never in warmth: a short or one-word message ("bro", "hey", "you there?") still gets a warm, engaged reply that reads the moment and keeps the conversation going — never a flat "Yeah?" or "Ok". If you're mid-conversation, stay connected to what you were both just talking about and pick the thread back up. Go deep on deep questions; keep casual moments light and easy, but never cold or clipped.
 - Never give generic advice. Everything is specific to ${name} in ${country}.
 - You remember everything said earlier in this conversation. Refer back to it naturally.
 
@@ -7941,9 +7949,11 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         {msgs.length===0&&(
           <div style={{textAlign:"center",padding:"32px 16px"}}>
             <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>🤖</div>
-            <h3 style={{fontSize:16,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>Your AI Coach</h3>
+            <h3 style={{fontSize:17,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>
+              {(()=>{const h=new Date().getHours();const t=h<12?"Good morning":h<17?"Good afternoon":h<21?"Good evening":"Hey";return `${t}${profile?.name?", "+profile.name:""} 👋`;})()}
+            </h3>
             <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:300,marginInline:"auto"}}>
-              Ask me anything about your goals, challenges, or decisions. I know your profile and report.
+              Good to see you. I'm here whenever you want to talk — your goals, a decision you're weighing, or just how your day's going.
             </p>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:16}}>
               {["What should I actually focus on right now?","What's my biggest blind spot?","I’m scared to make the wrong move","How do I stop overthinking and just act?"]
@@ -7957,21 +7967,6 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
                   {q}
                 </button>
               ))}
-            </div>
-          </div>
-        )}
-
-        {msgs.length===0&&!loading&&(
-          <div style={{textAlign:"center",padding:"48px 24px",opacity:0.75}}>
-            <div style={{width:44,height:44,borderRadius:"50%",margin:"0 auto 14px",
-              background:"linear-gradient(135deg,rgba(155,114,207,0.3),rgba(240,180,41,0.12))",
-              border:"1px solid rgba(240,180,41,0.25)",display:"flex",alignItems:"center",
-              justifyContent:"center",fontSize:18}}>◇</div>
-            <div style={{fontSize:14.5,fontWeight:600,color:"var(--cream)",marginBottom:5}}>
-              {coachName} is listening
-            </div>
-            <div style={{fontSize:12.5,color:"var(--cream-40)",lineHeight:1.6,maxWidth:260,margin:"0 auto"}}>
-              Knows your profile, your goals, and where you're stuck. Say what's on your mind.
             </div>
           </div>
         )}
