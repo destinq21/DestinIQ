@@ -7948,12 +7948,7 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         {/* Welcome bubble */}
         {msgs.length===0&&(
           <div style={{textAlign:"center",padding:"32px 16px"}}>
-            <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>🤖</div>
-            <h3 style={{fontSize:16,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>Your AI Coach</h3>
-            <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:300,marginInline:"auto"}}>
-              Ask me anything about your goals, challenges, or decisions. I know your profile and report.
-            </p>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:16}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:8}}>
               {["What should I actually focus on right now?","What's my biggest blind spot?","I’m scared to make the wrong move","How do I stop overthinking and just act?"]
                 .map((q,qi)=>(
                 <button key={qi} onClick={()=>setInput(q)}
