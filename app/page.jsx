@@ -7949,11 +7949,9 @@ function AdvisorChat({profile,reportData,userId,isPremium,isProMax,isPaid,onUnlo
         {msgs.length===0&&(
           <div style={{textAlign:"center",padding:"32px 16px"}}>
             <div style={{fontSize:"clamp(28px,8vw,40px)",marginBottom:12}}>🤖</div>
-            <h3 style={{fontSize:17,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>
-              {(()=>{const h=new Date().getHours();const t=h<12?"Good morning":h<17?"Good afternoon":h<21?"Good evening":"Hey";return `${t}${profile?.name?", "+profile.name:""} 👋`;})()}
-            </h3>
+            <h3 style={{fontSize:16,fontWeight:700,color:G.cream,margin:"0 0 8px"}}>Your AI Coach</h3>
             <p style={{fontSize:13,color:G.dim,lineHeight:1.7,margin:0,maxWidth:300,marginInline:"auto"}}>
-              Good to see you. I'm here whenever you want to talk — your goals, a decision you're weighing, or just how your day's going.
+              Ask me anything about your goals, challenges, or decisions. I know your profile and report.
             </p>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginTop:16}}>
               {["What should I actually focus on right now?","What's my biggest blind spot?","I’m scared to make the wrong move","How do I stop overthinking and just act?"]
